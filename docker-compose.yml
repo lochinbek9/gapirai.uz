@@ -1,0 +1,109 @@
+version: "3.9"
+
+services:
+  # ──────────────────────────────
+  # PostgreSQL Database
+  # ──────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dubber_postgres
+    environment:
+      POSTGRES_DB: dubber_db
+      POSTGRES_USER: dubber
+      POSTGRES_PASSWORD: dubber123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dubber -d dubber_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────
+  # Redis (Celery broker + cache)
+  # ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: dubber_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ──────────────────────────────
+  # FastAPI Backend
+  # ──────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dubber_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ──────────────────────────────
+  # Celery Worker
+  # ──────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dubber_worker
+    environment:
+      - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A backend.workers.celery_app worker -l info -Q video_processing -c 2
+
+  # ──────────────────────────────
+  # Celery Flower (monitoring)
+  # ──────────────────────────────
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dubber_flower
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    command: celery -A backend.workers.celery_app flower --port=5555
+
+volumes:
+  postgres_data:

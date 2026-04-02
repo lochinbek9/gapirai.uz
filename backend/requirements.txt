@@ -1,0 +1,39 @@
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Task Queue
+celery==5.4.0
+redis==5.2.1
+flower==2.0.1
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+asyncpg==0.30.0
+
+# AI / ML
+faster-whisper==1.1.0
+openai==1.58.1
+
+# Video / Audio Processing
+yt-dlp==2024.12.13
+moviepy==1.0.3
+pydub==0.25.1
+
+# Azure TTS
+azure-cognitiveservices-speech==1.42.0
+
+# File Storage (AWS S3)
+boto3==1.35.92
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+httpx==0.28.1
+aiofiles==24.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
