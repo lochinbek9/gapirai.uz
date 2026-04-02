@@ -40,8 +40,8 @@ services:
   # ──────────────────────────────
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: dubber_backend
     ports:
       - "8000:8000"
@@ -53,8 +53,10 @@ services:
     env_file:
       - .env
     volumes:
+      - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./cookies.txt:/app/cookies.txt
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,8 +69,8 @@ services:
   # ──────────────────────────────
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: dubber_worker
     environment:
       - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
@@ -78,8 +80,10 @@ services:
     env_file:
       - .env
     volumes:
+      - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./cookies.txt:/app/cookies.txt
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,8 +96,8 @@ services:
   # ──────────────────────────────
   flower:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: dubber_flower
     ports:
       - "5555:5555"

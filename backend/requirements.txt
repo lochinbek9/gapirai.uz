@@ -19,15 +19,19 @@ faster-whisper==1.1.0
 openai==1.58.1
 
 # Video / Audio Processing
-yt-dlp==2024.12.13
+yt-dlp
 moviepy==1.0.3
 pydub==0.25.1
+audioop-lts==0.2.2; python_version>='3.13'
 
 # Azure TTS
 azure-cognitiveservices-speech==1.42.0
 
 # File Storage (AWS S3)
 boto3==1.35.92
+
+# Headless browser (YouTube cookie auto-refresh)
+playwright==1.49.1
 
 # Utilities
 python-dotenv==1.0.1

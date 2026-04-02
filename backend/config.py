@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     WHISPER_MODEL_SIZE: str = "large-v3"  # tiny/base/small/medium/large-v3
     WHISPER_DEVICE: str = "cpu"           # cpu / cuda
 
+    # YouTube dedicated account (cookie auto-refresh)
+    YOUTUBE_EMAIL: str = ""
+    YOUTUBE_PASSWORD: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -1,21 +1,28 @@
-import yt_dlp
+"""
+Downloader — Docker worker tomonidan chaqiriladi.
+Haqiqiy yuklab olish host Mac dagi download_service.py da amalga oshiriladi.
+Docker ichidan host ga: http://host.docker.internal:8001
+"""
 import os
-import re
+import yt_dlp
+import httpx
 from pathlib import Path
 from backend.config import get_settings
 
 settings = get_settings()
 
-
-def sanitize_filename(name: str) -> str:
-    """Fayl nomidan xavfli belgilarni olib tashlash."""
-    return re.sub(r'[\\/*?:"<>|]', "_", name)
+# Host Mac dagi download servisi manzili
+DOWNLOAD_SERVICE_URL = os.getenv("DOWNLOAD_SERVICE_URL", "http://host.docker.internal:8001")
+COOKIES_FILE = "/app/cookies.txt"
 
 
 def get_video_info(youtube_url: str) -> dict:
     """YouTube video haqida ma'lumot olish (yuklamasdan)."""
-    ydl_opts = {"quiet": True, "no_warnings": True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    opts = {"quiet": True, "no_warnings": True}
+    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
+        opts["cookiefile"] = COOKIES_FILE
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
         return {
             "title": info.get("title", "Unknown"),
@@ -27,69 +34,27 @@ def get_video_info(youtube_url: str) -> dict:
 
 def download_video(youtube_url: str, job_id: str) -> dict:
     """
-    YouTube'dan videoni yuklab olish.
-
-    Returns:
-        dict: {
-            "video_path": str,  # Video fayl yo'li (audio yo'q)
-            "audio_path": str,  # Audio fayl yo'li (faqat audio)
-            "title": str,
-            "duration": float
-        }
+    Host Mac dagi download servisiga so'rov yuborish.
+    Natija: video va audio fayl yo'llari.
     """
-    output_dir = Path(settings.UPLOAD_DIR) / job_id
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    video_path = str(output_dir / "video.%(ext)s")
-    audio_path = str(output_dir / "audio.%(ext)s")
-
-    # 1. Faqat video (audio siz) yuklab olish
-    video_opts = {
-        "format": "bestvideo[ext=mp4]/bestvideo",
-        "outtmpl": video_path,
-        "quiet": True,
-        "no_warnings": True,
-    }
-
-    # 2. Faqat audio yuklab olish
-    audio_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": audio_path,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "wav",
-            "preferredquality": "192",
-        }],
-        "quiet": True,
-        "no_warnings": True,
-    }
-
-    title = "Unknown"
-    duration = 0
-
-    with yt_dlp.YoutubeDL(video_opts) as ydl:
-        info = ydl.extract_info(youtube_url, download=True)
-        title = info.get("title", "Unknown")
-        duration = info.get("duration", 0)
-
-    with yt_dlp.YoutubeDL(audio_opts) as ydl:
-        ydl.download([youtube_url])
-
-    # Yaratilgan fayllarni topish
-    downloaded_video = _find_file(output_dir, "video")
-    downloaded_audio = _find_file(output_dir, "audio")
-
-    return {
-        "video_path": str(downloaded_video),
-        "audio_path": str(downloaded_audio),
-        "title": title,
-        "duration": duration,
-    }
-
-
-def _find_file(directory: Path, prefix: str) -> Path:
-    """Papkadan prefiks bo'yicha faylni topish."""
-    for f in directory.iterdir():
-        if f.stem == prefix:
-            return f
-    raise FileNotFoundError(f"'{prefix}' fayli topilmadi: {directory}")
+    try:
+        response = httpx.post(
+            f"{DOWNLOAD_SERVICE_URL}/download",
+            json={"youtube_url": youtube_url, "job_id": job_id},
+            timeout=600.0,  # 10 daqiqa — katta videolar uchun
+        )
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "video_path": data["video_path"],
+            "audio_path": data["audio_path"],
+            "title": data["title"],
+            "duration": data["duration"],
+        }
+    except httpx.ConnectError:
+        raise RuntimeError(
+            "Download servisi topilmadi. "
+            "Host Mac da `python download_service.py` ni ishga tushiring."
+        )
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(f"Download xatolik: {e.response.json().get('detail', str(e))}")

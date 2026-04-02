@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 from pathlib import Path
 
@@ -33,16 +33,28 @@ class JobResponse(BaseModel):
     job_id: str
     status: str
     progress: float
-    status_message: str | None
-    video_title: str | None
-    video_duration: float | None
-    output_video_url: str | None
-    transcript_text: str | None
-    translated_text: str | None
-    error_message: str | None
+    status_message: str | None = None
+    video_title: str | None = None
+    video_duration: float | None = None
+    output_video_url: str | None = None
+    transcript_text: str | None = None
+    translated_text: str | None = None
+    error_message: str | None = None
 
-    class Config:
-        from_attributes = True
+
+def _job_to_response(job: DubbingJob) -> JobResponse:
+    return JobResponse(
+        job_id=str(job.id),
+        status=job.status.value if hasattr(job.status, "value") else job.status,
+        progress=job.progress or 0.0,
+        status_message=job.status_message,
+        video_title=job.video_title,
+        video_duration=job.video_duration,
+        output_video_url=job.output_video_url,
+        transcript_text=job.transcript_text,
+        translated_text=job.translated_text,
+        error_message=job.error_message,
+    )
 
 
 # ─────────────────────────────────────────
@@ -88,7 +100,7 @@ async def get_job(job_id: str, db: Session = Depends(get_db)) -> JobResponse:
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
-    return JobResponse.model_validate(job)
+    return _job_to_response(job)
 
 
 @router.get("/jobs")
@@ -105,7 +117,7 @@ async def list_jobs(
         .limit(limit)
         .all()
     )
-    return [JobResponse.model_validate(j) for j in jobs]
+    return [_job_to_response(j) for j in jobs]
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
