@@ -9,11 +9,25 @@
       "port": 3000
     },
     {
-      "name": "Backend (FastAPI)",
-      "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "up", "--no-recreate"],
+      "name": "Backend + Worker + DB (Docker Compose)",
+      "runtimeExecutable": "/usr/local/bin/docker",
+      "runtimeArgs": ["compose", "up"],
       "cwd": "/Users/user/Desktop/ai-dubber",
       "port": 8000
+    },
+    {
+      "name": "Download Service (Host)",
+      "runtimeExecutable": "./venv/bin/python3",
+      "runtimeArgs": ["download_service.py"],
+      "cwd": "/Users/user/Desktop/ai-dubber",
+      "port": 8001
+    },
+    {
+      "name": "Flower Monitor (Celery UI)",
+      "runtimeExecutable": "/usr/local/bin/docker",
+      "runtimeArgs": ["compose", "up", "flower"],
+      "cwd": "/Users/user/Desktop/ai-dubber",
+      "port": 5555
     }
   ]
 }

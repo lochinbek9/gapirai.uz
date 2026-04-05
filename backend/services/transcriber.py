@@ -15,6 +15,8 @@ def get_model() -> WhisperModel:
             settings.WHISPER_MODEL_SIZE,
             device=settings.WHISPER_DEVICE,
             compute_type="int8",  # Hisoblash uchun int8 - tezroq va kamroq RAM
+            cpu_threads=4,        # Ko'p yadro ishlatish
+            num_workers=2,        # Parallel workers
         )
     return _model
 
@@ -35,10 +37,11 @@ def transcribe_audio(audio_path: str) -> dict:
 
     segments, info = model.transcribe(
         audio_path,
-        beam_size=5,
+        beam_size=1,            # Greedy decoding — 3-5x tezroq (CPU uchun optimal)
         language="en",          # Ingliz tilini majburiy aniqlash
         vad_filter=True,        # Sukut(silence)larni filtrlash
         vad_parameters=dict(min_silence_duration_ms=500),
+        condition_on_previous_text=False,  # Qo'shimcha tezlashtirish
     )
 
     segments_list = []

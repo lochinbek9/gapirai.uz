@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "AI Dublyaj — YouTube videolarini o'zbek tiliga",
+  title: "AI Dubber — YouTube videolarini o'zbek tiliga",
   description: "YouTube videolarini sun'iy intellekt yordamida o'zbek tiliga dublyaj qilish platformasi",
 };
 
@@ -15,8 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="uz">
-      <body className={inter.className}>{children}</body>
+    <html lang="uz" suppressHydrationWarning>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -61,6 +61,11 @@ def process_video(self: Task, job_id: str) -> dict:
         job.srt_content = transcript["srt"]
         db.commit()
 
+        if not transcript["segments"]:
+            raise ValueError(
+                "Bu videoda nutq topilmadi. Faqat nutq mavjud videolarni dublyaj qilish mumkin."
+            )
+
         # ──────────────────────────────────────────
         # BOSQICH 3: O'zbekchaga tarjima
         # ──────────────────────────────────────────
@@ -117,7 +122,10 @@ def process_video(self: Task, job_id: str) -> dict:
             "updated_at": datetime.utcnow(),
         })
         db.commit()
-        raise self.retry(exc=exc, countdown=30)
+        # Download xatoliklarida qayta urinish, biznes xatoliklarida emas
+        if "yuklanmodi" in str(exc) or "Download" in str(exc):
+            raise self.retry(exc=exc, countdown=30)
+        raise exc
 
     finally:
         db.close()

@@ -95,7 +95,7 @@ async def create_job(request: CreateJobRequest, db: Session = Depends(get_db)) -
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str, db: Session = Depends(get_db)) -> JobResponse:
+async def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobResponse:
     """Job holati va natijasini olish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
@@ -121,7 +121,7 @@ async def list_jobs(
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
-async def delete_job(job_id: str, db: Session = Depends(get_db)):
+async def delete_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Jobni o'chirish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
@@ -131,7 +131,7 @@ async def delete_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/outputs/{job_id}/video")
-async def download_video(job_id: str, db: Session = Depends(get_db)):
+async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Tayyor videoni yuklab olish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:

@@ -41,7 +41,12 @@ def download_video(youtube_url: str, job_id: str) -> dict:
         response = httpx.post(
             f"{DOWNLOAD_SERVICE_URL}/download",
             json={"youtube_url": youtube_url, "job_id": job_id},
-            timeout=600.0,  # 10 daqiqa — katta videolar uchun
+            timeout=httpx.Timeout(
+                connect=30.0,    # Ulanish uchun 30 soniya
+                read=1800.0,     # O'qish uchun 30 daqiqa (katta videolar uchun)
+                write=30.0,      # Yozish uchun 30 soniya
+                pool=30.0,       # Pool uchun 30 soniya
+            ),
         )
         response.raise_for_status()
         data = response.json()
