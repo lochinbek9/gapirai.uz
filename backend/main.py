@@ -8,6 +8,7 @@ import os
 from backend.config import get_settings
 from backend.models.database import create_tables
 from backend.api.routes import router
+from backend.api.auth_routes import router as auth_router
 
 settings = get_settings()
 
@@ -52,6 +53,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # API routerlar
+app.include_router(auth_router)
 app.include_router(router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish

@@ -4,6 +4,7 @@ import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2 } from "lucide-r
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, formatDuration } from "@/lib/api";
 import { useState } from "react";
+import VideoPlayer from "@/components/VideoPlayer";
 
 interface Props {
   job: Job;
@@ -44,17 +45,14 @@ export default function VideoResult({ job, onReset }: Props) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.1 }}
-        className="relative group rounded-3xl overflow-hidden aspect-video bg-black shadow-2xl ring-1 ring-black/5 dark:ring-white/10"
+        className="rounded-3xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10"
       >
-        <video
+        <VideoPlayer
           key={videoUrl}
           src={videoUrl}
-          controls
-          autoPlay={false}
-          className="w-full h-full object-contain"
-          preload="metadata"
+          subtitlesContent={job.uzbek_srt_content}
+          className="rounded-3xl"
         />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
       </motion.div>
 
       {/* ── Info & Actions ────────────────────────── */}

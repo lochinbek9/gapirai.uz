@@ -3,97 +3,71 @@ import os
 from pathlib import Path
 
 
+def _get_duration(file_path: str) -> float:
+    """FFprobe orqali fayl davomiyligini olish (soniyada)."""
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "quiet",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            file_path,
+        ],
+        capture_output=True, text=True,
+    )
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return 0.0
+
+
 def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str) -> str:
     """
     Original video + O'zbekcha audio → Tayyor video.
 
-    FFmpeg yordamida:
-    1. Original audioni o'chirib tashlash
-    2. Yangi dublyaj audioni qo'shish
+    Agar o'zbekcha audio video dan uzunroq bo'lsa:
+    → Video oxirgi kadri "freeze" qilinadi (qora ekran emas, tabiiy tugatish)
 
-    Args:
-        video_path: Original video fayl (.mp4, audio yo'q)
-        dubbed_audio_path: O'zbekcha audio (.wav)
-        output_path: Chiqish video fayl yo'li
-
-    Returns:
-        Chiqish video fayl yo'li
+    Agar video uzunroq bo'lsa:
+    → Audio tugagandan so'ng video ham tugaydi
     """
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        "ffmpeg",
-        "-y",                          # Mavjud faylni ustiga yozish
-        "-i", video_path,              # Video manba
-        "-i", dubbed_audio_path,       # Audio manba
-        "-c:v", "copy",                # Videoni qayta encode qilmaslik (tezroq)
-        "-c:a", "aac",                 # Audio codec
-        "-b:a", "192k",               # Audio bitrate
-        "-map", "0:v:0",              # 1-manbadan video
-        "-map", "1:a:0",              # 2-manbadan audio
-        "-shortest",                   # Qisqaroq stream tugaganda to'xtatish
-        output_path,
-    ]
+    video_dur = _get_duration(video_path)
+    audio_dur = _get_duration(dubbed_audio_path)
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=600,  # 10 daqiqa
-    )
+    if audio_dur <= video_dur:
+        # Audio qisqaroq — oddiy birlashtirish, video davom etadi (sukut qoladi)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", dubbed_audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ]
+    else:
+        # Audio uzunroq — video oxirgi kadrini "freeze" qilib audio ga uzaytirish
+        extra = audio_dur - video_dur
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", dubbed_audio_path,
+            # Video oxirini "tpad" bilan uzaytirish (oxirgi kadr freeze)
+            "-filter_complex",
+            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v]",
+            "-map", "[v]",
+            "-map", "1:a:0",
+            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "192k",
+            output_path,
+        ]
 
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg xatoligi:\n{result.stderr}")
-
-    return output_path
-
-
-def merge_with_background_music(
-    video_path: str,
-    dubbed_audio_path: str,
-    original_audio_path: str,
-    output_path: str,
-    music_volume: float = 0.15,  # Fon musiqasi balandligi (0.0 - 1.0)
-) -> str:
-    """
-    Video + Dublyaj audio + Original fon musiqasi (aralashtirilgan).
-
-    Bu funksiya demucs bilan ajratilgan musiqa trekini ishlatadi.
-    Dublyaj ovozi 100%, fon musiqasi 15% balandlikda.
-    """
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-
-    # FFmpeg filter: dubbed_audio to'liq + original_music past balandlikda
-    filter_complex = (
-        f"[1:a]volume=1.0[dubbed];"
-        f"[2:a]volume={music_volume}[music];"
-        f"[dubbed][music]amix=inputs=2:duration=longest[aout]"
-    )
-
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", video_path,
-        "-i", dubbed_audio_path,
-        "-i", original_audio_path,
-        "-filter_complex", filter_complex,
-        "-map", "0:v:0",
-        "-map", "[aout]",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-shortest",
-        output_path,
-    ]
-
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg xatoligi:\n{result.stderr}")
+        raise RuntimeError(f"FFmpeg xatoligi:\n{result.stderr[-1000:]}")
 
     return output_path

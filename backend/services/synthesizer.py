@@ -1,6 +1,8 @@
 import azure.cognitiveservices.speech as speechsdk
 import os
 import re
+import subprocess
+import tempfile
 import time
 import xml.sax.saxutils as saxutils
 from pathlib import Path
@@ -9,212 +11,217 @@ from backend.config import get_settings
 
 settings = get_settings()
 
-# Uzbek TTS taxminiy tezligi: ~13 harf/soniya (neutral prosody)
-_CHARS_PER_SEC = 13.0
-
-# Chiqish audio formati
 _AUDIO_FORMAT = speechsdk.SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm
 _FRAME_RATE = 24000
 
 
-def _calculate_ssml_rate(text: str, available_ms: int) -> str:
-    """
-    Segment vaqtiga mos SSML rate qiymatini hisoblash.
-    SSML orqali tezlikni oldindan sozlash → post-process minimallashadi.
-    """
-    if available_ms <= 0:
-        return "-8%"
-    text_length = len(text.strip())
-    if text_length == 0:
-        return "-8%"
-
-    estimated_ms = (text_length / _CHARS_PER_SEC) * 1000
-    ratio = estimated_ms / available_ms
-
-    if ratio <= 0.75:
-        return "-12%"   # Ko'p vaqt → sekin, vazmin
-    elif ratio <= 0.90:
-        return "-8%"    # Vaqt bor → tabiiy sekin
-    elif ratio <= 1.05:
-        return "-3%"    # Deyarli mos → salgina sekin
-    elif ratio <= 1.20:
-        return "+8%"    # Biroz qisiq → oz tezroq
-    elif ratio <= 1.40:
-        return "+20%"   # Qisiq
-    elif ratio <= 1.65:
-        return "+35%"   # Juda qisiq
-    else:
-        return "+50%"   # Haddan qisiq → SSML max (+ post-process)
-
-
 def _text_to_ssml_body(text: str) -> str:
     """
-    Matnni SSML formatiga o'tkazish:
-    — XML belgilarini qochirish
-    — Tinish belgilari bo'yicha tabiiy pauza qo'shish
-    — Dublyaj uchun tabiiy nafas ritmi
+    Matnni SSML formatiga o'girish.
+    Tabiiy o'zbek nutq ritmi uchun optimallashtirilgan.
     """
-    # 1. XML xavfsizligi
     escaped = saxutils.escape(text)
 
-    # 2. Ko'p nuqta → uzoqroq pauza (fikr to'xtatilishi)
-    escaped = re.sub(
-        r'\.{3,}\s*',
-        '...<break time="380ms"/> ',
-        escaped
-    )
+    # Ko'p nuqta — uzoq pauza (o'ylash, kutish)
+    escaped = re.sub(r'\.{3,}\s*', '...<break time="550ms"/> ', escaped)
 
-    # 3. Gap oxiri (. ! ?) → tabiiy nafas pauza
-    escaped = re.sub(
-        r'([.!?])\s+',
-        r'\1<break time="260ms"/> ',
-        escaped
-    )
+    # Savol gaplari — biroz ko'proq pauza (tinglovchi o'ylansin)
+    escaped = re.sub(r'\?\s+', '?<break time="420ms"/> ', escaped)
 
-    # 4. Vergul, nuqtali vergul → qisqa pauza
-    escaped = re.sub(
-        r'([,;])\s+',
-        r'\1<break time="110ms"/> ',
-        escaped
-    )
+    # Undov gaplari — ta'kidli pauza
+    escaped = re.sub(r'!\s+', '!<break time="380ms"/> ', escaped)
 
-    # 5. Ikki nuqta → o'rta pauza (ro'yxat boshlanishi)
-    escaped = re.sub(
-        r'([:])\s+',
-        r'\1<break time="180ms"/> ',
-        escaped
-    )
+    # Oddiy gap tugashi — tabiiy nafas
+    escaped = re.sub(r'\.\s+', '.<break time="320ms"/> ', escaped)
+
+    # Vergul, nuqtali vergul — kichik pauza
+    escaped = re.sub(r',\s+', ',<break time="160ms"/> ', escaped)
+    escaped = re.sub(r';\s+', ';<break time="200ms"/> ', escaped)
+
+    # Ikki nuqta — tushuntirish oldidan pauza
+    escaped = re.sub(r':\s+', ':<break time="220ms"/> ', escaped)
+
+    # Tire — gap ichida pauza (o'zbek nutqida ko'p ishlatiladi)
+    escaped = re.sub(r'\s[—–-]\s', ' <break time="180ms"/>— ', escaped)
+
+    # Qavs yopilishi — kichik pauza
+    escaped = re.sub(r'\)\s+', ')<break time="110ms"/> ', escaped)
 
     return escaped.strip()
 
 
-def _build_ssml(text: str, rate: str = "-8%") -> str:
-    """
-    Azure TTS uchun kinodagi kabi tabiiy SSML yaratish.
-    — prosody: tezlik va pitch boshqaruvi
-    — break: tinish belgilari bo'yicha pauza
-    — pitch kontouri: gap oxirida tabiiy pasayish
-    """
-    body = _text_to_ssml_body(text)
+def _split_into_sentences(text: str) -> list[str]:
+    """Matnni gaplarga bo'lish."""
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s for s in sentences if s.strip()]
+
+
+def _build_ssml(text: str, voice_name: str | None = None) -> str:
+    chosen_voice = voice_name or settings.AZURE_VOICE_NAME
+    is_female = "Madina" in chosen_voice
+
+    # Ovoz xususiyatlari
+    # Sardor: biroz past, sekinroq — erkakcha vazmin ovoz
+    # Madina: biroz baland, tabiiy tezlik — ayolcha ravon ovoz
+    if is_female:
+        rate   = "-4%"
+        pitch  = "+4%"
+        volume = "+8%"
+    else:
+        rate   = "-10%"   # Erkak o'zbek podcast ovozi sekinroq gapiradi
+        pitch  = "-1%"    # Deyarli tabiiy pitch
+        volume = "+6%"
+
+    # Har bir gapni alohida <p> teg ichiga joylash — tabiiy ritm uchun
+    sentences = _split_into_sentences(text)
+    ssml_sentences = []
+    for sent in sentences:
+        body = _text_to_ssml_body(sent)
+        # Savol gaplari uchun ko'tariluvchi intonatsiya
+        if sent.rstrip().endswith("?"):
+            ssml_sentences.append(
+                f'<p><prosody pitch="+6%">{body}</prosody></p>'
+            )
+        # Undov gaplari uchun ta'kidliroq
+        elif sent.rstrip().endswith("!"):
+            ssml_sentences.append(
+                f'<p><prosody pitch="+2%" volume="+12%">{body}</prosody></p>'
+            )
+        else:
+            ssml_sentences.append(f'<p>{body}</p>')
+
+    inner = "\n".join(ssml_sentences)
 
     return (
         '<speak version="1.0" '
         'xmlns="http://www.w3.org/2001/10/synthesis" '
         'xmlns:mstts="http://www.w3.org/2001/mstts" '
         f'xml:lang="uz-UZ">'
-        f'<voice name="{settings.AZURE_VOICE_NAME}">'
-        # Biroz chuqurroq va sekinroq → erkak dublyaj ovoziga o'xshash
-        f'<prosody rate="{rate}" pitch="-4%" volume="+8%">'
-        f'{body}'
+        f'<voice name="{chosen_voice}">'
+        f'<prosody rate="{rate}" pitch="{pitch}" volume="{volume}">'
+        f'{inner}'
         f'</prosody>'
         f'</voice>'
         f'</speak>'
     )
 
 
-def synthesize_segments(segments: list[dict], output_dir: str) -> str:
+def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
+    """FFmpeg atempo filter bilan audio tezlashtirish (pitch o'zgarmaydi)."""
+    factor = max(0.5, min(2.0, round(factor, 3)))
+    in_fd, in_path = tempfile.mkstemp(suffix=".wav")
+    out_fd, out_path = tempfile.mkstemp(suffix=".wav")
+    os.close(in_fd); os.close(out_fd)
+    try:
+        audio.export(in_path, format="wav")
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", in_path, "-filter:a", f"atempo={factor}", out_path],
+            check=True, capture_output=True,
+        )
+        return AudioSegment.from_wav(out_path)
+    finally:
+        os.unlink(in_path)
+        os.unlink(out_path)
+
+
+def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str | None = None) -> str:
     """
-    Har bir segmentni SSML orqali ovozga aylantirish va birlashtirish.
+    Har bir segmentni tabiiy tezlikda ovozga aylantirish.
+
+    Sinxronizatsiya strategiyasi:
+    - Har segment asl BOSHLANISH vaqtida joylashtiriladi (sync saqlanadi)
+    - Tabiiy tezlik — hech qanday tezlashtirish yo'q
+    - Agar segment vaqt slotidan uzun bo'lsa → sukut qismiga kirib ketadi (tabiiy)
+    - Agar audio video dan uzun bo'lsa → merger oxirgi kadrni freeze qiladi
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    segment_files = []
-
+    # 1. Har bir segmentni tabiiy tezlikda sintez qilish
+    seg_data = []
     for seg in segments:
         text = seg.get("text", "").strip()
         if not text:
             continue
-
-        available_ms = int((seg["end"] - seg["start"]) * 1000)
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
-        _synthesize_text(text, str(seg_file), available_ms=available_ms)
-        segment_files.append({
-            "path": str(seg_file),
-            "start": seg["start"],
-            "end": seg["end"],
-        })
+        _synthesize_text(text, str(seg_file), voice_name=voice_name)
+        if seg_file.exists():
+            audio = AudioSegment.from_wav(str(seg_file))
+            seg_data.append({
+                "audio": audio,
+                "start_ms": int(seg["start"] * 1000),
+                "end_ms": int(seg["end"] * 1000),
+            })
+
+    if not seg_data:
+        raise ValueError("Birlashtirish uchun segment topilmadi.")
+
+    # 2. Overlap oldini olish: tezlashtir → hali ham uzoq bo'lsa → trim + fade
+    for i in range(len(seg_data) - 1):
+        cur = seg_data[i]
+        nxt = seg_data[i + 1]
+        slot_ms = nxt["start_ms"] - cur["start_ms"]
+        audio_ms = len(cur["audio"])
+
+        if audio_ms <= slot_ms + 60:
+            continue  # overlap yo'q
+
+        # Qadam 1: tezlashtirish (max 1.5x)
+        if slot_ms > 200:
+            factor = min(audio_ms / slot_ms, 1.5)
+            if factor > 1.05:
+                try:
+                    cur["audio"] = _speedup_audio(cur["audio"], factor)
+                    audio_ms = len(cur["audio"])
+                except Exception:
+                    pass  # tezlashtirish xato bo'lsa original qoladi
+
+        # Qadam 2: hali ham uzun bo'lsa — oxirini trim + fade out
+        if len(cur["audio"]) > slot_ms + 60:
+            cut_ms = max(slot_ms - 50, 100)
+            fade_ms = min(80, cut_ms // 2)
+            cur["audio"] = cur["audio"][:cut_ms].fade_out(fade_ms)
+
+    # 3. Umumiy audio uzunligini hisoblash
+    #    = asl video uzunligi YOKI oxirgi segment + uning audio uzunligi
+    last = seg_data[-1]
+    natural_end_ms = last["start_ms"] + len(last["audio"])
+    original_end_ms = last["end_ms"]
+    total_ms = max(natural_end_ms, original_end_ms) + 200  # 200ms buffer
+
+    combined = AudioSegment.silent(duration=total_ms, frame_rate=_FRAME_RATE)
+
+    # 4. Har segmentni asl boshlanish vaqtiga qo'yish
+    for item in seg_data:
+        combined = combined.overlay(item["audio"], position=item["start_ms"])
 
     merged_path = str(output_path / "dubbed_audio.wav")
-    _merge_segments(segment_files, merged_path)
+    combined.set_frame_rate(_FRAME_RATE).export(merged_path, format="wav")
     return merged_path
 
 
 def _synthesize_text(
     text: str,
     output_path: str,
-    available_ms: int = 0,
     retries: int = 3,
+    voice_name: str | None = None,
 ) -> None:
-    """
-    Azure TTS orqali SSML bilan matnni audio faylga aylantirish.
-    Har segment uchun optimal rate avtomatik hisoblanadi.
-    """
     speech_config = speechsdk.SpeechConfig(
         subscription=settings.AZURE_SPEECH_KEY,
         region=settings.AZURE_SPEECH_REGION,
     )
-    speech_config.speech_synthesis_voice_name = settings.AZURE_VOICE_NAME
+    speech_config.speech_synthesis_voice_name = voice_name or settings.AZURE_VOICE_NAME
     speech_config.set_speech_synthesis_output_format(_AUDIO_FORMAT)
 
     audio_config = speechsdk.audio.AudioOutputConfig(filename=output_path)
-    synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config, audio_config=audio_config
-    )
-
-    rate = _calculate_ssml_rate(text, available_ms)
-    ssml = _build_ssml(text, rate=rate)
+    synth = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+    ssml = _build_ssml(text, voice_name=voice_name)
 
     for attempt in range(retries):
-        result = synthesizer.speak_ssml_async(ssml).get()
+        result = synth.speak_ssml_async(ssml).get()
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             return
         if attempt < retries - 1:
             time.sleep(2)
 
     raise RuntimeError(f"TTS xatoligi: {text[:50]}...")
-
-
-def _merge_segments(segment_files: list[dict], output_path: str) -> None:
-    """
-    Segmentlarni vaqt belgilari asosida birlashtirish.
-    SSML rate tufayli ko'p holda post-process minimal bo'ladi.
-    """
-    if not segment_files:
-        raise ValueError("Birlashtirish uchun segment topilmadi.")
-
-    total_duration_ms = int(segment_files[-1]["end"] * 1000)
-    # Shovqin yo'q, toza sukut — 24kHz, mono
-    combined = AudioSegment.silent(
-        duration=total_duration_ms,
-        frame_rate=_FRAME_RATE,
-    )
-
-    for seg in segment_files:
-        if not os.path.exists(seg["path"]):
-            continue
-
-        seg_audio = AudioSegment.from_wav(seg["path"])
-        start_ms = int(seg["start"] * 1000)
-        end_ms = int(seg["end"] * 1000)
-        available_ms = end_ms - start_ms
-
-        # Hali slot dan uzun bo'lsa → minimal post-process (1.12x dan yuqori)
-        if len(seg_audio) > available_ms and available_ms > 0:
-            speed_ratio = len(seg_audio) / available_ms
-            if speed_ratio > 1.12:
-                seg_audio = _change_speed(seg_audio, speed_ratio)
-
-        combined = combined.overlay(seg_audio, position=start_ms)
-
-    combined.export(output_path, format="wav")
-
-
-def _change_speed(audio: AudioSegment, speed: float) -> AudioSegment:
-    """Audio tezligini o'zgartirish — pitch saqlanadi."""
-    new_frame_rate = int(audio.frame_rate * speed)
-    fast_audio = audio._spawn(
-        audio.raw_data,
-        overrides={"frame_rate": new_frame_rate}
-    )
-    return fast_audio.set_frame_rate(audio.frame_rate)

@@ -1,21 +1,12 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
-import { useEffect, useState } from "react";
 
+// mounted guardi olib tashlandi — ThemeProvider har doim ishlaydi.
+// html elementi suppressHydrationWarning orqali hydration xatolarini bostiradi.
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       {children}
     </ThemeProvider>
   );

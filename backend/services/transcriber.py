@@ -21,7 +21,14 @@ def get_model() -> WhisperModel:
     return _model
 
 
-def transcribe_audio(audio_path: str) -> dict:
+_QUALITY_PARAMS = {
+    "fast":     {"beam_size": 1, "condition_on_previous_text": False, "temperature": 0.0},
+    "standard": {"beam_size": 3, "condition_on_previous_text": False, "temperature": 0.0},
+    "hd":       {"beam_size": 5, "condition_on_previous_text": True,  "temperature": 0.0},
+}
+
+
+def transcribe_audio(audio_path: str, quality: str = "standard") -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
@@ -34,14 +41,16 @@ def transcribe_audio(audio_path: str) -> dict:
         }
     """
     model = get_model()
+    params = _QUALITY_PARAMS.get(quality, _QUALITY_PARAMS["standard"])
 
     segments, info = model.transcribe(
         audio_path,
-        beam_size=1,            # Greedy decoding — 3-5x tezroq (CPU uchun optimal)
-        language="en",          # Ingliz tilini majburiy aniqlash
-        vad_filter=True,        # Sukut(silence)larni filtrlash
+        beam_size=params["beam_size"],
+        language="en",
+        vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500),
-        condition_on_previous_text=False,  # Qo'shimcha tezlashtirish
+        condition_on_previous_text=params["condition_on_previous_text"],
+        temperature=params["temperature"],
     )
 
     segments_list = []
