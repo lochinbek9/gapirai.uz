@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     YOUTUBE_EMAIL: str = ""
     YOUTUBE_PASSWORD: str = ""
 
+    # Click Payment
+    CLICK_MERCHANT_ID: str = ""
+    CLICK_SERVICE_ID: str = ""
+    CLICK_SECRET_KEY: str = ""
+    FRONTEND_URL: str = "http://localhost:3000"
+
     class Config:
         env_file = ".env"
         extra = "ignore"
