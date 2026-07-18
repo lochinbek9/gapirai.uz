@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
+    # Google Generative AI (optional)
+    USE_GOOGLE_AI: bool = False
+    GOOGLE_API_KEY: str = ""
+    GOOGLE_MODEL: str = "gemini-flash-latest"
+
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
     AZURE_SPEECH_REGION: str = "eastus"
