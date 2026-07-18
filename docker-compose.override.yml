@@ -23,7 +23,11 @@ services:
     container_name: dubber_cookie_refresher
     env_file:
       - .env
+    environment:
+      - DISPLAY=${DISPLAY}
     volumes:
       - ./:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
     command: xvfb-run -a -s "-screen 0 1024x768x24" python /app/backend/services/cookie_refresher.py
     restart: unless-stopped
