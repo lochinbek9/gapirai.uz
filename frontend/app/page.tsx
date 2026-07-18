@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createJob, getVideoInfo, VideoInfo } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
@@ -158,6 +159,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
 /* ── Main Page ────────────────────────────────────── */
 export default function Home() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   // jobId — lazy init orqali localStorage dan tiklanadi (refresh da yo'qolmaydi)
   const [jobId, setJobId] = useState<string | null>(loadJobId);
@@ -205,6 +207,13 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(id);
   }, [jobId, job?.status]);
+
+  // Redirect to payment if awaiting payment
+  useEffect(() => {
+    if (jobId && job && job.status === "awaiting_payment") {
+      router.push(`/video/${jobId}`);
+    }
+  }, [jobId, job, router]);
 
   const handleUrlChange = async (value: string) => {
     setUrl(value);

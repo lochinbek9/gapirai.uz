@@ -45,7 +45,13 @@ async def refresh_cookies(youtube_email: str, youtube_password: str) -> bool:
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox"],
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-gpu",
+                "--single-process",
+            ],
         )
         context = await browser.new_context(
             user_agent=(
@@ -58,16 +64,18 @@ async def refresh_cookies(youtube_email: str, youtube_password: str) -> bool:
 
         try:
             # Google login
-            await page.goto("https://accounts.google.com/signin", timeout=30000)
+            await page.goto("https://accounts.google.com/signin", timeout=120000)
+            await page.wait_for_selector('input[type="email"]', timeout=120000)
             await page.fill('input[type="email"]', youtube_email)
             await page.click('button:has-text("Next"), #identifierNext')
             await page.wait_for_timeout(2000)
+            await page.wait_for_selector('input[type="password"]', timeout=120000)
             await page.fill('input[type="password"]', youtube_password)
             await page.click('button:has-text("Next"), #passwordNext')
             await page.wait_for_timeout(3000)
 
             # YouTube ga o'tish
-            await page.goto("https://www.youtube.com", timeout=30000)
+            await page.goto("https://www.youtube.com", timeout=120000)
             await page.wait_for_timeout(2000)
 
             # Cookilarni Netscape formatida saqlash

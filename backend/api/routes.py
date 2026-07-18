@@ -12,6 +12,7 @@ from backend.services.downloader import get_video_info
 from backend.services.auth import get_current_user, get_optional_user
 from backend.workers.tasks import process_video
 from backend.config import get_settings
+from backend.services.click_service import calculate_price
 
 settings = get_settings()
 router = APIRouter(prefix="/api", tags=["dubbing"])
@@ -87,31 +88,55 @@ async def create_job(
     if "youtube.com" not in request.youtube_url and "youtu.be" not in request.youtube_url:
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
 
-    # Thumbnail olish
-    thumbnail = None
+    # Video ma'lumotlarini yuklash
     try:
         info = get_video_info(request.youtube_url)
-        thumbnail = info.get("thumbnail")
-    except Exception:
-        pass
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
+
+    title = info.get("title", "Unknown")
+    duration = info.get("duration", 0)
+    thumbnail = info.get("thumbnail")
+
+    duration_minutes = duration / 60.0
+    amount = calculate_price(duration_minutes)
+
+    if amount > 0 and not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail="10 daqiqadan uzun videolar uchun tizimga kirish va to'lov qilish talab etiladi."
+        )
 
     job_id = str(uuid.uuid4())
+    
+    if amount > 0:
+        status = JobStatus.AWAITING_PAYMENT
+        status_message = "To'lov kutilmoqda"
+    else:
+        status = JobStatus.PENDING
+        status_message = "Navbatga qo'shildi"
+
     job = DubbingJob(
         id=job_id,
         user_id=current_user.id if current_user else None,
         youtube_url=request.youtube_url,
+        video_title=title,
+        video_duration=duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=request.voice_gender,
         quality=request.quality,
-        status=JobStatus.PENDING,
+        status=status,
         progress=0.0,
-        status_message="Navbatga qo'shildi",
+        status_message=status_message,
     )
     db.add(job)
     db.commit()
 
-    process_video.apply_async(args=[job_id], task_id=job_id)
-    return {"job_id": job_id, "status": "pending"}
+    if amount == 0:
+        process_video.apply_async(args=[job_id], task_id=job_id)
+        return {"job_id": job_id, "status": "pending"}
+    
+    return {"job_id": job_id, "status": "awaiting_payment", "amount": amount}
 
 
 @router.get("/jobs/{job_id}")

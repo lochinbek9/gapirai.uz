@@ -16,6 +16,7 @@ Base = declarative_base()
 
 class JobStatus(str, enum.Enum):
     PENDING = "pending"
+    AWAITING_PAYMENT = "awaiting_payment"
     DOWNLOADING = "downloading"
     TRANSCRIBING = "transcribing"
     TRANSLATING = "translating"
@@ -83,4 +84,12 @@ def get_db():
 
 
 def create_tables():
+    from sqlalchemy import text
+    try:
+        connection = engine.connect()
+        # Postgresql enum alter value
+        connection.execute(text("ALTER TYPE jobstatus ADD VALUE 'awaiting_payment'"))
+        connection.commit()
+    except Exception:
+        pass
     Base.metadata.create_all(bind=engine)

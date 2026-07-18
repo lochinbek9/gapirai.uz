@@ -1,0 +1,19 @@
+services:
+  download_service:
+    image: ai-dubber-backend
+    container_name: dubber_downloader
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    command: python /app/download_service.py
+
+  backend:
+    environment:
+      - DOWNLOAD_SERVICE_URL=http://download_service:8001
+
+  worker:
+    environment:
+      - DOWNLOAD_SERVICE_URL=http://download_service:8001

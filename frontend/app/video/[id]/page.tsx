@@ -2,27 +2,50 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment } from '@/lib/api'
+import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   Download, ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2
+  Mic2, Clock, Loader2, CreditCard
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
+
+function calculateClientPrice(durationMinutes: number): number {
+  if (durationMinutes <= 10.0) {
+    return 0;
+  } else if (durationMinutes <= 30.0) {
+    return 30000;
+  } else if (durationMinutes <= 60.0) {
+    return 60000;
+  } else {
+    return Math.ceil(durationMinutes) * 1000;
+  }
+}
 
 /* ── Page ────────────────────────────────────────── */
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [job, setJob] = useState<Job | null>(null)
+  const { job: polledJob, error: pollError } = useJobPolling(id)
+  
   const [loading, setLoading] = useState(true)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
 
+  const job = polledJob
+
   useEffect(() => {
-    getJob(id)
-      .then(setJob)
-      .catch(() => router.push('/dashboard'))
-      .finally(() => setLoading(false))
+    if (job) {
+      setLoading(false)
+    }
+  }, [job])
+
+  useEffect(() => {
+    if (id) {
+      getJob(id).catch(() => router.push('/dashboard'))
+    }
   }, [id, router])
 
   if (loading || !job) {
@@ -35,6 +58,24 @@ export default function VideoPage() {
 
   const videoSrc = getVideoUrl(id)
   const audioUrl = job.status === 'completed' ? getAudioUrl(id) : undefined
+
+  const handlePayment = async () => {
+    if (!id) return
+    setPaymentLoading(true)
+    setPaymentError(null)
+    try {
+      const res = await initiateClickPayment(id)
+      if (res.success && res.payment_url) {
+        window.location.href = res.payment_url
+      } else {
+        setPaymentError("To'lov havolasini yaratishda xatolik yuz berdi.")
+      }
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -69,6 +110,66 @@ export default function VideoPage() {
                 onTheaterToggle={() => setTheaterMode(m => !m)}
                 className={theaterMode ? '' : 'rounded-2xl'}
               />
+            ) : job.status === 'awaiting_payment' ? (
+              <div className="aspect-video bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 border border-white/5 shadow-2xl relative overflow-hidden">
+                {/* Visual glow backdrop */}
+                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
+                <div className="max-w-md w-full text-center space-y-6 z-10">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-500/10 mb-2">
+                    <CreditCard className="w-7 h-7 text-blue-400 animate-pulse" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-extrabold text-white">To'lov kutilmoqda</h2>
+                    <p className="text-sm text-slate-400 leading-relaxed">
+                      Ushbu video 10 daqiqadan uzun bo'lgani sababli, dublyaj xizmati pullik.
+                    </p>
+                  </div>
+
+                  {/* Pricing Details */}
+                  <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <div className="text-left">
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Davomiylik</p>
+                      <p className="text-lg font-bold text-white mt-1">
+                        {job.video_duration ? formatDuration(job.video_duration) : 'Noma\'lum'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Xizmat haqi</p>
+                      <p className="text-lg font-bold text-blue-400 mt-1">
+                        {job.video_duration ? (() => {
+                          const amount = calculateClientPrice(job.video_duration / 60.0);
+                          return amount.toLocaleString('uz-UZ') + " UZS";
+                        })() : 'Loyiha narxi'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {paymentError && (
+                    <div className="text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl p-3 text-left">
+                      {paymentError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handlePayment}
+                    disabled={paymentLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {paymentLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      "Click orqali to'lov qilish"
+                    )}
+                  </button>
+
+                  <p className="text-[11px] text-slate-500">
+                    To'lov tasdiqlangandan so'ng, dublyaj jarayoni avtomatik tarzda boshlanadi.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center">
                 <div className="text-center">

@@ -38,6 +38,7 @@ export interface Job {
 
 export type JobStatus =
   | 'pending'
+  | 'awaiting_payment'
   | 'downloading'
   | 'transcribing'
   | 'translating'
@@ -48,6 +49,7 @@ export type JobStatus =
 
 export const STATUS_LABELS: Record<JobStatus, string> = {
   pending: 'Navbatda',
+  awaiting_payment: 'To\'lov kutilmoqda',
   downloading: 'Yuklanmoqda',
   transcribing: 'Matnga aylantirilmoqda',
   translating: 'Tarjima qilinmoqda',
@@ -89,6 +91,11 @@ export async function listJobs(): Promise<Job[]> {
 
 export async function deleteJob(jobId: string): Promise<void> {
   await apiClient.delete(`/api/jobs/${jobId}`)
+}
+
+export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; amount: number }> {
+  const res = await apiClient.post('/api/payments/click/initiate', { job_id: jobId })
+  return res.data
 }
 
 export function getDownloadUrl(jobId: string): string {
