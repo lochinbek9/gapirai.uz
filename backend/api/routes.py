@@ -22,7 +22,6 @@ class CreateJobRequest(BaseModel):
     youtube_url: str
     target_language: str = "uz"
     voice_gender: str = "auto"   # auto / male / female
-    quality: str = "standard"    # fast / standard / hd
 
 
 class VideoInfoResponse(BaseModel):
@@ -124,7 +123,6 @@ async def create_job(
         video_duration=duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=request.voice_gender,
-        quality=request.quality,
         status=status,
         progress=0.0,
         status_message=status_message,

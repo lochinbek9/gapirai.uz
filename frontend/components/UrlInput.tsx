@@ -10,10 +10,8 @@ interface Props {
   loading: boolean;
   error: string | null;
   voiceGender: string;
-  quality: string;
   onChange: (value: string) => void;
   onGenderChange: (gender: string) => void;
-  onQualityChange: (quality: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -54,45 +52,9 @@ const GENDER_OPTIONS = [
   { value: "female", label: "Ayol",      icon: "👩", desc: "Madina ovozi" },
 ];
 
-const QUALITY_OPTIONS = [
-  {
-    value: "fast",
-    label: "Tez",
-    icon: "⚡",
-    desc: "~1.5× vaqt",
-    color: "amber",
-    tip: "Oddiy sifat, tez natija",
-    multiplier: 1.5,
-  },
-  {
-    value: "standard",
-    label: "Standart",
-    icon: "⭐",
-    desc: "~3× vaqt",
-    color: "blue",
-    tip: "Yaxshi sifat va tezlik",
-    multiplier: 3,
-  },
-  {
-    value: "hd",
-    label: "HD",
-    icon: "💎",
-    desc: "~5× vaqt",
-    color: "purple",
-    tip: "Eng yuqori sifat",
-    multiplier: 5,
-  },
-];
-
-function fmtMin(seconds: number, multiplier: number): string {
-  const mins = Math.ceil((seconds / 60) * multiplier);
-  if (mins < 1) return "< 1 daq";
-  return `~${mins} daq`;
-}
-
 export default function UrlInput({
-  url, videoInfo, loading, error, voiceGender, quality,
-  onChange, onGenderChange, onQualityChange, onSubmit,
+  url, videoInfo, loading, error, voiceGender,
+  onChange, onGenderChange, onSubmit,
 }: Props) {
 
   const handlePaste = async () => {
@@ -172,43 +134,6 @@ export default function UrlInput({
             );
           })}
         </div>
-      </div>
-
-      {/* Quality selector */}
-      <div className="space-y-2">
-        <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
-          Dublyaj sifati
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {QUALITY_OPTIONS.map((opt) => {
-            const isSelected = quality === opt.value;
-            const timeEst = videoInfo?.duration
-              ? fmtMin(videoInfo.duration, opt.multiplier)
-              : opt.desc;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onQualityChange(opt.value)}
-                className={`flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border text-center transition-all duration-200 ${
-                  isSelected
-                    ? "border-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/20"
-                    : "border-black/10 dark:border-white/10 hover:border-indigo-400/40"
-                }`}
-              >
-                <span className="text-xl">{opt.icon}</span>
-                <span className={`text-xs font-bold ${isSelected ? "text-indigo-600 dark:text-indigo-400" : "text-gray-700 dark:text-gray-300"}`}>
-                  {opt.label}
-                </span>
-                <span className="text-[9px] text-gray-400 dark:text-gray-500">{timeEst}</span>
-              </button>
-            );
-          })}
-        </div>
-        {/* Tanlangan sifat haqida qisqa izoh */}
-        <p className="text-[10px] text-gray-400 dark:text-gray-600 text-center mt-1">
-          {QUALITY_OPTIONS.find(o => o.value === quality)?.tip}
-        </p>
       </div>
 
       {/* Error */}

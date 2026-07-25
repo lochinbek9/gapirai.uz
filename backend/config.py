@@ -19,11 +19,7 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
-
-    # Google Generative AI (optional)
-    USE_GOOGLE_AI: bool = False
-    GOOGLE_API_KEY: str = ""
-    GOOGLE_MODEL: str = "gemini-flash-latest"
+    OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
@@ -39,10 +35,6 @@ class Settings(BaseSettings):
     # Paths
     UPLOAD_DIR: str = "./uploads"
     OUTPUT_DIR: str = "./outputs"
-
-    # Whisper
-    WHISPER_MODEL_SIZE: str = "large-v3"  # tiny/base/small/medium/large-v3
-    WHISPER_DEVICE: str = "cpu"           # cpu / cuda
 
     # YouTube dedicated account (cookie auto-refresh)
     YOUTUBE_EMAIL: str = ""

@@ -10,16 +10,22 @@ import {
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 
+const TEST_PRICE_MULTIPLIER = 0.1
+
 function calculateClientPrice(durationMinutes: number): number {
+  let baseAmount = 0
+
   if (durationMinutes <= 10.0) {
-    return 0;
+    baseAmount = 0
   } else if (durationMinutes <= 30.0) {
-    return 30000;
+    baseAmount = 30000
   } else if (durationMinutes <= 60.0) {
-    return 60000;
+    baseAmount = 60000
   } else {
-    return Math.ceil(durationMinutes) * 1000;
+    baseAmount = Math.ceil(durationMinutes) * 1000
   }
+
+  return Math.round(baseAmount * TEST_PRICE_MULTIPLIER)
 }
 
 /* ── Page ────────────────────────────────────────── */

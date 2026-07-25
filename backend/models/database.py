@@ -51,8 +51,6 @@ class DubbingJob(Base):
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
-    quality = Column(String(10), default="standard")           # fast / standard / hd
-
     status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))

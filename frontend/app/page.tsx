@@ -169,7 +169,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [voiceGender, setVoiceGender] = useState("auto");
-  const [quality, setQuality] = useState("standard");
   const [showWelcome, setShowWelcome] = useState(false);
   const startRef = useRef<number | null>(null);
 
@@ -234,7 +233,7 @@ export default function Home() {
     startRef.current = null;
     setElapsed(0);
     try {
-      const { job_id } = await createJob(url, voiceGender, quality);
+      const { job_id } = await createJob(url, voiceGender);
       setJobId(job_id);
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Xatolik yuz berdi. Qayta urinib ko'ring.");
@@ -309,10 +308,8 @@ export default function Home() {
                   loading={loading}
                   error={error}
                   voiceGender={voiceGender}
-                  quality={quality}
                   onChange={handleUrlChange}
                   onGenderChange={setVoiceGender}
-                  onQualityChange={setQuality}
                   onSubmit={handleSubmit}
                 />
               </motion.div>
@@ -378,7 +375,7 @@ export default function Home() {
           <div className="inline-flex items-center gap-6 px-6 py-2 rounded-full bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.05] transition-colors">
             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">Stack</span>
             <div className="flex gap-4 items-center">
-              {["Whisper", "GPT-4o", "Azure TTS"].map((s) => (
+              {["OpenAI STT", "GPT-4o", "Azure TTS"].map((s) => (
                 <span key={s} className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 transition-colors cursor-default">{s}</span>
               ))}
             </div>

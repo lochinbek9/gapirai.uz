@@ -1,34 +1,119 @@
-from faster_whisper import WhisperModel
+import subprocess
+import tempfile
 from pathlib import Path
+from openai import OpenAI
 from backend.config import get_settings
 
 settings = get_settings()
+client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
+_CHUNK_DURATION_SECONDS = 8 * 60
+_CHUNK_BITRATE = "64k"
 
-# Model bir marta yuklanadi (singleton pattern)
-_model: WhisperModel | None = None
+
+def _get_client() -> OpenAI:
+    if not client:
+        raise RuntimeError("OPENAI_API_KEY not set")
+    return client
 
 
-def get_model() -> WhisperModel:
-    global _model
-    if _model is None:
-        _model = WhisperModel(
-            settings.WHISPER_MODEL_SIZE,
-            device=settings.WHISPER_DEVICE,
-            compute_type="int8",  # Hisoblash uchun int8 - tezroq va kamroq RAM
-            cpu_threads=4,        # Ko'p yadro ishlatish
-            num_workers=2,        # Parallel workers
+def _chunk_audio(audio_path: str, chunk_dir: Path) -> list[Path]:
+    output_pattern = chunk_dir / "chunk_%03d.mp3"
+    proc = subprocess.run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            audio_path,
+            "-f",
+            "segment",
+            "-segment_time",
+            str(_CHUNK_DURATION_SECONDS),
+            "-reset_timestamps",
+            "1",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-codec:a",
+            "libmp3lame",
+            "-b:a",
+            _CHUNK_BITRATE,
+            str(output_pattern),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"Audio bo'laklarga ajratishda xatolik: {proc.stderr[-500:]}")
+
+    chunks = sorted(chunk_dir.glob("chunk_*.mp3"))
+    if not chunks:
+        raise RuntimeError("OpenAI transkripsiyasi uchun audio bo'laklari yaratilmadi.")
+    return chunks
+
+
+def _segment_to_dict(segment: object) -> dict:
+    if hasattr(segment, "model_dump"):
+        return segment.model_dump()
+    if isinstance(segment, dict):
+        return segment
+    return {
+        "start": getattr(segment, "start", None),
+        "end": getattr(segment, "end", None),
+        "text": getattr(segment, "text", ""),
+    }
+
+
+def _response_to_dict(response: object) -> dict:
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    if isinstance(response, dict):
+        return response
+    return {
+        "text": getattr(response, "text", ""),
+        "language": getattr(response, "language", ""),
+        "segments": getattr(response, "segments", []),
+    }
+
+
+def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
+    with chunk_path.open("rb") as audio_file:
+        response = _get_client().audio.transcriptions.create(
+            file=audio_file,
+            model=settings.OPENAI_TRANSCRIPTION_MODEL,
+            language="en",
+            response_format="verbose_json",
+            timestamp_granularities=["segment"],
         )
-    return _model
+
+    response_data = _response_to_dict(response)
+    segments = []
+    for segment in response_data.get("segments", []):
+        segment_data = _segment_to_dict(segment)
+        text = (segment_data.get("text") or "").strip()
+        start = segment_data.get("start")
+        end = segment_data.get("end")
+        if not text or start is None or end is None:
+            continue
+        segments.append(
+            {
+                "start": round(float(start) + offset_seconds, 3),
+                "end": round(float(end) + offset_seconds, 3),
+                "text": text,
+            }
+        )
+
+    return (
+        segments,
+        (response_data.get("text") or "").strip(),
+        response_data.get("language") or "en",
+    )
 
 
-_QUALITY_PARAMS = {
-    "fast":     {"beam_size": 1, "condition_on_previous_text": False, "temperature": 0.0},
-    "standard": {"beam_size": 3, "condition_on_previous_text": False, "temperature": 0.0},
-    "hd":       {"beam_size": 5, "condition_on_previous_text": True,  "temperature": 0.0},
-}
-
-
-def transcribe_audio(audio_path: str, quality: str = "standard") -> dict:
+def transcribe_audio(audio_path: str) -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
@@ -40,44 +125,39 @@ def transcribe_audio(audio_path: str, quality: str = "standard") -> dict:
             "language": str,       # Aniqlangan til
         }
     """
-    model = get_model()
-    params = _QUALITY_PARAMS.get(quality, _QUALITY_PARAMS["standard"])
-
-    segments, info = model.transcribe(
-        audio_path,
-        beam_size=params["beam_size"],
-        language="en",
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500),
-        condition_on_previous_text=params["condition_on_previous_text"],
-        temperature=params["temperature"],
-    )
-
     segments_list = []
     full_text_parts = []
-    srt_lines = []
+    language = "en"
 
-    for i, seg in enumerate(segments, start=1):
-        segment_data = {
-            "id": i,
-            "start": round(seg.start, 3),
-            "end": round(seg.end, 3),
-            "text": seg.text.strip(),
-        }
-        segments_list.append(segment_data)
-        full_text_parts.append(seg.text.strip())
+    with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
+        chunk_paths = _chunk_audio(audio_path, Path(temp_dir))
+        for index, chunk_path in enumerate(chunk_paths):
+            chunk_segments, chunk_text, chunk_language = _transcribe_chunk(
+                chunk_path,
+                offset_seconds=index * _CHUNK_DURATION_SECONDS,
+            )
+            if chunk_text:
+                full_text_parts.append(chunk_text)
+            if chunk_segments:
+                segments_list.extend(chunk_segments)
+            if chunk_language:
+                language = chunk_language
+
+    srt_lines = []
+    for i, seg in enumerate(segments_list, start=1):
+        seg["id"] = i
 
         # SRT format
         srt_lines.append(str(i))
-        srt_lines.append(f"{_format_time(seg.start)} --> {_format_time(seg.end)}")
-        srt_lines.append(seg.text.strip())
+        srt_lines.append(f"{_format_time(seg['start'])} --> {_format_time(seg['end'])}")
+        srt_lines.append(seg["text"])
         srt_lines.append("")
 
     return {
         "text": " ".join(full_text_parts),
         "segments": segments_list,
         "srt": "\n".join(srt_lines),
-        "language": info.language,
+        "language": language,
     }
 
 

@@ -183,7 +183,7 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const hideTimer    = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [playing,      setPlaying]      = useState(false);
   const [muted,        setMuted]        = useState(false);

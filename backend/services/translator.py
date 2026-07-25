@@ -1,6 +1,5 @@
 import json
 import re
-import httpx
 from openai import OpenAI
 from backend.config import get_settings
 
@@ -155,20 +154,10 @@ def _extract_segments_from_result(result: dict | list, original: list[dict]) -> 
     return original
 
 
-def _google_generate(prompt: str) -> str:
-    """Call Google Generative API and return text response."""
-    if not settings.GOOGLE_API_KEY:
-        raise RuntimeError("GOOGLE_API_KEY not set but USE_GOOGLE_AI is True")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GOOGLE_MODEL}:generateContent"
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {"Content-Type": "application/json", "X-goog-api-key": settings.GOOGLE_API_KEY}
-    resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
-    resp.raise_for_status()
-    data = resp.json()
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        raise RuntimeError(f"Invalid Google response: {e} | {data}")
+def _get_client() -> OpenAI:
+    if not client:
+        raise RuntimeError("OPENAI_API_KEY not set")
+    return client
 
 
 def _translate_chunk(segments: list[dict]) -> list[dict]:
@@ -187,16 +176,7 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
         f"{user_message}"
     )
 
-    if settings.USE_GOOGLE_AI:
-        content = _google_generate(SYSTEM_PROMPT + "\n" + instruction)
-        result = json.loads(content)
-        return _extract_segments_from_result(result, segments)
-
-    # Fallback to OpenAI
-    if not client:
-        raise RuntimeError("OPENAI_API_KEY not set and USE_GOOGLE_AI is False")
-
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -213,14 +193,7 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
 
 def translate_full_text(text: str) -> str:
     """To'liq matnni tarjima qilish (ko'rish uchun)."""
-    if settings.USE_GOOGLE_AI:
-        prompt = "Inglizcha matnni o'zbek tiliga professional tarzda tarjima qiling.\n" + text
-        return _google_generate(prompt)
-
-    if not client:
-        raise RuntimeError("OPENAI_API_KEY not set and USE_GOOGLE_AI is False")
-
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=[
             {

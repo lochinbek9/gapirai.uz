@@ -73,9 +73,8 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 export async function createJob(
   youtube_url: string,
   voice_gender: string = 'auto',
-  quality: string = 'standard',
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender, quality })
+  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender })
   return res.data
 }
 

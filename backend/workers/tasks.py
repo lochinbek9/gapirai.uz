@@ -45,28 +45,9 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
 
 
 def _detect_gender(transcript_text: str) -> str:
-    """Detect speaker gender using configured LLM provider."""
+    """Detect speaker gender with OpenAI."""
     try:
         snippet = transcript_text[:1000]
-        if settings.USE_GOOGLE_AI:
-            import httpx
-            if not settings.GOOGLE_API_KEY:
-                return "male"
-            prompt = (
-                "You analyze video transcripts and determine the speaker's gender. "
-                "Reply with ONLY one word: 'male' or 'female'. If unclear or multiple speakers, reply 'male'.\n"
-                f"Transcript: {snippet}"
-            )
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GOOGLE_MODEL}:generateContent"
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            headers = {"Content-Type": "application/json", "X-goog-api-key": settings.GOOGLE_API_KEY}
-            resp = httpx.post(url, json=payload, headers=headers, timeout=20.0)
-            resp.raise_for_status()
-            data = resp.json()
-            text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip().lower()
-            return "female" if "female" in text else "male"
-
-        # Fallback to OpenAI
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         resp = client.chat.completions.create(
             model=settings.OPENAI_MODEL if settings.OPENAI_MODEL else "gpt-4o",
@@ -119,9 +100,8 @@ def process_video(self: Task, job_id: str) -> dict:
         db.commit()
 
         # BOSQICH 2: Transkripsiya
-        quality = job.quality or "standard"
         _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
-        transcript = transcriber.transcribe_audio(download_result["audio_path"], quality=quality)
+        transcript = transcriber.transcribe_audio(download_result["audio_path"])
         job.transcript_text = transcript["text"]
         job.srt_content = transcript["srt"]
         db.commit()

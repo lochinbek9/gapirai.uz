@@ -75,7 +75,7 @@ Foydalanuvchi faqat link yuboradi — hech qanday texnik bilim talab qilinmaydi.
 │                                                             │
 │  [1] yt-dlp         → YouTube dan video yuklash             │
 │       ↓                                                     │
-│  [2] Faster-Whisper → Inglizcha nutq → matn (STT)           │
+│  [2] OpenAI STT API  → Inglizcha nutq → matn (STT)          │
 │       ↓                                                     │
 │  [3] GPT-4o API     → Inglizcha → O'zbekcha (tarjima)       │
 │       ↓                                                     │
@@ -122,7 +122,7 @@ Celery   → Disk:    Video/audio fayllarni saqlash
 ### AI / ML
 | Texnologiya | Maqsad |
 |---|---|
-| Faster-Whisper (large-v3) | Speech-to-Text (inglizcha transkripsiya) |
+| OpenAI Audio API (`whisper-1`) | Speech-to-Text (inglizcha transkripsiya) |
 | GPT-4o (OpenAI) | Inglizcha → O'zbekcha tarjima |
 | Azure TTS (uz-UZ-SardorNeural) | Text-to-Speech (o'zbekcha ovoz) |
 
@@ -159,14 +159,14 @@ YouTube URL → yt-dlp → video.mp4 + audio.wav
 ```
 - Cookie authentication (bot blokirovkasini chetlab o'tish)
 - Eng yuqori sifatli format tanlanadi
-- FFmpeg audio ajratib oladi (16kHz mono — Whisper uchun optimal)
+- FFmpeg audio ajratib oladi (16kHz mono — OpenAI transkripsiyasi uchun optimal)
 
-### Bosqich 2 — Speech-to-Text (Faster-Whisper)
+### Bosqich 2 — Speech-to-Text (OpenAI)
 ```
-audio.wav → Whisper large-v3 → matn + vaqt belgilari (SRT)
+audio.wav → ffmpeg chunking → OpenAI `whisper-1` → matn + vaqt belgilari (SRT)
 ```
-- Model: `large-v3` (eng aniq, lekin sekin) — sozlanadi
-- VAD filter: Sukut qismlarni avtomatik filtrlash
+- Audio 8 daqiqalik bo'laklarga bo'linadi, so'ng OpenAI'ga yuboriladi
+- Lokal model yuklab olinmaydi va worker ichida STT modeli ishlatilmaydi
 - Natija: `[{id, start, end, text}, ...]` — har bir gap alohida segment
 
 ### Bosqich 3 — Tarjima (GPT-4o)
@@ -230,7 +230,7 @@ ai-dubber/
 │   │
 │   └── services/
 │       ├── downloader.py           # yt-dlp, cookie management
-│       ├── transcriber.py          # Faster-Whisper STT
+│       ├── transcriber.py          # OpenAI STT (chunked transcription)
 │       ├── translator.py           # GPT-4o tarjima
 │       ├── synthesizer.py          # Azure TTS + audio sync
 │       ├── merger.py               # FFmpeg video birlashtirish
@@ -436,17 +436,12 @@ yt-dlp --cookies-from-browser chrome \
 docker compose restart backend worker
 ```
 
-### Whisper modeli tanlash
+### OpenAI modellari
 ```env
-# Tezlik/aniqlik muvozan
-WHISPER_MODEL_SIZE=tiny     # Juda tez, kam aniq
-WHISPER_MODEL_SIZE=base     # Tez, o'rtacha aniq
-WHISPER_MODEL_SIZE=medium   # O'rtacha
-WHISPER_MODEL_SIZE=large-v3 # Sekin, eng aniq (tavsiya etiladi)
-
-# GPU bo'lsa (NVIDIA)
-WHISPER_DEVICE=cuda
+OPENAI_MODEL=gpt-4o
+OPENAI_TRANSCRIPTION_MODEL=whisper-1
 ```
+Loyiha endi lokal STT model yuklamaydi. Transkripsiya to'liq OpenAI Audio API orqali bajariladi.
 
 ### O'zbek ovoz tanlash (Azure TTS)
 ```env
@@ -470,6 +465,7 @@ docker compose up -d --scale worker=4
 # ─── OpenAI ───────────────────────────────────
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
+OPENAI_TRANSCRIPTION_MODEL=whisper-1
 
 # ─── Azure TTS ────────────────────────────────
 AZURE_SPEECH_KEY=...
@@ -479,10 +475,6 @@ AZURE_VOICE_NAME=uz-UZ-SardorNeural
 # ─── YouTube ──────────────────────────────────
 YOUTUBE_EMAIL=bot@gmail.com
 YOUTUBE_PASSWORD=...
-
-# ─── Whisper ──────────────────────────────────
-WHISPER_MODEL_SIZE=large-v3
-WHISPER_DEVICE=cpu
 
 # ─── Database ─────────────────────────────────
 DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db

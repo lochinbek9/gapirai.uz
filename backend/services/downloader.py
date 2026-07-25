@@ -79,7 +79,7 @@ def download_video(youtube_url: str, job_id: str) -> dict:
             raise RuntimeError(f"Yuklangan video topilmadi: {job_dir}")
         video_file = files[0]
 
-    # Extract audio with ffmpeg (16kHz mono WAV for Whisper)
+    # Extract audio with ffmpeg (16kHz mono WAV for OpenAI transcription)
     audio_file = job_dir / "audio.wav"
     ffmpeg_cmd = [
         "ffmpeg", "-y", "-i", str(video_file),

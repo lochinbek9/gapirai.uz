@@ -8,7 +8,8 @@ from backend.services.click_service import (
     generate_payment_url, 
     validate_signature, 
     ClickErrors,
-    calculate_price
+    calculate_price,
+    normalize_uzs_amount,
 )
 from backend.services.auth import get_current_user
 from backend.config import get_settings
@@ -69,6 +70,11 @@ async def initiate_payment(
         db.add(payment)
         db.commit()
         db.refresh(payment)
+    elif normalize_uzs_amount(payment.amount) != amount:
+        payment.amount = amount
+        payment.click_create_time = int(time.time())
+        db.commit()
+        db.refresh(payment)
 
     merchant_id = settings.CLICK_MERCHANT_ID or "56653"
     service_id = settings.CLICK_SERVICE_ID or "97933"
@@ -106,7 +112,7 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
         return {"error": ClickErrors.ACTION_NOT_FOUND, "error_note": "Invalid action"}
 
     merchant_trans_id = data.get("merchant_trans_id")
-    amount = float(data.get("amount", 0))
+    amount = normalize_uzs_amount(data.get("amount", 0))
     click_trans_id = data.get("click_trans_id")
 
     payment = db.query(Payment).filter(Payment.id == merchant_trans_id).first()
@@ -116,7 +122,7 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
     if payment.status == PaymentStatus.APPROVED:
         return {"error": ClickErrors.ALREADY_PAID, "error_note": "Already paid"}
 
-    if float(payment.amount) != amount:
+    if normalize_uzs_amount(payment.amount) != amount:
         return {"error": ClickErrors.INVALID_AMOUNT, "error_note": "Amount mismatch"}
 
     payment.click_transaction_id = str(click_trans_id)
