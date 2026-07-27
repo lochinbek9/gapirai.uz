@@ -57,6 +57,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./cookies.txt:/app/cookies.txt
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +85,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./cookies.txt:/app/cookies.txt
     depends_on:
       postgres:
         condition: service_healthy

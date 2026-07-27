@@ -1,7 +1,8 @@
 import Cookies from 'js-cookie'
 import axios from 'axios'
+import { getApiUrl } from './runtime-config'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = getApiUrl()
 
 export interface User {
   id: string

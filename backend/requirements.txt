@@ -15,6 +15,7 @@ psycopg2-binary==2.9.10
 asyncpg==0.30.0
 
 # AI / ML
+faster-whisper==1.1.0
 openai==1.58.1
 
 # Video / Audio Processing
@@ -29,10 +30,14 @@ azure-cognitiveservices-speech==1.42.0
 # File Storage (AWS S3)
 boto3==1.35.92
 
+# Headless browser (YouTube cookie auto-refresh)
+playwright==1.49.1
+
 # Utilities
 python-dotenv==1.0.1
 pydantic==2.10.4
 pydantic-settings==2.7.0
+httpx==0.28.1
 aiofiles==24.1.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4

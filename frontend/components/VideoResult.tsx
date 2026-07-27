@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, formatDuration } from "@/lib/api";
 import { useState } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
+import { getApiUrl } from "@/lib/runtime-config";
 
 interface Props {
   job: Job;
   onReset: () => void;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiUrl();
 
 export default function VideoResult({ job, onReset }: Props) {
   const [showText, setShowText] = useState(false);
