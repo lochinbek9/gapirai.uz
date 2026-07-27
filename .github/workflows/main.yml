@@ -40,4 +40,4 @@ jobs:
             git clean -fd
             echo "Git pull completed successfully."
 
-            docker-compose up -d --build
+            docker compose up -d --build
