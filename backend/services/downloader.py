@@ -25,6 +25,7 @@ def _get_yt_opts() -> dict:
                 "player_skip": ["webpage"],
             }
         },
+        "js_runtimes": ["node"],
         "force_ipv4": True,
     }
 
