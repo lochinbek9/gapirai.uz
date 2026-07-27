@@ -153,14 +153,23 @@ def get_yt_dlp(extra: dict | None = None):
 
 
 def get_video_info(youtube_url: str) -> dict:
-    with get_yt_dlp() as ydl:
-        info = ydl.extract_info(youtube_url, download=False)
-        return {
-            "title": info.get("title", "Unknown"),
-            "duration": info.get("duration", 0),
-            "thumbnail": info.get("thumbnail", ""),
-            "uploader": info.get("uploader", ""),
-        }
+    try:
+        with get_yt_dlp() as ydl:
+            info = ydl.extract_info(youtube_url, download=False)
+            return {
+                "title": info.get("title", "Unknown"),
+                "duration": info.get("duration", 0),
+                "thumbnail": info.get("thumbnail", ""),
+                "uploader": info.get("uploader", ""),
+            }
+    except Exception as e:
+        err_str = str(e)
+        if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
+            raise RuntimeError(
+                "YouTube session cookielari eskirgan yoki bekor qilingan (browser session rotated). "
+                "Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+            ) from e
+        raise RuntimeError(f"Video ma'lumot olishda xatolik: {e}") from e
 
 
 def download_video(youtube_url: str, job_id: str) -> dict:
@@ -193,7 +202,13 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
             title = info.get("title", "Unknown")
             duration = float(info.get("duration", 0) or 0)
     except Exception as e:
-        raise RuntimeError(f"Video yuklashda xatolik: {e}")
+        err_str = str(e)
+        if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
+            raise RuntimeError(
+                "YouTube session cookielari eskirgan yoki bekor qilingan (browser session rotated). "
+                "Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+            ) from e
+        raise RuntimeError(f"Video yuklashda xatolik: {e}") from e
 
     video_file = None
     for f in job_dir.iterdir():
