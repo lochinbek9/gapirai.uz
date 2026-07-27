@@ -86,10 +86,12 @@ class YoutubeRateLimiter:
 _rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
 
 
-def _build_yt_opts(extra: dict | None = None) -> dict:
+def _build_yt_opts(extra: dict | None = None) -> tuple[dict, str | None]:
     """yt-dlp options tuned for single-IP anti-blocking.
 
     Auth: cookies.txt (required). Falls back to unauthenticated iOS client if cookies missing.
+    Copies cookies.txt to a temporary file so yt-dlp can write session cookies without failing
+    if COOKIES_PATH is on a read-only filesystem mount.
     """
     opts: dict = {
         "quiet": True,
@@ -110,21 +112,44 @@ def _build_yt_opts(extra: dict | None = None) -> dict:
         },
     }
 
-    if os.path.isfile(COOKIES_PATH):
-        opts["cookiefile"] = COOKIES_PATH
+    temp_cookie_path = None
+    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
+    if os.path.isfile(cookies_target):
+        try:
+            tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
+            shutil.copyfile(cookies_target, tmp.name)
+            tmp.close()
+            temp_cookie_path = tmp.name
+            opts["cookiefile"] = temp_cookie_path
+        except Exception as e:
+            logger.warning(f"Could not copy cookies file from {cookies_target}: {e}")
+            opts["cookiefile"] = cookies_target
     else:
         # No cookies — use iOS-only (less strict) but limited formats
         opts["extractor_args"]["youtube"]["player_client"] = "ios,web_creator"
 
     if extra:
         opts.update(extra)
-    return opts
+    return opts, temp_cookie_path
+
+
+@contextmanager
+def get_yt_dlp(extra: dict | None = None):
+    """Context manager for YoutubeDL instance ensuring temporary cookie files are cleaned up."""
+    opts, temp_cookie_path = _build_yt_opts(extra)
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            yield ydl
+    finally:
+        if temp_cookie_path and os.path.exists(temp_cookie_path):
+            try:
+                os.remove(temp_cookie_path)
+            except Exception as e:
+                logger.warning(f"Could not remove temp cookie file {temp_cookie_path}: {e}")
 
 
 def get_video_info(youtube_url: str) -> dict:
-    opts = _build_yt_opts()
-
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with get_yt_dlp() as ydl:
         info = ydl.extract_info(youtube_url, download=False)
         return {
             "title": info.get("title", "Unknown"),
@@ -152,14 +177,14 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
     job_dir.mkdir(parents=True, exist_ok=True)
 
     video_tpl = str(job_dir / "video.%(ext)s")
-    opts = _build_yt_opts({
+    extra_opts = {
         "outtmpl": video_tpl,
         "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
-    })
+    }
 
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with get_yt_dlp(extra_opts) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
             title = info.get("title", "Unknown")
             duration = float(info.get("duration", 0) or 0)
