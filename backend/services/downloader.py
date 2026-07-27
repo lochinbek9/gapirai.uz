@@ -21,11 +21,10 @@ def _get_yt_opts() -> dict:
         "no_warnings": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv", "web_embedded"],
-                "player_skip": ["webpage"],
+                "player_client": "tv,web_embedded",
+                "player_skip": "webpage",
             }
         },
-        "js_runtimes": ["node"],
         "force_ipv4": True,
     }
 
