@@ -1,0 +1,261 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - '**'
+      - '!.next/**'
+      - '!.venv/**'
+      - '!node_modules/**'
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test Frontend & Backend
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      BACKEND_ENV: test
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: dubber_test
+          POSTGRES_PASSWORD: dubber_test_pw
+          POSTGRES_DB: dubber_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: ${{ github.workspace }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: ${{ github.workspace }}/frontend
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          python -m pytest tests -v --tb=short
+        working-directory: ${{ github.workspace }}
+        env:
+          DATABASE_URL: postgresql://dubber_test:dubber_test_pw@localhost:5432/dubber_test_db
+          ASYNC_DATABASE_URL: postgresql+asyncpg://dubber_test:dubber_test_pw@localhost:5432/dubber_test_db
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'test-key' }}
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY || 'test-key' }}
+          AZURE_SPEECH_REGION: eastus
+          DEBUG: "true"
+        timeout-minutes: 15
+
+      - name: Run frontend tests
+        run: npm run lint
+        working-directory: ${{ github.workspace }}/frontend
+        timeout-minutes: 10
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ${{ github.workspace }}/frontend
+        timeout-minutes: 15
+
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Tag Backend
+        run: |
+          cd backend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/backend:latest .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/backend:latest ${{ secrets.DOCKER_USERNAME }}/backend:${{ github.sha }}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/backend:latest ${{ secrets.DOCKER_USERNAME }}/backend:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/backend:latest
+        working-directory: ${{ github.workspace }}
+
+      - name: Build & Tag Frontend
+        run: |
+          cd frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/frontend:latest ${{ secrets.DOCKER_USERNAME }}/frontend:${{ github.sha }}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/frontend:latest ${{ secrets.DOCKER_USERNAME }}/frontend:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+        working-directory: ${{ github.workspace }}
+
+      - name: Save artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            frontend/.next/
+            backend/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout artifacts
+        uses: actions/checkout@v4
+
+      - name: Wait for build to complete
+        run: echo "Build completed, ready to deploy"
+
+      - name: Deploy to Ubuntu Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 51.21.35.247
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Create deployment directory
+            mkdir -p /opt/xadichai
+
+            # Pull latest code (optional - depends on your setup)
+            # cd /opt/xadichai && git pull origin main
+
+            # Stop services
+            sudo supervisorctl stop ai-dubber-api ai-dubber-worker
+
+            # Setup environment file
+            echo 'APP_NAME="AI Dubber"' > /opt/xadichai/.env
+            echo 'DEBUG=False' >> /opt/xadichai/.env
+            echo 'DATABASE_URL="postgresql://dubber:dubber123@localhost:5432/dubber_db"' >> /opt/xadichai/.env
+            echo 'ASYNC_DATABASE_URL="postgresql+asyncpg://dubber:dubber123@localhost:5432/dubber_db"' >> /opt/xadichai/.env
+            echo 'REDIS_URL="redis://localhost:6379/0"' >> /opt/xadichai/.env
+            echo 'CELERY_BROKER_URL="redis://localhost:6379/0"' >> /opt/xadichai/.env
+            echo 'CELERY_RESULT_BACKEND="redis://localhost:6379/0"' >> /opt/xadichai/.env
+            echo 'OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"' >> /opt/xadichai/.env
+            echo 'OPENAI_MODEL="gpt-4o"' >> /opt/xadichai/.env
+            echo 'OPENAI_TRANSCRIPTION_MODEL="whisper-1"' >> /opt/xadichai/.env
+            echo 'AZURE_SPEECH_KEY="${{ secrets.AZURE_SPEECH_KEY }}"' >> /opt/xadichai/.env
+            echo 'AZURE_SPEECH_REGION="eastus"' >> /opt/xadichai/.env
+            echo 'AZURE_VOICE_NAME="uz-UZ-SardorNeural"' >> /opt/xadichai/.env
+            echo 'CLICK_MERCHANT_ID="${{ secrets.CLICK_MERCHANT_ID }}"' >> /opt/xadichai/.env
+            echo 'CLICK_SERVICE_ID="${{ secrets.CLICK_SERVICE_ID }}"' >> /opt/xadichai/.env
+            echo 'CLICK_SECRET_KEY="${{ secrets.CLICK_SECRET_KEY }}"' >> /opt/xadichai/.env
+            echo 'FRONTEND_URL="https://xadichai.uz"' >> /opt/xadichai/.env
+
+            # Copy build artifacts
+            mkdir -p /opt/xadichai/frontend
+            # Copy webpack build
+            rsync -avz --delete frontend/public/ /opt/xadichai/frontend/
+
+            # Install and setup supervisor configuration
+            mkdir -p /etc/supervisor/conf.d
+            cat > /etc/supervisor/conf.d/xadichai.conf << 'EOF'
+            [program:ai-dubber-api]
+            command=/opt/xadichai/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+            directory=/opt/xadichai
+            user=ubuntu
+            autostart=true
+            autorestart=true
+            redirect_stderr=true
+            stdout_logfile=/var/log/ai-dubber/api.log
+            environment=PYTHONPATH="/opt/xadichai"
+            stopwaitsecs=10
+
+            [program:ai-dubber-worker]
+            command=/opt/xadichai/.venv/bin/celery -A backend.workers.celery_app worker -l info -Q video_processing -c 2
+            directory=/opt/xadichai
+            user=ubuntu
+            autostart=true
+            autorestart=true
+            redirect_stderr=true
+            stdout_logfile=/var/log/ai-dubber/worker.log
+            environment=PYTHONPATH="/opt/xadichai"
+            stopwaitsecs=10
+            EOF
+
+            # Start services
+            sudo supervisorctl update
+            sudo supervisorctl start ai-dubber-api ai-dubber-worker
+
+            # Follow logs
+            sudo supervisorctl status
+
+      - name: Nginx Rebuild
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 51.21.35.247
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Perform nginx configuration test
+            sudo nginx -t
+
+            # Test frontend build exists
+            if [ ! -f "/var/www/xadichai.uz/index.html" ]; then
+              echo "Error: Frontend build not found"
+              exit 1
+            fi
+
+            # Test API health
+            sleep 3
+            if ! curl -f http://localhost:8000/health || ! curl -f http://localhost:3001/health; then
+              echo "Error: API services not healthy"
+              exit 1
+            fi
+
+            # Reload nginx
+            sudo systemctl reload nginx
+
+            echo "Deployment successful!"
