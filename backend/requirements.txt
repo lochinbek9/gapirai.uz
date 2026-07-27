@@ -24,8 +24,12 @@ moviepy==1.0.3
 pydub==0.25.1
 audioop-lts==0.2.2; python_version>='3.13'
 
-# Azure TTS
+# TTS (Azure / Edge / Google)
 azure-cognitiveservices-speech==1.42.0
+edge-tts>=7.2.8
+gTTS>=2.5.4
+google-cloud-texttospeech>=2.37.0
+
 
 # File Storage (AWS S3)
 boto3==1.35.92
