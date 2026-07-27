@@ -21,10 +21,9 @@ RUN git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /tmp/b
     && npm ci \
     && npx tsc \
     && mkdir -p /root/bgutil-ytdlp-pot-provider \
-    && cp -r server /root/bgutil-ytdlp-pot-provider/server \
+    && cp -r /tmp/bgutil/server /root/bgutil-ytdlp-pot-provider/server \
     && rm -rf /tmp/bgutil
 
 COPY backend/ ./backend/
 
-# Papkalarni yaratish
 RUN mkdir -p /app/uploads /app/outputs
