@@ -1,0 +1,65 @@
+name: Node.js CI/CD
+
+# Controls when the workflow will run
+on:
+  push:
+    branches:
+      - main # Trigger CI for changes to the "main" branch
+  pull_request:
+    branches:
+      - main # Trigger CI for pull requests targeting "main"
+
+# Define jobs for the workflow
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy using SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e  # Stop execution if any command fails
+
+            # Source the NVM to ensure using the right Node.js version
+            [ -s "$HOME/.nvm/nvm.sh" ] && \. "$HOME/.nvm/nvm.sh"
+            echo "Node.js version: $(node -v)"
+
+            # # Change to the project directory
+            # cd ~/hr-lodex
+            # echo "Changed directory to ~/hr-lodex"
+
+            # # Pull the latest code from the current branch instead of hardcoding main
+            # # (or stay on main but ensure we have the latest)
+            # git fetch origin main
+            # git reset --hard origin/main
+            # git clean -fd
+            # echo "Git pull completed successfully."
+
+            # # Deploy server
+            # cd server/
+            # npm install
+            # npm run build
+            # echo "Server dependencies installed and TypeScript build completed."
+            
+            # # Use absolute path for PM2 and ensure it restarts the right process
+            # pm2 reload hr-lodex --log-date-format "YYYY-MM-DD HH:mm:ss"
+            # echo "Server (re)started with PM2."
+
+            # # Deploy client
+            # cd ../client/
+            # npm install
+            # npm run build
+            # echo "Client build completed."
+            
+            # # Sync to Nginx web root
+            # sudo mkdir -p /var/www/hrlodex-frontend
+            # sudo rsync -av --delete ./dist/ /var/www/hrlodex-frontend/
+            # echo "Client files synced to web root."
+            
+            # # Final Health Check (Internal)
+            # curl -I http://localhost:5001/api/health || echo "WARNING: Backend health check failed internally!"

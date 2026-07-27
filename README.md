@@ -455,6 +455,25 @@ Bir vaqtda ko'p video qayta ishlash uchun worker sonini oshirish:
 docker compose up -d --scale worker=4
 ```
 
+### PM2 bilan backend
+
+`ecosystem.config.cjs` bitta PM2 faylda API va Celery worker'ni boshqaradi.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+npm install -g pm2
+
+pm2 start ecosystem.config.cjs
+pm2 status
+pm2 logs ai-dubber-api
+pm2 logs ai-dubber-worker
+pm2 save
+```
+
+PM2 config rootdagi `.env` faylini o'qiydi va agar mavjud bo'lsa `.venv/bin/python` ni ishlatadi. Production serverda PostgreSQL va Redis alohida servis sifatida ishlashi kerak.
+
 ---
 
 ## Konfiguratsiya
