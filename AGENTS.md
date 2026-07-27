@@ -55,8 +55,8 @@ pm2 logs ai-dubber-worker
 
 ## Build quirks
 
-- **Backend Dockerfile** installs ffmpeg + Node.js + Deno and configures yt-dlp with `--js-runtimes deno` for built-in PO token generation. YouTube downloads fail without this Deno runtime config.
-- **OAuth for yt-dlp**: The downloader uses yt-dlp's built-in OAuth (`username=oauth2, password=""`) which persists a token in `~/.cache/yt-dlp/`. No cookies.txt or Playwright login needed. If a `cookies.txt` is still present, it takes priority over OAuth.
+- **Backend Dockerfile** installs ffmpeg + Node.js + Deno and configures yt-dlp with `--js-runtimes deno --remote-components ejs:github` for PO tokens + JS challenge solving. Without these, YouTube downloads fail with "signature solving failed" or "please sign in".
+- **Auth**: yt-dlp uses `cookies.txt` (mounted read-only via `docker-compose.yml`). OAuth was deprecated by yt-dlp and no longer works. If `cookies.txt` is missing, falls back to unauthenticated iOS client (limited formats, may not work for all videos).
 - **YouTube rate limiting**: `YoutubeRateLimiter` in `downloader.py` uses Redis to ensure max 1 concurrent download + 30s cooldown between downloads, with exponential backoff (up to 5 min) on failures. Celery task route also has `rate_limit="1/m"` as a safety net.
 - **DB enum hack**: `create_tables()` in `backend/models/database.py:84` tries `ALTER TYPE jobstatus ADD VALUE 'awaiting_payment'` on startup. Creates the missing enum value in existing DBs. If the PG enum is out of sync, this is the fix.
 

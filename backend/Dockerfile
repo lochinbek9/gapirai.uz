@@ -20,10 +20,9 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# yt-dlp config: enable Deno JS runtime for built-in PO token generation
+# yt-dlp config: enable Deno for PO tokens + EJS for JS challenge solving
 RUN mkdir -p /root/.config/yt-dlp \
-    && echo '--js-runtimes' > /root/.config/yt-dlp/config \
-    && echo 'deno' >> /root/.config/yt-dlp/config
+    && printf '%s\n' '--js-runtimes' 'deno' '--remote-components' 'ejs:github' > /root/.config/yt-dlp/config
 
 # OAuth token cache directory (persisted via volume)
 RUN mkdir -p /root/.cache/yt-dlp

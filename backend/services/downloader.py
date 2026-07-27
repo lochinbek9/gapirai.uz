@@ -1,5 +1,5 @@
 """
-Downloader — yt-dlp with OAuth, iOS fallback, and Redis-based rate limiting.
+Downloader — yt-dlp with cookies auth, iOS fallback, and Redis-based rate limiting.
 Single-IP safe: prevents hammering YouTube even under concurrent job requests.
 """
 import os
@@ -59,7 +59,7 @@ class YoutubeRateLimiter:
             pipe.set("yt_dl:last_start", time.time())
             pipe.expire("yt_dl:last_start", 3600)
             results = pipe.execute()
-            if results[0] == 1:  # our incr won
+            if results[0] == 1:
                 return
             time.sleep(0.5)
 
@@ -73,7 +73,6 @@ class YoutubeRateLimiter:
         pipe.execute()
 
     def mark_failure(self) -> None:
-        """Increase cooldown exponentially on failure to avoid repeated blocks."""
         fails = self.redis.incr("yt_dl:fails")
         self.redis.expire("yt_dl:fails", 3600)
         backoff = min(self.MAX_COOLDOWN, self.MIN_COOLDOWN * (2 ** fails))
@@ -90,7 +89,7 @@ _rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
 def _build_yt_opts(extra: dict | None = None) -> dict:
     """yt-dlp options tuned for single-IP anti-blocking.
 
-    Auth priority: OAuth (yt-dlp built-in) > cookies.txt fallback.
+    Auth: cookies.txt (required). Falls back to unauthenticated iOS client if cookies missing.
     """
     opts: dict = {
         "quiet": True,
@@ -105,7 +104,7 @@ def _build_yt_opts(extra: dict | None = None) -> dict:
         },
         "extractor_args": {
             "youtube": {
-                "player_client": "ios,web,web_creator",
+                "player_client": "web,web_creator,ios",
                 "player_skip": ["webpage", "configs"],
             }
         },
@@ -114,8 +113,8 @@ def _build_yt_opts(extra: dict | None = None) -> dict:
     if os.path.isfile(COOKIES_PATH):
         opts["cookiefile"] = COOKIES_PATH
     else:
-        opts["username"] = "oauth2"
-        opts["password"] = ""  # yt-dlp handles OAuth flow internally
+        # No cookies — use iOS-only (less strict) but limited formats
+        opts["extractor_args"]["youtube"]["player_client"] = "ios,web_creator"
 
     if extra:
         opts.update(extra)
