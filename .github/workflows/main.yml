@@ -29,37 +29,15 @@ jobs:
             [ -s "$HOME/.nvm/nvm.sh" ] && \. "$HOME/.nvm/nvm.sh"
             echo "Node.js version: $(node -v)"
 
-            # # Change to the project directory
-            # cd ~/hr-lodex
-            # echo "Changed directory to ~/hr-lodex"
+            # Change to the project directory
+            cd ~/ai-dubber
+            echo "Changed directory to ~/ai-dubber"
 
-            # # Pull the latest code from the current branch instead of hardcoding main
-            # # (or stay on main but ensure we have the latest)
-            # git fetch origin main
-            # git reset --hard origin/main
-            # git clean -fd
-            # echo "Git pull completed successfully."
+            # Pull the latest code from the current branch instead of hardcoding main
+            # (or stay on main but ensure we have the latest)
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
+            echo "Git pull completed successfully."
 
-            # # Deploy server
-            # cd server/
-            # npm install
-            # npm run build
-            # echo "Server dependencies installed and TypeScript build completed."
-            
-            # # Use absolute path for PM2 and ensure it restarts the right process
-            # pm2 reload hr-lodex --log-date-format "YYYY-MM-DD HH:mm:ss"
-            # echo "Server (re)started with PM2."
-
-            # # Deploy client
-            # cd ../client/
-            # npm install
-            # npm run build
-            # echo "Client build completed."
-            
-            # # Sync to Nginx web root
-            # sudo mkdir -p /var/www/hrlodex-frontend
-            # sudo rsync -av --delete ./dist/ /var/www/hrlodex-frontend/
-            # echo "Client files synced to web root."
-            
-            # # Final Health Check (Internal)
-            # curl -I http://localhost:5001/api/health || echo "WARNING: Backend health check failed internally!"
+            docker-compose up -d --build

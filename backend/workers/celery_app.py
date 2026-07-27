@@ -18,6 +18,7 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_acks_late=True,          # Xatolik bo'lsa qayta urinish
+    broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=1, # Bir vaqtda bitta vazifa
     task_routes={
         "backend.workers.tasks.process_video": {"queue": "video_processing"},

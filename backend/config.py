@@ -36,10 +36,6 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     OUTPUT_DIR: str = "./outputs"
 
-    # YouTube dedicated account (cookie auto-refresh)
-    YOUTUBE_EMAIL: str = ""
-    YOUTUBE_PASSWORD: str = ""
-
     # Click Payment
     CLICK_MERCHANT_ID: str = ""
     CLICK_SERVICE_ID: str = ""

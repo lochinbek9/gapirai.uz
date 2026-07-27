@@ -10,15 +10,12 @@ from pathlib import Path
 from backend.config import get_settings
 
 settings = get_settings()
-COOKIES_FILE = "/app/cookies.txt"
 CONTAINER_UPLOADS_DIR = os.getenv("CONTAINER_UPLOADS_DIR", "/app/uploads")
 
 
 def get_video_info(youtube_url: str) -> dict:
     """YouTube video haqida ma'lumot olish (yuklamasdan)."""
     opts = {"quiet": True, "no_warnings": True}
-    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        opts["cookiefile"] = COOKIES_FILE
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
@@ -47,13 +44,8 @@ def download_video(youtube_url: str, job_id: str) -> dict:
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
+        "nocookies": True,
     }
-
-    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        opts["cookiefile"] = COOKIES_FILE
-    else:
-        # Disable cookie extraction inside container to avoid browser-cookie lookup errors
-        opts["nocookies"] = True
 
     title = "Unknown"
     duration = 0.0
