@@ -1,6 +1,6 @@
 FROM python:3.12-slim-bookworm
 
-# FFmpeg va tizim kutubxonalarini o'rnatish
+# FFmpeg, Node.js, git va tizim kutubxonalarini o'rnatish
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
@@ -15,11 +15,13 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# PO Token server — build from source for bgutil plugin
+# PO Token server — build bgutil scripts for yt-dlp plugin
 RUN git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /tmp/bgutil \
     && cd /tmp/bgutil/server \
-    && npm ci && npx tsc \
-    && cp -r /tmp/bgutil/server /root/bgutil-ytdlp-pot-provider/server \
+    && npm ci \
+    && npx tsc \
+    && mkdir -p /root/bgutil-ytdlp-pot-provider \
+    && cp -r server /root/bgutil-ytdlp-pot-provider/server \
     && rm -rf /tmp/bgutil
 
 COPY backend/ ./backend/
