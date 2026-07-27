@@ -6,5 +6,6 @@ services:
       - .env
     volumes:
       - ./:/app
-    command: xvfb-run -a -s "-screen 0 1024x768x24" python /app/backend/services/cookie_refresher.py
+    working_dir: /app
+    command: xvfb-run -a -s "-screen 0 1024x768x24" python -m backend.services.cookie_refresher
     restart: unless-stopped
