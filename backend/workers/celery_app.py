@@ -21,6 +21,9 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=1, # Bir vaqtda bitta vazifa
     task_routes={
-        "backend.workers.tasks.process_video": {"queue": "video_processing"},
+        "backend.workers.tasks.process_video": {
+            "queue": "video_processing",
+            "rate_limit": "1/m",  # max 1 YouTube download per minute per worker
+        },
     },
 )

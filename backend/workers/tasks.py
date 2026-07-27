@@ -77,8 +77,8 @@ def _detect_gender(transcript_text: str) -> str:
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
-    max_retries=2,
-    default_retry_delay=30,
+    max_retries=3,
+    default_retry_delay=60,
 )
 def process_video(self: Task, job_id: str) -> dict:
     db = SessionLocal()
@@ -165,8 +165,9 @@ def process_video(self: Task, job_id: str) -> dict:
             "updated_at": datetime.utcnow(),
         })
         db.commit()
-        if "Download" in str(exc):
-            raise self.retry(exc=exc, countdown=30)
+        if self.request.retries < self.max_retries:
+            countdown = min(300, 30 * (2 ** self.request.retries))
+            raise self.retry(exc=exc, countdown=countdown)
         raise exc
 
     finally:

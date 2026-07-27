@@ -20,20 +20,14 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# PO Token server — build bgutil scripts for yt-dlp plugin
-RUN git clone https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /tmp/bgutil \
-    && cd /tmp/bgutil/server \
-    && npm ci \
-    && npx tsc \
-    && mkdir -p /root/bgutil-ytdlp-pot-provider \
-    && cp -r /tmp/bgutil/server /root/bgutil-ytdlp-pot-provider/server \
-    && rm -rf /tmp/bgutil
-
-COPY backend/ ./backend/
-
-# yt-dlp config: enable Deno JS runtime for PO token generation
+# yt-dlp config: enable Deno JS runtime for built-in PO token generation
 RUN mkdir -p /root/.config/yt-dlp \
     && echo '--js-runtimes' > /root/.config/yt-dlp/config \
     && echo 'deno' >> /root/.config/yt-dlp/config
+
+# OAuth token cache directory (persisted via volume)
+RUN mkdir -p /root/.cache/yt-dlp
+
+COPY backend/ ./backend/
 
 RUN mkdir -p /app/uploads /app/outputs

@@ -57,6 +57,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - oauth_cache:/root/.cache/yt-dlp
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +85,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - oauth_cache:/root/.cache/yt-dlp
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,3 +114,4 @@ services:
 
 volumes:
   postgres_data:
+  oauth_cache:
