@@ -30,8 +30,8 @@ azure-cognitiveservices-speech==1.42.0
 # File Storage (AWS S3)
 boto3==1.35.92
 
-# Headless browser (YouTube cookie auto-refresh)
-playwright==1.49.1
+# YouTube PO Token (bot detection bypass)
+bgutil-ytdlp-pot-provider
 
 # Utilities
 python-dotenv==1.0.1

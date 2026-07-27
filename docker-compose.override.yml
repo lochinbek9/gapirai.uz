@@ -1,11 +1,1 @@
-services:
-  cookie_refresher:
-    image: ai-dubber-backend
-    container_name: dubber_cookie_refresher
-    env_file:
-      - .env
-    volumes:
-      - ./:/app
-    working_dir: /app
-    command: xvfb-run -a -s "-screen 0 1024x768x24" python -m backend.services.cookie_refresher
-    restart: unless-stopped
+services: {}

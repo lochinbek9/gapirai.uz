@@ -1,24 +1,37 @@
 """
-Downloader — now performs downloads locally inside the worker using yt-dlp and ffmpeg.
-This removes the external download_service and avoids host.docker.internal network calls.
-Returns container-accessible paths (/app/uploads/<job_id>/...).
+Downloader — performs downloads locally inside the worker using yt-dlp and ffmpeg.
+Uses PO Token provider for YouTube bot detection bypass.
 """
 import os
 import subprocess
+import logging
 import yt_dlp
 from pathlib import Path
 from backend.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
-COOKIES_FILE = "/app/cookies.txt"
 CONTAINER_UPLOADS_DIR = os.getenv("CONTAINER_UPLOADS_DIR", "/app/uploads")
+
+
+def _get_yt_opts() -> dict:
+    """Base yt-dlp options with PO token + anti-bot settings."""
+    return {
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv", "web_embedded"],
+                "player_skip": ["webpage"],
+            }
+        },
+        "force_ipv4": True,
+    }
 
 
 def get_video_info(youtube_url: str) -> dict:
     """YouTube video haqida ma'lumot olish (yuklamasdan)."""
-    opts = {"quiet": True, "no_warnings": True}
-    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        opts["cookiefile"] = COOKIES_FILE
+    opts = _get_yt_opts()
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
@@ -40,20 +53,15 @@ def download_video(youtube_url: str, job_id: str) -> dict:
     job_dir.mkdir(parents=True, exist_ok=True)
 
     video_tpl = str(job_dir / "video.%(ext)s")
-    opts = {
+    opts = _get_yt_opts()
+    opts.update({
         "outtmpl": video_tpl,
-        "quiet": True,
-        "no_warnings": True,
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
-    }
-
-    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-        opts["cookiefile"] = COOKIES_FILE
-    else:
-        # Disable cookie extraction inside container to avoid browser-cookie lookup errors
-        opts["nocookies"] = True
+        "retries": 3,
+        "fragment_retries": 3,
+        "socket_timeout": 30,
+    })
 
     title = "Unknown"
     duration = 0.0
@@ -73,13 +81,12 @@ def download_video(youtube_url: str, job_id: str) -> dict:
             video_file = f
             break
     if not video_file:
-        # fallback: pick first file in dir
         files = [f for f in job_dir.iterdir() if f.is_file()]
         if not files:
             raise RuntimeError(f"Yuklangan video topilmadi: {job_dir}")
         video_file = files[0]
 
-    # Extract audio with ffmpeg (16kHz mono WAV for Whisper)
+    # Extract audio with ffmpeg (16kHz mono WAV for transcription)
     audio_file = job_dir / "audio.wav"
     ffmpeg_cmd = [
         "ffmpeg", "-y", "-i", str(video_file),

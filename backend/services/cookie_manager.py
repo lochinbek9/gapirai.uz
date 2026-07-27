@@ -45,38 +45,66 @@ async def refresh_cookies(youtube_email: str, youtube_password: str) -> bool:
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
+            ignore_default_args=["--enable-automation"],
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-blink-features=AutomationControlled",
                 "--disable-gpu",
-                "--single-process",
+                "--disable-infobars",
             ],
         )
         context = await browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 800},
+            locale="en-US",
         )
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
         page = await context.new_page()
 
         try:
-            # Google login
-            await page.goto("https://accounts.google.com/signin", timeout=120000)
-            await page.wait_for_selector('input[type="email"]', timeout=120000)
-            await page.fill('input[type="email"]', youtube_email)
-            await page.click('button:has-text("Next"), #identifierNext')
-            await page.wait_for_timeout(2000)
-            await page.wait_for_selector('input[type="password"]', timeout=120000)
-            await page.fill('input[type="password"]', youtube_password)
-            await page.click('button:has-text("Next"), #passwordNext')
+            # YouTube ga o'tib, Sign in tugmasini bosish
+            await page.goto("https://www.youtube.com", timeout=60000)
             await page.wait_for_timeout(3000)
 
-            # YouTube ga o'tish
-            await page.goto("https://www.youtube.com", timeout=120000)
-            await page.wait_for_timeout(2000)
+            # Cookie consent modal bo'lsa qabul qilish
+            try:
+                accept_btn = await page.wait_for_selector(
+                    'button[aria-label*="Accept"], button:has-text("Accept all")', timeout=5000
+                )
+                await accept_btn.click()
+                await page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
+            # Sign in tugmasi yoki to'g'ri login sahifasi
+            try:
+                signin_btn = await page.wait_for_selector('a[aria-label*="Sign in"], a[href*="ServiceLogin"]', timeout=5000)
+                await signin_btn.click()
+                await page.wait_for_timeout(3000)
+            except Exception:
+                await page.goto("https://accounts.google.com/ServiceLogin?service=youtube", timeout=60000)
+
+            # Email kiritish
+            email_inp = await page.wait_for_selector('input[name="identifier"], input[type="email"]', timeout=30000)
+            await email_inp.fill(youtube_email)
+            await page.click('button:has-text("Next"), #identifierNext')
+            await page.wait_for_timeout(3000)
+
+            # Parol kiritish
+            pwd_inp = await page.wait_for_selector('input[name="Passwd"], input[name="password"], input[type="password"]', timeout=30000)
+            await pwd_inp.fill(youtube_password)
+            await page.click('button:has-text("Next"), #passwordNext')
+            await page.wait_for_timeout(5000)
+
+            # YouTube ga o'tish tekshiruvi
+            if "youtube.com" not in page.url:
+                await page.goto("https://www.youtube.com", timeout=60000)
+                await page.wait_for_timeout(3000)
 
             # Cookilarni Netscape formatida saqlash
             cookies = await context.cookies()
@@ -104,7 +132,8 @@ def _save_cookies_netscape(cookies: list, filepath: str) -> None:
         include_subdomains = "TRUE" if domain.startswith(".") else "FALSE"
         path = c.get("path", "/")
         secure = "TRUE" if c.get("secure", False) else "FALSE"
-        expires = int(c.get("expires", 0)) if c.get("expires") else 0
+        exp_raw = c.get("expires", 0)
+        expires = int(exp_raw) if exp_raw and exp_raw > 0 else 0
         name = c.get("name", "")
         value = c.get("value", "")
         lines.append(f"{domain}\t{include_subdomains}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n")
