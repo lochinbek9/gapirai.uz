@@ -60,9 +60,11 @@ class YoutubeRateLimiter:
 
             pipe = self.redis.pipeline()
             pipe.incr("yt_dl:concurrent")
+            pipe.expire("yt_dl:concurrent", 180)
             pipe.set("yt_dl:last_start", time.time())
             pipe.expire("yt_dl:last_start", 3600)
             results = pipe.execute()
+
             if results[0] == 1:
                 return
             time.sleep(0.5)
