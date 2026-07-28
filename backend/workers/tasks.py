@@ -2,12 +2,14 @@ import os
 from pathlib import Path
 from datetime import datetime
 from celery import Task
+from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, synthesizer, merger
 from backend.config import get_settings
 
+logger = get_task_logger(__name__)
 settings = get_settings()
 
 
