@@ -98,12 +98,18 @@ async def create_job(
     thumbnail = info.get("thumbnail")
 
     duration_minutes = duration / 60.0
-    amount = calculate_price(duration_minutes)
+
+    is_first_video = False
+    if current_user:
+        existing_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count()
+        is_first_video = existing_jobs_count == 0
+
+    amount = calculate_price(duration_minutes, is_first_video=is_first_video)
 
     if amount > 0 and not current_user:
         raise HTTPException(
             status_code=401,
-            detail="10 daqiqadan uzun videolar uchun tizimga kirish va to'lov qilish talab etiladi."
+            detail="To'lov uchun tizimga kirish talab etiladi."
         )
 
     job_id = str(uuid.uuid4())

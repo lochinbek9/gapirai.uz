@@ -39,10 +39,11 @@ async def initiate_payment(
         raise HTTPException(status_code=400, detail="Video davomiyligi aniqlanmadi.")
     
     duration_minutes = job.video_duration / 60.0
-    amount = calculate_price(duration_minutes)
+    is_first_video = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count() == 0
+    amount = calculate_price(duration_minutes, is_first_video=is_first_video)
 
     if amount == 0:
-        return {"success": True, "message": "Video 10 daqiqadan qisqa, bepul.", "amount": 0}
+        return {"success": True, "message": "Bepul video.", "amount": 0}
 
     # Check if already paid
     existing_approved = db.query(Payment).filter(
@@ -130,13 +131,18 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
     payment.click_status = 0
     db.commit()
 
+    import zlib
+    prep_id = zlib.crc32(payment.id.bytes)
+    click_trans_val = int(click_trans_id) if str(click_trans_id).isdigit() else 0
+
     return {
         "error": ClickErrors.SUCCESS,
         "error_note": "Success",
-        "click_trans_id": click_trans_id,
+        "click_trans_id": click_trans_val,
         "merchant_trans_id": merchant_trans_id,
-        "merchant_prepare_id": str(payment.id)
+        "merchant_prepare_id": prep_id
     }
+
 
 @router.post("/complete")
 async def click_complete(request: Request, db: Session = Depends(get_db)):
@@ -180,13 +186,17 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
             "merchant_trans_id": merchant_trans_id
         }
 
+    import zlib
+    confirm_id = zlib.crc32(payment.id.bytes)
+    click_trans_val = int(click_trans_id) if str(click_trans_id).isdigit() else 0
+
     if payment.status == PaymentStatus.APPROVED:
         return {
             "error": ClickErrors.SUCCESS,
             "error_note": "Already completed",
-            "click_trans_id": click_trans_id,
+            "click_trans_id": click_trans_val,
             "merchant_trans_id": merchant_trans_id,
-            "merchant_confirm_id": str(payment.id)
+            "merchant_confirm_id": confirm_id
         }
 
     payment.status = PaymentStatus.APPROVED
@@ -205,7 +215,8 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     return {
         "error": ClickErrors.SUCCESS,
         "error_note": "Success",
-        "click_trans_id": click_trans_id,
+        "click_trans_id": click_trans_val,
         "merchant_trans_id": merchant_trans_id,
-        "merchant_confirm_id": str(payment.id)
+        "merchant_confirm_id": confirm_id
     }
+

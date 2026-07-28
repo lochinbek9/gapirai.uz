@@ -1,10 +1,7 @@
 import hashlib
 import math
-import time
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import urlencode
-
-TEST_PRICE_MULTIPLIER = Decimal("0.1")
 
 class ClickErrors:
     SUCCESS = 0
@@ -79,22 +76,14 @@ def validate_signature(params: dict, secret_key: str) -> bool:
 
     return expected.lower() == str(sign_string).lower()
 
-def calculate_price(duration_minutes: float) -> int:
+def calculate_price(duration_minutes: float, *, is_first_video: bool = False) -> int:
     """
     Pricing logic:
-    - First 10 minutes of video is free.
-    - Up to 30 minutes (10 < duration <= 30) costs 30,000 UZS.
-    - Up to 60 minutes (30 < duration <= 60) costs 60,000 UZS.
-    - Above 60 minutes: 1,000 UZS per minute.
+    - First video for a user: free (no matter the length).
+    - Subsequent videos: 1,000 UZS per minute.
     """
-    if duration_minutes <= 10.0:
-        base_amount = 0
-    elif duration_minutes <= 30.0:
-        base_amount = 30000
-    elif duration_minutes <= 60.0:
-        base_amount = 60000
-    else:
-        base_amount = math.ceil(duration_minutes) * 1000
+    if is_first_video:
+        return 0
 
-    discounted_amount = Decimal(base_amount) * TEST_PRICE_MULTIPLIER
-    return normalize_uzs_amount(discounted_amount)
+    amount = math.ceil(duration_minutes) * 1000
+    return normalize_uzs_amount(amount)
