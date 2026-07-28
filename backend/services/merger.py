@@ -65,7 +65,7 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             output_path,
         ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=8000)
 
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg xatoligi:\n{result.stderr[-1000:]}")

@@ -30,7 +30,7 @@ class YoutubeRateLimiter:
     MIN_COOLDOWN = 30       # minimum seconds between download starts
     MAX_COOLDOWN = 300      # cap exponential backoff at 5 minutes
     MAX_CONCURRENT = 1
-    ACQUIRE_TIMEOUT = 600   # max wait for a slot (10 minutes)
+    ACQUIRE_TIMEOUT = 8000   # max wait for a slot (10 minutes)
     POLL_INTERVAL = 1.5     # sleep between slot checks
 
     def __init__(self, redis_url: str):
