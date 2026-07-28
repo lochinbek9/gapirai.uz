@@ -2,6 +2,7 @@ import os
 import boto3
 import logging
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,12 @@ def _get_s3_client():
         kwargs["region_name"] = settings.AWS_REGION
 
     try:
-        s3_client = boto3.client("s3", **kwargs)
+        # Enforce Signature Version 4 for S3 presigned URLs in regional buckets
+        s3_client = boto3.client(
+            "s3",
+            config=Config(signature_version="s3v4"),
+            **kwargs
+        )
         return s3_client, bucket
     except Exception as e:
         logger.error(f"Failed to create S3 client: {e}")
