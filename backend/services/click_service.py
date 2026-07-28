@@ -82,6 +82,10 @@ def calculate_price(duration_minutes: float, *, is_first_video: bool = False) ->
     - First video for a user: free (no matter the length).
     - Subsequent videos: 1,000 UZS per minute.
     """
-    # Temporary flat 1000 UZS price for testing
-    return 1000
+    if is_first_video:
+        return 0
+
+    amount = math.ceil(duration_minutes) * 1000
+    return normalize_uzs_amount(amount)
+
 

@@ -152,11 +152,25 @@ def process_video(self: Task, job_id: str) -> dict:
 
         job.output_video_path = final_output
         job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
+
+        # Upload files to S3 if configured
+        try:
+            from backend.services.storage import upload_file_to_s3
+            s3_audio_key = f"dubber/{job_id}/dubbed_audio.wav"
+            s3_video_key = f"dubber/{job_id}/dubbed_final.mp4"
+            logger.info(f"Uploading output files for job {job_id} to S3...")
+            
+            upload_file_to_s3(dubbed_audio_path, s3_audio_key)
+            upload_file_to_s3(final_output, s3_video_key)
+        except Exception as s3_err:
+            logger.error(f"S3 upload failed for job {job_id}: {s3_err}")
+
         _update_job(db, job, JobStatus.COMPLETED, 100.0, "Dublyaj tayyor!")
         job.completed_at = datetime.utcnow()
         db.commit()
 
         return {"job_id": job_id, "status": "completed", "output_url": job.output_video_url}
+
 
     except Exception as exc:
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({

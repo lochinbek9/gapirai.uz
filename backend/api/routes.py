@@ -1,7 +1,7 @@
 import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -205,6 +205,15 @@ async def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Audio hali tayyor emas.")
+
+    settings = get_settings()
+    if settings.AWS_BUCKET_NAME:
+        from backend.services.storage import generate_presigned_download_url
+        s3_key = f"dubber/{job_id}/dubbed_audio.wav"
+        presigned_url = generate_presigned_download_url(s3_key)
+        if presigned_url:
+            return RedirectResponse(url=presigned_url)
+
     audio_path = job.dubbed_audio_path
     if not audio_path or not Path(audio_path).exists():
         raise HTTPException(status_code=404, detail="Audio fayl topilmadi.")
@@ -218,8 +227,18 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+
+    settings = get_settings()
+    if settings.AWS_BUCKET_NAME:
+        from backend.services.storage import generate_presigned_download_url
+        s3_key = f"dubber/{job_id}/dubbed_final.mp4"
+        presigned_url = generate_presigned_download_url(s3_key)
+        if presigned_url:
+            return RedirectResponse(url=presigned_url)
+
     video_path = job.output_video_path
     if not video_path or not Path(video_path).exists():
         raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
     filename = f"dubbed_{job.video_title or job_id}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+

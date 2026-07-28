@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 
-const TEST_PRICE_MULTIPLIER = 0.1
+const TEST_PRICE_MULTIPLIER = 1.0
 
 function calculateClientPrice(durationMinutes: number): number {
   let baseAmount = 0

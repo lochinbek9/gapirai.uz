@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     # AWS S3
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_BUCKET_NAME: str = "ai-dubber-videos"
-    AWS_REGION: str = "us-east-1"
+    AWS_BUCKET_NAME: str = "hr-lodex-recordings"
+    AWS_REGION: str = "eu-north-1"
+
 
     # Paths
     UPLOAD_DIR: str = "./uploads"
