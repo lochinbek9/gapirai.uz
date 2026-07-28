@@ -21,10 +21,13 @@ def _get_s3_client():
         kwargs["region_name"] = settings.AWS_REGION
 
     try:
-        # Enforce Signature Version 4 for S3 presigned URLs in regional buckets
+        # Enforce Signature Version 4 for S3 presigned URLs in regional buckets with path-style addressing
         s3_client = boto3.client(
             "s3",
-            config=Config(signature_version="s3v4"),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
             **kwargs
         )
         return s3_client, bucket
