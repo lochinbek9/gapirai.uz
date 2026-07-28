@@ -212,7 +212,7 @@ async def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
         s3_key = f"dubber/{job_id}/dubbed_audio.wav"
         presigned_url = generate_presigned_download_url(s3_key)
         if presigned_url:
-            return RedirectResponse(url=presigned_url)
+            return Response(status_code=307, headers={"Location": presigned_url})
 
     audio_path = job.dubbed_audio_path
     if not audio_path or not Path(audio_path).exists():
@@ -234,7 +234,7 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
         s3_key = f"dubber/{job_id}/dubbed_final.mp4"
         presigned_url = generate_presigned_download_url(s3_key)
         if presigned_url:
-            return RedirectResponse(url=presigned_url)
+            return Response(status_code=307, headers={"Location": presigned_url})
 
     video_path = job.output_video_path
     if not video_path or not Path(video_path).exists():
