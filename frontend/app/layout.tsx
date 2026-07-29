@@ -8,17 +8,36 @@ const inter = Inter({ subsets: ["latin"], display: "swap" });
 export const metadata: Metadata = {
   metadataBase: new URL('https://xadichai.uz'),
   title: {
-    default: "Xadichai.uz — AI yordamida YouTube videolarini o'zbekcha dublyaj qilish",
-    template: "%s | Xadichai.uz",
+    default: "Xadichai.uz — Hadicha & Xadicha AI Dublyaj Programmasi | Online Video Dublyaj Dasturi",
+    template: "%s | Xadichai.uz (Hadicha Dublyaj)",
   },
-  description: "Xadichai.uz — Sun'iy intellekt (AI) yordamida YouTube va boshqa videolarni tezkor, sifatli hamda avtomatik o'zbek tiliga dublyaj va tarjima qilish platformasi. O'zbekcha dublyaj, tarjima va ovozlashtirish.",
+  description: "Xadichai.uz (Hadicha / Xadicha) — YouTube videolarni sun'iy intellekt (AI) yordamida tezkor, bepul va avtomatik o'zbek tiliga dublyaj qiluvchi eng ilg'or dublyaj programmasi va video tarjima dasturi.",
   keywords: [
-    "Xadichai",
+    // Brand Variations (O'zbek, Kirill va Lotin qidiruvlar)
+    "xadicha",
+    "hadicha",
+    "xadichai",
+    "hadichai",
     "xadichai.uz",
-    "Xadicha",
+    "hadicha uz",
     "xadicha uz",
-    "xadichai dublyaj",
+    "hadicha dublyaj",
+    "xadicha dublyaj",
+    "xadicha ai",
+    "hadicha ai",
+
+    // Dublyaj & Dastur Qidiruv Kalit So'zlari
+    "dublyaj",
+    "dublyaj programmasi",
+    "dublyaj dasturi",
+    "dublyaj qilish",
+    "dublyaj sayti",
+    "online dublyaj",
+    "onlayn dublyaj",
+    "video dublyaj",
+    "video dublyaj dasturi",
     "youtube dublyaj",
+    "youtube dublyaj programmasi",
     "youtube o'zbekcha dublyaj",
     "youtube video tarjima",
     "youtube tarjimon",
@@ -29,15 +48,14 @@ export const metadata: Metadata = {
     "AI dublyaj",
     "ai dubbing uzbek",
     "sun'iy intellekt dublyaj",
-    "ai tarjima",
+    "ai tarjima programmasi",
     "video tarjima ai",
     "videolarni o'zbek tiliga o'girish",
-    "ovozlashtirish",
-    "video ovoz berish",
-    "ai voice generator uzbek",
-    "xadichai ai dubbing platformasi"
+    "ovozlashtirish dasturi",
+    "video ovoz berish programmasi",
+    "ai voice generator uzbek"
   ],
-  authors: [{ name: "Xadichai.uz Team", url: "https://xadichai.uz" }],
+  authors: [{ name: "Xadichai.uz Team (Hadicha)", url: "https://xadichai.uz" }],
   creator: "Xadichai.uz",
   publisher: "Xadichai.uz",
   alternates: {
@@ -57,22 +75,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "uz_UZ",
     url: "https://xadichai.uz",
-    siteName: "Xadichai.uz",
-    title: "Xadichai.uz — AI yordamida YouTube videolarini o'zbekcha dublyaj qilish",
-    description: "Sun'iy intellekt yordamida videolarni avtomatik va sifatli o'zbek tiliga dublyaj hamda tarjima qiling.",
+    siteName: "Xadichai.uz (Hadicha Dublyaj)",
+    title: "Xadichai.uz — Hadicha & Xadicha AI Dublyaj Programmasi",
+    description: "Sun'iy intellekt yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj hamda tarjima qiluvchi dastur va platforma.",
     images: [
       {
         url: "/logo.png",
         width: 1200,
         height: 630,
-        alt: "Xadichai.uz AI Dubbing",
+        alt: "Xadichai.uz Hadicha AI Dublyaj Programmasi",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Xadichai.uz — AI yordamida YouTube videolarini o'zbekcha dublyaj qilish",
-    description: "Videolarni AI yordamida avtomatik o'zbek tiliga dublyaj qilamiz.",
+    title: "Xadichai.uz — Hadicha & Xadicha AI Dublyaj Programmasi",
+    description: "Videolarni AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi dastur va sayt.",
     images: ["/logo.png"],
   },
   robots: {
@@ -93,14 +111,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const jsonLd = {
+  const softwareAppSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Xadichai.uz",
+    "alternateName": [
+      "Hadicha",
+      "Xadicha",
+      "Hadicha uz",
+      "Xadicha uz",
+      "Xadichai",
+      "Hadichai",
+      "Hadicha Dublyaj",
+      "Xadicha Dublyaj",
+      "Dublyaj Programmasi",
+      "Dublyaj Dasturi"
+    ],
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "All",
     "url": "https://xadichai.uz",
-    "description": "YouTube videolarini sun'iy intellekt (AI) yordamida avtomatik o'zbek tiliga dublyaj va tarjima qilish platformasi.",
+    "description": "Hadicha (Xadichai.uz) — YouTube videolarni sun'iy intellekt (AI) yordamida avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn dublyaj programmasi va dasturi.",
     "offers": {
       "@type": "Offer",
       "price": "0",
@@ -108,12 +138,47 @@ export default function RootLayout({
     }
   };
 
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Hadicha (Xadichai.uz) nima?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Xadichai.uz (Hadicha) — sun'iy intellekt (AI) yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi innovatsion onlayn platforma va dublyaj programmasidir."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Dublyaj programmasi orqali videolarni o'zbekcha qilish bepulmi?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Ha! Xadichai.uz saytida 10 daqiqagacha bo'lgan YouTube videolarni mutlaqo bepul va tezkor o'zbek tiliga dublyaj qilishingiz mumkin."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "YouTube videolarni o'zbek tiliga dublyaj qilish qanday ishlaydi?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Shunchaki YouTube havolasini Xadichai.uz (Hadicha) saytiga joylaysiz. Sun'iy intellekt video matnini ajratadi, professional o'zbek tiliga tarjima qiladi va tabiiy insoniy ovozda dublyaj qiladi."
+        }
+      }
+    ]
+  };
+
   return (
     <html lang="uz" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         />
       </head>
       <body className={inter.className}>
