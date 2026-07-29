@@ -91,11 +91,12 @@ export default function VideoPage() {
           <button onClick={() => router.back()} className="text-slate-400 hover:text-white transition">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <Youtube className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-base font-bold text-white">AI Dubber</span>
+          <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
+            <img src="/logo.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain dark:hidden" />
+            <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain hidden dark:block" />
+            <span className="text-base font-black tracking-tight text-black dark:text-white">
+              Xadichai<span className="text-red-500">.uz</span>
+            </span>
           </Link>
         </div>
       </header>

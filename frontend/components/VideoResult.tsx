@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2 } from "lucide-react";
+import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, formatDuration } from "@/lib/api";
 import { useState } from "react";
@@ -16,8 +16,39 @@ const API_BASE = getApiUrl();
 
 export default function VideoResult({ job, onReset }: Props) {
   const [showText, setShowText] = useState(false);
+  const [copied, setCopied] = useState(false);
   const videoUrl = `${API_BASE}${job.output_video_url}`;
   const downloadUrl = getDownloadUrl(job.job_id);
+
+  const handleShare = async () => {
+    const shareUrl = typeof window !== "undefined"
+      ? `${window.location.origin}/video/${job.job_id}`
+      : "";
+    const title = job.video_title || "Dublyaj qilingan video";
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: "Xadichai.uz orqali o'zbek tiliga dublyaj qilingan videoni ko'ring!",
+          url: shareUrl || window.location.href,
+        });
+        return;
+      } catch (err) {
+        // User canceled or web share failed, fallback to copy
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl || window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch (err) {
+        console.error("Clipboard copy failed:", err);
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -25,19 +56,19 @@ export default function VideoResult({ job, onReset }: Props) {
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-4 bg-green-500/10 border border-green-500/20 rounded-3xl px-6 py-4 transition-colors"
+        className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl px-6 py-4 transition-colors"
       >
         <div className="relative">
-           <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-500 transition-colors" strokeWidth={2.5} />
+           <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-500 transition-colors" strokeWidth={2.5} />
            <motion.div 
-             className="absolute inset-0 bg-green-500 rounded-full blur-lg opacity-20"
+             className="absolute inset-0 bg-emerald-500 rounded-full blur-lg opacity-20"
              animate={{ scale: [1, 1.5, 1] }}
              transition={{ duration: 2, repeat: Infinity }}
            />
         </div>
         <div>
-          <h3 className="text-sm font-black text-green-600 dark:text-green-400 uppercase tracking-widest transition-colors">Dublyaj Tayyor!</h3>
-          <p className="text-[11px] text-green-600/60 dark:text-green-400/60 font-medium transition-colors">Video muvaffaqiyatli qayta ishlandi</p>
+          <h3 className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest transition-colors">Dublyaj Tayyor!</h3>
+          <p className="text-[11px] text-emerald-600/60 dark:text-emerald-400/60 font-medium transition-colors">Video muvaffaqiyatli qayta ishlandi</p>
         </div>
       </motion.div>
 
@@ -65,18 +96,26 @@ export default function VideoResult({ job, onReset }: Props) {
             </h4>
             <div className="flex items-center gap-2">
                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase transition-colors">Davomiyligi</span>
-               <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 transition-colors">{formatDuration(job.video_duration || 0)}</span>
+               <span className="text-[10px] font-mono text-red-600 dark:text-red-400 transition-colors">{formatDuration(job.video_duration || 0)}</span>
             </div>
           </div>
           
           <div className="flex gap-2">
             <motion.button 
+              onClick={handleShare}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="p-3 bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl hover:bg-black/10 dark:hover:bg-white/[0.08] transition-colors"
+              className="px-3.5 py-3 bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl hover:bg-black/10 dark:hover:bg-white/[0.08] transition-all flex items-center gap-1.5"
               title="Ulashish"
             >
-              <Share2 size={18} className="text-gray-500 transition-colors" />
+              {copied ? (
+                <>
+                  <Check size={18} className="text-emerald-500 transition-colors" />
+                  <span className="text-xs font-bold text-emerald-500">Nusxalandi!</span>
+                </>
+              ) : (
+                <Share2 size={18} className="text-gray-500 dark:text-gray-400 transition-colors" />
+              )}
             </motion.button>
           </div>
         </div>
@@ -87,9 +126,8 @@ export default function VideoResult({ job, onReset }: Props) {
           whileHover={{ y: -2 }}
           whileTap={{ y: 0 }}
           className="btn-premium w-full flex items-center justify-center gap-3
-                     bg-gradient-to-r from-blue-600 to-indigo-600 
-                     text-white font-bold py-5 rounded-[24px]
-                     transition-all duration-300 text-sm shadow-xl shadow-blue-900/40"
+                     py-5 rounded-[24px]
+                     transition-all duration-300 text-sm shadow-xl font-extrabold"
         >
           <Download size={18} />
           Videoni yuklab olish
@@ -104,7 +142,7 @@ export default function VideoResult({ job, onReset }: Props) {
             className="w-full flex items-center justify-between px-6 py-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
           >
             <div className="flex items-center gap-3">
-               <div className="w-1 h-1 rounded-full bg-blue-500"></div>
+               <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest transition-colors">O'zbekcha matn</span>
             </div>
             <ChevronDown 

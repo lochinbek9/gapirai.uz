@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Dubber API",
-    description="YouTube videolarini o'zbek tiliga dublyaj qilish",
+    title="Xadichai.uz API",
+    description="YouTube videolarini sun'iy intellekt yordamida o'zbek tiliga dublyaj va tarjima qilish platformasi API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -64,4 +64,4 @@ app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs"
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "AI Dubber"}
+    return {"status": "ok", "service": "Xadichai.uz"}

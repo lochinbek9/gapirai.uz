@@ -11,14 +11,14 @@ import {
 
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { color: string; icon: React.ReactNode }> = {
-    completed: { color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CheckCircle2 className="w-3 h-3" /> },
-    failed: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: <XCircle className="w-3 h-3" /> },
-    pending: { color: 'bg-slate-500/20 text-slate-400 border-slate-500/30', icon: <Clock className="w-3 h-3" /> },
+    completed: { color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
+    failed: { color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20', icon: <XCircle className="w-3 h-3" /> },
+    pending: { color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', icon: <Clock className="w-3 h-3" /> },
   }
-  const def = { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
+  const def = { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
   const { color, icon } = cfg[status] || def
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${color}`}>
       {icon}
       {STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status}
     </span>
@@ -31,32 +31,32 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
   const isReady = job.status === 'completed'
 
   return (
-    <div className="group bg-white/5 hover:bg-white/8 border border-white/10 hover:border-white/20 rounded-2xl overflow-hidden transition-all">
+    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
       {/* Thumbnail */}
-      <div className="relative aspect-video bg-slate-800 overflow-hidden">
+      <div className="relative aspect-video bg-black/10 dark:bg-slate-900/60 overflow-hidden">
         {job.video_thumbnail ? (
           <img src={thumbnail} alt={job.video_title || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Youtube className="w-12 h-12 text-slate-600" />
+          <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/[0.02]">
+            <Youtube className="w-12 h-12 text-slate-400 dark:text-slate-700" />
           </div>
         )}
         {/* Duration badge */}
-        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-mono">
+        <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-lg font-mono font-bold tracking-tighter">
           {duration}
         </div>
         {/* Play overlay */}
         {isReady && (
-          <Link href={`/video/${job.job_id}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
-            <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-              <Play className="w-6 h-6 text-slate-900 ml-1" />
+          <Link href={`/video/${job.job_id}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm">
+            <div className="w-12 h-12 bg-white/95 rounded-2xl flex items-center justify-center shadow-lg transition transform translate-y-2 group-hover:translate-y-0 duration-300">
+              <Play className="w-5 h-5 text-indigo-600 fill-indigo-600 ml-0.5" />
             </div>
           </Link>
         )}
         {/* Gender badge */}
         {job.speaker_gender && (
-          <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            {job.speaker_gender === 'female' ? <Mic2 className="w-3 h-3 text-pink-400" /> : <Mic2 className="w-3 h-3 text-blue-400" />}
+          <div className="absolute top-2.5 left-2.5 bg-black/70 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm">
+            {job.speaker_gender === 'female' ? <Mic2 className="w-3 h-3 text-pink-400" /> : <Mic2 className="w-3 h-3 text-indigo-400" />}
             {job.speaker_gender === 'female' ? 'Ayol' : 'Erkak'}
           </div>
         )}
@@ -64,7 +64,7 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="text-white font-medium text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
+        <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
           {job.video_title || 'Yuklanmoqda...'}
         </h3>
         <div className="flex items-center justify-between">
@@ -73,22 +73,32 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
             {isReady && (
               <Link
                 href={`/video/${job.job_id}`}
-                className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-bold"
               >
                 Ko'rish →
               </Link>
             )}
             <button
               onClick={() => onDelete(job.job_id)}
-              className="text-slate-500 hover:text-red-400 transition p-1 rounded"
+              className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+function MeshBackground() {
+  return (
+    <div className="mesh-gradient">
+      <div className="mesh-gradient-blob blob-1" />
+      <div className="mesh-gradient-blob blob-2" />
+      <div className="mesh-gradient-blob blob-3" />
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -108,7 +118,6 @@ export default function DashboardPage() {
         .catch(console.error)
         .finally(() => setJobsLoading(false))
 
-      // Jarayondagi joblarni yangilash
       const interval = setInterval(() => {
         listJobs().then(setJobs).catch(console.error)
       }, 5000)
@@ -129,8 +138,8 @@ export default function DashboardPage() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      <div className="min-h-screen bg-[#050101] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-red-500" />
       </div>
     )
   }
@@ -139,31 +148,31 @@ export default function DashboardPage() {
   const processingCount = jobs.filter(j => !['completed', 'failed'].includes(j.status)).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950">
+    <div className="min-h-screen relative flex flex-col transition-colors duration-300">
+      <MeshBackground />
+
       {/* Header */}
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
+      <header className="border-b border-black/5 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <Youtube className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-white">AI Dubber</span>
+          <Link href="/" className="flex items-center gap-3 group">
+            <img src="/logo.png" alt="Xadichai.uz" className="h-8 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" />
+            <img src="/logodark.png" alt="Xadichai.uz" className="h-8 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" />
           </Link>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-300">
-              <User2 className="w-4 h-4" />
-              <span className="text-sm">{user.name}</span>
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
+              <User2 className="w-4 h-4 text-red-500" />
+              <span className="text-xs font-bold">{user.name}</span>
             </div>
             <Link
               href="/"
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+              className="flex items-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md"
             >
               <Plus className="w-4 h-4" />
-              Yangi
+              Yangi video
             </Link>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition"
+              className="flex items-center gap-2 text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-xs font-bold transition px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
             >
               <LogOut className="w-4 h-4" />
               Chiqish
@@ -172,36 +181,35 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-slate-400 text-sm mb-1">Jami</p>
-            <p className="text-3xl font-bold text-white">{jobs.length}</p>
+        <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-8">
+          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Jami</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white">{jobs.length}</p>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-slate-400 text-sm mb-1">Tayyor</p>
-            <p className="text-3xl font-bold text-green-400">{completedCount}</p>
+          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Tayyor</p>
+            <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{completedCount}</p>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-slate-400 text-sm mb-1">Jarayonda</p>
-            <p className="text-3xl font-bold text-blue-400">{processingCount}</p>
+          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Jarayonda</p>
+            <p className="text-3xl font-black text-red-600 dark:text-red-400">{processingCount}</p>
           </div>
         </div>
 
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-white mb-6">Mening videolarim</h1>
+        <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
 
         {/* Grid */}
         {jobsLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-red-500" />
           </div>
         ) : jobs.length === 0 ? (
-          <div className="text-center py-20">
-            <Youtube className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 text-lg mb-2">Hali video yo'q</p>
-            <Link href="/" className="text-blue-400 hover:text-blue-300">
+          <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
+            <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
+            <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
+            <Link href="/" className="text-red-500 hover:underline text-xs font-bold uppercase tracking-wider">
               Birinchi videoni dublyaj qiling →
             </Link>
           </div>

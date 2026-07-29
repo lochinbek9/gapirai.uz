@@ -10,18 +10,17 @@ logger = logging.getLogger(__name__)
 def _get_s3_client():
     settings = get_settings()
     bucket = settings.AWS_BUCKET_NAME
-    if not bucket:
+    if not bucket or not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
         return None, None
 
-    kwargs = {}
-    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
-        kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
-        kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+    kwargs = {
+        "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+        "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+    }
     if settings.AWS_REGION:
         kwargs["region_name"] = settings.AWS_REGION
 
     try:
-        # Enforce Signature Version 4 for S3 presigned URLs in regional buckets with path-style addressing
         s3_client = boto3.client(
             "s3",
             config=Config(
@@ -49,7 +48,7 @@ def upload_file_to_s3(file_path: str, object_name: str) -> bool:
         s3_client.upload_file(file_path, bucket, object_name)
         logger.info(f"Successfully uploaded {file_path} to S3 as {object_name}")
         return True
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"S3 upload failed for {file_path}: {e}")
         return False
 
@@ -66,6 +65,6 @@ def generate_presigned_download_url(object_name: str, expiration: int = 3600) ->
             ExpiresIn=expiration,
         )
         return response
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"Failed to generate presigned URL: {e}")
         return None

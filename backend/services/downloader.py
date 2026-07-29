@@ -92,10 +92,10 @@ class YoutubeRateLimiter:
 _rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
 
 
-def _build_yt_opts(extra: dict | None = None) -> tuple[dict, str | None]:
+def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple[dict, str | None]:
     """yt-dlp options tuned for single-IP anti-blocking.
 
-    Auth: cookies.txt (required). Falls back to unauthenticated iOS client if cookies missing.
+    Auth: cookies.txt (optional). Falls back to unauthenticated iOS/Android client if cookies missing or disabled.
     Copies cookies.txt to a temporary file so yt-dlp can write session cookies without failing
     if COOKIES_PATH is on a read-only filesystem mount.
     """
@@ -112,15 +112,14 @@ def _build_yt_opts(extra: dict | None = None) -> tuple[dict, str | None]:
         },
         "extractor_args": {
             "youtube": {
-                "player_client": "web,web_creator,ios",
-                "player_skip": ["webpage", "configs"],
+                "player_client": ["web", "ios", "android", "mweb"],
             }
         },
     }
 
     temp_cookie_path = None
     cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
-    if os.path.isfile(cookies_target):
+    if use_cookies and os.path.isfile(cookies_target):
         try:
             tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
             shutil.copyfile(cookies_target, tmp.name)
@@ -131,8 +130,8 @@ def _build_yt_opts(extra: dict | None = None) -> tuple[dict, str | None]:
             logger.warning(f"Could not copy cookies file from {cookies_target}: {e}")
             opts["cookiefile"] = cookies_target
     else:
-        # No cookies — use iOS-only (less strict) but limited formats
-        opts["extractor_args"]["youtube"]["player_client"] = "ios,web_creator"
+        # No cookies or unauthenticated fallback — use iOS/Android/mweb clients
+        opts["extractor_args"]["youtube"]["player_client"] = ["ios", "mweb", "android"]
 
     if extra:
         opts.update(extra)
@@ -140,9 +139,9 @@ def _build_yt_opts(extra: dict | None = None) -> tuple[dict, str | None]:
 
 
 @contextmanager
-def get_yt_dlp(extra: dict | None = None):
+def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True):
     """Context manager for YoutubeDL instance ensuring temporary cookie files are cleaned up."""
-    opts, temp_cookie_path = _build_yt_opts(extra)
+    opts, temp_cookie_path = _build_yt_opts(extra, use_cookies=use_cookies)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             yield ydl
@@ -156,7 +155,7 @@ def get_yt_dlp(extra: dict | None = None):
 
 def get_video_info(youtube_url: str) -> dict:
     try:
-        with get_yt_dlp() as ydl:
+        with get_yt_dlp(use_cookies=True) as ydl:
             info = ydl.extract_info(youtube_url, download=False)
             return {
                 "title": info.get("title", "Unknown"),
@@ -165,13 +164,23 @@ def get_video_info(youtube_url: str) -> dict:
                 "uploader": info.get("uploader", ""),
             }
     except Exception as e:
-        err_str = str(e)
-        if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
-            raise RuntimeError(
-                "YouTube session cookielari eskirgan yoki bekor qilingan (browser session rotated). "
-                "Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-            ) from e
-        raise RuntimeError(f"Video ma'lumot olishda xatolik: {e}") from e
+        logger.warning(f"Extract info with cookies failed ({e}). Retrying without cookies...")
+        try:
+            with get_yt_dlp(use_cookies=False) as ydl:
+                info = ydl.extract_info(youtube_url, download=False)
+                return {
+                    "title": info.get("title", "Unknown"),
+                    "duration": info.get("duration", 0),
+                    "thumbnail": info.get("thumbnail", ""),
+                    "uploader": info.get("uploader", ""),
+                }
+        except Exception as e2:
+            err_str = f"{e} | {e2}"
+            if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
+                raise RuntimeError(
+                    "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+                ) from e2
+            raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
 
 
 def download_video(youtube_url: str, job_id: str) -> dict:
@@ -199,18 +208,24 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
     }
 
     try:
-        with get_yt_dlp(extra_opts) as ydl:
+        with get_yt_dlp(extra_opts, use_cookies=True) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
             title = info.get("title", "Unknown")
             duration = float(info.get("duration", 0) or 0)
     except Exception as e:
-        err_str = str(e)
-        if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
-            raise RuntimeError(
-                "YouTube session cookielari eskirgan yoki bekor qilingan (browser session rotated). "
-                "Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-            ) from e
-        raise RuntimeError(f"Video yuklashda xatolik: {e}") from e
+        logger.warning(f"Download with cookies failed ({e}). Retrying without cookies...")
+        try:
+            with get_yt_dlp(extra_opts, use_cookies=False) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+                title = info.get("title", "Unknown")
+                duration = float(info.get("duration", 0) or 0)
+        except Exception as e2:
+            err_str = f"{e} | {e2}"
+            if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
+                raise RuntimeError(
+                    "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+                ) from e2
+            raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
 
     video_file = None
     for f in job_dir.iterdir():

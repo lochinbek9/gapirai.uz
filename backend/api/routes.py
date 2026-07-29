@@ -239,6 +239,7 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     video_path = job.output_video_path
     if not video_path or not Path(video_path).exists():
         raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
-    filename = f"dubbed_{job.video_title or job_id}.mp4"
+    safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
+    filename = f"dubbed_{safe_title or job_id}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
 

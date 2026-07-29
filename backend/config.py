@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "AI Dubber"
+    APP_NAME: str = "Xadichai.uz"
     DEBUG: bool = False
 
     # Database
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
+
+    # Google AI Studio / Gemini API
+    GEMINI_API_KEY: str = ""
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""

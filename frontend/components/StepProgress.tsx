@@ -45,13 +45,13 @@ export default function StepProgress({ job, elapsed }: Props) {
               <motion.div
                 initial={false}
                 animate={{
-                  scale: isActive ? 1.1 : 1,
-                  backgroundColor: isCompleted ? "rgb(34, 197, 94)" : isActive ? "rgb(59, 130, 246)" : "rgba(100, 116, 139, 0.05)",
-                  borderColor: isActive ? "rgba(59, 130, 246, 0.5)" : "rgba(100, 116, 139, 0.1)",
+                  scale: isActive ? 1.15 : 1,
+                  backgroundColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgb(239, 68, 68)" : "rgba(255, 255, 255, 0.02)",
+                  borderColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgba(239, 68, 68, 0.8)" : "rgba(255, 255, 255, 0.05)",
                 }}
                 className={`
                   w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500
-                  ${isCompleted ? "shadow-lg shadow-green-500/20" : isActive ? "shadow-xl shadow-blue-500/30" : ""}
+                  ${isCompleted ? "shadow-lg shadow-emerald-500/20 text-white" : isActive ? "shadow-xl shadow-red-500/30 text-white" : "text-gray-500"}
                 `}
               >
                 <AnimatePresence mode="wait">
@@ -69,20 +69,20 @@ export default function StepProgress({ job, elapsed }: Props) {
                       key="active"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="relative"
+                      className="relative flex items-center justify-center w-full h-full"
                     >
-                       <span className="text-lg">{step.icon}</span>
-                       <div className="absolute -inset-0 rounded-full border-2 border-white/20 border-t-white dark:border-white/20 animate-spin"></div>
+                       <span className="text-lg z-10">{step.icon}</span>
+                       <div className="absolute inset-0 rounded-2xl border-2 border-white/20 border-t-white dark:border-white/20 animate-spin"></div>
                     </motion.div>
                   ) : (
-                    <motion.span key="icon" className="text-gray-400 dark:text-gray-700 opacity-60 grayscale transition-colors">{step.icon}</motion.span>
+                    <motion.span key="icon" className="text-gray-400 dark:text-gray-600 opacity-60 grayscale transition-colors">{step.icon}</motion.span>
                   )}
                 </AnimatePresence>
               </motion.div>
               
               <div className="text-center">
-                 <p className={`text-[9px] font-bold uppercase tracking-tighter transition-colors duration-300
-                    ${isCompleted ? "text-green-500" : isActive ? "text-blue-500" : "text-gray-400 dark:text-gray-700"}`}>
+                 <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors duration-300
+                    ${isCompleted ? "text-emerald-500" : isActive ? "text-red-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
                    {step.label}
                  </p>
               </div>
@@ -94,7 +94,7 @@ export default function StepProgress({ job, elapsed }: Props) {
         <div className="absolute top-5 left-8 right-8 h-[2px] bg-black/5 dark:bg-white/[0.03] -z-0 transition-colors"></div>
         {/* Active Connector Line */}
         <motion.div 
-          className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-green-500 to-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] -z-0"
+          className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-emerald-500 via-red-500 to-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.5)] -z-0"
           initial={{ width: 0 }}
           animate={{ width: `${(current / (STEPS.length - 1)) * 88}%` }}
           transition={{ duration: 1, ease: "easeInOut" }}
@@ -106,24 +106,24 @@ export default function StepProgress({ job, elapsed }: Props) {
         <div className="flex justify-between items-end">
            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                 <Sparkles className="w-3 h-3 text-blue-500 animate-pulse" />
-                 <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400/80 uppercase tracking-widest transition-colors">{job.status_message}</p>
+                 <Sparkles className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                 <p className="text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
-                 <p className="text-3xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
-                   {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
+                 <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
+                   {Math.round(job.progress)}<span className="text-red-500 text-lg ml-0.5">%</span>
                  </p>
                  <div className="py-1 px-3 rounded-full bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex items-center gap-2 transition-colors">
-                    <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 animate-pulse transition-colors"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse transition-colors"></div>
                     <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 transition-colors">{formatElapsed(elapsed)}</span>
                  </div>
               </div>
            </div>
         </div>
 
-        <div className="relative h-2 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1px] transition-colors">
+        <div className="relative h-3.5 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1.5px] transition-colors">
           <motion.div
-            className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-400 rounded-full"
+            className="h-full bg-gradient-to-r from-emerald-500 via-red-500 to-rose-400 rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${job.progress}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}

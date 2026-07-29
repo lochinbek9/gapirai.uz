@@ -11,7 +11,9 @@ import UrlInput from "@/components/UrlInput";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
+import Footer from "@/components/Footer";
 import { LayoutDashboard, LogIn, X, UserPlus } from "lucide-react";
+
 
 /* ── LocalStorage helpers ─────────────────────────── */
 const JOB_KEY = "dubber_last_job";
@@ -60,24 +62,24 @@ function Logo() {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-4 text-center mb-8"
+      className="flex flex-col items-center gap-2.5 text-center mb-6 sm:mb-8 px-2"
     >
-      <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
-        <div className="relative w-16 h-16 rounded-2xl bg-white dark:bg-[#0F172A] border border-black/5 dark:border-white/10 flex items-center justify-center shadow-2xl transition-colors duration-300">
-          <svg viewBox="0 0 24 24" className="w-8 h-8 fill-blue-500">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" />
-          </svg>
-        </div>
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-md shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+        <span className="text-[11px] font-extrabold text-red-600 dark:text-red-400 tracking-wider uppercase">
+          AI Studio 2.0 • Avtomatik Dublyaj
+        </span>
       </div>
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 transition-colors duration-300">
-          AI Dubber
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1">
-          Professional darajada avtomatik dublyaj platformasi
-        </p>
-      </div>
+
+      <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-black dark:text-white transition-colors duration-300">
+        Xadichai<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-500 to-pink-500">.uz</span>
+      </h1>
+      <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 font-medium max-w-md leading-relaxed">
+        YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-gray-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
+      </p>
+      <h2 className="sr-only">
+        YouTube videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj va tarjima qilish platformasi — Xadicha uz (Xadichai)
+      </h2>
     </motion.div>
   );
 }
@@ -90,14 +92,14 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", duration: 0.5 }}
-          className="relative w-full max-w-md bg-white dark:bg-[#0F172A] rounded-[32px] p-8 shadow-2xl border border-black/5 dark:border-white/10"
+          className="relative w-full max-w-md bg-white dark:bg-[#070202] rounded-[32px] p-8 shadow-2xl border border-black/5 dark:border-white/10"
         >
           {/* Yopish */}
           <button
@@ -109,35 +111,33 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
 
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-xl">
-              <svg viewBox="0 0 24 24" className="w-8 h-8 fill-white">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" />
-              </svg>
+            <div className="p-2 transition duration-300 hover:scale-105">
+              <img src="/logo.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain dark:hidden" />
+              <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain hidden dark:block" />
             </div>
           </div>
 
-          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white text-center mb-2">
-            AI Dubber'ga xush kelibsiz
+          <h2 className="text-2xl font-black text-black dark:text-white text-center mb-2">
+            Xadichai.uz ga xush kelibsiz
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed">
-            YouTube videolarini o'zbek tiliga dublyaj qiling.
-            Barcha videolaringizni saqlash uchun hisob oching.
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed px-4">
+            YouTube videolarini o'zbek tiliga soniyalar ichida dublyaj qiling. Barcha videolaringizni saqlash uchun bepul hisob oching.
           </p>
 
           <div className="space-y-3">
             <Link
               href="/register"
               onClick={onClose}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-2xl transition shadow-lg shadow-blue-900/20 text-sm"
+              className="w-full flex items-center justify-center gap-2 btn-premium py-3.5 rounded-2xl font-extrabold text-sm"
             >
               <UserPlus className="w-4 h-4" />
-              Bepul ro'yhatdan o'tish
+              Bepul ro'yxatdan o'tish
             </Link>
 
             <Link
               href="/login"
               onClick={onClose}
-              className="w-full flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 font-semibold py-3.5 rounded-2xl transition text-sm"
+              className="w-full flex items-center justify-center gap-2 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 font-semibold py-3.5 rounded-2xl transition text-sm"
             >
               <LogIn className="w-4 h-4" />
               Hisobim bor — kirish
@@ -145,7 +145,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
 
             <button
               onClick={onClose}
-              className="w-full text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 py-2 transition"
+              className="w-full text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 py-2 transition font-medium"
             >
               Hisobsiz davom etish
             </button>
@@ -161,8 +161,7 @@ export default function Home() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // jobId — lazy init orqali localStorage dan tiklanadi (refresh da yo'qolmaydi)
-  const [jobId, setJobId] = useState<string | null>(loadJobId);
+  const [jobId, setJobId] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -174,13 +173,16 @@ export default function Home() {
 
   const { job } = useJobPolling(jobId);
 
-  // Birinchi tashrif — login yo'q, modal ko'rsatilmagan bo'lsa
+  useEffect(() => {
+    const saved = loadJobId();
+    if (saved) setJobId(saved);
+  }, []);
+
   useEffect(() => {
     if (authLoading) return;
     if (isLoggedIn) return;
     const seen = localStorage.getItem("dubber_welcome_seen");
     if (!seen) {
-      // Kichik kechikish — sahifa yuklanganidan keyin ko'rsin
       const t = setTimeout(() => setShowWelcome(true), 800);
       return () => clearTimeout(t);
     }
@@ -191,12 +193,10 @@ export default function Home() {
     localStorage.setItem("dubber_welcome_seen", "1");
   };
 
-  // jobId o'zgarganda localStorage ga saqlash
   useEffect(() => {
     if (jobId) saveJobId(jobId);
   }, [jobId]);
 
-  // Timer
   useEffect(() => {
     if (!jobId || !job) return;
     if (job.status === "completed" || job.status === "failed") return;
@@ -207,7 +207,6 @@ export default function Home() {
     return () => clearInterval(id);
   }, [jobId, job?.status]);
 
-  // Redirect to payment if awaiting payment
   useEffect(() => {
     if (jobId && job && job.status === "awaiting_payment") {
       router.push(`/video/${jobId}`);
@@ -260,33 +259,40 @@ export default function Home() {
     : "processing";
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center p-6 sm:p-12 overflow-hidden transition-colors duration-300">
+    <main className="relative min-h-screen flex flex-col items-center justify-start sm:justify-center pt-24 sm:pt-16 pb-12 px-4 sm:px-8 overflow-x-hidden transition-colors duration-300">
       <MeshBackground />
 
-      {/* Welcome modal */}
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
 
-      {/* Top right nav */}
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
-        {isLoggedIn ? (
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-4 py-2 rounded-xl transition backdrop-blur"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard
-          </Link>
-        ) : (
-          <Link
-            href="/login"
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-medium px-4 py-2 rounded-xl transition backdrop-blur"
-          >
-            <LogIn className="w-4 h-4" />
-            Kirish
-          </Link>
-        )}
-        <ThemeToggle />
-      </div>
+      <header className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
+        {/* Left Logo */}
+        <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
+          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-14 sm:h-16 w-auto object-contain scale-150 origin-left dark:hidden" />
+          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-14 sm:h-16 w-auto object-contain scale-150 origin-left hidden dark:block" />
+        </Link>
+
+        {/* Right Controls */}
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
+          {isLoggedIn ? (
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
+              Paneli
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+            >
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
+              Kirish
+            </Link>
+          )}
+          <ThemeToggle />
+        </div>
+      </header>
 
       <div className="w-full max-w-xl z-10">
         <Logo />
@@ -299,7 +305,6 @@ export default function Home() {
           transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
         >
           <AnimatePresence mode="wait">
-            {/* IDLE */}
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <UrlInput
@@ -315,38 +320,34 @@ export default function Home() {
               </motion.div>
             )}
 
-            {/* LOADING */}
             {phase === "loading" && (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-4">
                 <div className="relative flex items-center justify-center">
-                  <div className="absolute w-12 h-12 rounded-full border-t-2 border-blue-500 animate-spin" />
-                  <div className="w-8 h-8 rounded-full border-t-2 border-indigo-400 animate-spin-slow" />
+                  <div className="absolute w-12 h-12 rounded-full border-t-2 border-red-500 animate-spin" />
+                  <div className="w-8 h-8 rounded-full border-t-2 border-rose-400 animate-spin-slow" />
                 </div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 animate-pulse">Server bilan bog'lanilmoqda...</p>
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse">Server bilan bog'lanilmoqda...</p>
               </motion.div>
             )}
 
-            {/* PROCESSING */}
             {phase === "processing" && job && (
               <motion.div key="processing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 {job.video_title && (
                   <div className="pb-4 border-b border-black/5 dark:border-white/5 transition-colors">
-                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest block mb-1">Hozirgi video</span>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-1 transition-colors">{job.video_title}</h2>
+                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest block mb-1">Hozirgi video</span>
+                    <h2 className="text-base font-bold text-gray-900 dark:text-white line-clamp-1 transition-colors">{job.video_title}</h2>
                   </div>
                 )}
                 <StepProgress job={job} elapsed={elapsed} />
               </motion.div>
             )}
 
-            {/* DONE */}
             {phase === "done" && job && (
               <motion.div key="done" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
                 <VideoResult job={job} onReset={handleReset} />
               </motion.div>
             )}
 
-            {/* ERROR */}
             {phase === "error" && job && (
               <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-2">
@@ -362,7 +363,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={handleReset}
-                  className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all"
+                  className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
                 >
                   Qayta boshlash
                 </button>
@@ -370,18 +371,9 @@ export default function Home() {
             )}
           </AnimatePresence>
         </motion.div>
-
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="mt-12 text-center">
-          <div className="inline-flex items-center gap-6 px-6 py-2 rounded-full bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.05] transition-colors">
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">Stack</span>
-            <div className="flex gap-4 items-center">
-              {["OpenAI STT", "GPT-4o", "Azure TTS"].map((s) => (
-                <span key={s} className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-300 transition-colors cursor-default">{s}</span>
-              ))}
-            </div>
-          </div>
-        </motion.div>
       </div>
+
+      <Footer />
     </main>
   );
 }
