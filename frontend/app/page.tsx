@@ -259,7 +259,7 @@ export default function Home() {
     : "processing";
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-start sm:justify-center pt-24 sm:pt-16 pb-12 px-4 sm:px-8 overflow-x-hidden transition-colors duration-300">
+    <main className="relative min-h-screen flex flex-col items-center justify-start pt-20 sm:pt-24 pb-20 px-4 sm:px-8 overflow-x-hidden transition-colors duration-300">
       <MeshBackground />
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
@@ -294,7 +294,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="w-full max-w-xl z-10">
+      <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
         <Logo />
 
         <motion.div

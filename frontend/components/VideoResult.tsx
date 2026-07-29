@@ -3,7 +3,7 @@
 import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, formatDuration } from "@/lib/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
 import { getApiUrl } from "@/lib/runtime-config";
 
@@ -19,6 +19,12 @@ export default function VideoResult({ job, onReset }: Props) {
   const [copied, setCopied] = useState(false);
   const videoUrl = `${API_BASE}${job.output_video_url}`;
   const downloadUrl = getDownloadUrl(job.job_id);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 120, behavior: "smooth" });
+    }
+  }, []);
 
   const handleShare = async () => {
     const shareUrl = typeof window !== "undefined"
