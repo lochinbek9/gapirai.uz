@@ -61,7 +61,7 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];[1:a]alimiter=limit=0.95:level=true[a]",
             "-map", "[v]",
             "-map", "[a]",
-            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-c:v", "libx264", "-crf", "20", "-preset", "ultrafast", "-threads", "0",
             "-c:a", "aac", "-b:a", "192k",
             output_path,
         ]
