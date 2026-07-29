@@ -115,6 +115,27 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Xadichai.uz",
+    "alternateName": ["Hadicha", "Xadicha uz", "Hadicha Dublyaj"],
+    "url": "https://xadichai.uz",
+    "inLanguage": "uz",
+    "description": "YouTube videolarni sun'iy intellekt (AI) yordamida tezkor, bepul va avtomatik o'zbek tiliga dublyaj qiluvchi eng ilg'or dublyaj programmasi."
+  };
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Xadichai.uz",
+    "url": "https://xadichai.uz",
+    "logo": "https://xadichai.uz/logo.png",
+    "sameAs": [
+      "https://xadichai.uz"
+    ]
+  };
+
   const softwareAppSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -177,6 +198,14 @@ export default function RootLayout({
     <html lang="uz" suppressHydrationWarning>
       <head>
         <meta name="google-site-verification" content="srZlb7Q_Zziyn-5bWCG4Kc5NLwyyALavPhPL9MaU_iU" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
