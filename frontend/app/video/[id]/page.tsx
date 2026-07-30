@@ -90,7 +90,17 @@ export default function VideoPage() {
       {/* Header */}
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-slate-400 hover:text-white transition">
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back()
+              } else {
+                router.push('/')
+              }
+            }}
+            className="text-slate-400 hover:text-white transition p-2 -ml-2 rounded-xl hover:bg-white/5"
+            title="Orqaga qaytish"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
@@ -177,6 +187,13 @@ export default function VideoPage() {
                   <p className="text-[11px] text-slate-500">
                     To'lov tasdiqlangandan so'ng, dublyaj jarayoni avtomatik tarzda boshlanadi.
                   </p>
+
+                  <Link
+                    href="/"
+                    className="inline-block text-xs font-semibold text-slate-400 hover:text-white transition pt-2"
+                  >
+                    ← Bosh sahifaga qaytish
+                  </Link>
                 </div>
               </div>
             ) : (

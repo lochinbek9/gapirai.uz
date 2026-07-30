@@ -24,6 +24,7 @@ class InitiatePaymentRequest(BaseModel):
 @router.post("/initiate")
 async def initiate_payment(
     req: InitiatePaymentRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
@@ -99,8 +100,16 @@ async def initiate_payment(
 
     merchant_id = settings.CLICK_MERCHANT_ID or "56653"
     service_id = settings.CLICK_SERVICE_ID or "97933"
-    frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-    return_url = f"{frontend_url}/video/{job.id}"  # redirect back to video page
+    
+    origin_header = request.headers.get("origin") or request.headers.get("referer")
+    if origin_header:
+        from urllib.parse import urlparse
+        parsed = urlparse(origin_header)
+        base_origin = f"{parsed.scheme}://{parsed.netloc}"
+        return_url = f"{base_origin}/video/{job.id}"
+    else:
+        frontend_url = settings.FRONTEND_URL or "https://xadichai.uz"
+        return_url = f"{frontend_url.rstrip('/')}/video/{job.id}"
 
     payment_url = generate_payment_url(
         merchant_id=merchant_id,
