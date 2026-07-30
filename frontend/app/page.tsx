@@ -174,11 +174,11 @@ export default function Home() {
   const { job, is404 } = useJobPolling(jobId);
 
   useEffect(() => {
-    if (is404) {
+    if (is404 || (job && job.status === "awaiting_payment")) {
       clearJobId();
       setJobId(null);
     }
-  }, [is404]);
+  }, [is404, job?.status]);
 
   useEffect(() => {
     const saved = loadJobId();

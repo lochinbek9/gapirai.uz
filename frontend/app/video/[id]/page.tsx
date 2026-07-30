@@ -37,6 +37,16 @@ export default function VideoPage() {
   }
 
   useEffect(() => {
+    const handlePopState = () => {
+      clearJobId()
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  useEffect(() => {
     if (job) {
       setLoading(false)
     }
