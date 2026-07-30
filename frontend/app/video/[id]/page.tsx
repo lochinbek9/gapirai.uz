@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment, clearJobId } from '@/lib/api'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   Download, ArrowLeft, Youtube, ChevronDown, ChevronUp,
@@ -31,6 +31,11 @@ export default function VideoPage() {
 
   const job = polledJob
 
+  const handleGoHome = () => {
+    clearJobId()
+    router.push('/')
+  }
+
   useEffect(() => {
     if (job) {
       setLoading(false)
@@ -39,6 +44,7 @@ export default function VideoPage() {
 
   useEffect(() => {
     if (is404) {
+      clearJobId()
       router.push('/dashboard')
     }
   }, [is404, router])
@@ -91,7 +97,7 @@ export default function VideoPage() {
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
-            onClick={() => router.push('/')}
+            onClick={handleGoHome}
             className="text-slate-400 hover:text-white transition p-2 -ml-2 rounded-xl hover:bg-white/5"
             title="Bosh sahifaga qaytish"
           >
@@ -182,12 +188,12 @@ export default function VideoPage() {
                     To'lov tasdiqlangandan so'ng, dublyaj jarayoni avtomatik tarzda boshlanadi.
                   </p>
 
-                  <Link
-                    href="/"
+                  <button
+                    onClick={handleGoHome}
                     className="inline-block text-xs font-semibold text-slate-400 hover:text-white transition pt-2"
                   >
                     ← Bosh sahifaga qaytish
-                  </Link>
+                  </button>
                 </div>
               </div>
             ) : (

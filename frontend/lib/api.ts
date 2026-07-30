@@ -109,3 +109,31 @@ export function getVideoUrl(jobId: string): string {
 export function getAudioUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/audio`
 }
+
+const JOB_KEY = "dubber_last_job"
+
+export function saveJobId(id: string) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(JOB_KEY, JSON.stringify({ id, ts: Date.now() }))
+}
+
+export function loadJobId(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(JOB_KEY)
+    if (!raw) return null
+    const { id, ts } = JSON.parse(raw)
+    if (Date.now() - ts > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(JOB_KEY)
+      return null
+    }
+    return id ?? null
+  } catch {
+    return null
+  }
+}
+
+export function clearJobId() {
+  if (typeof window === "undefined") return
+  localStorage.removeItem(JOB_KEY)
+}

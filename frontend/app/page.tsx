@@ -214,12 +214,6 @@ export default function Home() {
     return () => clearInterval(id);
   }, [jobId, job?.status]);
 
-  useEffect(() => {
-    if (jobId && job && job.status === "awaiting_payment") {
-      router.push(`/video/${jobId}`);
-    }
-  }, [jobId, job, router]);
-
   const handleUrlChange = async (value: string) => {
     setUrl(value);
     setVideoInfo(null);
@@ -239,8 +233,13 @@ export default function Home() {
     startRef.current = null;
     setElapsed(0);
     try {
-      const { job_id } = await createJob(url, voiceGender);
-      setJobId(job_id);
+      const { job_id, status } = await createJob(url, voiceGender);
+      if (status === "awaiting_payment") {
+        saveJobId(job_id);
+        router.push(`/video/${job_id}`);
+      } else {
+        setJobId(job_id);
+      }
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Xatolik yuz berdi. Qayta urinib ko'ring.");
     } finally {
