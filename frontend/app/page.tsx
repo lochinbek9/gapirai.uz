@@ -171,7 +171,14 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const startRef = useRef<number | null>(null);
 
-  const { job } = useJobPolling(jobId);
+  const { job, is404 } = useJobPolling(jobId);
+
+  useEffect(() => {
+    if (is404) {
+      clearJobId();
+      setJobId(null);
+    }
+  }, [is404]);
 
   useEffect(() => {
     const saved = loadJobId();

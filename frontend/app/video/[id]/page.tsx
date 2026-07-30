@@ -32,7 +32,7 @@ function calculateClientPrice(durationMinutes: number): number {
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { job: polledJob, error: pollError } = useJobPolling(id)
+  const { job: polledJob, error: pollError, is404 } = useJobPolling(id)
   
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
@@ -49,10 +49,10 @@ export default function VideoPage() {
   }, [job])
 
   useEffect(() => {
-    if (id) {
-      getJob(id).catch(() => router.push('/dashboard'))
+    if (is404) {
+      router.push('/dashboard')
     }
-  }, [id, router])
+  }, [is404, router])
 
   if (loading || !job) {
     return (
