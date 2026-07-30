@@ -90,4 +90,11 @@ def create_tables():
         connection.commit()
     except Exception:
         pass
+
+    try:
+        connection = engine.connect()
+        connection.execute(text("ALTER TABLE payments ALTER COLUMN user_id DROP NOT NULL"))
+        connection.commit()
+    except Exception:
+        pass
     Base.metadata.create_all(bind=engine)

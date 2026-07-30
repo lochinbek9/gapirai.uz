@@ -11,7 +11,8 @@ from backend.services.click_service import (
     calculate_price,
     normalize_uzs_amount,
 )
-from backend.services.auth import get_current_user
+from typing import Optional
+from backend.services.auth import get_current_user, get_optional_user
 from backend.config import get_settings
 from backend.workers.tasks import process_video
 
@@ -24,19 +25,19 @@ class InitiatePaymentRequest(BaseModel):
 async def initiate_payment(
     req: InitiatePaymentRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     settings = get_settings()
     job = db.query(DubbingJob).filter(DubbingJob.id == req.job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    if not job.user_id:
-        job.user_id = current_user.id
-        db.commit()
-
-    if job.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Sizda bu videoga ruxsat yo'q.")
+    if current_user:
+        if not job.user_id:
+            job.user_id = current_user.id
+            db.commit()
+        elif job.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Sizda bu videoga ruxsat yo'q.")
 
     # duration is required to calculate price
     if not job.video_duration:
@@ -44,11 +45,14 @@ async def initiate_payment(
     
     duration_minutes = job.video_duration / 60.0
     # User's first video is free: check if user has other jobs
-    other_jobs_count = db.query(DubbingJob).filter(
-        DubbingJob.user_id == current_user.id,
-        DubbingJob.id != job.id
-    ).count()
-    is_first_video = (other_jobs_count == 0)
+    is_first_video = False
+    if current_user:
+        other_jobs_count = db.query(DubbingJob).filter(
+            DubbingJob.user_id == current_user.id,
+            DubbingJob.id != job.id
+        ).count()
+        is_first_video = (other_jobs_count == 0)
+
     amount = calculate_price(duration_minutes, is_first_video=is_first_video)
 
     if amount == 0:
@@ -73,9 +77,11 @@ async def initiate_payment(
         Payment.status == PaymentStatus.PENDING
     ).first()
 
+    user_id_val = current_user.id if current_user else None
+
     if not payment:
         payment = Payment(
-            user_id=current_user.id,
+            user_id=user_id_val,
             job_id=job.id,
             amount=amount,
             provider=PaymentProvider.CLICK,

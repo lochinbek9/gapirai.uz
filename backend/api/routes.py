@@ -106,12 +106,6 @@ async def create_job(
 
     amount = calculate_price(duration_minutes, is_first_video=is_first_video)
 
-    if amount > 0 and not current_user:
-        raise HTTPException(
-            status_code=401,
-            detail="10 daqiqadan uzun videolarni qayta ishlash uchun tizimga kirish va to'lov qilish talab etiladi."
-        )
-
     job_id = str(uuid.uuid4())
     
     if amount > 0:

@@ -79,10 +79,6 @@ export default function VideoPage() {
         setPaymentError("To'lov havolasini yaratishda xatolik yuz berdi.")
       }
     } catch (err: any) {
-      if (err?.response?.status === 401) {
-        router.push(`/login?next=/video/${id}`)
-        return
-      }
       setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
     } finally {
       setPaymentLoading(false)
