@@ -32,6 +32,7 @@ def generate_payment_url(
     transaction_param: str,
     amount: Decimal | float | int | str,
     return_url: str,
+    merchant_user_id: str = "",
 ) -> str:
     params = {
         'service_id': service_id,
@@ -40,6 +41,8 @@ def generate_payment_url(
         'transaction_param': transaction_param,
         'return_url': return_url,
     }
+    if merchant_user_id:
+        params['merchant_user_id'] = merchant_user_id
     return f"{CLICK_BASE_URL}?{urlencode(params)}"
 
 def validate_signature(params: dict, secret_key: str) -> bool:

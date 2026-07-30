@@ -99,7 +99,8 @@ async def initiate_payment(
         db.refresh(payment)
 
     merchant_id = settings.CLICK_MERCHANT_ID or "56653"
-    service_id = settings.CLICK_SERVICE_ID or "97933"
+    service_id = settings.CLICK_SERVICE_ID or "108780"
+    merchant_user_id = getattr(settings, "CLICK_MERCHANT_USER_ID", "") or "89102"
     
     origin_header = request.headers.get("origin") or request.headers.get("referer")
     if origin_header:
@@ -116,7 +117,8 @@ async def initiate_payment(
         service_id=service_id,
         transaction_param=str(payment.id),
         amount=amount,
-        return_url=return_url
+        return_url=return_url,
+        merchant_user_id=merchant_user_id,
     )
 
     return {
@@ -132,7 +134,7 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
     data = dict(form_data)
     
     settings = get_settings()
-    secret_key = settings.CLICK_SECRET_KEY or "NiZx8zzFZsX"
+    secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
     
     if not validate_signature(data, secret_key):
         return {"error": ClickErrors.SIGN_CHECK_FAILED, "error_note": "Invalid signature"}
@@ -179,7 +181,7 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     data = dict(form_data)
     
     settings = get_settings()
-    secret_key = settings.CLICK_SECRET_KEY or "NiZx8zzFZsX"
+    secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
     
     if not validate_signature(data, secret_key):
         return {"error": ClickErrors.SIGN_CHECK_FAILED, "error_note": "Invalid signature"}

@@ -41,10 +41,11 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "./outputs"
 
     # Click Payment
-    CLICK_MERCHANT_ID: str = ""
-    CLICK_SERVICE_ID: str = ""
-    CLICK_SECRET_KEY: str = ""
-    FRONTEND_URL: str = "http://localhost:3000"
+    CLICK_MERCHANT_ID: str = "56653"
+    CLICK_SERVICE_ID: str = "108780"
+    CLICK_SECRET_KEY: str = "Pbxfw7SaMso"
+    CLICK_MERCHANT_USER_ID: str = "89102"
+    FRONTEND_URL: str = "https://xadichai.uz"
 
     class Config:
         env_file = ".env"
