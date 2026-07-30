@@ -58,16 +58,27 @@ export default function VideoPage() {
     if (!id) return
     setPaymentLoading(true)
     setPaymentError(null)
+
+    // Popup blocker'ga tushmaslik uchun yangi oynani darhol ochamiz
+    const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+
     try {
       const res = await initiateClickPayment(id)
       if (res.success && res.payment_url) {
-        window.location.replace(res.payment_url)
+        if (paymentWindow) {
+          paymentWindow.location.href = res.payment_url
+        } else {
+          window.location.href = res.payment_url
+        }
       } else if (res.amount === 0) {
+        if (paymentWindow) paymentWindow.close()
         window.location.reload()
       } else {
+        if (paymentWindow) paymentWindow.close()
         setPaymentError("To'lov havolasini yaratishda xatolik yuz berdi.")
       }
     } catch (err: any) {
+      if (paymentWindow) paymentWindow.close()
       setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
     } finally {
       setPaymentLoading(false)
