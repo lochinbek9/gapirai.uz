@@ -61,7 +61,7 @@ export default function VideoPage() {
     try {
       const res = await initiateClickPayment(id)
       if (res.success && res.payment_url) {
-        window.location.href = res.payment_url
+        window.location.replace(res.payment_url)
       } else if (res.amount === 0) {
         window.location.reload()
       } else {
@@ -80,15 +80,9 @@ export default function VideoPage() {
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
-            onClick={() => {
-              if (typeof window !== 'undefined' && window.history.length > 1) {
-                router.back()
-              } else {
-                router.push('/')
-              }
-            }}
+            onClick={() => router.push('/')}
             className="text-slate-400 hover:text-white transition p-2 -ml-2 rounded-xl hover:bg-white/5"
-            title="Orqaga qaytish"
+            title="Bosh sahifaga qaytish"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
