@@ -31,7 +31,11 @@ async def initiate_payment(
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    if job.user_id and job.user_id != current_user.id:
+    if not job.user_id:
+        job.user_id = current_user.id
+        db.commit()
+
+    if job.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Sizda bu videoga ruxsat yo'q.")
 
     # duration is required to calculate price
@@ -39,11 +43,21 @@ async def initiate_payment(
         raise HTTPException(status_code=400, detail="Video davomiyligi aniqlanmadi.")
     
     duration_minutes = job.video_duration / 60.0
-    is_first_video = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count() == 0
+    # User's first video is free: check if user has other jobs
+    other_jobs_count = db.query(DubbingJob).filter(
+        DubbingJob.user_id == current_user.id,
+        DubbingJob.id != job.id
+    ).count()
+    is_first_video = (other_jobs_count == 0)
     amount = calculate_price(duration_minutes, is_first_video=is_first_video)
 
     if amount == 0:
-        return {"success": True, "message": "Bepul video.", "amount": 0}
+        if job.status == JobStatus.AWAITING_PAYMENT:
+            job.status = JobStatus.PENDING
+            job.status_message = "Navbatga qo'shildi"
+            db.commit()
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
+        return {"success": True, "message": "Bepul video. Ishlov berish boshlandi.", "amount": 0}
 
     # Check if already paid
     existing_approved = db.query(Payment).filter(

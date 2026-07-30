@@ -73,10 +73,16 @@ export default function VideoPage() {
       const res = await initiateClickPayment(id)
       if (res.success && res.payment_url) {
         window.location.href = res.payment_url
+      } else if (res.amount === 0) {
+        window.location.reload()
       } else {
         setPaymentError("To'lov havolasini yaratishda xatolik yuz berdi.")
       }
     } catch (err: any) {
+      if (err?.response?.status === 401) {
+        router.push(`/login?next=/video/${id}`)
+        return
+      }
       setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
     } finally {
       setPaymentLoading(false)
