@@ -1,5 +1,6 @@
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 from backend.config import get_settings
 
@@ -40,14 +41,20 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     Returns:
         Tarjima qilingan segmentlar ro'yxati.
     """
-    # Katta videolar uchun bo'laklarga bo'lish (token limiti)
     chunk_size = 30
-    translated = []
+    chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
+    if not chunks:
+        return []
 
-    for i in range(0, len(segments), chunk_size):
-        chunk = segments[i:i + chunk_size]
-        translated_chunk = _translate_chunk(chunk)
-        translated.extend(translated_chunk)
+    if len(chunks) == 1:
+        return _translate_chunk(chunks[0])
+
+    with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
+        chunk_results = list(executor.map(_translate_chunk, chunks))
+
+    translated = []
+    for res in chunk_results:
+        translated.extend(res)
 
     return translated
 

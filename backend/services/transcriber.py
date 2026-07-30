@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 from backend.config import get_settings
 
@@ -131,11 +132,21 @@ def transcribe_audio(audio_path: str) -> dict:
 
     with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
         chunk_paths = _chunk_audio(audio_path, Path(temp_dir))
-        for index, chunk_path in enumerate(chunk_paths):
-            chunk_segments, chunk_text, chunk_language = _transcribe_chunk(
-                chunk_path,
-                offset_seconds=index * _CHUNK_DURATION_SECONDS,
-            )
+        
+        if len(chunk_paths) == 1:
+            chunk_results = [
+                (0, _transcribe_chunk(chunk_paths[0], offset_seconds=0))
+            ]
+        else:
+            def _process_chunk(args):
+                idx, cpath = args
+                return idx, _transcribe_chunk(cpath, offset_seconds=idx * _CHUNK_DURATION_SECONDS)
+
+            with ThreadPoolExecutor(max_workers=min(len(chunk_paths), 4)) as executor:
+                chunk_results = list(executor.map(_process_chunk, enumerate(chunk_paths)))
+
+        chunk_results.sort(key=lambda x: x[0])
+        for _, (chunk_segments, chunk_text, chunk_language) in chunk_results:
             if chunk_text:
                 full_text_parts.append(chunk_text)
             if chunk_segments:

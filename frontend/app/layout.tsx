@@ -81,7 +81,7 @@ export const metadata: Metadata = {
     description: "Sun'iy intellekt yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj hamda tarjima qiluvchi dastur va platforma.",
     images: [
       {
-        url: "/logo.png",
+        url: "https://xadichai.uz/logo.png",
         width: 1200,
         height: 630,
         alt: "Xadichai.uz Hadicha AI Dublyaj Programmasi",
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Xadichai.uz — Hadicha & Xadicha AI Dublyaj Programmasi",
     description: "Videolarni AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi dastur va sayt.",
-    images: ["/logo.png"],
+    images: ["https://xadichai.uz/logo.png"],
   },
   robots: {
     index: true,

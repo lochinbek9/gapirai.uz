@@ -263,8 +263,22 @@ def _synthesize_text(
 
     # 2. Native Uzbek Neural TTS (uz-UZ-SardorNeural / uz-UZ-MadinaNeural)
     try:
-        if asyncio.run(_synthesize_edge_tts(text, output_path, voice_name=voice_name)):
-            return
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        if loop.is_running():
+            # If called inside an existing running loop, use new loop in thread
+            new_loop = asyncio.new_event_loop()
+            try:
+                if new_loop.run_until_complete(_synthesize_edge_tts(text, output_path, voice_name=voice_name)):
+                    return
+            finally:
+                new_loop.close()
+        else:
+            if loop.run_until_complete(_synthesize_edge_tts(text, output_path, voice_name=voice_name)):
+                return
     except Exception as e:
         logger.warning(f"Edge TTS fallback error: {e}")
 
@@ -298,12 +312,12 @@ def _build_ssml(text: str, voice_name: str | None = None) -> str:
 
     if is_female:
         rate   = "-4%"
-        pitch  = "+4%"
-        volume = "+8%"
+        pitch  = "+2%"
+        volume = "0%"
     else:
-        rate   = "-10%"
-        pitch  = "-1%"
-        volume = "+6%"
+        rate   = "-8%"
+        pitch  = "0%"
+        volume = "0%"
 
     sentences = _split_into_sentences(text)
     ssml_sentences = []
@@ -311,11 +325,11 @@ def _build_ssml(text: str, voice_name: str | None = None) -> str:
         body = saxutils.escape(sent)
         if sent.rstrip().endswith("?"):
             ssml_sentences.append(
-                f'<p><prosody pitch="+6%">{body}</prosody></p>'
+                f'<p><prosody pitch="+4%">{body}</prosody></p>'
             )
         elif sent.rstrip().endswith("!"):
             ssml_sentences.append(
-                f'<p><prosody pitch="+2%" volume="+12%">{body}</prosody></p>'
+                f'<p><prosody pitch="+2%">{body}</prosody></p>'
             )
         else:
             ssml_sentences.append(f'<p>{body}</p>')
@@ -337,7 +351,7 @@ def _build_ssml(text: str, voice_name: str | None = None) -> str:
 
 
 def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
-    """FFmpeg atempo filter bilan audio tezlashtirish (pitch va namuna chastotasi o'zgarmaydi, alimiter bilan shirillash oldi olinadi)."""
+    """FFmpeg atempo filter bilan audio tezlashtirish (pitch va namuna chastotasi o'zgarmaydi, toza ovoz saqlanadi)."""
     factor = max(0.5, min(2.0, round(factor, 3)))
     in_fd, in_path = tempfile.mkstemp(suffix=".wav")
     out_fd, out_path = tempfile.mkstemp(suffix=".wav")
@@ -345,7 +359,7 @@ def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
     try:
         audio.export(in_path, format="wav")
         subprocess.run(
-            ["ffmpeg", "-y", "-i", in_path, "-filter:a", f"atempo={factor},alimiter=limit=0.95:level=true", "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", out_path],
+            ["ffmpeg", "-y", "-i", in_path, "-filter:a", f"atempo={factor},volume=0.95", "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", out_path],
             check=True, capture_output=True,
         )
         return AudioSegment.from_wav(out_path)
@@ -371,7 +385,7 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. Har bir segmentni parallel ravishda sintez qilish (10x tezlashtirish)
+    # 1. Har bir segmentni parallel ravishda sintez qilish (16x tezlashtirish)
     def _process_single_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
@@ -381,6 +395,12 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
         _synthesize_text(text, str(seg_file), voice_name=voice_name)
         if seg_file.exists():
             audio = AudioSegment.from_wav(str(seg_file))
+            # Bosh va oxiridagi bo'sh sukunatni tozalash (audio o'z-o'zidan 200-400ms qisqaradi va aniqroq bo'ladi)
+            silence_len = 30
+            while len(audio) > 150 and audio[:silence_len].dBFS < -42:
+                audio = audio[silence_len:]
+            while len(audio) > 150 and audio[-silence_len:].dBFS < -42:
+                audio = audio[:-silence_len]
             audio = audio.normalize(headroom=2.0)
             return (idx, {
                 "audio": audio,
@@ -389,7 +409,7 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
             })
         return None
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=16) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
     # Saralangan segmentlarni yig'ish
@@ -400,25 +420,34 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     if not seg_data:
         raise ValueError("Birlashtirish uchun segment topilmadi.")
 
-    # 2. Overlap saqlash: Yengil tezlashtirish (max 1.25x), yetmasa -> keyingi segmentni surish (MATN HECH QACHON KESILMAYDI)
-    for i in range(len(seg_data) - 1):
+    # 2. Aniq vaqtga sinxronlash (Strict Timestamp Synchronization)
+    # HECH QACHON keyingi segment vaqti surilmaydi — barcha segmentlar o'z vaqtida (lip-sync) chiqadi!
+    for i in range(len(seg_data)):
         cur = seg_data[i]
-        nxt = seg_data[i + 1]
-        slot_ms = nxt["start_ms"] - cur["start_ms"]
+        start_ms = cur["start_ms"]
+
+        if i < len(seg_data) - 1:
+            slot_ms = seg_data[i + 1]["start_ms"] - start_ms
+        else:
+            slot_ms = max(cur["end_ms"] - start_ms, 1000)
+
         audio_ms = len(cur["audio"])
 
-        if audio_ms > slot_ms + 40 and slot_ms > 200:
-            factor = min(audio_ms / slot_ms, 1.25)
-            if factor > 1.05:
+        # Agar audio navbatdagi segmentgacha bo'lgan vaqt oralig'idan uzunroq bo'lsa, mos ravishda tezlashtiramiz:
+        if slot_ms > 150 and audio_ms > slot_ms:
+            factor = audio_ms / slot_ms
+            speed_factor = min(factor, 1.45)
+            if speed_factor > 1.03:
                 try:
-                    cur["audio"] = _speedup_audio(cur["audio"], factor)
+                    cur["audio"] = _speedup_audio(cur["audio"], speed_factor)
                 except Exception:
                     pass
 
-        # Keyingi segment boshlanishi joriy audio tugashidan oldin kelib qolmasligi uchun surish:
-        min_next_start = cur["start_ms"] + len(cur["audio"]) + 100
-        if nxt["start_ms"] < min_next_start:
-            nxt["start_ms"] = min_next_start
+            # Tezlashtirilgandan so'ng ham keyingi segment vaqtiga tutashib ketsa, fade-out bilan keskin ustma-ust tushish oldi olinadi
+            if i < len(seg_data) - 1:
+                max_allowed_ms = seg_data[i + 1]["start_ms"] - start_ms
+                if max_allowed_ms > 100 and len(cur["audio"]) > max_allowed_ms:
+                    cur["audio"] = cur["audio"][:max_allowed_ms].fade_out(25)
 
     # 3. Umumiy audio uzunligini hisoblash
     last = seg_data[-1]
@@ -428,7 +457,7 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
 
     combined = AudioSegment.silent(duration=total_ms, frame_rate=_FRAME_RATE)
 
-    # 4. Har bir segmentni overlay qilish
+    # 4. Har bir segmentni o'zining ANIQ vaqt koordinatasiga o'rnatish
     for item in seg_data:
         combined = combined.overlay(item["audio"], position=item["start_ms"])
 

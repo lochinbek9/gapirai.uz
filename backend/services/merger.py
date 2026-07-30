@@ -42,7 +42,7 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "-i", video_path,
             "-i", dubbed_audio_path,
             "-c:v", "copy",
-            "-af", "alimiter=limit=0.95:level=true",
+            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
             "-c:a", "aac", "-b:a", "192k",
             "-map", "0:v:0",
             "-map", "1:a:0",
@@ -58,10 +58,10 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "-i", dubbed_audio_path,
             # Video oxirini "tpad" bilan uzaytirish (oxirgi kadr freeze)
             "-filter_complex",
-            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];[1:a]alimiter=limit=0.95:level=true[a]",
+            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[a]",
             "-map", "[v]",
             "-map", "[a]",
-            "-c:v", "libx264", "-crf", "20", "-preset", "ultrafast", "-threads", "0",
+            "-c:v", "libx264", "-crf", "23", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "0",
             "-c:a", "aac", "-b:a", "192k",
             output_path,
         ]
