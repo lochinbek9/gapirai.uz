@@ -13,19 +13,8 @@ import VideoPlayer from '@/components/VideoPlayer'
 const TEST_PRICE_MULTIPLIER = 1.0
 
 function calculateClientPrice(durationMinutes: number): number {
-  let baseAmount = 0
-
-  if (durationMinutes <= 10.0) {
-    baseAmount = 0
-  } else if (durationMinutes <= 30.0) {
-    baseAmount = 30000
-  } else if (durationMinutes <= 60.0) {
-    baseAmount = 60000
-  } else {
-    baseAmount = Math.ceil(durationMinutes) * 1000
-  }
-
-  return Math.round(baseAmount * TEST_PRICE_MULTIPLIER)
+  if (durationMinutes <= 10.0) return 0
+  return Math.ceil(durationMinutes) * 1000
 }
 
 /* ── Page ────────────────────────────────────────── */
