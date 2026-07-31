@@ -174,7 +174,7 @@ export default function Home() {
   const { job, is404 } = useJobPolling(jobId);
 
   useEffect(() => {
-    if (is404 || (job && job.status === "awaiting_payment")) {
+    if (is404 || (job && (job.status === "awaiting_payment" || job.status === "completed" || job.status === "failed"))) {
       clearJobId();
       setJobId(null);
     }
@@ -182,7 +182,19 @@ export default function Home() {
 
   useEffect(() => {
     const saved = loadJobId();
-    if (saved) setJobId(saved);
+    if (saved) {
+      getJob(saved)
+        .then((data) => {
+          if (data && !["completed", "failed", "awaiting_payment"].includes(data.status)) {
+            setJobId(saved);
+          } else {
+            clearJobId();
+          }
+        })
+        .catch(() => {
+          clearJobId();
+        });
+    }
   }, []);
 
   useEffect(() => {
