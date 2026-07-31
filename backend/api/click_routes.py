@@ -157,14 +157,14 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
     if normalize_uzs_amount(payment.amount) != amount:
         return {"error": ClickErrors.INVALID_AMOUNT, "error_note": "Amount mismatch"}
 
-    payment.click_transaction_id = str(click_trans_id)
-    payment.click_prepare_id = int(click_trans_id) if str(click_trans_id).isdigit() else 0
-    payment.click_status = 0
-    db.commit()
-
     import zlib
     prep_id = zlib.crc32(payment.id.bytes)
     click_trans_val = int(click_trans_id) if str(click_trans_id).isdigit() else 0
+
+    payment.click_transaction_id = str(click_trans_id)
+    payment.click_prepare_id = prep_id
+    payment.click_status = 0
+    db.commit()
 
     return {
         "error": ClickErrors.SUCCESS,

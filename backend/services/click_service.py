@@ -54,29 +54,19 @@ def validate_signature(params: dict, secret_key: str) -> bool:
     sign_time = params.get('sign_time')
     sign_string = params.get('sign_string')
     merchant_prepare_id = params.get('merchant_prepare_id')
-    error = params.get('error')
 
     if not all([click_trans_id, service_id, merchant_trans_id, amount, str(action), sign_time, sign_string]):
         return False
 
-    sign_payload = [
-        str(click_trans_id),
-        str(service_id),
-        secret_key,
-        str(merchant_trans_id),
-        str(amount),
-        str(action),
-        str(sign_time),
-    ]
+    if str(action) == "1":
+        # Complete request: click_trans_id + service_id + secret_key + merchant_trans_id + merchant_prepare_id + amount + action + sign_time
+        prep_str = str(merchant_prepare_id) if merchant_prepare_id is not None else ""
+        payload_str = f"{click_trans_id}{service_id}{secret_key}{merchant_trans_id}{prep_str}{amount}{action}{sign_time}"
+    else:
+        # Prepare request: click_trans_id + service_id + secret_key + merchant_trans_id + amount + action + sign_time
+        payload_str = f"{click_trans_id}{service_id}{secret_key}{merchant_trans_id}{amount}{action}{sign_time}"
 
-    if merchant_prepare_id is not None:
-        sign_payload.append(str(merchant_prepare_id))
-    if error is not None:
-        sign_payload.append(str(error))
-
-    payload_str = "".join(sign_payload)
     expected = hashlib.md5(payload_str.encode('utf-8')).hexdigest()
-
     return expected.lower() == str(sign_string).lower()
 
 def calculate_price(duration_minutes: float, *, is_first_video: bool = False) -> int:
