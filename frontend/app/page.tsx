@@ -112,7 +112,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="p-2 transition duration-300 hover:scale-105">
-              <img src="/logo1.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
+              <img src="/logo.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
               <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
             </div>
           </div>
@@ -273,7 +273,7 @@ export default function Home() {
       <header className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
         {/* Left Logo */}
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo1.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
+          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
           <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
         </Link>
 

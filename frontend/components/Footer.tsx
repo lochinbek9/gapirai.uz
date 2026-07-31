@@ -11,7 +11,7 @@ export default function Footer() {
           {/* Column 1: Brand Info */}
           <div className="space-y-4">
             <Link href="/" className="inline-block transition duration-300 hover:scale-105">
-              <img src="/logo1.png" alt="Xadichai.uz" className="h-10 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
+              <img src="/logo.png" alt="Xadichai.uz" className="h-10 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
               <img src="/logodark.png" alt="Xadichai.uz" className="h-10 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
             </Link>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
