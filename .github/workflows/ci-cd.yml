@@ -181,7 +181,7 @@ jobs:
 
             # Stop services
             echo "Stopping services..."
-            sudo supervisorctl stop ai-dubber-api ai-dubber-worker || true
+            sudo supervisorctl stop ai-dubber-api ai-dubber-worker ai-dubber-frontend || true
 
             # Setup environment file from GitHub Secrets
             echo ""
@@ -228,22 +228,29 @@ jobs:
             export NEXT_PUBLIC_GRAPHQL_URL="https://xadichai.uz/graphql"
             npm run build
 
-            # Copy their build to production
-            echo ""
-            echo "Deploying frontend build..."
-            sudo mkdir -p /var/www/xadichai.uz/public
-            sudo rm -rf /var/www/xadichai.uz/public/*
-            sudo cp -r .next/standalone/* /var/www/xadichai.uz/public/
-            sudo chown -R ubuntu:ubuntu /var/www/xadichai.uz
-            sudo chmod -R 755 /var/www/xadichai.uz
+            # Prepare standalone assets
+            cp -r public .next/standalone/public || true
+            mkdir -p .next/standalone/.next
+            cp -r .next/static .next/standalone/.next/static || true
 
-            # Copy current directory back to backend
             cd ..
 
             # Setup supervisor configuration
             echo ""
             echo "Setting up supervisor..."
             sudo cat > /etc/supervisor/conf.d/xadichai.conf << 'EOF'
+[program:ai-dubber-frontend]
+command=node /opt/xadichai/frontend/.next/standalone/server.js
+directory=/opt/xadichai/frontend
+user=ubuntu
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/ai-dubber/frontend.log
+stderr_logfile=/var/log/ai-dubber/frontend_err.log
+environment=PORT="3000",NODE_ENV="production"
+stopwaitsecs=10
+
 [program:ai-dubber-api]
 command=/opt/xadichai/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 directory=/opt/xadichai
@@ -278,9 +285,6 @@ server {
     listen [::]:80;
     server_name xadichai.uz;
 
-    root /var/www/xadichai.uz/public;
-    index index.html;
-
     location / {
         return 301 https://$host$request_uri;
     }
@@ -290,9 +294,6 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     server_name xadichai.uz;
-
-    root /var/www/xadichai.uz/public;
-    index index.html;
 
     ssl_certificate /etc/letsencrypt/live/xadichai.uz/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/xadichai.uz/privkey.pem;
@@ -306,7 +307,15 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
-        try_files $uri $uri/ /index.html;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /api/ {
@@ -337,16 +346,6 @@ server {
         proxy_pass http://127.0.0.1:8000/health;
         access_log off;
     }
-
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    location ~ /\.(?:htaccess|htpasswd|ini|log|sh|sql)$ {
-        deny all;
-    }
 }
 NGINXCONFIG
 
@@ -365,7 +364,8 @@ NGINXCONFIG
             echo "Starting services..."
             sudo supervisorctl reread
             sudo supervisorctl update
-            sudo supervisorctl start ai-dubber-api ai-dubber-worker
+            sudo supervisorctl restart ai-dubber-frontend ai-dubber-api ai-dubber-worker
+            sudo supervisorctl start ai-dubber-frontend ai-dubber-api ai-dubber-worker
 
             echo ""
             echo "Waiting for services to start..."
