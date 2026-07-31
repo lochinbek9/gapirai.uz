@@ -62,20 +62,20 @@ function Logo() {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-2.5 text-center mb-6 sm:mb-8 px-2"
+      className="flex flex-col items-center gap-3 text-center mb-6 sm:mb-8 px-2"
     >
-      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-md shadow-sm">
-        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-[11px] font-extrabold text-red-600 dark:text-red-400 tracking-wider uppercase">
+      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/20 backdrop-blur-md shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+        <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 tracking-wider uppercase">
           AI Studio 2.0 • Avtomatik Dublyaj
         </span>
       </div>
 
-      <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-black dark:text-white transition-colors duration-300">
-        Xadichai<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-500 to-pink-500">.uz</span>
+      <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
+        Xadichai<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-violet-600 to-indigo-600">.uz</span>
       </h1>
-      <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 font-medium max-w-md leading-relaxed">
-        YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-gray-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
+      <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
+        YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-slate-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
       </p>
       <h2 className="sr-only">
         YouTube videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj va tarjima qilish platformasi — Xadicha uz (Xadichai)
@@ -282,17 +282,17 @@ export default function Home() {
           {isLoggedIn ? (
             <Link
               href="/dashboard"
-              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
               Paneli
             </Link>
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
             >
-              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
               Kirish
             </Link>
           )}

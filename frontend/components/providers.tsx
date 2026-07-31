@@ -6,7 +6,7 @@ import { ThemeProvider } from "next-themes";
 // html elementi suppressHydrationWarning orqali hydration xatolarini bostiradi.
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       {children}
     </ThemeProvider>
   );

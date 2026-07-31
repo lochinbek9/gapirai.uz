@@ -4,29 +4,29 @@
 
 /* ── Theme Variables ──────────────────────────────── */
 :root {
-  /* Light Mode - Crimson / Red premium palette */
-  --bg-color: #fcfcff;
-  --card-bg: rgba(255, 255, 255, 0.75);
-  --accent-color: #ef4444;
-  --accent-glow: rgba(239, 68, 68, 0.12);
+  /* Light Mode - Fresh, Airy & Premium Palette */
+  --bg-color: #f8fafc;
+  --card-bg: rgba(255, 255, 255, 0.88);
+  --accent-color: #e11d48;
+  --accent-glow: rgba(225, 29, 72, 0.15);
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --glass-border: rgba(239, 68, 68, 0.08);
-  --blob-opacity: 0.12;
-  --primary-glow: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
+  --glass-border: rgba(226, 232, 240, 0.9);
+  --blob-opacity: 0.18;
+  --primary-glow: radial-gradient(circle, rgba(225, 29, 72, 0.1) 0%, transparent 70%);
 }
 
 .dark {
-  /* Dark Mode - Deep rich space background with red glow */
-  --bg-color: #050101;
-  --card-bg: rgba(15, 10, 10, 0.6);
-  --accent-color: #ef4444;
-  --accent-glow: rgba(239, 68, 68, 0.3);
+  /* Dark Mode - Deep Slate & Soft Rose Glow */
+  --bg-color: #090d16;
+  --card-bg: rgba(15, 23, 42, 0.75);
+  --accent-color: #f43f5e;
+  --accent-glow: rgba(244, 63, 94, 0.25);
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --glass-border: rgba(255, 255, 255, 0.08);
-  --blob-opacity: 0.35;
-  --primary-glow: radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, transparent 70%);
+  --blob-opacity: 0.28;
+  --primary-glow: radial-gradient(circle, rgba(244, 63, 94, 0.2) 0%, transparent 70%);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -71,36 +71,36 @@ body {
 .blob-1 {
   width: 700px;
   height: 700px;
-  background: radial-gradient(circle, #ef4444, transparent 70%);
-  top: -150px;
+  background: radial-gradient(circle, #f43f5e, transparent 70%);
+  top: -180px;
   left: -150px;
 }
 
 .blob-2 {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #f43f5e, transparent 70%);
-  bottom: -150px;
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, #6366f1, transparent 70%);
+  bottom: -180px;
   right: -150px;
   animation-delay: -6s;
 }
 
 .blob-3 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #0f172a, transparent 70%);
-  top: 40%;
-  left: 50%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, #38bdf8, transparent 70%);
+  top: 35%;
+  left: 45%;
   transform: translate(-50%, -50%);
-  opacity: calc(var(--blob-opacity) * 0.7);
+  opacity: calc(var(--blob-opacity) * 0.6);
   animation-duration: 30s;
   animation-delay: -12s;
 }
 
 @keyframes moveBlob {
   0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(60px, -80px) scale(1.15); }
-  66% { transform: translate(-40px, 40px) scale(0.9); }
+  33% { transform: translate(50px, -60px) scale(1.1); }
+  66% { transform: translate(-30px, 30px) scale(0.95); }
   100% { transform: translate(0, 0) scale(1); }
 }
 
@@ -121,37 +121,38 @@ body {
 /* ── Glassmorphism ────────────────────────────────── */
 .glass-card {
   background: var(--card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.06), 0 0 1px 1px rgba(255, 255, 255, 0.7) inset;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .glass-card {
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
-  background: linear-gradient(135deg, rgba(15, 10, 10, 0.7) 0%, rgba(5, 2, 2, 0.5) 100%);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(9, 13, 22, 0.6) 100%);
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) inset;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .glass-input {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .glass-input:focus-within {
   border-color: var(--accent-color);
-  box-shadow: 0 0 25px var(--accent-glow);
-  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 25px var(--accent-glow), 0 0 0 3px rgba(225, 29, 72, 0.1);
+  background: #ffffff;
 }
 
 .dark .glass-input:focus-within {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* ── Premium Buttons ─────────────────────────────── */
@@ -159,14 +160,14 @@ body {
   position: relative;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 50%, #be123c 100%);
   color: white;
-  box-shadow: 0 4px 20px -2px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 20px -2px rgba(225, 29, 72, 0.35);
 }
 
 .btn-premium:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px -2px rgba(239, 68, 68, 0.6);
+  box-shadow: 0 10px 28px -2px rgba(225, 29, 72, 0.5);
 }
 
 .btn-premium::after {
