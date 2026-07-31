@@ -132,6 +132,7 @@ async def initiate_payment(
 async def click_prepare(request: Request, db: Session = Depends(get_db)):
     form_data = await request.form()
     data = dict(form_data)
+    print(f">>> [CLICK PREPARE WEBHOOK RECEIVED]: {data}", flush=True)
     
     settings = get_settings()
     secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
@@ -179,6 +180,7 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
 async def click_complete(request: Request, db: Session = Depends(get_db)):
     form_data = await request.form()
     data = dict(form_data)
+    print(f">>> [CLICK COMPLETE WEBHOOK RECEIVED]: {data}", flush=True)
     
     settings = get_settings()
     secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
