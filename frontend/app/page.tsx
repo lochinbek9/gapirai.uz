@@ -273,8 +273,8 @@ export default function Home() {
       <header className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
         {/* Left Logo */}
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-8 sm:h-10 w-auto max-w-[200px] object-contain dark:hidden" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
-          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-8 sm:h-10 w-auto max-w-[200px] object-contain hidden dark:block" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-10 sm:h-14 md:h-16 w-auto object-contain dark:hidden drop-shadow-sm" style={{ maxWidth: "240px", maxHeight: "64px", height: "auto" }} />
+          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-10 sm:h-14 md:h-16 w-auto object-contain hidden dark:block drop-shadow-sm" style={{ maxWidth: "240px", maxHeight: "64px", height: "auto" }} />
         </Link>
 
         {/* Right Controls */}
