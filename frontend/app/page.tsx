@@ -270,11 +270,11 @@ export default function Home() {
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
 
-      <header className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
+      <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         {/* Left Logo */}
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
-          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
+          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
         </Link>
 
         {/* Right Controls */}
@@ -305,7 +305,7 @@ export default function Home() {
 
         <motion.div
           layout
-          className="glass-card rounded-[32px] p-8 sm:p-10"
+          className="glass-card rounded-[24px] sm:rounded-[32px] p-5 sm:p-8 md:p-10"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}

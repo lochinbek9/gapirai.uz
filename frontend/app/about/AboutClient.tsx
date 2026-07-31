@@ -22,10 +22,10 @@ export default function AboutClient() {
       <MeshBackground />
 
       {/* Top Header Bar */}
-      <header className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
+      <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
-          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-20 sm:h-28 md:h-36 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "450px", maxHeight: "140px", height: "auto" }} />
+          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
         </Link>
 
         <div className="pointer-events-auto flex items-center gap-3">
