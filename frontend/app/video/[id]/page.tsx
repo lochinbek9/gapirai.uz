@@ -114,10 +114,9 @@ export default function VideoPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logo.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain dark:hidden" />
-            <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain hidden dark:block" />
-            <span className="text-base font-black tracking-tight text-black dark:text-white">
-              Xadichai<span className="text-red-500">.uz</span>
+            <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <span className="text-lg font-black tracking-tight text-white">
+              Xadichai<span className="text-rose-500">.uz</span>
             </span>
           </Link>
         </div>
