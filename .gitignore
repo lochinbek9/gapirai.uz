@@ -2,6 +2,7 @@
 .env
 cookies.txt
 *.txt
+!frontend/public/robots.txt
 
 # ── Python ───────────────────────────────────────────
 __pycache__/
