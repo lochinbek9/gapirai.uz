@@ -379,26 +379,26 @@ export default function Home() {
         </motion.div>
       </div>
 
-      {/* ── SEO Section: Xadicha / Hadicha Dublyaj Programmasi ── */}
+      {/* ── SEO Section: Xadicha / Hadicha & You Tube Dublyaj Programmasi ── */}
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
         <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            Xadichai.uz (Hadicha) — Sun'iy Intellekt Bilan Bepul Video Dublyaj Programmasi
+            Xadichai.uz (Hadicha / Xadicha uz) — You Tube Dublyaj va Video Tarjima Programmasi
           </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>Xadichai.uz</strong> (xalq orasida <em>Hadicha</em> yoki <em>Xadicha uz</em> nomi bilan tanilgan) — bu YouTube va boshqa videolarni avtomatik tarzda sof o'zbek tiliga tarjima va dublyaj qiluvchi 1-raqamli <strong>dublyaj programmasi va dasturidir</strong>. Google AI Studio hamda Neural AI texnologiyalari yordamida har bir video jonli, insoniy va ta'sirli nutq bilan ovozlashtiriladi.
+            <strong>Xadichai.uz</strong> (foydalanuvchilar orasida <em>Hadicha</em>, <em>Xadicha</em>, <em>Xadicha uz</em> yoki <em>Xadichai uz</em> nomi bilan qidiriladigan sayt) — bu <strong>You Tube dublyaj</strong> va har qanday videolarni avtomatik tarzda sof o'zbek tiliga tarjima va dublyaj qiluvchi 1-raqamli <strong>onlayn dublyaj programmasi hamda dasturidir</strong>. Google AI va OpenAI Whisper / Azure Speech AI texnologiyalari yordamida har bir YouTube video tabiiy insoniy ovozda ovozlashtiriladi.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">🎯 Nega Xadicha (Hadicha uz) Dublyaj Sayti?</h3>
+              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">🎯 Hadicha / Xadicha Uz Dublyaj Imkoniyatlari</h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
-                Har qanday YouTube video havolasini kiriting va soniyalar ichida professional <strong>o'zbekcha dublyaj</strong> hamda <strong>sinxron subtitrlarni</strong> yuklab oling.
+                Istalgan YouTube havolasini kiriting va <strong>You Tube dublyaj</strong> xizmati orqali soniyalar ichida professional <strong>o'zbekcha dublyaj</strong> va tayyor MP4 video faylni yuklab oling.
               </p>
             </div>
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">⚡ Onlayn Dublyaj Dasturi Afzalliklari</h3>
+              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">⚡ Bevosita Onlayn Dublyaj Dasturi</h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
-                Dasturni kompyuterga o'rnatish shart emas. Barcha jarayonlar 100% onlayn brauzerda avtomatlashtirilgan.
+                Kompyuter yoki telefonga qo'shimcha ilova yuklash shart emas. <strong>Hadicha (Xadichai uz)</strong> brauzerning o'zida avtomatik ishlaydi.
               </p>
             </div>
           </div>
