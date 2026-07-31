@@ -164,10 +164,10 @@ jobs:
             echo ""
 
             # Create deployment directory
-            mkdir -p /opt/xadichai
+            mkdir -p /home/ubuntu/ai-dubber
 
             # Pull latest code
-            cd /opt/xadichai
+            cd /home/ubuntu/ai-dubber
             if [ -d .git ]; then
               git pull origin main
             else
@@ -245,8 +245,8 @@ jobs:
             echo "Setting up supervisor..."
             sudo cat > /etc/supervisor/conf.d/xadichai.conf << 'EOF'
 [program:ai-dubber-frontend]
-command=node /opt/xadichai/frontend/.next/standalone/server.js
-directory=/opt/xadichai/frontend
+command=node /home/ubuntu/ai-dubber/frontend/.next/standalone/server.js
+directory=/home/ubuntu/ai-dubber/frontend
 user=ubuntu
 autostart=true
 autorestart=true
@@ -257,27 +257,27 @@ environment=PORT="3000",NODE_ENV="production"
 stopwaitsecs=10
 
 [program:ai-dubber-api]
-command=/opt/xadichai/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
-directory=/opt/xadichai
+command=/home/ubuntu/ai-dubber/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+directory=/home/ubuntu/ai-dubber
 user=ubuntu
 autostart=true
 autorestart=true
 redirect_stderr=true
 stdout_logfile=/var/log/ai-dubber/api.log
 stderr_logfile=/var/log/ai-dubber/api_err.log
-environment=PYTHONPATH="/opt/xadichai"
+environment=PYTHONPATH="/home/ubuntu/ai-dubber"
 stopwaitsecs=10
 
 [program:ai-dubber-worker]
-command=/opt/xadichai/venv/bin/celery -A backend.workers.celery_app worker -l info -Q video_processing -c 2
-directory=/opt/xadichai
+command=/home/ubuntu/ai-dubber/venv/bin/celery -A backend.workers.celery_app worker -l info -Q video_processing -c 2
+directory=/home/ubuntu/ai-dubber
 user=ubuntu
 autostart=true
 autorestart=true
 redirect_stderr=true
 stdout_logfile=/var/log/ai-dubber/worker.log
 stderr_logfile=/var/log/ai-dubber/worker_err.log
-environment=PYTHONPATH="/opt/xadichai"
+environment=PYTHONPATH="/home/ubuntu/ai-dubber"
 stopwaitsecs=10
 EOF
 
@@ -312,7 +312,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location /_next/static/ {
-        alias /opt/xadichai/frontend/.next/standalone/.next/static/;
+        alias /home/ubuntu/ai-dubber/frontend/.next/standalone/.next/static/;
         expires 365d;
         access_log off;
         add_header Cache-Control "public, max-age=31536000, immutable";
@@ -371,13 +371,11 @@ NGINXCONFIG
             sudo nginx -t
             sudo systemctl reload nginx
 
-            # Start supervisor and services
+            # Restart Docker services (server uses Docker Compose)
             echo ""
-            echo "Starting services..."
-            sudo supervisorctl reread
-            sudo supervisorctl update
-            sudo supervisorctl restart ai-dubber-frontend ai-dubber-api ai-dubber-worker
-            sudo supervisorctl start ai-dubber-frontend ai-dubber-api ai-dubber-worker
+            echo "Restarting Docker services..."
+            cd /home/ubuntu/ai-dubber
+            docker compose up -d --build backend worker
 
             echo ""
             echo "Waiting for services to start..."
@@ -387,7 +385,7 @@ NGINXCONFIG
             echo "=== Deployment Complete ==="
             echo ""
             echo "Checking service status..."
-            sudo supervisorctl status
+            docker compose ps
 
             echo ""
             echo "Testing API health..."
