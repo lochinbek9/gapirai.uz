@@ -155,7 +155,7 @@ export default function DashboardPage() {
       <header className="border-b border-black/5 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <img src="/logo.png" alt="Xadichai.uz" className="h-12 sm:h-16 md:h-18 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" style={{ maxWidth: "280px", maxHeight: "72px", height: "auto" }} />
+            <img src="/logo1.png" alt="Xadichai.uz" className="h-12 sm:h-16 md:h-18 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" style={{ maxWidth: "280px", maxHeight: "72px", height: "auto" }} />
             <img src="/logodark.png" alt="Xadichai.uz" className="h-12 sm:h-16 md:h-18 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" style={{ maxWidth: "280px", maxHeight: "72px", height: "auto" }} />
           </Link>
           <div className="flex items-center gap-4">
