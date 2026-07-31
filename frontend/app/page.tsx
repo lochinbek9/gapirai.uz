@@ -72,7 +72,7 @@ function Logo() {
       </div>
 
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
-        Xadichai<span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-violet-600 to-indigo-600">.uz</span>
+        Xadichai.uz
       </h1>
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
         YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-slate-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
