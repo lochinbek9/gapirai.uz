@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createJob, getVideoInfo, VideoInfo } from "@/lib/api";
+import { createJob, getJob, getVideoInfo, VideoInfo } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
