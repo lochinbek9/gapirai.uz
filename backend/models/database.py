@@ -51,7 +51,7 @@ class DubbingJob(Base):
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
-    status = Column(Enum(JobStatus), default=JobStatus.PENDING, nullable=False)
+    status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
 
@@ -84,17 +84,21 @@ def get_db():
 def create_tables():
     from sqlalchemy import text
     try:
-        connection = engine.connect()
-        # Postgresql enum alter value
-        connection.execute(text("ALTER TYPE jobstatus ADD VALUE 'awaiting_payment'"))
-        connection.commit()
+        with engine.connect() as connection:
+            for val in ['awaiting_payment', 'AWAITING_PAYMENT']:
+                try:
+                    connection.execute(text(f"ALTER TYPE jobstatus ADD VALUE '{val}'"))
+                    connection.commit()
+                except Exception:
+                    pass
     except Exception:
         pass
 
     try:
-        connection = engine.connect()
-        connection.execute(text("ALTER TABLE payments ALTER COLUMN user_id DROP NOT NULL"))
-        connection.commit()
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE payments ALTER COLUMN user_id DROP NOT NULL"))
+            connection.commit()
     except Exception:
         pass
+
     Base.metadata.create_all(bind=engine)
