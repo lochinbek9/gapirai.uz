@@ -1,9 +1,13 @@
 import json
 import re
+import time
+import random
+import logging
 from concurrent.futures import ThreadPoolExecutor
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from backend.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 
@@ -49,7 +53,7 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     if len(chunks) == 1:
         return _translate_chunk(chunks[0])
 
-    with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         chunk_results = list(executor.map(_translate_chunk, chunks))
 
     translated = []
@@ -101,6 +105,32 @@ def _get_client() -> OpenAI:
     return client
 
 
+def call_openai_with_retry(api_func, *args, **kwargs):
+    max_attempts = 7
+    for attempt in range(max_attempts):
+        try:
+            return api_func(*args, **kwargs)
+        except RateLimitError as e:
+            if attempt == max_attempts - 1:
+                raise e
+            
+            retry_after = 5.0
+            try:
+                if hasattr(e, "response") and e.response is not None:
+                    headers = e.response.headers
+                    if "retry-after-ms" in headers:
+                        retry_after = float(headers["retry-after-ms"]) / 1000.0
+                    elif "retry-after" in headers:
+                        retry_after = float(headers["retry-after"])
+            except Exception:
+                pass
+            
+            backoff = (2 ** attempt) + random.uniform(0.1, 1.0)
+            sleep_time = max(retry_after, backoff)
+            logger.warning(f"OpenAI RateLimit (429) hit. Qayta urinish {sleep_time:.2f} soniyadan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
+            time.sleep(sleep_time)
+
+
 def _translate_chunk(segments: list[dict]) -> list[dict]:
     """Bir bo'lak segmentlarni tarjima qilish."""
     clean_segments = [
@@ -117,7 +147,8 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
         f"{user_message}"
     )
 
-    response = _get_client().chat.completions.create(
+    response = call_openai_with_retry(
+        _get_client().chat.completions.create,
         model=settings.OPENAI_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -134,7 +165,8 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
 
 def translate_full_text(text: str) -> str:
     """To'liq matnni tarjima qilish (ko'rish uchun)."""
-    response = _get_client().chat.completions.create(
+    response = call_openai_with_retry(
+        _get_client().chat.completions.create,
         model=settings.OPENAI_MODEL,
         messages=[
             {

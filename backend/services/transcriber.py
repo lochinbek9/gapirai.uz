@@ -1,10 +1,14 @@
 import subprocess
 import tempfile
+import time
+import random
+import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from backend.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 _CHUNK_DURATION_SECONDS = 8 * 60
@@ -80,9 +84,36 @@ def _response_to_dict(response: object) -> dict:
     }
 
 
+def call_openai_with_retry(api_func, *args, **kwargs):
+    max_attempts = 7
+    for attempt in range(max_attempts):
+        try:
+            return api_func(*args, **kwargs)
+        except RateLimitError as e:
+            if attempt == max_attempts - 1:
+                raise e
+            
+            retry_after = 5.0
+            try:
+                if hasattr(e, "response") and e.response is not None:
+                    headers = e.response.headers
+                    if "retry-after-ms" in headers:
+                        retry_after = float(headers["retry-after-ms"]) / 1000.0
+                    elif "retry-after" in headers:
+                        retry_after = float(headers["retry-after"])
+            except Exception:
+                pass
+            
+            backoff = (2 ** attempt) + random.uniform(0.1, 1.0)
+            sleep_time = max(retry_after, backoff)
+            logger.warning(f"OpenAI RateLimit (429) hit. Qayta urinish {sleep_time:.2f} soniyadan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
+            time.sleep(sleep_time)
+
+
 def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
     with chunk_path.open("rb") as audio_file:
-        response = _get_client().audio.transcriptions.create(
+        response = call_openai_with_retry(
+            _get_client().audio.transcriptions.create,
             file=audio_file,
             model=settings.OPENAI_TRANSCRIPTION_MODEL,
             language="en",
