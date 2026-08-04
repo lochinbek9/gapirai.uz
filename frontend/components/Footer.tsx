@@ -60,13 +60,13 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <Link href="/" className="hover:text-red-600 dark:hover:text-red-400 transition">Foydalanish shartlari (Terms)</Link>
+                <Link href="/terms" className="hover:text-red-600 dark:hover:text-red-400 transition">Foydalanish shartlari (Terms)</Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-red-600 dark:hover:text-red-400 transition">Maxfiylik siyosati</Link>
+                <Link href="/privacy" className="hover:text-red-600 dark:hover:text-red-400 transition">Maxfiylik siyosati</Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-red-600 dark:hover:text-red-400 transition">Yordam va Savollar (FAQ)</Link>
+                <Link href="/faq" className="hover:text-red-600 dark:hover:text-red-400 transition">Yordam va Savollar (FAQ)</Link>
               </li>
             </ul>
           </div>

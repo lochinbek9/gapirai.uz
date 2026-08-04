@@ -58,8 +58,11 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
     expected_end_time = None
     if status_str not in ("completed", "failed", "awaiting_payment"):
         duration = job.video_duration or 300.0
-        est_seconds = 30 + 0.3 * duration
-        expected_dt = job.created_at + timedelta(seconds=est_seconds)
+        baseline_dt = job.updated_at or job.created_at
+        progress = job.progress or 0.0
+        remaining_factor = max(0.1, (100.0 - progress) / 100.0)
+        est_seconds = (30 + 0.3 * duration) * remaining_factor
+        expected_dt = baseline_dt + timedelta(seconds=est_seconds)
         expected_end_time = expected_dt.isoformat() + "Z"
 
     return JobResponse(
