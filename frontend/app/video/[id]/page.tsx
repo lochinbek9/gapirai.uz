@@ -39,6 +39,7 @@ export default function VideoPage() {
   const [showTranscript, setShowTranscript] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [currentTime, setCurrentTime] = useState(Date.now())
 
   const job = polledJob
 
@@ -73,6 +74,13 @@ export default function VideoPage() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -253,7 +261,7 @@ export default function VideoPage() {
                         {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </p>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        (taxminan {formatRemainingTime(Math.max(0, Math.ceil((new Date(job.expected_end_time).getTime() - Date.now()) / 1000)))} qoldi)
+                        (taxminan {formatRemainingTime(Math.max(0, Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000)))} qoldi)
                       </p>
                     </div>
                   )}
