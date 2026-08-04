@@ -48,6 +48,16 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
     create_tables()
+    
+    # Clear stale concurrent download locks
+    try:
+        from redis import Redis
+        r = Redis.from_url(settings.REDIS_URL)
+        r.delete("yt_dl:concurrent")
+        print("[STARTUP] Cleared stale yt-dlp concurrency lock from Redis.")
+    except Exception as e:
+        print(f"[STARTUP ERROR] Could not clear Redis locks: {e}")
+
     recover_stuck_jobs()
     yield
     # Shutdown (agar kerak bo'lsa)
