@@ -17,6 +17,16 @@ function calculateClientPrice(durationMinutes: number): number {
   return Math.ceil((Math.ceil(durationMinutes) * 1000) / 60)
 }
 
+function formatRemainingTime(seconds: number): string {
+  if (seconds <= 0) return "kam qoldi..."
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m > 0) {
+    return `${m} daqiqa ${s} soniya`
+  }
+  return `${s} soniya`
+}
+
 /* ── Page ────────────────────────────────────────── */
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>()
@@ -241,6 +251,9 @@ export default function VideoPage() {
                       <p className="font-semibold text-slate-300">Taxminiy yakunlanish vaqti:</p>
                       <p className="text-white font-mono text-sm">
                         {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        (taxminan {formatRemainingTime(Math.max(0, Math.ceil((new Date(job.expected_end_time).getTime() - Date.now()) / 1000)))} qoldi)
                       </p>
                     </div>
                   )}
