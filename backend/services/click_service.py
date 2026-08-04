@@ -76,6 +76,9 @@ def calculate_price(duration_minutes: float, *, is_first_video: bool = False) ->
     - First video for a user: free (no matter the length).
     - Subsequent videos: 1,000 UZS per minute.
     """
+    # Temporarily make everything completely free:
+    return 0
+
     if duration_minutes <= 10.0:
         return 0
     if is_first_video:
