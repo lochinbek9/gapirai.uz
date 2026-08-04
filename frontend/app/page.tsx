@@ -178,7 +178,7 @@ export default function Home() {
     setCancelLoading(true);
     try {
       const res = await cancelJob(jobId);
-      if (res.status === "success") {
+      if (res.success) {
         alert("Jarayon muvaffaqiyatli bekor qilindi.");
         clearJobId();
         setJobId(null);
