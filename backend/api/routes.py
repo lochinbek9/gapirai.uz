@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
@@ -47,11 +48,20 @@ class JobResponse(BaseModel):
     speaker_gender: Optional[str] = None
     voice_gender_setting: Optional[str] = None
     uzbek_srt_content: Optional[str] = None
+    expected_end_time: Optional[str] = None
 
 
 def _job_to_response(job: DubbingJob) -> JobResponse:
     raw_status = job.status.value if hasattr(job.status, "value") else job.status
     status_str = str(raw_status).lower() if raw_status else "pending"
+    
+    expected_end_time = None
+    if status_str not in ("completed", "failed", "awaiting_payment"):
+        duration = job.video_duration or 300.0
+        est_seconds = 30 + 0.3 * duration
+        expected_dt = job.created_at + timedelta(seconds=est_seconds)
+        expected_end_time = expected_dt.isoformat() + "Z"
+
     return JobResponse(
         job_id=str(job.id),
         status=status_str,
@@ -68,6 +78,7 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         uzbek_srt_content=job.uzbek_srt_content,
+        expected_end_time=expected_end_time
     )
 
 
@@ -238,4 +249,41 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"dubbed_{safe_title or job_id}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job topilmadi.")
+    
+    active_statuses = [
+        JobStatus.PENDING,
+        JobStatus.AWAITING_PAYMENT,
+        JobStatus.DOWNLOADING,
+        JobStatus.TRANSCRIBING,
+        JobStatus.TRANSLATING,
+        JobStatus.SYNTHESIZING,
+        JobStatus.SYNCING,
+        JobStatus.MERGING
+    ]
+    if job.status not in active_statuses:
+        return {"success": False, "message": "Job active holatda emas, bekor qilib bo'lmaydi."}
+
+    from backend.workers.celery_app import celery_app
+    try:
+        celery_app.control.revoke(str(job_id), terminate=True)
+    except Exception:
+        pass
+    
+    job.status = JobStatus.FAILED
+    job.status_message = "Foydalanuvchi tomonidan bekor qilindi."
+    job.error_message = "User cancelled the job."
+    job.updated_at = datetime.utcnow()
+    db.commit()
+    
+    return {"success": True, "message": "Dublyaj bekor qilindi."}
 

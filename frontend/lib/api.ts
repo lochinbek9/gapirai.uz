@@ -35,6 +35,7 @@ export interface Job {
   created_at?: string
   speaker_gender?: string
   uzbek_srt_content?: string
+  expected_end_time?: string
 }
 
 export type JobStatus =
@@ -136,4 +137,9 @@ export function loadJobId(): string | null {
 export function clearJobId() {
   if (typeof window === "undefined") return
   localStorage.removeItem(JOB_KEY)
+}
+
+export async function cancelJob(jobId: string): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/cancel`)
+  return res.data
 }

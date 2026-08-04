@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment, clearJobId } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment, clearJobId, cancelJob } from '@/lib/api'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   Download, ArrowLeft, Youtube, ChevronDown, ChevronUp,
@@ -28,12 +28,31 @@ export default function VideoPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   const job = polledJob
 
   const handleGoHome = () => {
     clearJobId()
     router.push('/')
+  }
+
+  const handleCancel = async () => {
+    if (!id) return
+    if (!window.confirm("Rostdan ham ushbu dublyajni bekor qilmoqchimisiz?")) return
+    setCancelLoading(true)
+    try {
+      const res = await cancelJob(id)
+      if (res.success) {
+        window.location.reload()
+      } else {
+        alert(res.message || "Bekor qilishda xatolik yuz berdi.")
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.")
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -206,10 +225,36 @@ export default function VideoPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center">
-                <div className="text-center">
-                  <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto mb-3" />
-                  <p className="text-slate-400">{job.status_message || 'Qayta ishlanmoqda...'}</p>
+              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+                
+                <div className="text-center space-y-4 max-w-sm z-10">
+                  <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto" />
+                  <div className="space-y-1">
+                    <p className="text-white font-semibold text-lg">{job.status_message || 'Qayta ishlanmoqda...'}</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Progress: {job.progress}%</p>
+                  </div>
+
+                  {job.expected_end_time && (
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-slate-400 space-y-1">
+                      <p className="font-semibold text-slate-300">Taxminiy yakunlanish vaqti:</p>
+                      <p className="text-white font-mono text-sm">
+                        {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      onClick={handleCancel}
+                      disabled={cancelLoading}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-500 rounded-lg transition duration-200 disabled:opacity-50"
+                    >
+                      {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      Jarayonni bekor qilish
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
