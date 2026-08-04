@@ -50,9 +50,11 @@ class JobResponse(BaseModel):
 
 
 def _job_to_response(job: DubbingJob) -> JobResponse:
+    raw_status = job.status.value if hasattr(job.status, "value") else job.status
+    status_str = str(raw_status).lower() if raw_status else "pending"
     return JobResponse(
         job_id=str(job.id),
-        status=job.status.value if hasattr(job.status, "value") else job.status,
+        status=status_str,
         progress=job.progress or 0.0,
         status_message=job.status_message,
         video_title=job.video_title,

@@ -15,16 +15,16 @@ Base = declarative_base()
 
 
 class JobStatus(str, enum.Enum):
-    PENDING = "pending"
-    AWAITING_PAYMENT = "awaiting_payment"
-    DOWNLOADING = "downloading"
-    TRANSCRIBING = "transcribing"
-    TRANSLATING = "translating"
-    SYNTHESIZING = "synthesizing"
-    SYNCING = "syncing"
-    MERGING = "merging"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    AWAITING_PAYMENT = "AWAITING_PAYMENT"
+    DOWNLOADING = "DOWNLOADING"
+    TRANSCRIBING = "TRANSCRIBING"
+    TRANSLATING = "TRANSLATING"
+    SYNTHESIZING = "SYNTHESIZING"
+    SYNCING = "SYNCING"
+    MERGING = "MERGING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class User(Base):
