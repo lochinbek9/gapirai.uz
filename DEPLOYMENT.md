@@ -30,7 +30,7 @@ sudo apt-get install -y python3-pip python3-venv postgresql redis-server nginx s
 
 ### 1. SSH Connection
 ```bash
-ssh -i ~/.ssh/id_ed25519_lodex ubuntu@51.21.35.247
+ssh -i ~/.ssh/id_ed25519_xadichai ubuntu@51.21.35.247
 ```
 
 ### 2. Create User (if not exists)
@@ -80,7 +80,7 @@ tar czf xadichai-update.tar.gz --exclude='.git' --exclude='.next' --exclude='nod
 
 # Upload and extract on server
 scp xadichai-update.tar.gz ubuntu@51.21.35.247:/opt/xadichai/
-ssh -i ~/.ssh/id_ed25519_lodex ubuntu@51.21.35.247
+ssh -i ~/.ssh/id_ed25519_xadichai ubuntu@51.21.35.247
 cd /opt/xadichai
 tar xzf xadichai-update.tar.gz
 ```
@@ -282,7 +282,7 @@ Certbot automatically renews certificates monthly.
 ### Update Application
 ```bash
 # SSH to server
-ssh -i ~/.ssh/id_ed25519_lodex ubuntu@51.21.35.247
+ssh -i ~/.ssh/id_ed25519_xadichai ubuntu@51.21.35.247
 
 # Pull latest changes
 cd /opt/xadichai
