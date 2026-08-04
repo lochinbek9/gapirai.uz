@@ -133,6 +133,8 @@ export default function RootLayout({
     "@type": "WebSite",
     "name": "Xadichai.uz",
     "alternateName": [
+      "Xadichai",
+      "Hadichai",
       "Hadicha",
       "Xadicha",
       "Hadicha uz",

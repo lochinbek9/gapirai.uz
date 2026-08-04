@@ -395,10 +395,10 @@ export default function Home() {
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
         <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            Xadichai.uz (Hadicha / Xadicha uz) — You Tube Dublyaj va Video Tarjima Programmasi
+            Xadichai (Xadichai.uz / Hadicha / Xadicha uz) — You Tube Dublyaj va Video Tarjima Programmasi
           </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>Xadichai.uz</strong> (foydalanuvchilar orasida <em>Hadicha</em>, <em>Xadicha</em>, <em>Xadicha uz</em> yoki <em>Xadichai uz</em> nomi bilan qidiriladigan sayt) — bu <strong>You Tube dublyaj</strong> va har qanday videolarni avtomatik tarzda sof o'zbek tiliga tarjima va dublyaj qiluvchi 1-raqamli <strong>onlayn dublyaj programmasi hamda dasturidir</strong>. Google AI va OpenAI Whisper / Azure Speech AI texnologiyalari yordamida har bir YouTube video tabiiy insoniy ovozda ovozlashtiriladi.
+            <strong>Xadichai</strong> (foydalanuvchilar orasida <em>Xadichai</em>, <em>Hadichai</em>, <em>Hadicha</em>, <em>Xadicha</em>, <em>Xadicha uz</em> yoki <em>Xadichai uz</em> nomi bilan qidiriladigan sayt) — bu <strong>You Tube dublyaj</strong> va har qanday videolarni avtomatik tarzda sof o'zbek tiliga tarjima va dublyaj qiluvchi 1-raqamli <strong>onlayn dublyaj programmasi hamda dasturidir</strong>. Google AI va OpenAI Whisper / Azure Speech AI texnologiyalari yordamida har bir YouTube video tabiiy insoniy ovozda ovozlashtiriladi.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
