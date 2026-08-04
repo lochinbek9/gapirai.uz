@@ -14,12 +14,41 @@ from backend.api.click_routes import router as click_router
 settings = get_settings()
 
 
+def recover_stuck_jobs():
+    from backend.models.database import SessionLocal, DubbingJob, JobStatus
+    from backend.workers.tasks import process_video
+    db = SessionLocal()
+    try:
+        active_statuses = [
+            JobStatus.PENDING,
+            JobStatus.DOWNLOADING,
+            JobStatus.TRANSCRIBING,
+            JobStatus.TRANSLATING,
+            JobStatus.SYNTHESIZING,
+            JobStatus.SYNCING,
+            JobStatus.MERGING
+        ]
+        stuck_jobs = db.query(DubbingJob).filter(DubbingJob.status.in_(active_statuses)).all()
+        if stuck_jobs:
+            for job in stuck_jobs:
+                print(f"[RECOVERY] Re-enqueueing stuck job {job.id} with status {job.status}")
+                job.status = JobStatus.PENDING
+                job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
+                db.commit()
+                process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
+    except Exception as e:
+        print(f"[RECOVERY ERROR] Error during job recovery: {e}")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
     create_tables()
+    recover_stuck_jobs()
     yield
     # Shutdown (agar kerak bo'lsa)
 

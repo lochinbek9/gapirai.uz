@@ -6,7 +6,7 @@ import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, 
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   Download, ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2, CreditCard
+  Mic2, Clock, Loader2, CreditCard, AlertTriangle
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 
@@ -240,6 +240,29 @@ export default function VideoPage() {
                   >
                     ← Bosh sahifaga qaytish
                   </button>
+                </div>
+              </div>
+            ) : job.status === 'failed' ? (
+              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20">
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-rose-500/5 blur-3xl pointer-events-none" />
+                <div className="text-center space-y-4 max-w-md z-10">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mb-2">
+                    <AlertTriangle className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
+                    <p className="text-xs text-rose-300 font-mono bg-rose-950/30 border border-rose-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
+                      {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
+                    </p>
+                  </div>
+                  <div className="pt-2 flex justify-center gap-3">
+                    <button
+                      onClick={handleGoHome}
+                      className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition duration-200"
+                    >
+                      Bosh sahifaga qaytish
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
