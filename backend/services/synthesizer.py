@@ -30,8 +30,17 @@ async def _synthesize_edge_tts(text: str, output_path: str, voice_name: str | No
     clean_text = clean_text.replace("%", " foiz ").replace("$", " dollar ").replace("&", " va ").replace("+", " plyus ")
     clean_text = clean_text.replace("`", "'").replace("’", "'").replace("‘", "'")
     clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-    if not clean_text:
-        return False
+    if not clean_text or not re.search(r'[A-Za-z0-9\u0400-\u04FF\u0100-\u017F\u00C0-\u017F]', clean_text):
+        logger.info(f"Text '{text}' has no pronounceable characters. Generating silence.")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", "0.5", "-acodec", "pcm_s16le", output_path],
+                check=True, capture_output=True
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to generate silence for empty segment: {e}")
+            return False
 
     try:
         import edge_tts
