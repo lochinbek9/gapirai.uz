@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Integer
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Integer, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -28,7 +28,7 @@ class Payment(Base):
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     
     click_transaction_id = Column(String, index=True)
-    click_prepare_id = Column(Integer)
+    click_prepare_id = Column(BigInteger)
     click_status = Column(Integer)
     click_create_time = Column(Integer)
     click_complete_time = Column(Integer)

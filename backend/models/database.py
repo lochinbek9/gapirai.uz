@@ -101,4 +101,11 @@ def create_tables():
     except Exception:
         pass
 
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE payments ALTER COLUMN click_prepare_id TYPE BIGINT"))
+            connection.commit()
+    except Exception:
+        pass
+
     Base.metadata.create_all(bind=engine)
