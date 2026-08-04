@@ -1,5 +1,4 @@
-"use client";
-
+import { useState, useEffect } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job } from "@/lib/api";
@@ -19,6 +18,18 @@ function getCurrentStep(status: Job["status"]): number {
 interface Props {
   job: Job;
   elapsed: number;
+  onCancel?: () => void;
+  cancelLoading?: boolean;
+}
+
+function formatRemainingTime(seconds: number): string {
+  if (seconds <= 0) return "kam qoldi..."
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m > 0) {
+    return `${m} daqiqa ${s} soniya`
+  }
+  return `${s} soniya`
 }
 
 function formatElapsed(sec: number) {
@@ -27,9 +38,17 @@ function formatElapsed(sec: number) {
   return `${m ? `${m}daq ` : ""}${s}son`;
 }
 
-export default function StepProgress({ job, elapsed }: Props) {
+export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: Props) {
   const current = getCurrentStep(job.status);
   const isFailed = job.status === "failed";
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="space-y-8 py-2">
@@ -133,6 +152,31 @@ export default function StepProgress({ job, elapsed }: Props) {
           </motion.div>
         </div>
       </div>
+
+      {job.expected_end_time && !isFailed && (
+        <div className="bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl p-4 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1 transition-colors">
+          <p className="font-bold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
+          <p className="text-gray-950 dark:text-white font-mono text-base font-black">
+            {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+            (taxminan {formatRemainingTime(Math.max(0, Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000)))} qoldi)
+          </p>
+        </div>
+      )}
+
+      {onCancel && !isFailed && (
+        <div className="pt-2 text-center">
+          <button
+            onClick={onCancel}
+            disabled={cancelLoading}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-500 hover:text-white bg-rose-500/10 hover:bg-rose-500 rounded-xl transition duration-200 disabled:opacity-50"
+          >
+            {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            Jarayonni bekor qilish
+          </button>
+        </div>
+      )}
 
       {isFailed && (
         <motion.div

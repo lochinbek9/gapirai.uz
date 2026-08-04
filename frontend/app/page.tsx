@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createJob, getJob, getVideoInfo, VideoInfo } from "@/lib/api";
+import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
@@ -169,7 +169,28 @@ export default function Home() {
   const [elapsed, setElapsed] = useState(0);
   const [voiceGender, setVoiceGender] = useState("auto");
   const [showWelcome, setShowWelcome] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const startRef = useRef<number | null>(null);
+
+  const handleCancel = async () => {
+    if (!jobId) return;
+    if (!confirm("Rostdan ham jarayonni bekor qilmoqchimisiz?")) return;
+    setCancelLoading(true);
+    try {
+      const res = await cancelJob(jobId);
+      if (res.status === "success") {
+        alert("Jarayon muvaffaqiyatli bekor qilindi.");
+        clearJobId();
+        setJobId(null);
+      } else {
+        alert(res.message || "Bekor qilishda xatolik yuz berdi.");
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
 
   const { job, is404 } = useJobPolling(jobId);
 
@@ -356,7 +377,7 @@ export default function Home() {
                     <h2 className="text-base font-bold text-gray-900 dark:text-white line-clamp-1 transition-colors">{job.video_title}</h2>
                   </div>
                 )}
-                <StepProgress job={job} elapsed={elapsed} />
+                <StepProgress job={job} elapsed={elapsed} onCancel={handleCancel} cancelLoading={cancelLoading} />
               </motion.div>
             )}
 
