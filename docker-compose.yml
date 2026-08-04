@@ -93,7 +93,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A backend.workers.celery_app worker -l info -Q video_processing -c 2
+    command: celery -A backend.workers.celery_app worker -l info -Q video_processing -c 4
 
   # ──────────────────────────────
   # Celery Flower (monitoring)

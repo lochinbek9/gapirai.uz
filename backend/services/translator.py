@@ -3,6 +3,7 @@ import re
 import time
 import random
 import logging
+import httpx
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI, RateLimitError
 from backend.config import get_settings
@@ -10,6 +11,34 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
+
+
+def translate_free_google(text: str, target_lang: str = "uz") -> str:
+    url = "https://translate.googleapis.com/translate_a/single"
+    params = {
+        "client": "gtx",
+        "sl": "auto",
+        "tl": target_lang,
+        "dt": "t",
+        "q": text
+    }
+    try:
+        response = httpx.get(url, params=params, timeout=10.0)
+        if response.status_code == 200:
+            data = response.json()
+            parts = [item[0] for item in data[0] if item and item[0]]
+            return "".join(parts)
+    except Exception as e:
+        logger.error(f"Free Google Translate API request failed: {e}")
+    return text
+
+
+def _translate_segment_free(segment: dict) -> dict:
+    original_text = segment.get("text", "")
+    if not original_text:
+        return segment
+    translated_text = translate_free_google(original_text, target_lang="uz")
+    return {**segment, "text": translated_text}
 
 SYSTEM_PROMPT = """Siz mahoratli va tajribali o'zbek dublyaj akterisiz hamda professional dublyaj rejissyorisiz.
 Vazifangiz: Inglizcha videolarni sof, jonli, o'ta tabiiy va ta'sirli O'ZBEKCHA dublyaj matniga o'girish.
@@ -45,6 +74,14 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     Returns:
         Tarjima qilingan segmentlar ro'yxati.
     """
+    if not segments:
+        return []
+
+    if settings.FREE_MODE:
+        logger.info("FREE_MODE: Translating segments using free Google Translate API...")
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            return list(executor.map(_translate_segment_free, segments))
+
     chunk_size = 30
     chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
     if not chunks:

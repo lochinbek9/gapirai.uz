@@ -157,6 +157,44 @@ def transcribe_audio(audio_path: str) -> dict:
             "language": str,       # Aniqlangan til
         }
     """
+    if settings.FREE_MODE:
+        try:
+            from faster_whisper import WhisperModel
+            logger.info("FREE_MODE: Running local faster-whisper transcription (small model on CPU)...")
+            
+            model = WhisperModel("small", device="cpu", compute_type="int8")
+            segments, info = model.transcribe(audio_path, beam_size=5)
+            
+            segments_list = []
+            full_text_parts = []
+            for i, segment in enumerate(segments, start=1):
+                text = segment.text.strip()
+                if not text:
+                    continue
+                full_text_parts.append(text)
+                segments_list.append({
+                    "id": i,
+                    "start": round(segment.start, 3),
+                    "end": round(segment.end, 3),
+                    "text": text
+                })
+                
+            srt_lines = []
+            for seg in segments_list:
+                srt_lines.append(str(seg["id"]))
+                srt_lines.append(f"{_format_time(seg['start'])} --> {_format_time(seg['end'])}")
+                srt_lines.append(seg["text"])
+                srt_lines.append("")
+                
+            return {
+                "text": " ".join(full_text_parts),
+                "segments": segments_list,
+                "srt": "\n".join(srt_lines),
+                "language": info.language,
+            }
+        except Exception as e:
+            logger.error(f"Local faster-whisper transcription failed: {e}. Falling back to OpenAI...")
+
     segments_list = []
     full_text_parts = []
     language = "en"

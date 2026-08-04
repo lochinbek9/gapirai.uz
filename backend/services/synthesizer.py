@@ -257,9 +257,12 @@ def _synthesize_text(
     retries: int = 3,
     voice_name: str | None = None,
 ) -> None:
-    # 1. Primary Engine: Google AI Studio Text-to-Speech (Gemini 3.1 / 2.5 Flash TTS Engine)
-    if _synthesize_google_ai_studio_tts(text, output_path, voice_name=voice_name):
-        return
+    if settings.FREE_MODE:
+        logger.info("FREE_MODE: Forcing free Edge TTS synthesis...")
+    else:
+        # 1. Primary Engine: Google AI Studio Text-to-Speech (Gemini 3.1 / 2.5 Flash TTS Engine)
+        if _synthesize_google_ai_studio_tts(text, output_path, voice_name=voice_name):
+            return
 
     # 2. Native Uzbek Neural TTS (uz-UZ-SardorNeural / uz-UZ-MadinaNeural)
     try:
@@ -279,8 +282,12 @@ def _synthesize_text(
         else:
             if loop.run_until_complete(_synthesize_edge_tts(text, output_path, voice_name=voice_name)):
                 return
+            if settings.FREE_MODE:
+                raise RuntimeError("FREE_MODE: Edge TTS synthesis failed and paid fallbacks are disabled.")
     except Exception as e:
         logger.warning(f"Edge TTS fallback error: {e}")
+        if settings.FREE_MODE:
+            raise e
 
     # 3. Azure Speech SDK with uz-UZ voices
     try:

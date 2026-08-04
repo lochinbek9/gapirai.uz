@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "Xadichai.uz"
     DEBUG: bool = False
+    FREE_MODE: bool = False
 
     # Database
     DATABASE_URL: str = "postgresql://dubber:dubber123@localhost:5432/dubber_db"
