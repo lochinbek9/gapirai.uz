@@ -162,7 +162,7 @@ def transcribe_audio(audio_path: str) -> dict:
             from faster_whisper import WhisperModel
             logger.info("FREE_MODE: Running local faster-whisper transcription (small model on CPU)...")
             
-            model = WhisperModel("small", device="cpu", compute_type="int8")
+            model = WhisperModel("tiny", device="cpu", compute_type="int8")
             segments, info = model.transcribe(audio_path, beam_size=5)
             
             segments_list = []
