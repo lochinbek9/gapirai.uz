@@ -6,7 +6,7 @@ from openai import OpenAI
 from backend.config import get_settings
 
 settings = get_settings()
-client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
+client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 _CHUNK_DURATION_SECONDS = 8 * 60
 _CHUNK_BITRATE = "64k"
 

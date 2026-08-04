@@ -175,15 +175,24 @@ def process_video(self: Task, job_id: str) -> dict:
 
 
     except Exception as exc:
+        if self.request.retries < self.max_retries:
+            countdown = min(300, 30 * (2 ** self.request.retries))
+            # Qayta urinishlar mavjud bo'lsa statusni FAILED qilmaymiz, faqat xabarni yangilaymiz
+            job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+            if job:
+                job.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
+                job.error_message = str(exc)
+                job.updated_at = datetime.utcnow()
+                db.commit()
+            db.close()
+            raise self.retry(exc=exc, countdown=countdown)
+
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
             "status": JobStatus.FAILED,
             "error_message": str(exc),
             "updated_at": datetime.utcnow(),
         })
         db.commit()
-        if self.request.retries < self.max_retries:
-            countdown = min(300, 30 * (2 ** self.request.retries))
-            raise self.retry(exc=exc, countdown=countdown)
         raise exc
 
     finally:
