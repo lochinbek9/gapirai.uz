@@ -160,7 +160,9 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
             {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </p>
           <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
-            (taxminan {formatRemainingTime(Math.max(0, Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000)))} qoldi)
+            {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
+              ? "(tez orada yakunlanadi...)"
+              : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
           </p>
         </div>
       )}
