@@ -73,15 +73,16 @@ def calculate_price(duration_minutes: float, *, is_first_video: bool = False) ->
     """
     Pricing logic:
     - Videos < 60 minutes (1 hour): free.
-    - Videos >= 60 minutes: paid (60x cheaper for testing).
+    - Videos >= 60 minutes: 500 UZS per minute.
+      Example: 60 min → 30,000 UZS, 90 min → 45,000 UZS.
     """
     if duration_minutes < 60.0:
         return 0
     if is_first_video:
         return 0
 
-    # 1000 UZS per minute, made 60x cheaper for testing
-    amount = math.ceil((math.ceil(duration_minutes) * 1000) / 60)
+    # 500 UZS per minute (60 min = 30,000 UZS)
+    amount = math.ceil(duration_minutes) * 500
     return normalize_uzs_amount(amount)
 
 
