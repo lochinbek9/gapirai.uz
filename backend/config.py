@@ -43,8 +43,7 @@ class Settings(BaseSettings):
 
     # TTS Provider abstraction
     # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai"
-    # Benchmark natijasi: Azure native Uzbek voices bilan ustun (sifat + xarajat + tezlik)
-    TTS_PROVIDER: str = "azure"
+    TTS_PROVIDER: str = "elevenlabs"
 
     # ElevenLabs TTS
     ELEVENLABS_API_KEY: str = ""
