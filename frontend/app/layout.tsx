@@ -9,67 +9,21 @@ const inter = Inter({ subsets: ["latin"], display: "swap" });
 export const metadata: Metadata = {
   metadataBase: new URL('https://xadichai.uz'),
   title: {
-    default: "Xadichai.uz (Hadicha / Xadicha uz) — YouTube Dublyaj Programmasi | Online Video Dublyaj",
-    template: "%s | Xadichai.uz (Hadicha & Xadicha Uz Dublyaj)",
+    default: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    template: "%s | Xadichai.uz",
   },
-  description: "Xadichai.uz (Hadicha / Xadicha / Xadicha uz / Xadichai uz) — YouTube videolarni (You Tube dublyaj) sun'iy intellekt (AI) yordamida tezkor, bepul va avtomatik o'zbek tiliga dublyaj qiluvchi 1-raqamli dublyaj programmasi hamda video tarjima dasturi.",
+  description: "Xadichai.uz — YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma. 1 soatgacha videolar bepul.",
   keywords: [
-    // Brand Variations (Lotin & Kirill)
-    "hadicha",
-    "xadicha",
     "xadichai",
-    "hadichai",
-    "xadicha uz",
-    "hadicha uz",
     "xadichai uz",
-    "hadichai uz",
-    "hadicha dublyaj",
-    "xadicha dublyaj",
-    "hadicha ai",
-    "xadicha ai",
-    "хадича",
-    "хадичаи",
-    "хадича уз",
-    "хадича дубляж",
-
-    // YouTube Dublyaj & Search Keywords
-    "you tube dublyaj",
     "youtube dublyaj",
-    "you tube dublyaj qilish",
-    "youtube dublyaj qilish",
-    "youtube video dublyaj",
-    "youtube o'zbekcha dublyaj",
-    "youtube tarjimon",
-    "youtube video tarjima",
-
-    // Dublyaj & Dastur Kalit So'zlari
-    "dublyaj",
-    "dublyaj ilovasi",
-    "dublyaj programmasi",
-    "dublyaj dasturi",
-    "dublyaj qilish",
-    "dublyaj sayti",
-    "online dublyaj",
-    "onlayn dublyaj",
     "video dublyaj",
-    "video dublyaj dasturi",
     "o'zbekcha dublyaj",
-    "ozbekcha dublyaj",
-    "o'zbek tilida dublyaj",
-    "video dublyaj uzbekcha",
     "AI dublyaj",
-    "ai dubbing uzbek",
-    "sun'iy intellekt dublyaj",
-    "ai tarjima programmasi",
-    "video tarjima ai",
-    "videolarni o'zbek tiliga o'girish",
-    "ovozlashtirish dasturi",
-    "video ovoz berish programmasi",
-    "ai voice generator uzbek",
-    "дубляж иловаси",
-    "ўзбекча дубляж"
+    "video tarjima",
+    "ovozlashtirish",
   ],
-  authors: [{ name: "Xadichai.uz Team (Hadicha & Xadicha Uz)", url: "https://xadichai.uz" }],
+  authors: [{ name: "Xadichai.uz", url: "https://xadichai.uz" }],
   creator: "Xadichai.uz",
   publisher: "Xadichai.uz",
   alternates: {
@@ -89,22 +43,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "uz_UZ",
     url: "https://xadichai.uz",
-    siteName: "Xadichai.uz (Hadicha / Xadicha uz — YouTube Dublyaj)",
-    title: "Xadichai.uz (Hadicha / Xadicha uz) — YouTube Dublyaj Programmasi",
-    description: "Sun'iy intellekt yordamida YouTube videolarni (You Tube dublyaj) avtomatik o'zbek tiliga dublyaj hamda tarjima qiluvchi dastur va platforma.",
+    siteName: "Xadichai.uz",
+    title: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    description: "Sun'iy intellekt yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn platforma.",
     images: [
       {
         url: "https://xadichai.uz/logo.webp",
         width: 256,
         height: 256,
-        alt: "Xadichai.uz Hadicha Xadicha uz AI Dublyaj Programmasi",
+        alt: "Xadichai.uz logotipi",
       },
     ],
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Xadichai.uz (Hadicha / Xadicha uz) — YouTube Dublyaj Programmasi",
-    description: "Videolarni va You Tube dublyaj kontentlarini AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi dastur va sayt.",
+    card: "summary",
+    title: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    description: "Videolarni AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma.",
     images: ["https://xadichai.uz/logo.webp"],
   },
   robots: {
@@ -132,95 +86,34 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Xadichai.uz",
-    "alternateName": [
-      "Xadichai",
-      "Hadichai",
-      "Hadicha",
-      "Xadicha",
-      "Hadicha uz",
-      "Xadicha uz",
-      "Xadichai uz",
-      "Hadichai uz",
-      "YouTube dublyaj",
-      "You tube dublyaj",
-      "Hadicha Dublyaj"
-    ],
+    "alternateName": ["Xadichai", "Xadichai uz"],
     "url": "https://xadichai.uz",
     "inLanguage": "uz",
-    "description": "YouTube videolarni (You Tube dublyaj) sun'iy intellekt (AI) yordamida tezkor, bepul va avtomatik o'zbek tiliga dublyaj qiluvchi 1-raqamli Hadicha / Xadicha uz dublyaj programmasi."
+    "description": "YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma."
   };
 
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Xadichai.uz (Hadicha & Xadicha uz)",
+    "name": "Xadichai.uz",
     "url": "https://xadichai.uz",
-    "logo": "https://xadichai.uz/logo.webp",
-    "sameAs": [
-      "https://xadichai.uz"
-    ]
+    "logo": "https://xadichai.uz/logo.webp"
   };
 
   const softwareAppSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Xadichai.uz",
-    "alternateName": [
-      "Hadicha",
-      "Xadicha",
-      "Hadicha uz",
-      "Xadicha uz",
-      "Xadichai",
-      "Hadichai",
-      "Xadichai uz",
-      "Hadichai uz",
-      "YouTube dublyaj",
-      "You tube dublyaj",
-      "Hadicha Dublyaj",
-      "Xadicha Dublyaj",
-      "Dublyaj Programmasi",
-      "Dublyaj Dasturi"
-    ],
+    "alternateName": ["Xadichai", "Xadichai uz"],
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "All",
     "url": "https://xadichai.uz",
-    "description": "Hadicha / Xadicha uz (Xadichai.uz) — YouTube videolarni (You tube dublyaj) sun'iy intellekt (AI) yordamida avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn dublyaj programmasi.",
+    "description": "YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn platforma.",
     "offers": {
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "UZS"
     }
-  };
-
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "Hadicha (Xadicha / Xadicha uz / Xadichai.uz) nima?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Xadichai.uz (Hadicha / Xadicha uz) — sun'iy intellekt (AI) yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi innovatsion onlayn platforma va dublyaj programmasidir."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "YouTube dublyaj (You tube dublyaj) dasturi orqali videolarni o'zbekcha qilish bepulmi?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Ha! Xadichai.uz (Hadicha uz) saytida 10 daqiqagacha bo'lgan YouTube videolarni mutlaqo bepul va tezkor o'zbek tiliga dublyaj qilishingiz mumkin."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "YouTube videolarni Xadicha uz (Hadicha) orqali o'zbek tiliga dublyaj qilish qanday ishlaydi?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Shunchaki YouTube havolasini Xadichai.uz (Hadicha / Xadicha uz) saytiga joylaysiz. Sun'iy intellekt video matnini ajratadi, professional o'zbek tiliga tarjima qiladi va tabiiy insoniy ovozda dublyaj qiladi."
-        }
-      }
-    ]
   };
 
   return (
@@ -237,10 +130,6 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         />
       </head>
       <body className={inter.className}>

@@ -1,13 +1,22 @@
 name: Node.js CI/CD
 
-# Controls when the workflow will run
+# DISABLED 2026-08-05 — manual runs only.
+#
+# The rsync below copies .next/standalone/ straight to the app root, but because
+# the repo root holds a package-lock.json, Next treats it as the workspace root
+# and emits .next/standalone/frontend/server.js. So server.js lands at
+# app/frontend/server.js and the systemd unit finds nothing to run.
+# Deploys are done by hand until that path is corrected.
+#
+# Nothing below is removed. To re-enable automatic runs, restore:
+#   push:
+#     branches:
+#       - main
+#   pull_request:
+#     branches:
+#       - main
 on:
-  push:
-    branches:
-      - main # Trigger CI for changes to the "main" branch
-  pull_request:
-    branches:
-      - main # Trigger CI for pull requests targeting "main"
+  workflow_dispatch:
 
 # Define jobs for the workflow
 jobs:

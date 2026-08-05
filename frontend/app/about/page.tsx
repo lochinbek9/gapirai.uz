@@ -2,33 +2,29 @@ import type { Metadata } from 'next'
 import AboutClient from './AboutClient'
 
 export const metadata: Metadata = {
-  title: "Xadichai.uz Haqida — Sun'iy Intellekt Video Dublyaj Programmasi | Hadicha",
-  description: "Xadichai.uz (Hadicha) platformasi va sun'iy intellekt (AI) yordamida videolarni o'zbek tiliga avtomatik dublyaj hamda tarjima qilish loyihasi haqida batafsil ma'lumot.",
+  title: "Loyiha haqida",
+  description: "Xadichai.uz platformasi va sun'iy intellekt yordamida videolarni o'zbek tiliga avtomatik dublyaj qilish loyihasi haqida batafsil ma'lumot.",
   keywords: [
-    "xadicha haqida",
-    "hadicha uz haqida",
     "xadichai haqida",
-    "hadichai haqida",
-    "dublyaj programmasi loyihasi",
-    "video dublyaj dasturi",
+    "dublyaj dasturi",
     "ai dublyaj texnologiyasi",
-    "o'zbekcha ai dublyaj"
+    "o'zbekcha ai dublyaj",
   ],
   alternates: {
     canonical: "/about",
   },
   openGraph: {
-    title: "Xadichai.uz Haqida — Hadicha AI Video Dublyaj Programmasi",
-    description: "YouTube va boshqa videolarni sun'iy intellekt kuchi bilan o'zbek tiliga avtomatik dublyaj qiluvchi innovatsion milliy loyiha.",
+    title: "Loyiha haqida | Xadichai.uz",
+    description: "YouTube va boshqa videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj qiluvchi loyiha haqida.",
     url: "https://xadichai.uz/about",
-    siteName: "Xadichai.uz (Hadicha Dublyaj)",
+    siteName: "Xadichai.uz",
     locale: "uz_UZ",
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Xadichai.uz Haqida — Hadicha AI Video Dublyaj Programmasi",
-    description: "Videolarni AI yordamida o'zbek tiliga dublyaj qiluvchi dastur va platforma haqida.",
+    card: "summary",
+    title: "Loyiha haqida | Xadichai.uz",
+    description: "Videolarni AI yordamida o'zbek tiliga dublyaj qiluvchi platforma haqida.",
   },
 }
 

@@ -1,0 +1,22 @@
+export const FAQS = [
+  {
+    q: "Xadichai.uz qanday ishlaydi?",
+    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
+  },
+  {
+    q: "Platformadan foydalanish bepulmi?",
+    a: "Ha, davomiyligi 1 soat (60 daqiqa) gacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. 1 soatdan uzun videolarni dublyaj qilish uchun esa Click tizimi orqali to'lov amalga oshirilishi talab qilinadi."
+  },
+  {
+    q: "Dublyaj qilish qancha vaqt oladi?",
+    a: "O'rtacha hisobda videoni qayta ishlash davomiyligi video uzunligining 30% ini tashkil qiladi. Masalan, 10 daqiqalik video taxminan 3 daqiqa ichida tayyor bo'ladi. Jarayon davomida taxminiy vaqt ekranda ko'rsatib turiladi."
+  },
+  {
+    q: "Dublyaj jarayonini bekor qilsa bo'ladimi?",
+    a: "Ha, jarayon davomida xohlagan vaqtingizda 'Jarayonni bekor qilish' tugmasini bosib, ishni to'xtatishingiz mumkin. Agar video bepul bo'lsa, hech qanday to'lov yo'qolmaydi."
+  },
+  {
+    q: "Agar dublyaj jarayonida xatolik yuz bersa nima bo'ladi?",
+    a: "Agar tizimda yoki tarjimada xatolik yuz bersa, tizim avtomatik ravishda jarayonni qayta tiklashga (retry) harakat qiladi. Agar butunlay muvaffaqiyatsiz bo'lsa, to'liq xatolik sababi ekranda ko'rsatiladi va siz bosh sahifaga qaytib qaytadan urinib ko'rishingiz mumkin."
+  }
+]

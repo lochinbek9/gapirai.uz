@@ -6,16 +6,13 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/dashboard/', '/video/'],
-      },
-      {
-        userAgent: 'Googlebot',
-        allow: '/',
-        disallow: ['/api/', '/dashboard/'],
+        // Only block the API. /dashboard and /video are handled with a noindex
+        // meta tag instead — blocking them here would stop Google from ever
+        // crawling the page to see that tag.
+        disallow: ['/api/'],
       },
     ],
     sitemap: 'https://xadichai.uz/sitemap.xml',
     host: 'https://xadichai.uz',
   }
 }
-

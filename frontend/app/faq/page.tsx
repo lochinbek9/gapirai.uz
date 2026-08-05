@@ -2,30 +2,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-
-const FAQS = [
-  {
-    q: "Xadichai.uz qanday ishlaydi?",
-    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
-  },
-  {
-    q: "Platformadan foydalanish bepulmi?",
-    a: "Ha, davomiyligi 1 soat (60 daqiqa) gacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. 1 soatdan uzun videolarni dublyaj qilish uchun esa Click tizimi orqali to'lov amalga oshirilishi talab qilinadi."
-  },
-  {
-    q: "Dublyaj qilish qancha vaqt oladi?",
-    a: "O'rtacha hisobda videoni qayta ishlash davomiyligi video uzunligining 30% ini tashkil qiladi. Masalan, 10 daqiqalik video taxminan 3 daqiqa ichida tayyor bo'ladi. Jarayon davomida taxminiy vaqt ekranda ko'rsatib turiladi."
-  },
-  {
-    q: "Dublyaj jarayonini bekor qilsa bo'ladimi?",
-    a: "Ha, jarayon davomida xohlagan vaqtingizda 'Jarayonni bekor qilish' tugmasini bosib, ishni to'xtatishingiz mumkin. Agar video bepul bo'lsa, hech qanday to'lov yo'qolmaydi."
-  },
-  {
-    q: "Agar dublyaj jarayonida xatolik yuz bersa nima bo'ladi?",
-    a: "Agar tizimda yoki tarjimada xatolik yuz bersa, tizim avtomatik ravishda jarayonni qayta tiklashga (retry) harakat qiladi. Agar butunlay muvaffaqiyatsiz bo'lsa, to'liq xatolik sababi ekranda ko'rsatiladi va siz bosh sahifaga qaytib qaytadan urinib ko'rishingiz mumkin."
-  }
-]
+import { motion } from 'framer-motion'
+import { FAQS } from './faqs'
 
 export default function FAQPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
@@ -65,27 +43,27 @@ export default function FAQPage() {
                 >
                   <button
                     onClick={() => setOpenIndex(isOpen ? null : i)}
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-answer-${i}`}
                     className="w-full px-5 py-4 flex items-center justify-between text-left text-xs sm:text-sm font-bold text-slate-100 hover:text-white transition"
                   >
                     <span>{faq.q}</span>
                     {isOpen ? <ChevronUp className="w-4 h-4 text-rose-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
                   </button>
 
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: "auto" }}
-                        exit={{ height: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-400 border-t border-slate-800/40 leading-relaxed">
-                          {faq.a}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Always rendered so the answer text ships in the SSR HTML —
+                      crawlers (and the FAQPage schema in layout.tsx) need it. */}
+                  <motion.div
+                    id={`faq-answer-${i}`}
+                    initial={false}
+                    animate={{ height: isOpen ? "auto" : 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-400 border-t border-slate-800/40 leading-relaxed">
+                      {faq.a}
+                    </div>
+                  </motion.div>
                 </div>
               )
             })}
