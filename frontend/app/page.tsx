@@ -195,9 +195,14 @@ export default function Home() {
   const { job, is404 } = useJobPolling(jobId);
 
   useEffect(() => {
-    if (is404 || (job && (job.status === "awaiting_payment" || job.status === "completed" || job.status === "failed"))) {
+    if (is404 || (job && job.status === "awaiting_payment")) {
       clearJobId();
       setJobId(null);
+    } else if (job && (job.status === "completed" || job.status === "failed")) {
+      // Natija/xatolik ekrani `job` holatiga tayanadi — faqat localStorage'ni
+      // tozalaymiz, jobId'ni saqlab qolamiz, aks holda ekran boshlang'ich
+      // formaga qaytib ketadi.
+      clearJobId();
     }
   }, [is404, job?.status]);
 

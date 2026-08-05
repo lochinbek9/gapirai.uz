@@ -19,7 +19,6 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-CONTAINER_UPLOADS_DIR = os.getenv("CONTAINER_UPLOADS_DIR", "/app/uploads")
 
 COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
 
@@ -247,12 +246,9 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
     if proc.returncode != 0:
         raise RuntimeError(f"Audio ajratishda xatolik: {proc.stderr[-500:]}")
 
-    container_video = Path(CONTAINER_UPLOADS_DIR) / job_id / video_file.name
-    container_audio = Path(CONTAINER_UPLOADS_DIR) / job_id / audio_file.name
-
     return {
-        "video_path": str(container_video),
-        "audio_path": str(container_audio),
+        "video_path": str(video_file),
+        "audio_path": str(audio_file),
         "title": title,
         "duration": duration,
     }
