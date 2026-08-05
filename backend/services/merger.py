@@ -36,13 +36,12 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
     audio_dur = _get_duration(dubbed_audio_path)
 
     if audio_dur <= video_dur:
-        # Audio qisqaroq — oddiy birlashtirish, video davom etadi (sukut qoladi)
+        # Audio qisqaroq — oddiy birlashtirish (stream copy, instant)
         cmd = [
             "ffmpeg", "-y",
             "-i", video_path,
             "-i", dubbed_audio_path,
             "-c:v", "copy",
-            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
             "-c:a", "aac", "-b:a", "192k",
             "-map", "0:v:0",
             "-map", "1:a:0",
@@ -56,12 +55,11 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "ffmpeg", "-y",
             "-i", video_path,
             "-i", dubbed_audio_path,
-            # Video oxirini "tpad" bilan uzaytirish (oxirgi kadr freeze)
             "-filter_complex",
-            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[a]",
+            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v]",
             "-map", "[v]",
-            "-map", "[a]",
-            "-c:v", "libx264", "-crf", "23", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "0",
+            "-map", "1:a:0",
+            "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "0",
             "-c:a", "aac", "-b:a", "192k",
             output_path,
         ]

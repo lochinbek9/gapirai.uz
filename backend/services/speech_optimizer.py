@@ -277,7 +277,7 @@ def _llm_optimize(segments: list[dict]) -> list[dict]:
     chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
     if len(chunks) == 1:
         return _llm_optimize_chunk(chunks[0])
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         results = list(executor.map(_llm_optimize_chunk, chunks))
     merged: list[dict] = []
     for r in results:

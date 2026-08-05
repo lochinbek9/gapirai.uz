@@ -90,7 +90,7 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     if len(chunks) == 1:
         return _translate_chunk(chunks[0])
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         chunk_results = list(executor.map(_translate_chunk, chunks))
 
     translated = []
