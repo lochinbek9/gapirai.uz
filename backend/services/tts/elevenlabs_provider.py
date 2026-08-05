@@ -14,6 +14,7 @@ Konfiguratsiya (.env orqali):
 """
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
