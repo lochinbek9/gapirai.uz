@@ -142,16 +142,16 @@ export default function VideoPage() {
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4 pointer-events-auto">
           <button
-            onClick={handleGoHome}
-            className="text-slate-400 hover:text-white transition p-2 -ml-2 rounded-xl hover:bg-white/5"
-            title="Bosh sahifaga qaytish"
+            onClick={() => router.push("/dashboard")}
+            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
+            aria-label="Orqaga qaytish"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <img src="/logodark.webp" alt="Xadichai.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
             <span className="text-lg font-black tracking-tight text-white">
               Xadichai<span className="text-rose-500">.uz</span>
             </span>

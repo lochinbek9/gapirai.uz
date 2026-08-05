@@ -78,7 +78,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/icon.png" },
-      { url: "/logo.png", type: "image/png" },
+      { url: "/logo.webp", type: "image/webp" },
     ],
     shortcut: ["/favicon.ico"],
     apple: [
@@ -94,9 +94,9 @@ export const metadata: Metadata = {
     description: "Sun'iy intellekt yordamida YouTube videolarni (You Tube dublyaj) avtomatik o'zbek tiliga dublyaj hamda tarjima qiluvchi dastur va platforma.",
     images: [
       {
-        url: "https://xadichai.uz/logo.png",
-        width: 1200,
-        height: 630,
+        url: "https://xadichai.uz/logo.webp",
+        width: 256,
+        height: 256,
         alt: "Xadichai.uz Hadicha Xadicha uz AI Dublyaj Programmasi",
       },
     ],
@@ -105,7 +105,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Xadichai.uz (Hadicha / Xadicha uz) — YouTube Dublyaj Programmasi",
     description: "Videolarni va You Tube dublyaj kontentlarini AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi dastur va sayt.",
-    images: ["https://xadichai.uz/logo.png"],
+    images: ["https://xadichai.uz/logo.webp"],
   },
   robots: {
     index: true,
@@ -155,7 +155,7 @@ export default function RootLayout({
     "@type": "Organization",
     "name": "Xadichai.uz (Hadicha & Xadicha uz)",
     "url": "https://xadichai.uz",
-    "logo": "https://xadichai.uz/logo.png",
+    "logo": "https://xadichai.uz/logo.webp",
     "sameAs": [
       "https://xadichai.uz"
     ]

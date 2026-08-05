@@ -105,6 +105,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition text-gray-500 dark:text-gray-400"
+            aria-label="Yopish"
           >
             <X className="w-4 h-4" />
           </button>
@@ -112,8 +113,8 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="p-2 transition duration-300 hover:scale-105">
-              <img src="/logo.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
-              <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
+              <img src="/logo.webp" alt="Xadichai.uz Logo" width={256} height={256} className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
+              <img src="/logodark.webp" alt="Xadichai.uz Logo" width={256} height={256} className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
             </div>
           </div>
 
@@ -311,8 +312,8 @@ export default function Home() {
       <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         {/* Left Logo */}
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
-          <img src="/logodark.png" alt="Xadichai.uz Logo" className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logo.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logodark.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
         </Link>
 
         {/* Right Controls */}
