@@ -28,10 +28,10 @@ settings = get_settings()
 class ElevenLabsProvider(TTSProvider):
     """ElevenLabs Text-to-Speech provider (eleven_multilingual_v2)."""
 
-    # Adam (male multilingual)
-    DEFAULT_VOICE_ID_MALE = "pNInz6obpgDQGcFmaJgB"
-    # Rachel (female multilingual)
-    DEFAULT_VOICE_ID_FEMALE = "21m00Tcm4TlvDq8ikWAM"
+    # George (Warm, Captivating Storyteller — shirali kino suxandoni ovozi)
+    DEFAULT_VOICE_ID_MALE = "JBFqnCBsd6RMkjVDRZzb"
+    # Sarah (Mature, Reassuring, Confident — tabiiy va yoqimli ayol ovozi)
+    DEFAULT_VOICE_ID_FEMALE = "EXAVITQu4vr4xnSDxMaL"
 
     @property
     def name(self) -> str:
@@ -39,13 +39,23 @@ class ElevenLabsProvider(TTSProvider):
 
     @property
     def cost_per_1k(self) -> float:
-        # Pay-as-you-go: ~$0.30 per 1K chars (Creator tier average)
         return 0.30
 
     def _get_voice_id(self, voice_name: str | None) -> str:
         if self._is_female(voice_name):
             return settings.ELEVENLABS_VOICE_ID_FEMALE or self.DEFAULT_VOICE_ID_FEMALE
         return settings.ELEVENLABS_VOICE_ID_MALE or self.DEFAULT_VOICE_ID_MALE
+
+    def _normalize_uzbek_text(self, text: str) -> str:
+        """g' va o' harflaridagi har xil Unicode apostroflarni standartlashtirish."""
+        if not text:
+            return text
+        # HTML taglarni olib tashlash
+        text = re.sub(r"<[^>]+>", "", text)
+        # Barcha turdagi apostroflarni standart ' ga o'tkazish
+        text = text.replace("‘", "'").replace("’", "'").replace("ʻ", "'").replace("`", "'")
+        # Keraksiz ko'p bo'shliqlarni tozalash
+        return re.sub(r"\s+", " ", text).strip()
 
     def synthesize(
         self,
@@ -58,13 +68,16 @@ class ElevenLabsProvider(TTSProvider):
             logger.warning("ELEVENLABS_API_KEY topilmadi — ElevenLabs o'tkazib yuborildi.")
             return False
 
-        import re
-        clean_text = re.sub(r"<[^>]+>", "", text).strip()
+        clean_text = self._normalize_uzbek_text(text)
         if not clean_text:
             return False
 
         voice_id = self._get_voice_id(voice_name)
         model_id = settings.ELEVENLABS_MODEL or "eleven_multilingual_v2"
+
+        # Stability 0.80 bo'lsa har bir segment bitta bir xil ohang va tonda chiqadi
+        stability = float(settings.ELEVENLABS_STABILITY or 0.80)
+        similarity_boost = float(settings.ELEVENLABS_SIMILARITY_BOOST or 0.85)
 
         max_retries = 3
         for attempt in range(max_retries):
@@ -79,8 +92,8 @@ class ElevenLabsProvider(TTSProvider):
                     text=clean_text,
                     model_id=model_id,
                     voice_settings=VoiceSettings(
-                        stability=float(settings.ELEVENLABS_STABILITY or 0.5),
-                        similarity_boost=float(settings.ELEVENLABS_SIMILARITY_BOOST or 0.75),
+                        stability=stability,
+                        similarity_boost=similarity_boost,
                         style=float(settings.ELEVENLABS_STYLE or 0.0),
                         use_speaker_boost=True,
                     ),

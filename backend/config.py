@@ -47,11 +47,11 @@ class Settings(BaseSettings):
 
     # ElevenLabs TTS
     ELEVENLABS_API_KEY: str = ""
-    ELEVENLABS_VOICE_ID_MALE: str = "pNInz6obpgDQGcFmaJgB"    # Adam (multilingual)
-    ELEVENLABS_VOICE_ID_FEMALE: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel (multilingual)
+    ELEVENLABS_VOICE_ID_MALE: str = "JBFqnCBsd6RMkjVDRZzb"    # George (Warm, Captivating Storyteller)
+    ELEVENLABS_VOICE_ID_FEMALE: str = "EXAVITQu4vr4xnSDxMaL"  # Sarah (Mature, Reassuring)
     ELEVENLABS_MODEL: str = "eleven_multilingual_v2"
-    ELEVENLABS_STABILITY: float = 0.5
-    ELEVENLABS_SIMILARITY_BOOST: float = 0.75
+    ELEVENLABS_STABILITY: float = 0.80
+    ELEVENLABS_SIMILARITY_BOOST: float = 0.85
     ELEVENLABS_STYLE: float = 0.0
     ELEVENLABS_SPEED: float = 1.0
     ELEVENLABS_FALLBACK_TO_EDGE: bool = True
