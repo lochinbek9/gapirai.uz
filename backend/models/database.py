@@ -73,6 +73,23 @@ class DubbingJob(Base):
     user = relationship("User", back_populates="jobs")
 
 
+class PronunciationMemory(Base):
+    """
+    O'rganilgan talaffuz tuzatishlari: term -> Azure/Edge TTS uchun og'zaki shakl.
+    Static PRONUNCIATION_DICT'ni ustidan yozadi (backend/services/speech_optimizer.py).
+    Hozircha faqat o'qish uchun ishlatiladi; yozish yo'li (avtomatik yoki qo'lda
+    talaffuz QA'sidan) keyingi bosqichda qo'shiladi.
+    """
+    __tablename__ = "pronunciation_memory"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    term = Column(String(255), unique=True, nullable=False, index=True)
+    spoken_form = Column(String(500), nullable=False)
+    source = Column(String(20), default="manual")  # manual | qa_auto
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:

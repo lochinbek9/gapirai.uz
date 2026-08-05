@@ -44,6 +44,7 @@ export type JobStatus =
   | 'downloading'
   | 'transcribing'
   | 'translating'
+  | 'syncing'
   | 'synthesizing'
   | 'merging'
   | 'completed'
@@ -55,6 +56,7 @@ export const STATUS_LABELS: Record<JobStatus, string> = {
   downloading: 'Yuklanmoqda',
   transcribing: 'Matnga aylantirilmoqda',
   translating: 'Tarjima qilinmoqda',
+  syncing: 'Talaffuzga moslashtirilmoqda',
   synthesizing: 'Ovoz yaratilmoqda',
   merging: 'Birlashtirilmoqda',
   completed: 'Tayyor',

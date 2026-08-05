@@ -7,6 +7,7 @@ const STEPS = [
   { key: "downloading",  icon: "⬇", label: "Yuklab olish" },
   { key: "transcribing", icon: "🎙", label: "Transkripsiya" },
   { key: "translating",  icon: "🌐", label: "Tarjima" },
+  { key: "syncing",      icon: "🗣", label: "Talaffuz" },
   { key: "synthesizing", icon: "🔊", label: "Ovoz berish" },
   { key: "merging",      icon: "🎬", label: "Birlashtirish" },
 ] as const;
