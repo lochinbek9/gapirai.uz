@@ -6,7 +6,7 @@ from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
-from backend.services import downloader, transcriber, translator, synthesizer, merger
+from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
 from backend.config import get_settings
 
 logger = get_task_logger(__name__)
@@ -130,13 +130,19 @@ def process_video(self: Task, job_id: str) -> dict:
         job.uzbek_srt_content = _segments_to_vtt(translated_segments)
         db.commit()
 
+        # BOSQICH 4.5: Nutq uchun optimallashtirish (raqamlar, qisqartmalar, og'zaki uslub)
+        # Faqat TTS kirishi uchun — subtitr matni yuqoridagi tarjimadan o'zgarishsiz qoladi,
+        # chunki "JWT" -> "Jey Vi Ti" kabi og'zaki shakllar yozma subtitrda g'alati ko'rinadi.
+        _update_job(db, job, JobStatus.SYNCING, 50.0, "Matn tabiiy talaffuzga moslashtirilmoqda...")
+        speech_segments = speech_optimizer.optimize_segments(translated_segments)
+
         # BOSQICH 5: TTS (jinsga mos ovoz)
         voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
         _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                     f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
         tts_dir = str(output_dir / "tts_segments")
         dubbed_audio_path = synthesizer.synthesize_segments(
-            translated_segments, tts_dir, voice_name=voice
+            speech_segments, tts_dir, voice_name=voice
         )
         job.dubbed_audio_path = dubbed_audio_path
         db.commit()
