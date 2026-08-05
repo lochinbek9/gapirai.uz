@@ -41,6 +41,22 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     OUTPUT_DIR: str = "./outputs"
 
+    # TTS Provider abstraction
+    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai"
+    # Benchmark natijasi: Azure native Uzbek voices bilan ustun (sifat + xarajat + tezlik)
+    TTS_PROVIDER: str = "azure"
+
+    # ElevenLabs TTS
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_VOICE_ID_MALE: str = "pNInz6obpgDQGcFmaJgB"    # Adam (multilingual)
+    ELEVENLABS_VOICE_ID_FEMALE: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel (multilingual)
+    ELEVENLABS_MODEL: str = "eleven_multilingual_v2"
+    ELEVENLABS_STABILITY: float = 0.5
+    ELEVENLABS_SIMILARITY_BOOST: float = 0.75
+    ELEVENLABS_STYLE: float = 0.0
+    ELEVENLABS_SPEED: float = 1.0
+    ELEVENLABS_FALLBACK_TO_EDGE: bool = True
+
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"
