@@ -10,8 +10,8 @@ export function getApiUrl(): string {
       return "http://localhost:8000";
     }
 
-    return "https://api.xadichai.uz";
+    return "https://api.gapirai.uz";
   }
 
-  return "https://api.xadichai.uz";
+  return "https://api.gapirai.uz";
 }

@@ -24,8 +24,8 @@ export default function AboutClient() {
       {/* Top Header Bar */}
       <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
-          <img src="/logodark.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
         </Link>
 
         <div className="pointer-events-auto flex items-center gap-3">
@@ -55,11 +55,11 @@ export default function AboutClient() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-black dark:text-white tracking-tight leading-tight">
-            Xadichai<span className="text-red-500">.uz</span> haqida
+            GapirAI<span className="text-red-500">.uz</span> haqida
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed font-medium">
-            <strong className="text-red-600 dark:text-red-400 font-semibold">Xadichai.uz</strong> — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj va tarjima qilib beruvchi eng ilg'or milliy platformadir.
+            <strong className="text-red-600 dark:text-red-400 font-semibold">GapirAI.uz</strong> — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj va tarjima qilib beruvchi eng ilg'or milliy platformadir.
           </p>
 
           <div className="pt-4 flex justify-center">

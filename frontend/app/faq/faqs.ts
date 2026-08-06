@@ -1,6 +1,6 @@
 export const FAQS = [
   {
-    q: "Xadichai.uz qanday ishlaydi?",
+    q: "GapirAI.uz qanday ishlaydi?",
     a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
   },
   {

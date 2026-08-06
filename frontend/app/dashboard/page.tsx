@@ -155,8 +155,8 @@ export default function DashboardPage() {
       <header className="border-b border-black/5 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2">
           <Link href="/" className="flex items-center gap-3 group">
-            <img src="/logo.webp" alt="Xadichai.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)", maxHeight: "64px", height: "auto" }} />
-            <img src="/logodark.webp" alt="Xadichai.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)", maxHeight: "64px", height: "auto" }} />
+            <img src="/logo.webp" alt="GapirAI.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)", maxHeight: "64px", height: "auto" }} />
+            <img src="/logodark.webp" alt="GapirAI.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)", maxHeight: "64px", height: "auto" }} />
           </Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">

@@ -7,15 +7,15 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://xadichai.uz'),
+  metadataBase: new URL('https://gapirai.uz'),
   title: {
-    default: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
-    template: "%s | Xadichai.uz",
+    default: "GapirAI.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    template: "%s | GapirAI.uz",
   },
-  description: "Xadichai.uz — YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma. 1 soatgacha videolar bepul.",
+  description: "GapirAI.uz — YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma. 1 soatgacha videolar bepul.",
   keywords: [
-    "xadichai",
-    "xadichai uz",
+    "gapirai",
+    "gapirai uz",
     "youtube dublyaj",
     "video dublyaj",
     "o'zbekcha dublyaj",
@@ -23,9 +23,9 @@ export const metadata: Metadata = {
     "video tarjima",
     "ovozlashtirish",
   ],
-  authors: [{ name: "Xadichai.uz", url: "https://xadichai.uz" }],
-  creator: "Xadichai.uz",
-  publisher: "Xadichai.uz",
+  authors: [{ name: "GapirAI.uz", url: "https://gapirai.uz" }],
+  creator: "GapirAI.uz",
+  publisher: "GapirAI.uz",
   alternates: {
     canonical: "/",
   },
@@ -42,24 +42,24 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "uz_UZ",
-    url: "https://xadichai.uz",
-    siteName: "Xadichai.uz",
-    title: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    url: "https://gapirai.uz",
+    siteName: "GapirAI.uz",
+    title: "GapirAI.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
     description: "Sun'iy intellekt yordamida YouTube videolarni avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn platforma.",
     images: [
       {
-        url: "https://xadichai.uz/logo.webp",
+        url: "https://gapirai.uz/logo.webp",
         width: 256,
         height: 256,
-        alt: "Xadichai.uz logotipi",
+        alt: "GapirAI.uz logotipi",
       },
     ],
   },
   twitter: {
     card: "summary",
-    title: "Xadichai.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
+    title: "GapirAI.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
     description: "Videolarni AI yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma.",
-    images: ["https://xadichai.uz/logo.webp"],
+    images: ["https://gapirai.uz/logo.webp"],
   },
   robots: {
     index: true,
@@ -85,9 +85,9 @@ export default function RootLayout({
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "Xadichai.uz",
-    "alternateName": ["Xadichai", "Xadichai uz"],
-    "url": "https://xadichai.uz",
+    "name": "GapirAI.uz",
+    "alternateName": ["GapirAI", "GapirAI uz"],
+    "url": "https://gapirai.uz",
     "inLanguage": "uz",
     "description": "YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma."
   };
@@ -95,19 +95,19 @@ export default function RootLayout({
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Xadichai.uz",
-    "url": "https://xadichai.uz",
-    "logo": "https://xadichai.uz/logo.webp"
+    "name": "GapirAI.uz",
+    "url": "https://gapirai.uz",
+    "logo": "https://gapirai.uz/logo.webp"
   };
 
   const softwareAppSchema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Xadichai.uz",
-    "alternateName": ["Xadichai", "Xadichai uz"],
+    "name": "GapirAI.uz",
+    "alternateName": ["GapirAI", "GapirAI uz"],
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "All",
-    "url": "https://xadichai.uz",
+    "url": "https://gapirai.uz",
     "description": "YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj va tarjima qiluvchi onlayn platforma.",
     "offers": {
       "@type": "Offer",

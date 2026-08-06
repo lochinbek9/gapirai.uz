@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "Xadichai.uz"
+    APP_NAME: str = "GapirAI.uz"
     DEBUG: bool = False
     FREE_MODE: bool = False
 
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     CLICK_SERVICE_ID: str = "108780"
     CLICK_SECRET_KEY: str = "Pbxfw7SaMso"
     CLICK_MERCHANT_USER_ID: str = "89102"
-    FRONTEND_URL: str = "https://xadichai.uz"
+    FRONTEND_URL: str = "https://gapirai.uz"
 
     class Config:
         env_file = ".env"

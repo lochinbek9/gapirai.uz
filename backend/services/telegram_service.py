@@ -38,12 +38,12 @@ def send_telegram_feedback(
     title_clean = video_title or "Noma'lum video"
 
     text = (
-        f"⭐️ <b>YANGI FIKR VA BAHOLASH (Xadichai.uz)</b> ⭐️\n\n"
+        f"⭐️ <b>YANGI FIKR VA BAHOLASH (GapirAI.uz)</b> ⭐️\n\n"
         f"📹 <b>Video</b>: {title_clean}\n"
         f"⭐ <b>Baho</b>: {stars_str} ({rating} / 5)\n"
         f"💬 <b>Fikr</b>: \"{comment_clean}\"\n\n"
         f"🆔 <b>Job ID</b>: <code>{job_id}</code>\n"
-        f"🔗 <b>Havola</b>: https://xadichai.uz/video/{job_id}"
+        f"🔗 <b>Havola</b>: https://gapirai.uz/video/{job_id}"
     )
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"

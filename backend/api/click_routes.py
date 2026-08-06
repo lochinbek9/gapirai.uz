@@ -109,7 +109,7 @@ async def initiate_payment(
         base_origin = f"{parsed.scheme}://{parsed.netloc}"
         return_url = f"{base_origin}/video/{job.id}"
     else:
-        frontend_url = settings.FRONTEND_URL or "https://xadichai.uz"
+        frontend_url = settings.FRONTEND_URL or "https://gapirai.uz"
         return_url = f"{frontend_url.rstrip('/')}/video/{job.id}"
 
     payment_url = generate_payment_url(

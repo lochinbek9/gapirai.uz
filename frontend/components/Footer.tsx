@@ -11,14 +11,14 @@ export default function Footer() {
           {/* Column 1: Brand Info */}
           <div className="space-y-4">
             <Link href="/" className="inline-block transition duration-300 hover:scale-105">
-              <img src="/logo.webp" alt="Xadichai.uz" width={160} height={40} className="h-10 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
-              <img src="/logodark.webp" alt="Xadichai.uz" width={160} height={40} className="h-10 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
+              <img src="/logo.webp" alt="GapirAI.uz" width={160} height={40} className="h-10 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
+              <img src="/logodark.webp" alt="GapirAI.uz" width={160} height={40} className="h-10 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "48px", height: "auto" }} />
             </Link>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
               Videolarni Sun'iy Intellekt yordamida yuqori sifatda avtomatik o'zbek tiliga dublyaj qiluvchi birinchi innovatsion platforma.
             </p>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold pt-2">
-              © {new Date().getFullYear()} Xadichai.uz. Barcha huquqlar himoyalangan.
+              © {new Date().getFullYear()} GapirAI.uz. Barcha huquqlar himoyalangan.
             </p>
           </div>
 

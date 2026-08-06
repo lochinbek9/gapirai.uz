@@ -152,9 +152,9 @@ export default function VideoPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="Xadichai.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
             <span className="text-lg font-black tracking-tight text-white">
-              Xadichai<span className="text-rose-500">.uz</span>
+              GapirAI<span className="text-rose-500">.uz</span>
             </span>
           </Link>
         </div>

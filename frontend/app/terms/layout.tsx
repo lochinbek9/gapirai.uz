@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: "Foydalanish shartlari",
-  description: "Xadichai.uz AI dublyaj platformasidan foydalanish shartlari, foydalanuvchi huquq va majburiyatlari hamda to'lov qoidalari.",
+  description: "GapirAI.uz AI dublyaj platformasidan foydalanish shartlari, foydalanuvchi huquq va majburiyatlari hamda to'lov qoidalari.",
   alternates: { canonical: '/terms' },
 }
 

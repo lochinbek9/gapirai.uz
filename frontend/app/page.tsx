@@ -72,13 +72,13 @@ function Logo() {
       </div>
 
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
-        Xadichai<span className="text-rose-600 dark:text-rose-500">.uz</span>
+        GapirAI<span className="text-rose-600 dark:text-rose-500">.uz</span>
       </h1>
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
         YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-slate-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
       </p>
       <h2 className="sr-only">
-        YouTube videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj va tarjima qilish platformasi — Xadicha uz (Xadichai)
+        YouTube videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj va tarjima qilish platformasi — GapirAI.uz
       </h2>
     </motion.div>
   );
@@ -113,13 +113,13 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="p-2 transition duration-300 hover:scale-105">
-              <img src="/logo.webp" alt="Xadichai.uz Logo" width={256} height={256} className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
-              <img src="/logodark.webp" alt="Xadichai.uz Logo" width={256} height={256} className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
+              <img src="/logo.webp" alt="GapirAI.uz Logo" width={256} height={256} className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
+              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={256} height={256} className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
             </div>
           </div>
 
           <h2 className="text-2xl font-black text-black dark:text-white text-center mb-2">
-            Xadichai.uz ga xush kelibsiz
+            GapirAI.uz ga xush kelibsiz
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed px-4">
             YouTube videolarini o'zbek tiliga soniyalar ichida dublyaj qiling. Barcha videolaringizni saqlash uchun bepul hisob oching.
@@ -312,8 +312,8 @@ export default function Home() {
       <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         {/* Left Logo */}
         <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
-          <img src="/logodark.webp" alt="Xadichai.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
+          <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)", maxHeight: "96px", height: "auto" }} />
         </Link>
 
         {/* Right Controls */}
@@ -418,14 +418,14 @@ export default function Home() {
         </motion.div>
       </div>
 
-      {/* ── SEO Section: Xadichai.uz Tarjima va Dublyaj platformasi ── */}
+      {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
         <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            Xadichai.uz — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Platformasi
+            GapirAI.uz — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Platformasi
           </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>Xadichai.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj qilib beruvchi onlayn platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi.
+            <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj qilib beruvchi onlayn platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">

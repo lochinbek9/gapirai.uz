@@ -54,8 +54,8 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <div className="flex flex-col items-center gap-3">
             <div className="p-2 transition duration-300 hover:scale-[1.02]">
-              <img src="/logo.webp" alt="Xadichai.uz Logo" width={160} height={80} className="h-20 w-auto object-contain dark:hidden" />
-              <img src="/logodark.webp" alt="Xadichai.uz Logo" width={160} height={80} className="h-20 w-auto object-contain hidden dark:block" />
+              <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={80} className="h-20 w-auto object-contain dark:hidden" />
+              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={80} className="h-20 w-auto object-contain hidden dark:block" />
             </div>
             <p className="text-xs text-red-600/80 dark:text-red-400/80 font-bold uppercase tracking-widest mt-2">Yangi hisob yarating</p>
           </div>

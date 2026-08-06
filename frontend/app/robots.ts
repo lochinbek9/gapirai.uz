@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/api/'],
       },
     ],
-    sitemap: 'https://xadichai.uz/sitemap.xml',
-    host: 'https://xadichai.uz',
+    sitemap: 'https://gapirai.uz/sitemap.xml',
+    host: 'https://gapirai.uz',
   }
 }

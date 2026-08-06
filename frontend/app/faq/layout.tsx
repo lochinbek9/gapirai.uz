@@ -3,7 +3,7 @@ import { FAQS } from './faqs'
 
 export const metadata: Metadata = {
   title: "Yordam va tez-tez so'raladigan savollar (FAQ)",
-  description: "Xadichai.uz orqali YouTube videolarni o'zbek tiliga dublyaj qilish haqida eng ko'p beriladigan savollarga javoblar: narx, davomiylik, xatoliklar.",
+  description: "GapirAI.uz orqali YouTube videolarni o'zbek tiliga dublyaj qilish haqida eng ko'p beriladigan savollarga javoblar: narx, davomiylik, xatoliklar.",
   alternates: { canonical: '/faq' },
 }
 

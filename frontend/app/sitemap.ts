@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next'
 
-const baseUrl = 'https://xadichai.uz'
+const baseUrl = 'https://gapirai.uz'
 
 // Static build timestamp. Using `new Date()` here would stamp every URL with the
 // build time on each deploy, which trains Google to distrust <lastmod>.

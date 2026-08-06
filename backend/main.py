@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Xadichai.uz API",
+    title="GapirAI.uz API",
     description="YouTube videolarini sun'iy intellekt yordamida o'zbek tiliga dublyaj va tarjima qilish platformasi API",
     version="1.0.0",
     lifespan=lifespan,
@@ -103,4 +103,4 @@ app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs"
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "Xadichai.uz"}
+    return {"status": "ok", "service": "GapirAI.uz"}

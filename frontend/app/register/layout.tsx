@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: "Ro'yxatdan o'tish",
-  description: "Xadichai.uz platformasida bepul hisob yarating.",
+  description: "GapirAI.uz platformasida bepul hisob yarating.",
   alternates: { canonical: '/register' },
   robots: { index: false, follow: true },
 }

@@ -3,9 +3,9 @@ import AboutClient from './AboutClient'
 
 export const metadata: Metadata = {
   title: "Loyiha haqida",
-  description: "Xadichai.uz platformasi va sun'iy intellekt yordamida videolarni o'zbek tiliga avtomatik dublyaj qilish loyihasi haqida batafsil ma'lumot.",
+  description: "GapirAI.uz platformasi va sun'iy intellekt yordamida videolarni o'zbek tiliga avtomatik dublyaj qilish loyihasi haqida batafsil ma'lumot.",
   keywords: [
-    "xadichai haqida",
+    "gapirai haqida",
     "dublyaj dasturi",
     "ai dublyaj texnologiyasi",
     "o'zbekcha ai dublyaj",
@@ -14,16 +14,16 @@ export const metadata: Metadata = {
     canonical: "/about",
   },
   openGraph: {
-    title: "Loyiha haqida | Xadichai.uz",
+    title: "Loyiha haqida | GapirAI.uz",
     description: "YouTube va boshqa videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj qiluvchi loyiha haqida.",
-    url: "https://xadichai.uz/about",
-    siteName: "Xadichai.uz",
+    url: "https://gapirai.uz/about",
+    siteName: "GapirAI.uz",
     locale: "uz_UZ",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Loyiha haqida | Xadichai.uz",
+    title: "Loyiha haqida | GapirAI.uz",
     description: "Videolarni AI yordamida o'zbek tiliga dublyaj qiluvchi platforma haqida.",
   },
 }

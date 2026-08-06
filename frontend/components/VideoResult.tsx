@@ -36,7 +36,7 @@ export default function VideoResult({ job, onReset }: Props) {
       try {
         await navigator.share({
           title,
-          text: "Xadichai.uz orqali o'zbek tiliga dublyaj qilingan videoni ko'ring!",
+          text: "GapirAI.uz orqali o'zbek tiliga dublyaj qilingan videoni ko'ring!",
           url: shareUrl || window.location.href,
         });
         return;
