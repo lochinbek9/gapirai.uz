@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment, clearJobId, cancelJob } from '@/lib/api'
@@ -41,6 +41,9 @@ export default function VideoPage() {
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const prevStatusRef = useRef<string | undefined>(undefined)
+  const paidAmountRef = useRef<number | null>(null)
+  const paymentIdRef = useRef<string | null>(null)
 
   const job = polledJob
 
@@ -97,6 +100,45 @@ export default function VideoPage() {
     }
   }, [is404, router])
 
+  // To'lov "awaiting_payment"dan boshqa holatga o'tganda (ya'ni Click
+  // to'lovni tasdiqlaganda) Yandex Metrika'ga bir martagina purchase
+  // eventi yuboriladi — bu foydalanuvchi to'lov tugagach payment
+  // sahifasiga emas, shu sahifada qolganini poll orqali kuzatadi.
+  useEffect(() => {
+    if (!job || !id) return
+    const prevStatus = prevStatusRef.current
+    const trackKey = `ym_purchase_tracked_${id}`
+    if (
+      prevStatus === 'awaiting_payment' &&
+      job.status !== 'awaiting_payment' &&
+      typeof window !== 'undefined' &&
+      !sessionStorage.getItem(trackKey)
+    ) {
+      const amount = paidAmountRef.current ?? (job.video_duration ? calculateClientPrice(job.video_duration / 60.0) : 0)
+      if (amount > 0) {
+        const orderId = paymentIdRef.current || id
+        sessionStorage.setItem(trackKey, '1')
+        ;(window as any).dataLayer = (window as any).dataLayer || []
+        ;(window as any).dataLayer.push({
+          ecommerce: {
+            currencyCode: 'UZS',
+            purchase: {
+              actionField: { id: orderId, revenue: amount },
+              products: [{
+                id,
+                name: job.video_title || 'Video dublyaj',
+                category: 'Dublyaj xizmati',
+                price: amount,
+                quantity: 1,
+              }],
+            },
+          },
+        })
+      }
+    }
+    prevStatusRef.current = job.status
+  }, [job?.status, job?.video_duration, job?.video_title, id])
+
   if (loading || !job) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -119,6 +161,8 @@ export default function VideoPage() {
     try {
       const res = await initiateClickPayment(id)
       if (res.success && res.payment_url) {
+        paidAmountRef.current = res.amount
+        paymentIdRef.current = res.payment_id || null
         if (paymentWindow) {
           paymentWindow.location.href = res.payment_url
         } else {
