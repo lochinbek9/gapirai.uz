@@ -155,14 +155,14 @@ export default function RootLayout({
                 m[i].l=1*new Date();
                 for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
                 k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-            })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=111132425', 'ym');
+            })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=111361158', 'ym');
 
-            ym(111132425, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+            ym(111361158, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
           `}
         </Script>
         <noscript>
           <div>
-            <img src="https://mc.yandex.ru/watch/111132425" style={{ position: "absolute", left: "-9999px" }} alt="" />
+            <img src="https://mc.yandex.ru/watch/111361158" style={{ position: "absolute", left: "-9999px" }} alt="" />
           </div>
         </noscript>
       </body>
