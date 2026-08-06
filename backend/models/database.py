@@ -72,6 +72,9 @@ class DubbingJob(Base):
     rating = Column(Integer, nullable=True)
     feedback_comment = Column(Text, nullable=True)
     feedback_created_at = Column(DateTime, nullable=True)
+    feedback_voice_ok = Column(Boolean, nullable=True)
+    feedback_translation_ok = Column(Boolean, nullable=True)
+    feedback_speed_ok = Column(Boolean, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
@@ -136,6 +139,9 @@ def create_tables():
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS rating INT"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_comment TEXT"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_created_at TIMESTAMP"))
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_voice_ok BOOLEAN"))
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_translation_ok BOOLEAN"))
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_speed_ok BOOLEAN"))
             connection.commit()
     except Exception:
         pass

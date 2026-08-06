@@ -51,6 +51,9 @@ class JobResponse(BaseModel):
     expected_end_time: Optional[str] = None
     rating: Optional[int] = None
     feedback_comment: Optional[str] = None
+    feedback_voice_ok: Optional[bool] = None
+    feedback_translation_ok: Optional[bool] = None
+    feedback_speed_ok: Optional[bool] = None
 
 
 def _job_to_response(job: DubbingJob) -> JobResponse:
@@ -86,6 +89,9 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         expected_end_time=expected_end_time,
         rating=job.rating,
         feedback_comment=job.feedback_comment,
+        feedback_voice_ok=job.feedback_voice_ok,
+        feedback_translation_ok=job.feedback_translation_ok,
+        feedback_speed_ok=job.feedback_speed_ok,
     )
 
 
@@ -299,6 +305,9 @@ class FeedbackRequest(BaseModel):
     rating: int  # 1 to 5
     comment: Optional[str] = None
     chat_id: Optional[str] = None
+    voice_ok: Optional[bool] = None
+    translation_ok: Optional[bool] = None
+    speed_ok: Optional[bool] = None
 
 
 @router.post("/jobs/{job_id}/feedback")
@@ -317,6 +326,9 @@ async def submit_feedback(
     job.rating = req.rating
     job.feedback_comment = req.comment
     job.feedback_created_at = datetime.utcnow()
+    job.feedback_voice_ok = req.voice_ok
+    job.feedback_translation_ok = req.translation_ok
+    job.feedback_speed_ok = req.speed_ok
     db.commit()
 
     # Telegram xabarnoma yuborish
@@ -328,6 +340,9 @@ async def submit_feedback(
             rating=req.rating,
             comment=req.comment,
             chat_id=req.chat_id,
+            voice_ok=req.voice_ok,
+            translation_ok=req.translation_ok,
+            speed_ok=req.speed_ok,
         )
     except Exception as err:
         pass

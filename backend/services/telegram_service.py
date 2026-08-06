@@ -12,12 +12,21 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _format_ok(label: str, value: bool | None) -> str | None:
+    if value is None:
+        return None
+    return f"{'✅' if value else '❌'} <b>{label}</b>: {'Yaxshi' if value else 'Yomon'}"
+
+
 def send_telegram_feedback(
     job_id: str,
     video_title: str,
     rating: int,
     comment: str | None = None,
     chat_id: str | None = None,
+    voice_ok: bool | None = None,
+    translation_ok: bool | None = None,
+    speed_ok: bool | None = None,
 ) -> bool:
     """
     Dublyaj bahosi va fikrini Telegram bot orqali guruh/kanal/admin chatiga yuboradi.
@@ -37,10 +46,20 @@ def send_telegram_feedback(
     comment_clean = comment.strip() if comment and comment.strip() else "Fikr qoldirilmadi"
     title_clean = video_title or "Noma'lum video"
 
+    detail_lines = [
+        line for line in (
+            _format_ok("Ovoz sifati", voice_ok),
+            _format_ok("Tarjima sifati", translation_ok),
+            _format_ok("Tezlik", speed_ok),
+        ) if line
+    ]
+    details_block = ("\n" + "\n".join(detail_lines) + "\n") if detail_lines else ""
+
     text = (
         f"⭐️ <b>YANGI FIKR VA BAHOLASH (GapirAI.uz)</b> ⭐️\n\n"
         f"📹 <b>Video</b>: {title_clean}\n"
         f"⭐ <b>Baho</b>: {stars_str} ({rating} / 5)\n"
+        f"{details_block}"
         f"💬 <b>Fikr</b>: \"{comment_clean}\"\n\n"
         f"🆔 <b>Job ID</b>: <code>{job_id}</code>\n"
         f"🔗 <b>Havola</b>: https://gapirai.uz/video/{job_id}"

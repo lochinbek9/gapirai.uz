@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Star, Send, CheckCircle2, Loader2, MessageSquare } from 'lucide-react'
+import { Star, Send, CheckCircle2, Loader2, MessageSquare, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { submitFeedback } from '@/lib/api'
 
 interface FeedbackSectionProps {
@@ -10,10 +10,45 @@ interface FeedbackSectionProps {
   initialComment?: string
 }
 
+type OkValue = boolean | null
+
+function ThumbsQuestion({ label, value, onChange }: { label: string; value: OkValue; onChange: (v: OkValue) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-3.5 py-2.5">
+      <span className="text-xs text-slate-300 font-medium">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(value === true ? null : true)}
+          aria-label={`${label}: yaxshi`}
+          className={`p-1.5 rounded-lg transition ${
+            value === true ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10'
+          }`}
+        >
+          <ThumbsUp className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(value === false ? null : false)}
+          aria-label={`${label}: yomon`}
+          className={`p-1.5 rounded-lg transition ${
+            value === false ? 'bg-violet-500/20 text-violet-400' : 'text-slate-500 hover:text-violet-400 hover:bg-violet-500/10'
+          }`}
+        >
+          <ThumbsDown className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function FeedbackSection({ jobId, initialRating, initialComment }: FeedbackSectionProps) {
   const [rating, setRating] = useState<number>(initialRating || 0)
   const [hoverRating, setHoverRating] = useState<number>(0)
   const [comment, setComment] = useState<string>(initialComment || '')
+  const [voiceOk, setVoiceOk] = useState<OkValue>(null)
+  const [translationOk, setTranslationOk] = useState<OkValue>(null)
+  const [speedOk, setSpeedOk] = useState<OkValue>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(Boolean(initialRating))
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +63,7 @@ export default function FeedbackSection({ jobId, initialRating, initialComment }
     setSubmitting(true)
     setError(null)
     try {
-      await submitFeedback(jobId, rating, comment)
+      await submitFeedback(jobId, rating, comment, { voice_ok: voiceOk, translation_ok: translationOk, speed_ok: speedOk })
       setSubmitted(true)
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Fikr yuborishda xatolik yuz berdi. Qayta urinib ko'ring.")
@@ -116,6 +151,13 @@ export default function FeedbackSection({ jobId, initialRating, initialComment }
               {activeStars === 4 && "Juda yaxshi 😊"}
               {activeStars === 5 && "Ajoyib, mukammal! 🤩"}
             </p>
+          </div>
+
+          {/* Structured questions */}
+          <div className="space-y-2">
+            <ThumbsQuestion label="Ovoz sifati" value={voiceOk} onChange={setVoiceOk} />
+            <ThumbsQuestion label="Tarjima sifati" value={translationOk} onChange={setTranslationOk} />
+            <ThumbsQuestion label="Tezlik (sinxronlik)" value={speedOk} onChange={setSpeedOk} />
           </div>
 
           {/* Comment Textarea */}

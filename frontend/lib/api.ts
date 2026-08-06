@@ -151,8 +151,9 @@ export async function cancelJob(jobId: string): Promise<{ success: boolean; mess
 export async function submitFeedback(
   jobId: string,
   rating: number,
-  comment?: string
+  comment?: string,
+  extra?: { voice_ok?: boolean | null; translation_ok?: boolean | null; speed_ok?: boolean | null }
 ): Promise<{ success: boolean; message: string }> {
-  const res = await apiClient.post(`/api/jobs/${jobId}/feedback`, { rating, comment })
+  const res = await apiClient.post(`/api/jobs/${jobId}/feedback`, { rating, comment, ...extra })
   return res.data
 }
