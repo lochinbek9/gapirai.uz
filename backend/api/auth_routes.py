@@ -42,9 +42,25 @@ class PendingVerificationResponse(BaseModel):
 
 
 def _issue_code(user: User, db: Session) -> str:
+    """Tasdiqlash kodini beradi.
+
+    Agar hozirgina (so'nggi daqiqa ichida) berilgan, hali amal qiladigan kod
+    bo'lsa, o'shani qaytaradi — yangisini yaratmaydi. Aks holda, foydalanuvchi
+    tugmani ikki marta bossa yoki so'rov tasodifan qaytarilsa, birinchi
+    emailga yuborilgan kod bekor bo'lib, "to'g'ri kod ishlamadi" holatiga
+    olib keladi.
+    """
+    now = datetime.utcnow()
+    if (
+        user.verification_code
+        and user.verification_code_expires_at
+        and user.verification_code_expires_at - now > timedelta(minutes=CODE_TTL_MINUTES - 1)
+    ):
+        return user.verification_code
+
     code = generate_verification_code()
     user.verification_code = code
-    user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=CODE_TTL_MINUTES)
+    user.verification_code_expires_at = now + timedelta(minutes=CODE_TTL_MINUTES)
     db.commit()
     return code
 
@@ -76,8 +92,10 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)) -> Pendi
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
-    if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Email yoki parol noto'g'ri.")
+    if not user:
+        raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
+    if not verify_password(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Parol noto'g'ri.")
 
     code = _issue_code(user, db)
     if not send_verification_email(user.email, code, user.name):
