@@ -49,6 +49,8 @@ class JobResponse(BaseModel):
     voice_gender_setting: Optional[str] = None
     uzbek_srt_content: Optional[str] = None
     expected_end_time: Optional[str] = None
+    rating: Optional[int] = None
+    feedback_comment: Optional[str] = None
 
 
 def _job_to_response(job: DubbingJob) -> JobResponse:
@@ -81,7 +83,9 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         uzbek_srt_content=job.uzbek_srt_content,
-        expected_end_time=expected_end_time
+        expected_end_time=expected_end_time,
+        rating=job.rating,
+        feedback_comment=job.feedback_comment,
     )
 
 
@@ -289,4 +293,45 @@ async def cancel_job(
     db.commit()
     
     return {"success": True, "message": "Dublyaj bekor qilindi."}
+
+
+class FeedbackRequest(BaseModel):
+    rating: int  # 1 to 5
+    comment: Optional[str] = None
+    chat_id: Optional[str] = None
+
+
+@router.post("/jobs/{job_id}/feedback")
+async def submit_feedback(
+    job_id: uuid.UUID,
+    req: FeedbackRequest,
+    db: Session = Depends(get_db),
+):
+    if req.rating < 1 or req.rating > 5:
+        raise HTTPException(status_code=400, detail="Baho 1 va 5 orasida bo'lishi kerak.")
+
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job topilmadi.")
+
+    job.rating = req.rating
+    job.feedback_comment = req.comment
+    job.feedback_created_at = datetime.utcnow()
+    db.commit()
+
+    # Telegram xabarnoma yuborish
+    try:
+        from backend.services.telegram_service import send_telegram_feedback
+        send_telegram_feedback(
+            job_id=str(job.id),
+            video_title=job.video_title or "Video",
+            rating=req.rating,
+            comment=req.comment,
+            chat_id=req.chat_id,
+        )
+    except Exception as err:
+        pass
+
+    return {"success": True, "message": "Fikringiz va baholashingiz uchun rahmat!"}
+
 

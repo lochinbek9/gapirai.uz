@@ -9,6 +9,7 @@ import {
   Mic2, Clock, Loader2, CreditCard, AlertTriangle
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
+import FeedbackSection from '@/components/FeedbackSection'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -327,16 +328,27 @@ export default function VideoPage() {
                 </div>
               </div>
 
-              {/* Download */}
+              {/* Download & Feedback */}
               {job.status === 'completed' && (
-                <a
-                  href={getDownloadUrl(id)}
-                  download
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-medium transition"
-                >
-                  <Download className="w-4 h-4" />
-                  Yuklab olish (MP4)
-                </a>
+                <div className="space-y-6 pt-1">
+                  <div>
+                    <a
+                      href={getDownloadUrl(id)}
+                      download
+                      className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition hover:scale-105"
+                    >
+                      <Download className="w-5 h-5" />
+                      Yuklab olish (MP4)
+                    </a>
+                  </div>
+
+                  {/* Feedback rating component */}
+                  <FeedbackSection
+                    jobId={id}
+                    initialRating={job.rating}
+                    initialComment={job.feedback_comment}
+                  />
+                </div>
               )}
 
               {/* Translation accordion */}

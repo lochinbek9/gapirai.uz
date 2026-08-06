@@ -36,6 +36,8 @@ export interface Job {
   speaker_gender?: string
   uzbek_srt_content?: string
   expected_end_time?: string
+  rating?: number
+  feedback_comment?: string
 }
 
 export type JobStatus =
@@ -143,5 +145,14 @@ export function clearJobId() {
 
 export async function cancelJob(jobId: string): Promise<{ success: boolean; message: string }> {
   const res = await apiClient.post(`/api/jobs/${jobId}/cancel`)
+  return res.data
+}
+
+export async function submitFeedback(
+  jobId: string,
+  rating: number,
+  comment?: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/feedback`, { rating, comment })
   return res.data
 }

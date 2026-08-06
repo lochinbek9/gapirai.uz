@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     ELEVENLABS_SPEED: float = 1.0
     ELEVENLABS_FALLBACK_TO_EDGE: bool = True
 
+    # Telegram Notification Bot
+    TELEGRAM_BOT_TOKEN: str = "7987651672:AAH5OXmkbjH0HIEUih7cywWO1KOCbrF2Zic"
+    TELEGRAM_CHAT_ID: str = ""
+
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"
