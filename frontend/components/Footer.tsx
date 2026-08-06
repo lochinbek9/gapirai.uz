@@ -51,7 +51,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs font-medium text-gray-600 dark:text-gray-400">
               <li>
                 <a
-                  href="https://t.me/xadichai_uz_jamiyati"
+                  href="https://t.me/gapir_uz_muhokama"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-blue-600 dark:hover:text-blue-400 transition inline-flex items-center gap-1"
@@ -81,7 +81,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-2.5 pt-1">
               <a
-                href="https://t.me/xadichai_uz"
+                href="https://t.me/gapirai_uz"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Telegram"
