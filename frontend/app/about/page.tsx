@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: "GapirAI.uz platformasi va sun'iy intellekt yordamida videolarni o'zbek tiliga avtomatik dublyaj qilish loyihasi haqida batafsil ma'lumot.",
   keywords: [
     "gapirai haqida",
+    "gapir ai haqida",
     "dublyaj dasturi",
+    "dublaj dasturi",
+    "dublyaj programmasi",
+    "dublaj programmasi",
     "ai dublyaj texnologiyasi",
     "o'zbekcha ai dublyaj",
   ],

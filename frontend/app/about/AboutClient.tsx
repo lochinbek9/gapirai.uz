@@ -59,7 +59,7 @@ export default function AboutClient() {
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed font-medium">
-            <strong className="text-blue-600 dark:text-blue-400 font-semibold">GapirAI.uz</strong> — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj va tarjima qilib beruvchi eng ilg'or milliy platformadir.
+            <strong className="text-blue-600 dark:text-blue-400 font-semibold">GapirAI.uz</strong> (Gapir AI) — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj (dublaj) va tarjima qilib beruvchi eng ilg'or milliy dublyaj programmasi va platformadir.
           </p>
 
           <div className="pt-4 flex justify-center">

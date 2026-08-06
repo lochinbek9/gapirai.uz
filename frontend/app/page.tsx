@@ -422,10 +422,10 @@ export default function Home() {
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
         <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            GapirAI.uz — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Platformasi
+            GapirAI.uz (Gapir AI) — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Programmasi
           </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj qilib beruvchi onlayn platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi.
+            <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj programmasi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
