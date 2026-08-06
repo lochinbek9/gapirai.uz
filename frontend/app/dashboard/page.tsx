@@ -12,7 +12,7 @@ import {
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { color: string; icon: React.ReactNode }> = {
     completed: { color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
-    failed: { color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20', icon: <XCircle className="w-3 h-3" /> },
+    failed: { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <XCircle className="w-3 h-3" /> },
     pending: { color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', icon: <Clock className="w-3 h-3" /> },
   }
   const def = { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
@@ -80,7 +80,7 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
             )}
             <button
               onClick={() => onDelete(job.job_id)}
-              className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl"
+              className="text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -139,7 +139,7 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-[#050101] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     )
   }
@@ -160,7 +160,7 @@ export default function DashboardPage() {
           </Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
-              <User2 className="w-4 h-4 text-red-500" />
+              <User2 className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-bold">{user.name}</span>
             </div>
             <Link
@@ -172,7 +172,7 @@ export default function DashboardPage() {
             </Link>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-gray-500 hover:text-red-500 dark:hover:text-red-400 text-xs font-bold transition px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
+              className="flex items-center gap-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-bold transition px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
             >
               <LogOut className="w-4 h-4" />
               Chiqish
@@ -194,7 +194,7 @@ export default function DashboardPage() {
           </div>
           <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
             <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Jarayonda</p>
-            <p className="text-3xl font-black text-red-600 dark:text-red-400">{processingCount}</p>
+            <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{processingCount}</p>
           </div>
         </div>
 
@@ -203,13 +203,13 @@ export default function DashboardPage() {
         {/* Grid */}
         {jobsLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : jobs.length === 0 ? (
           <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
             <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
             <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
-            <Link href="/" className="text-red-500 hover:underline text-xs font-bold uppercase tracking-wider">
+            <Link href="/" className="text-blue-500 hover:underline text-xs font-bold uppercase tracking-wider">
               Birinchi videoni dublyaj qiling →
             </Link>
           </div>

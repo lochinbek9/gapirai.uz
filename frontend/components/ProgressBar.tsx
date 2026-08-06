@@ -29,7 +29,7 @@ export default function ProgressBar({ job }: Props) {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                   isFailed && isActive
-                    ? "bg-red-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : isDone
                     ? "bg-green-500 text-white"
                     : isActive
@@ -55,7 +55,7 @@ export default function ProgressBar({ job }: Props) {
       <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            isFailed ? "bg-red-500" : "bg-blue-500"
+            isFailed ? "bg-blue-500" : "bg-blue-500"
           }`}
           style={{ width: `${job.progress}%` }}
         />
@@ -63,7 +63,7 @@ export default function ProgressBar({ job }: Props) {
 
       {/* Status matn */}
       <div className="flex justify-between items-center text-sm">
-        <span className={isFailed ? "text-red-600" : "text-gray-600"}>
+        <span className={isFailed ? "text-blue-600" : "text-gray-600"}>
           {job.status_message || STATUS_LABELS[job.status]}
         </span>
         <span className="font-semibold text-gray-700">
@@ -73,7 +73,7 @@ export default function ProgressBar({ job }: Props) {
 
       {/* Xatolik xabari */}
       {isFailed && job.error_message && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
           <strong>Xatolik:</strong> {job.error_message}
         </div>
       )}

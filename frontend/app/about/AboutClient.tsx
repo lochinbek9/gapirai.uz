@@ -31,9 +31,9 @@ export default function AboutClient() {
         <div className="pointer-events-auto flex items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 h-10 px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 h-10 px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
           >
-            <ArrowLeft className="w-4 h-4 text-red-500" />
+            <ArrowLeft className="w-4 h-4 text-blue-500" />
             Bosh sahifa
           </Link>
           <ThemeToggle />
@@ -50,22 +50,22 @@ export default function AboutClient() {
           transition={{ duration: 0.5 }}
           className="glass-card rounded-[32px] p-8 sm:p-12 text-center space-y-4 relative overflow-hidden"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-widest">
             <Sparkles className="w-4 h-4" /> Innovatsion Platforma
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-black dark:text-white tracking-tight leading-tight">
-            GapirAI<span className="text-red-500">.uz</span> haqida
+            GapirAI<span className="text-blue-500">.uz</span> haqida
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed font-medium">
-            <strong className="text-red-600 dark:text-red-400 font-semibold">GapirAI.uz</strong> — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj va tarjima qilib beruvchi eng ilg'or milliy platformadir.
+            <strong className="text-blue-600 dark:text-blue-400 font-semibold">GapirAI.uz</strong> — bu YouTube va turli manbalardagi videolarni Sun'iy Intellekt (AI) texnologiyalari yordamida soniyalar ichida avtomatik tarzda o'zbek tiliga dublyaj va tarjima qilib beruvchi eng ilg'or milliy platformadir.
           </p>
 
           <div className="pt-4 flex justify-center">
             <Link
               href="/"
-              className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold px-8 py-3.5 rounded-2xl transition duration-300 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 active:scale-95 text-sm"
+              className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold px-8 py-3.5 rounded-2xl transition duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 active:scale-95 text-sm"
             >
               Dublyajni sinab ko'rish
             </Link>
@@ -80,7 +80,7 @@ export default function AboutClient() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="glass-card rounded-[28px] p-6 sm:p-8 space-y-3"
           >
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <Zap className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-black dark:text-white">Avtomatik va Tezkor</h3>
@@ -95,7 +95,7 @@ export default function AboutClient() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="glass-card rounded-[28px] p-6 sm:p-8 space-y-3"
           >
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <Cpu className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-black dark:text-white">Whisper + GPT-4o Texnologiyasi</h3>
@@ -110,7 +110,7 @@ export default function AboutClient() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="glass-card rounded-[28px] p-6 sm:p-8 space-y-3"
           >
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <Mic className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-black dark:text-white">Tabiiy Ovozlar (TTS)</h3>
@@ -125,7 +125,7 @@ export default function AboutClient() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="glass-card rounded-[28px] p-6 sm:p-8 space-y-3"
           >
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <Shield className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-black dark:text-white">Xavfsiz va Qulay Boshqaruv</h3>
@@ -143,7 +143,7 @@ export default function AboutClient() {
           className="glass-card rounded-[32px] p-8 sm:p-10 space-y-6"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <HeartHandshake className="w-5 h-5" />
             </div>
             <h2 className="text-xl font-black text-black dark:text-white">Bizning Maqsadimiz</h2>
@@ -155,13 +155,13 @@ export default function AboutClient() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-black/5 dark:border-white/10">
             <div className="flex items-center gap-2 text-xs font-bold text-black dark:text-white">
-              <CheckCircle2 className="w-4 h-4 text-red-500" /> 100% Avtomatik
+              <CheckCircle2 className="w-4 h-4 text-blue-500" /> 100% Avtomatik
             </div>
             <div className="flex items-center gap-2 text-xs font-bold text-black dark:text-white">
-              <CheckCircle2 className="w-4 h-4 text-red-500" /> Aniq Tarjima
+              <CheckCircle2 className="w-4 h-4 text-blue-500" /> Aniq Tarjima
             </div>
             <div className="flex items-center gap-2 text-xs font-bold text-black dark:text-white">
-              <CheckCircle2 className="w-4 h-4 text-red-500" /> HD Ovoz va Video
+              <CheckCircle2 className="w-4 h-4 text-blue-500" /> HD Ovoz va Video
             </div>
           </div>
         </motion.div>

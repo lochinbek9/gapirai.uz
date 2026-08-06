@@ -68,12 +68,12 @@ export default function UrlInput({
     <form onSubmit={onSubmit} className="space-y-6">
       {/* URL input */}
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest ml-1">
+        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
           YouTube Havolasi
         </label>
         <div className="glass-input flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl relative overflow-hidden group transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-rose-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <Youtube className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 flex-shrink-0" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-violet-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" />
+          <Youtube className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 flex-shrink-0" />
           <input
             type="text"
             value={url}
@@ -84,7 +84,7 @@ export default function UrlInput({
           <button
             type="button"
             onClick={handlePaste}
-            className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-red-600 dark:text-red-400 hover:text-red-500 bg-red-500/10 hover:bg-red-500/20 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
+            className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
           >
             <ClipboardPaste size={13} />
             <span className="inline">Nusxani qo'yish</span>
@@ -116,7 +116,7 @@ export default function UrlInput({
           <button
             type="button"
             onClick={() => onChange("https://youtu.be/UwMS0J2eTXE")}
-            className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-red-500/10 hover:text-red-500 border border-black/5 dark:border-white/5 transition-all text-gray-600 dark:text-gray-400 flex items-center gap-1.5"
+            className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-blue-500/10 hover:text-blue-500 border border-black/5 dark:border-white/5 transition-all text-gray-600 dark:text-gray-400 flex items-center gap-1.5"
           >
             <span>🎯</span> Qo'rquvni yengish (58s)
           </button>
@@ -125,7 +125,7 @@ export default function UrlInput({
 
       {/* Gender selector */}
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest ml-1">
+        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
           Ovoz jinsi
         </label>
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -138,15 +138,15 @@ export default function UrlInput({
                 onClick={() => onGenderChange(opt.value)}
                 className={`flex flex-col items-center gap-1 sm:gap-1.5 py-3 sm:py-4 px-1.5 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all duration-300 relative overflow-hidden ${
                   isSelected
-                    ? "border-red-500 bg-gradient-to-b from-red-500/10 to-red-500/20 dark:from-red-500/20 dark:to-red-500/30 shadow-lg shadow-red-500/10"
-                    : "border-black/5 dark:border-white/5 hover:border-red-400/40 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
+                    ? "border-blue-500 bg-gradient-to-b from-blue-500/10 to-blue-500/20 dark:from-blue-500/20 dark:to-blue-500/30 shadow-lg shadow-blue-500/10"
+                    : "border-black/5 dark:border-white/5 hover:border-blue-400/40 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                 }`}
               >
                 {isSelected && (
-                  <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500" />
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-violet-500 to-pink-500" />
                 )}
                 <span className="text-xl sm:text-2xl filter drop-shadow-md">{opt.icon}</span>
-                <span className={`text-[11px] sm:text-xs font-bold transition-colors duration-200 ${isSelected ? "text-red-600 dark:text-red-400 font-extrabold" : "text-gray-700 dark:text-gray-300"}`}>
+                <span className={`text-[11px] sm:text-xs font-bold transition-colors duration-200 ${isSelected ? "text-blue-600 dark:text-blue-400 font-extrabold" : "text-gray-700 dark:text-gray-300"}`}>
                   {opt.label}
                 </span>
                 <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-500 font-medium">{opt.desc}</span>
@@ -161,10 +161,10 @@ export default function UrlInput({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex gap-3 items-center"
+          className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3 items-center"
         >
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <p className="text-xs font-semibold text-red-600 dark:text-red-400">{error}</p>
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">{error}</p>
         </motion.div>
       )}
 
@@ -189,7 +189,7 @@ export default function UrlInput({
       <div className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
         {["100% Avtomat", "HD Sifat", "O'zbek tilida"].map((label, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">{label}</span>
           </div>
         ))}

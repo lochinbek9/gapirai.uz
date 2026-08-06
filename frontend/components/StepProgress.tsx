@@ -66,12 +66,12 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                 initial={false}
                 animate={{
                   scale: isActive ? 1.15 : 1,
-                  backgroundColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgb(239, 68, 68)" : "rgba(255, 255, 255, 0.02)",
-                  borderColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgba(239, 68, 68, 0.8)" : "rgba(255, 255, 255, 0.05)",
+                  backgroundColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgb(59, 130, 246)" : "rgba(255, 255, 255, 0.02)",
+                  borderColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.05)",
                 }}
                 className={`
                   w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500
-                  ${isCompleted ? "shadow-lg shadow-emerald-500/20 text-white" : isActive ? "shadow-xl shadow-red-500/30 text-white" : "text-gray-500"}
+                  ${isCompleted ? "shadow-lg shadow-emerald-500/20 text-white" : isActive ? "shadow-xl shadow-blue-500/30 text-white" : "text-gray-500"}
                 `}
               >
                 <AnimatePresence mode="wait">
@@ -102,7 +102,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
               
               <div className="text-center">
                  <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors duration-300
-                    ${isCompleted ? "text-emerald-500" : isActive ? "text-red-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
+                    ${isCompleted ? "text-emerald-500" : isActive ? "text-blue-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
                    {step.label}
                  </p>
               </div>
@@ -114,7 +114,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <div className="absolute top-5 left-8 right-8 h-[2px] bg-black/5 dark:bg-white/[0.03] -z-0 transition-colors"></div>
         {/* Active Connector Line */}
         <motion.div 
-          className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-emerald-500 via-red-500 to-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.5)] -z-0"
+          className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 shadow-[0_0_10px_rgba(59,130,246,0.5)] -z-0"
           initial={{ width: 0 }}
           animate={{ width: `${(current / (STEPS.length - 1)) * 88}%` }}
           transition={{ duration: 1, ease: "easeInOut" }}
@@ -126,15 +126,15 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <div className="flex justify-between items-end">
            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                 <Sparkles className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                 <p className="text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
+                 <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                 <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
                  <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
-                   {Math.round(job.progress)}<span className="text-red-500 text-lg ml-0.5">%</span>
+                   {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
                  </p>
                  <div className="py-1 px-3 rounded-full bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex items-center gap-2 transition-colors">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse transition-colors"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse transition-colors"></div>
                     <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 transition-colors">{formatElapsed(elapsed)}</span>
                  </div>
               </div>
@@ -143,7 +143,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
 
         <div className="relative h-3.5 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1.5px] transition-colors">
           <motion.div
-            className="h-full bg-gradient-to-r from-emerald-500 via-red-500 to-rose-400 rounded-full"
+            className="h-full bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${job.progress}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}
@@ -173,7 +173,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
           <button
             onClick={onCancel}
             disabled={cancelLoading}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-500 hover:text-white bg-rose-500/10 hover:bg-rose-500 rounded-xl transition duration-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-violet-500 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-xl transition duration-200 disabled:opacity-50"
           >
             {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             Jarayonni bekor qilish
@@ -185,10 +185,10 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-center"
+          className="p-5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center"
         >
-          <p className="text-sm font-bold text-red-600 dark:text-red-500 mb-1 transition-colors">Xatolik yuz berdi</p>
-          <p className="text-xs text-red-600/60 dark:text-red-400/60 leading-relaxed transition-colors">{job.error_message || "Tizimda kutilmagan xato."}</p>
+          <p className="text-sm font-bold text-blue-600 dark:text-blue-500 mb-1 transition-colors">Xatolik yuz berdi</p>
+          <p className="text-xs text-blue-600/60 dark:text-blue-400/60 leading-relaxed transition-colors">{job.error_message || "Tizimda kutilmagan xato."}</p>
         </motion.div>
       )}
     </div>

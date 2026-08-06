@@ -102,7 +102,7 @@ export default function VideoResult({ job, onReset }: Props) {
             </h4>
             <div className="flex items-center gap-2">
                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase transition-colors">Davomiyligi</span>
-               <span className="text-[10px] font-mono text-red-600 dark:text-red-400 transition-colors">{formatDuration(job.video_duration || 0)}</span>
+               <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 transition-colors">{formatDuration(job.video_duration || 0)}</span>
             </div>
           </div>
           
@@ -148,7 +148,7 @@ export default function VideoResult({ job, onReset }: Props) {
             className="w-full flex items-center justify-between px-6 py-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
           >
             <div className="flex items-center gap-3">
-               <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+               <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest transition-colors">O'zbekcha matn</span>
             </div>
             <ChevronDown 

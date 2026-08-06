@@ -134,7 +134,7 @@ export default function FeedbackSection({ jobId, initialRating, initialComment }
           </div>
 
           {error && (
-            <p className="text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-center">
+            <p className="text-xs font-semibold text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-lg p-2.5 text-center">
               {error}
             </p>
           )}

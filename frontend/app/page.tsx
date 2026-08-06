@@ -64,15 +64,15 @@ function Logo() {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center gap-3 text-center mb-6 sm:mb-8 px-2"
     >
-      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/20 backdrop-blur-md shadow-sm">
-        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-        <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 tracking-wider uppercase">
+      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/20 backdrop-blur-md shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+        <span className="text-[11px] font-black text-violet-600 dark:text-violet-400 tracking-wider uppercase">
           AI Studio 2.0 • Avtomatik Dublyaj
         </span>
       </div>
 
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
-        GapirAI<span className="text-rose-600 dark:text-rose-500">.uz</span>
+        GapirAI<span className="text-violet-600 dark:text-violet-500">.uz</span>
       </h1>
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
         YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-slate-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
@@ -323,7 +323,7 @@ export default function Home() {
               href="/dashboard"
               className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
               Paneli
             </Link>
           ) : (
@@ -331,7 +331,7 @@ export default function Home() {
               href="/login"
               className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
             >
-              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
               Kirish
             </Link>
           )}
@@ -368,8 +368,8 @@ export default function Home() {
             {phase === "loading" && (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-4">
                 <div className="relative flex items-center justify-center">
-                  <div className="absolute w-12 h-12 rounded-full border-t-2 border-red-500 animate-spin" />
-                  <div className="w-8 h-8 rounded-full border-t-2 border-rose-400 animate-spin-slow" />
+                  <div className="absolute w-12 h-12 rounded-full border-t-2 border-blue-500 animate-spin" />
+                  <div className="w-8 h-8 rounded-full border-t-2 border-violet-400 animate-spin-slow" />
                 </div>
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse">Server bilan bog'lanilmoqda...</p>
               </motion.div>
@@ -379,7 +379,7 @@ export default function Home() {
               <motion.div key="processing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 {job.video_title && (
                   <div className="pb-4 border-b border-black/5 dark:border-white/5 transition-colors">
-                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest block mb-1">Hozirgi video</span>
+                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest block mb-1">Hozirgi video</span>
                     <h2 className="text-base font-bold text-gray-900 dark:text-white line-clamp-1 transition-colors">{job.video_title}</h2>
                   </div>
                 )}
@@ -395,16 +395,16 @@ export default function Home() {
 
             {phase === "error" && job && (
               <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-2">
-                  <div className="w-8 h-8 text-red-500">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-2">
+                  <div className="w-8 h-8 text-blue-500">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
                     </svg>
                   </div>
                 </div>
-                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-6 transition-colors">
-                  <h3 className="text-red-500 dark:text-red-400 font-bold mb-2">Xatolik yuz berdi</h3>
-                  <p className="text-sm text-red-500/60 dark:text-red-400/60 leading-relaxed">{job.error_message}</p>
+                <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 transition-colors">
+                  <h3 className="text-blue-500 dark:text-blue-400 font-bold mb-2">Xatolik yuz berdi</h3>
+                  <p className="text-sm text-blue-500/60 dark:text-blue-400/60 leading-relaxed">{job.error_message}</p>
                 </div>
                 <button
                   onClick={handleReset}
@@ -429,13 +429,13 @@ export default function Home() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">🎯 Professional Dublyaj Imkoniyatlari</h3>
+              <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">🎯 Professional Dublyaj Imkoniyatlari</h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
                 Istalgan YouTube havolasini kiriting va sun'iy intellekt yordamida professional o'zbekcha dublyaj, sinxron audio hamda tayyor MP4 video faylni yuklab oling.
               </p>
             </div>
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">⚡ Tezkor Onlayn Xizmat</h3>
+              <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">⚡ Tezkor Onlayn Xizmat</h3>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
                 Qurilmangizga hech qanday qo'shimcha ilova yoki dastur yuklash talab qilinmaydi. Dublyaj jarayoni to'liq bulutli serverlarimizda amalga oshiriladi.
               </p>

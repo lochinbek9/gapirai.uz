@@ -154,7 +154,7 @@ export default function VideoPage() {
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
             <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
             <span className="text-lg font-black tracking-tight text-white">
-              GapirAI<span className="text-rose-500">.uz</span>
+              GapirAI<span className="text-violet-500">.uz</span>
             </span>
           </Link>
         </div>
@@ -214,7 +214,7 @@ export default function VideoPage() {
                   </div>
 
                   {paymentError && (
-                    <div className="text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl p-3 text-left">
+                    <div className="text-xs font-semibold text-blue-400 bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 text-left">
                       {paymentError}
                     </div>
                   )}
@@ -244,15 +244,15 @@ export default function VideoPage() {
                 </div>
               </div>
             ) : job.status === 'failed' ? (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20">
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-rose-500/5 blur-3xl pointer-events-none" />
+              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
                 <div className="text-center space-y-4 max-w-md z-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mb-2">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
                     <AlertTriangle className="w-6 h-6 animate-pulse" />
                   </div>
                   <div className="space-y-2">
                     <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
-                    <p className="text-xs text-rose-300 font-mono bg-rose-950/30 border border-rose-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
+                    <p className="text-xs text-violet-300 font-mono bg-violet-950/30 border border-violet-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
                       {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
                     </p>
                   </div>
@@ -296,7 +296,7 @@ export default function VideoPage() {
                     <button
                       onClick={handleCancel}
                       disabled={cancelLoading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-500 rounded-lg transition duration-200 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-violet-400 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-lg transition duration-200 disabled:opacity-50"
                     >
                       {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       Jarayonni bekor qilish

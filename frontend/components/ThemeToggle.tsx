@@ -22,7 +22,7 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-red-500/20 dark:border-white/15 text-gray-900 dark:text-white shadow-sm transition-all duration-300 backdrop-blur-md cursor-pointer"
+      className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white shadow-sm transition-all duration-300 backdrop-blur-md cursor-pointer"
       aria-label="Mavzuni o'zgartirish"
     >
       <AnimatePresence mode="wait">
@@ -34,7 +34,7 @@ export default function ThemeToggle() {
             exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
             transition={{ duration: 0.2 }}
           >
-            <Moon className="w-4 h-4 text-red-500 dark:text-red-400" />
+            <Moon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
           </motion.div>
         ) : (
           <motion.div
