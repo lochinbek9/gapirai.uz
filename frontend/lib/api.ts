@@ -98,7 +98,7 @@ export async function deleteJob(jobId: string): Promise<void> {
   await apiClient.delete(`/api/jobs/${jobId}`)
 }
 
-export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; amount: number }> {
+export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/click/initiate', { job_id: jobId })
   return res.data
 }
