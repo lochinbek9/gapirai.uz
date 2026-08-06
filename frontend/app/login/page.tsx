@@ -109,7 +109,12 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Parol</label>
+                <div className="flex items-center justify-between ml-1 mr-1">
+                  <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Parol</label>
+                  <Link href="/forgot-password" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                    Parolni unutdingizmi?
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     type={showPass ? 'text' : 'password'}

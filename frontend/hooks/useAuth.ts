@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode } from '@/lib/auth'
+import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode, apiForgotPassword, apiResetPassword } from '@/lib/auth'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -46,10 +46,22 @@ export function useAuth() {
     return apiResendCode(email)
   }, [])
 
+  const forgotPassword = useCallback(async (email: string) => {
+    return apiForgotPassword(email)
+  }, [])
+
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
+    const data = await apiResetPassword(email, code, newPassword)
+    setToken(data.access_token)
+    setStoredUser(data.user)
+    setUser(data.user)
+    return data.user
+  }, [])
+
   const logout = useCallback(() => {
     clearAuth()
     setUser(null)
   }, [])
 
-  return { user, loading, login, register, verifyCode, resendCode, logout, isLoggedIn: !!user }
+  return { user, loading, login, register, verifyCode, resendCode, forgotPassword, resetPassword, logout, isLoggedIn: !!user }
 }

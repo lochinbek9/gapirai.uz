@@ -4,7 +4,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.models.database import User, get_db
 from backend.services.auth import hash_password, verify_password, create_access_token, get_current_user
-from backend.services.email_service import generate_verification_code, send_verification_email, CODE_TTL_MINUTES
+from backend.services.email_service import (
+    generate_verification_code,
+    send_verification_email,
+    send_password_reset_email,
+    CODE_TTL_MINUTES,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,6 +32,16 @@ class VerifyCodeRequest(BaseModel):
 
 class ResendCodeRequest(BaseModel):
     email: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str
 
 
 class AuthResponse(BaseModel):
@@ -137,6 +152,45 @@ async def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> 
         raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
     return PendingVerificationResponse(email=user.email, message="Kod qayta yuborildi.")
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
+    user = db.query(User).filter(User.email == req.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
+
+    code = _issue_code(user, db)
+    if not send_password_reset_email(user.email, code, user.name):
+        raise HTTPException(status_code=500, detail="Kodni yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
+
+    return PendingVerificationResponse(email=user.email, message="Parolni tiklash kodi emailingizga yuborildi.")
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
+
+    user = db.query(User).filter(User.email == req.email.lower()).first()
+    if not user or not user.verification_code:
+        raise HTTPException(status_code=400, detail="Kod topilmadi. Qaytadan urinib ko'ring.")
+    if not user.verification_code_expires_at or user.verification_code_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
+    if user.verification_code != req.code.strip():
+        raise HTTPException(status_code=400, detail="Kod noto'g'ri.")
+
+    user.password_hash = hash_password(req.new_password)
+    user.is_verified = True
+    user.verification_code = None
+    user.verification_code_expires_at = None
+    db.commit()
+
+    token = create_access_token(str(user.id), user.email)
+    return AuthResponse(
+        access_token=token,
+        user={"id": str(user.id), "name": user.name, "email": user.email},
+    )
 
 
 @router.get("/me")

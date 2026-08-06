@@ -71,6 +71,16 @@ export async function apiResendCode(email: string): Promise<PendingVerification>
   return res.data
 }
 
+export async function apiForgotPassword(email: string): Promise<PendingVerification> {
+  const res = await axios.post(`${API_URL}/auth/forgot-password`, { email })
+  return res.data
+}
+
+export async function apiResetPassword(email: string, code: string, newPassword: string) {
+  const res = await axios.post(`${API_URL}/auth/reset-password`, { email, code, new_password: newPassword })
+  return res.data
+}
+
 export async function apiMe(token: string): Promise<User> {
   const res = await axios.get(`${API_URL}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
