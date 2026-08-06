@@ -1,12 +1,14 @@
 """
-Email Service — tasdiqlash kodlarini SMTP orqali yuborish (ro'yxatdan
+Email Service — tasdiqlash kodlarini Resend API orqali yuborish (ro'yxatdan
 o'tish va kirish uchun 2 bosqichli tasdiqlash).
+
+Gmail SMTP dastlab ishlatilgan edi, lekin oddiy shaxsiy Gmail hisobidan
+avtomatik yuborilgan xatlar Google'ning spam filtriga tushib qolgani
+sababli, gapirai.uz domenida SPF/DKIM tasdiqlangan Resend'ga o'tkazildi.
 """
 import random
-import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import httpx
 
 from backend.config import get_settings
 
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 CODE_TTL_MINUTES = 10
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 def generate_verification_code() -> str:
@@ -21,9 +24,9 @@ def generate_verification_code() -> str:
 
 
 def send_verification_email(to_email: str, code: str, name: str = "") -> bool:
-    """SMTP orqali tasdiqlash kodini yuboradi. Muvaffaqiyatli bo'lsa True qaytaradi."""
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        logger.warning("SMTP sozlanmagan (SMTP_USER/SMTP_PASSWORD bo'sh) — kod yuborilmadi.")
+    """Resend API orqali tasdiqlash kodini yuboradi. Muvaffaqiyatli bo'lsa True qaytaradi."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY sozlanmagan — kod yuborilmadi.")
         return False
 
     greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
@@ -48,19 +51,28 @@ def send_verification_email(to_email: str, code: str, name: str = "") -> bool:
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL or settings.SMTP_USER}>"
-    msg["To"] = to_email
-    msg["Subject"] = f"GapirAI.uz tasdiqlash kodi: {code}"
-    msg.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": f"GapirAI.uz tasdiqlash kodi: {code}",
+        "html": html_body,
+        "text": text_body,
+    }
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_USER, [to_email], msg.as_string())
-        return True
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={
+                "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend xatoligi ({to_email}): {response.status_code} {response.text[:300]}")
+        return False
     except Exception as e:
         logger.error(f"Tasdiqlash kodini yuborishda xatolik ({to_email}): {e}")
         return False
