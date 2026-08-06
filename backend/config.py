@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = "7987651672:AAH5OXmkbjH0HIEUih7cywWO1KOCbrF2Zic"
     TELEGRAM_CHAT_ID: str = ""
 
+    # SMTP (email tasdiqlash kodlari uchun)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "GapirAI.uz"
+
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"

@@ -35,6 +35,9 @@ class User(Base):
     name = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    verification_code = Column(String(6))
+    verification_code_expires_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     jobs = relationship("DubbingJob", back_populates="user", lazy="dynamic")
@@ -133,6 +136,15 @@ def create_tables():
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS rating INT"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_comment TEXT"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_created_at TIMESTAMP"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(6)"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code_expires_at TIMESTAMP"))
             connection.commit()
     except Exception:
         pass

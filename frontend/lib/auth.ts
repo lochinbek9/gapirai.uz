@@ -45,13 +45,29 @@ export function clearAuth() {
   localStorage.removeItem('auth_user')
 }
 
-export async function apiRegister(name: string, email: string, password: string) {
+export interface PendingVerification {
+  pending_verification: true
+  email: string
+  message: string
+}
+
+export async function apiRegister(name: string, email: string, password: string): Promise<PendingVerification> {
   const res = await axios.post(`${API_URL}/auth/register`, { name, email, password })
   return res.data
 }
 
-export async function apiLogin(email: string, password: string) {
+export async function apiLogin(email: string, password: string): Promise<PendingVerification> {
   const res = await axios.post(`${API_URL}/auth/login`, { email, password })
+  return res.data
+}
+
+export async function apiVerifyCode(email: string, code: string) {
+  const res = await axios.post(`${API_URL}/auth/verify-code`, { email, code })
+  return res.data
+}
+
+export async function apiResendCode(email: string): Promise<PendingVerification> {
+  const res = await axios.post(`${API_URL}/auth/resend-code`, { email })
   return res.data
 }
 
