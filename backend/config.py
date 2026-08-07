@@ -57,8 +57,8 @@ class Settings(BaseSettings):
     ELEVENLABS_FALLBACK_TO_EDGE: bool = True
 
     # Telegram Notification Bot
-    TELEGRAM_BOT_TOKEN: str = "7987651672:AAH5OXmkbjH0HIEUih7cywWO1KOCbrF2Zic"
-    TELEGRAM_CHAT_ID: str = ""
+    TELEGRAM_BOT_TOKEN: str = "8931174655:AAGS1PQsYiazxd5HjDet_kt4Y8mUVLqhHtU"
+    TELEGRAM_CHAT_ID: str = "-1004431243067"
 
     # Resend (email tasdiqlash kodlari uchun — gapirai.uz domenida SPF/DKIM tasdiqlangan)
     RESEND_API_KEY: str = ""

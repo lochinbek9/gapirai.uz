@@ -31,7 +31,7 @@ def send_telegram_feedback(
     """
     Dublyaj bahosi va fikrini Telegram bot orqali guruh/kanal/admin chatiga yuboradi.
     """
-    token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "7987651672:AAH5OXmkbjH0HIEUih7cywWO1KOCbrF2Zic")
+    token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "")
     target_chat = chat_id or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "")
 
     if not token:
