@@ -8,6 +8,7 @@ from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
+from backend.services.errors import PermanentError
 from backend.config import get_settings
 
 logger = get_task_logger(__name__)
@@ -65,12 +66,6 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
     db.commit()
 
 
-class _PermanentError(Exception):
-    """Qayta urinish ma'nosiz bo'lgan xatolik (masalan videoda nutq yo'q) —
-    qayta-qayta bir xil natija chiqadi, shuning uchun retry qilinmaydi."""
-    pass
-
-
 def _detect_gender(transcript_text: str) -> str:
     """Detect speaker gender with OpenAI."""
     try:
@@ -106,6 +101,8 @@ def _detect_gender(transcript_text: str) -> str:
     name="backend.workers.tasks.process_video",
     max_retries=3,
     default_retry_delay=60,
+    soft_time_limit=3300,  # 55 daqiqa — osilib qolgan bosqichga ogohlantirish
+    time_limit=3600,       # 60 daqiqa — worker'ni majburan to'xtatadi (hard limit)
 )
 def process_video(self: Task, job_id: str) -> dict:
     db = SessionLocal()
@@ -147,7 +144,7 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             transcript = transcriber.transcribe_audio(audio_path)
             if not transcript["segments"]:
-                raise _PermanentError("Bu videoda nutq topilmadi.")
+                raise PermanentError("Bu videoda nutq topilmadi.")
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
@@ -254,7 +251,7 @@ def process_video(self: Task, job_id: str) -> dict:
         return {"job_id": job_id, "status": "completed", "output_url": job.output_video_url}
 
 
-    except _PermanentError as exc:
+    except PermanentError as exc:
         # Qayta urinish ma'nosiz — har safar bir xil natija chiqadi.
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
             "status": JobStatus.FAILED,

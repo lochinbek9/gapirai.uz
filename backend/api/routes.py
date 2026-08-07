@@ -2,6 +2,7 @@ import re
 import shutil
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
@@ -18,6 +19,27 @@ from backend.services.click_service import calculate_price
 from backend.services.rate_limiter import rate_limit
 
 settings = get_settings()
+
+# Bitta video shu davomiylikdan uzun bo'lsa rad etiladi — cheksiz uzun
+# (masalan ko'p soatlik jonli efir yozuvi) video butun pipeline'ni juda
+# uzoq vaqt band qilib qo'yishi va API xarajatlarini nazoratsiz oshirib
+# yuborishi mumkin.
+MAX_VIDEO_DURATION_MINUTES = 180
+
+_YOUTUBE_HOSTS = {
+    "youtube.com", "www.youtube.com", "m.youtube.com",
+    "music.youtube.com", "youtu.be",
+}
+
+
+def _is_valid_youtube_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    return parsed.netloc.lower() in _YOUTUBE_HOSTS
 router = APIRouter(prefix="/api", tags=["dubbing"])
 
 
@@ -112,7 +134,7 @@ async def create_job(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> dict:
-    if "youtube.com" not in request.youtube_url and "youtu.be" not in request.youtube_url:
+    if not _is_valid_youtube_url(request.youtube_url):
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
 
     # Video ma'lumotlarini yuklash
@@ -126,6 +148,12 @@ async def create_job(
     thumbnail = info.get("thumbnail")
 
     duration_minutes = duration / 60.0
+
+    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
+        )
 
     is_first_video = False
     if current_user:

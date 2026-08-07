@@ -16,11 +16,41 @@ from redis import Redis
 
 
 from backend.config import get_settings
+from backend.services.errors import PermanentError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
+
+# Video haqiqiy fayli hech qachon foydalanuvchiga ko'rsatilmaydigan hajmdan
+# oshib ketmasligi uchun (disk to'lib qolishining oldini olish).
+MAX_DOWNLOAD_SIZE_BYTES = 3 * 1024 * 1024 * 1024  # 3 GB
+
+# yt-dlp/YouTube'dan qaytadigan, qayta urinish bilan hal bo'lmaydigan
+# xatolik matnlari — bunday holatlarda job darhol FAILED bo'lishi kerak,
+# 3 marta behuda qayta urinilmasligi kerak.
+_PERMANENT_ERROR_PATTERNS = [
+    "private video",
+    "video unavailable",
+    "video is unavailable",
+    "no longer available",
+    "has been removed",
+    "account associated with this video has been terminated",
+    "this video is not available",
+    "copyright",
+    "members-only",
+    "premieres in",
+    "live event will begin",
+    "this live stream recording is not available",
+    "video has been removed",
+    "unable to extract",
+]
+
+
+def _is_permanent_download_error(err_str: str) -> bool:
+    low = err_str.lower()
+    return any(pattern in low for pattern in _PERMANENT_ERROR_PATTERNS)
 
 
 class YoutubeRateLimiter:
@@ -179,6 +209,10 @@ def get_video_info(youtube_url: str) -> dict:
                 raise RuntimeError(
                     "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
                 ) from e2
+            if _is_permanent_download_error(err_str):
+                raise PermanentError(
+                    "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin."
+                ) from e2
             raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
 
 
@@ -224,6 +258,10 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
                 raise RuntimeError(
                     "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
                 ) from e2
+            if _is_permanent_download_error(err_str):
+                raise PermanentError(
+                    "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin."
+                ) from e2
             raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
 
     video_file = None
@@ -236,6 +274,19 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
         if not files:
             raise RuntimeError(f"Yuklangan video topilmadi: {job_dir}")
         video_file = files[0]
+
+    # Kutilganidan ancha katta fayl (masalan noto'g'ri format tanlandi yoki
+    # metadata xato) diskni to'ldirib qo'ymasligi uchun darhol o'chiriladi.
+    file_size = video_file.stat().st_size
+    if file_size > MAX_DOWNLOAD_SIZE_BYTES:
+        try:
+            video_file.unlink()
+        except Exception:
+            pass
+        raise PermanentError(
+            f"Video hajmi ruxsat etilgan chegaradan katta ({file_size / (1024**3):.1f} GB > "
+            f"{MAX_DOWNLOAD_SIZE_BYTES / (1024**3):.0f} GB)."
+        )
 
     audio_file = job_dir / "audio.wav"
     ffmpeg_cmd = [
