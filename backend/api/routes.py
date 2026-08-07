@@ -1,4 +1,5 @@
 import re
+import shutil
 import uuid
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -297,7 +298,17 @@ async def cancel_job(
     job.error_message = "User cancelled the job."
     job.updated_at = datetime.utcnow()
     db.commit()
-    
+
+    # Bekor qilingan job hech qachon yakunlanmaydi — yarim qolgan yuklama
+    # va sintez fayllarini darhol tozalaymiz.
+    for base_dir in (settings.UPLOAD_DIR, settings.OUTPUT_DIR):
+        job_dir = Path(base_dir) / str(job_id)
+        if job_dir.exists():
+            try:
+                shutil.rmtree(job_dir)
+            except Exception:
+                pass
+
     return {"success": True, "message": "Dublyaj bekor qilindi."}
 
 

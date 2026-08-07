@@ -260,6 +260,17 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
 
     merged_path = str(output_path / "dubbed_audio.wav")
     combined.set_frame_rate(_FRAME_RATE).export(merged_path, format="wav")
+
+    # Alohida segment fayllari (seg_XXXX.wav) birlashtirilgan audioga
+    # kirgandan so'ng boshqa hech qachon kerak bo'lmaydi — ular diskda
+    # qolib ketsa, har bir job o'nlab-yuzlab kichik WAV fayl tashlab
+    # ketadi (haqiqiy sinovda: job hajmining ~50% shu chiqindi edi).
+    for seg_file in output_path.glob("seg_*.wav"):
+        try:
+            seg_file.unlink()
+        except Exception:
+            pass
+
     return merged_path
 
 

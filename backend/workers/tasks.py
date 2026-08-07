@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 from datetime import datetime
 from celery import Task
@@ -36,6 +37,24 @@ def _segments_to_vtt(segments: list[dict]) -> str:
         lines.append(text)
         lines.append("")
     return "\n".join(lines)
+
+
+def _cleanup_upload_dir(job_id: str) -> None:
+    """
+    uploads/{job_id}/ (yuklab olingan asl video + transkripsiya uchun
+    ajratilgan audio) hech qachon foydalanuvchiga ko'rsatilmaydi — faqat
+    pipeline ichida ishlatiladi. Job haqiqatan tugagach (COMPLETED yoki
+    qayta urinishlar tugab FAILED bo'lgach) endi kerak emas.
+
+    Diqqat: bu faqat job TUGAGANDA chaqiriladi, retry oralig'ida emas —
+    aks holda navbatdagi urinish videoni behuda qayta yuklab olar edi.
+    """
+    job_dir = Path(settings.UPLOAD_DIR) / job_id
+    if job_dir.exists():
+        try:
+            shutil.rmtree(job_dir)
+        except Exception as exc:
+            logger.warning(f"uploads/{job_id} tozalab bo'lmadi: {exc}")
 
 
 def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message: str):
@@ -177,6 +196,8 @@ def process_video(self: Task, job_id: str) -> dict:
         job.completed_at = datetime.utcnow()
         db.commit()
 
+        _cleanup_upload_dir(job_id)
+
         return {"job_id": job_id, "status": "completed", "output_url": job.output_video_url}
 
 
@@ -199,6 +220,9 @@ def process_video(self: Task, job_id: str) -> dict:
             "updated_at": datetime.utcnow(),
         })
         db.commit()
+
+        _cleanup_upload_dir(job_id)
+
         raise exc
 
     finally:
