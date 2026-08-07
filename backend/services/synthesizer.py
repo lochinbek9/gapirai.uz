@@ -20,20 +20,23 @@ _FRAME_RATE = 24000
 def _synthesize_text(
     text: str,
     output_path: str,
-    retries: int = 3,
     voice_name: str | None = None,
-) -> None:
+) -> str:
     """
     Matnni audioga aylantiradi.
 
     Qatlam 1 — TTS_PROVIDER (default: ElevenLabs).
     Qatlam 2 — Edge TTS (bepul fallback, agar ELEVENLABS_FALLBACK_TO_EDGE=True).
+
+    Qaytaradi: ovozni haqiqatda sintez qilgan provider nomi
+    ('elevenlabs' | 'edge') — dublyajda faqat bitta ovoz eshitilishini
+    ta'minlash uchun synthesize_segments() bu qiymatni kuzatib boradi.
     """
     if settings.FREE_MODE:
         logger.info("FREE_MODE: Edge TTS (bepul) ishlatilmoqda...")
         fallback = get_fallback_provider()
         if fallback.synthesize(text, output_path, voice_name=voice_name):
-            return
+            return fallback.name
         raise RuntimeError("FREE_MODE: Edge TTS muvaffaqiyatsiz.")
 
     # --- Asosiy provider ---
@@ -41,7 +44,7 @@ def _synthesize_text(
     logger.info(f"TTS provider: {primary.name} | chars={len(text)}")
 
     if primary.synthesize(text, output_path, voice_name=voice_name):
-        return
+        return primary.name
 
     logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback Edge TTS ga o'tilmoqda.")
 
@@ -49,7 +52,7 @@ def _synthesize_text(
     if settings.ELEVENLABS_FALLBACK_TO_EDGE:
         fallback = get_fallback_provider()
         if fallback.synthesize(text, output_path, voice_name=voice_name):
-            return
+            return fallback.name
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 
@@ -139,31 +142,40 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. Har bir segmentni parallel ravishda sintez qilish (16x tezlashtirish)
+    # 1. Har bir segmentni parallel ravishda sintez qilish
+    def _clean_audio(audio: AudioSegment) -> AudioSegment:
+        # Bosh va oxiridagi bo'sh sukunatni tozalash (audio o'z-o'zidan 200-400ms qisqaradi va aniqroq bo'ladi)
+        silence_len = 30
+        while len(audio) > 150 and audio[:silence_len].dBFS < -42:
+            audio = audio[silence_len:]
+        while len(audio) > 150 and audio[-silence_len:].dBFS < -42:
+            audio = audio[:-silence_len]
+        return audio.normalize(headroom=2.0)
+
     def _process_single_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
         if not text:
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
-        _synthesize_text(text, str(seg_file), voice_name=voice_name)
+        engine = _synthesize_text(text, str(seg_file), voice_name=voice_name)
         if seg_file.exists():
-            audio = AudioSegment.from_wav(str(seg_file))
-            # Bosh va oxiridagi bo'sh sukunatni tozalash (audio o'z-o'zidan 200-400ms qisqaradi va aniqroq bo'ladi)
-            silence_len = 30
-            while len(audio) > 150 and audio[:silence_len].dBFS < -42:
-                audio = audio[silence_len:]
-            while len(audio) > 150 and audio[-silence_len:].dBFS < -42:
-                audio = audio[:-silence_len]
-            audio = audio.normalize(headroom=2.0)
+            audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
             return (idx, {
                 "audio": audio,
                 "start_ms": int(seg["start"] * 1000),
                 "end_ms": int(seg["end"] * 1000),
+                "engine": engine,
+                "text": text,
+                "seg_id": seg["id"],
             })
         return None
 
-    with ThreadPoolExecutor(max_workers=16) as executor:
+    # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit) —
+    # juda ko'p parallel oqim ba'zi segmentlarni Edge TTS'ga (boshqa ovozga)
+    # "fallback" qilib qo'yishi mumkin edi, natijada bitta dublyajda ikki xil
+    # odam ovozi eshitilardi. 5 oqim boshqa bosqichlar bilan mos va xavfsiz.
+    with ThreadPoolExecutor(max_workers=5) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
     # Saralangan segmentlarni yig'ish
@@ -173,6 +185,34 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
 
     if not seg_data:
         raise ValueError("Birlashtirish uchun segment topilmadi.")
+
+    # Ovoz izchilligi: agar ba'zi segmentlar (vaqtinchalik xatolik tufayli)
+    # boshqa TTS provayderiga tushib qolgan bo'lsa, ular ko'pchilik
+    # ishlatgan provayder bilan ketma-ket (shoshilmasdan) qayta sintez
+    # qilinadi — aks holda dublyajda bir necha xil ovoz aralashib qolardi.
+    if not settings.FREE_MODE:
+        engine_counts: dict[str, int] = {}
+        for item in seg_data:
+            engine_counts[item["engine"]] = engine_counts.get(item["engine"], 0) + 1
+        majority_engine = max(engine_counts, key=engine_counts.get)
+        primary = get_provider()
+        if majority_engine == primary.name:
+            for item in seg_data:
+                if item["engine"] == majority_engine:
+                    continue
+                retry_file = output_path / f"seg_retry_{item['seg_id']:04d}.wav"
+                try:
+                    time.sleep(1.5)
+                    if primary.synthesize(item["text"], str(retry_file), voice_name=voice_name):
+                        item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
+                        item["engine"] = majority_engine
+                        logger.info(f"Segment {item['seg_id']} ovoz izchilligi uchun {majority_engine} bilan qayta sintez qilindi.")
+                finally:
+                    if retry_file.exists():
+                        try:
+                            retry_file.unlink()
+                        except Exception:
+                            pass
 
     # 2. Aniq vaqtga sinxronlash (Strict Timestamp Synchronization)
     # HECH QACHON keyingi segment vaqti surilmaydi — barcha segmentlar o'z vaqtida (lip-sync) chiqadi!
