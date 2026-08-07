@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # TTS Provider abstraction
     # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai"
-    TTS_PROVIDER: str = "elevenlabs"
+    TTS_PROVIDER: str = "edge"
 
     # ElevenLabs TTS
     ELEVENLABS_API_KEY: str = ""
