@@ -94,8 +94,8 @@ _gate = _ConcurrencyGate(settings.REDIS_URL)
 class ElevenLabsProvider(TTSProvider):
     """ElevenLabs Text-to-Speech provider (eleven_multilingual_v2)."""
 
-    # George (Warm, Captivating Storyteller — shirali kino suxandoni ovozi)
-    DEFAULT_VOICE_ID_MALE = "JBFqnCBsd6RMkjVDRZzb"
+    # Eric (Smooth, Trustworthy — yengil va shirali erkak ovozi)
+    DEFAULT_VOICE_ID_MALE = "cjVigY5qzO86Huf0OWal"
     # Sarah (Mature, Reassuring, Confident — tabiiy va yoqimli ayol ovozi)
     DEFAULT_VOICE_ID_FEMALE = "EXAVITQu4vr4xnSDxMaL"
 
