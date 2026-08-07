@@ -20,6 +20,7 @@ from openai import OpenAI
 
 from backend.config import get_settings
 from backend.models.database import SessionLocal, PronunciationMemory
+from backend.services.speech_normalizer import normalize_apostrophes, _make_normalizer
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,8 +98,8 @@ def _apply_pronunciation_dict(text: str, overrides: dict[str, str]) -> str:
 # ─────────────────────────────────────────────────────────────
 # 1b. Raqamlarni o'zbekcha so'zga o'girish
 # ─────────────────────────────────────────────────────────────
-_UNITS = ["", "bir", "ikki", "uch", "to'rt", "besh", "olti", "yetti", "sakkiz", "to'qqiz"]
-_TENS = ["", "o'n", "yigirma", "o'ttiz", "qirq", "ellik", "oltmish", "yetmish", "sakson", "to'qson"]
+_UNITS = ["", "bir", "ikki", "uch", "toʻrt", "besh", "olti", "yetti", "sakkiz", "toʻqqiz"]
+_TENS = ["", "oʻn", "yigirma", "oʻttiz", "qirq", "ellik", "oltmish", "yetmish", "sakson", "toʻqson"]
 _SCALES = ["", " ming", " million", " milliard", " trillion"]
 
 
@@ -147,6 +148,11 @@ def number_to_uzbek_words(n: int) -> str:
             parts.append(f"{words}{_SCALES[i]}")
 
     return sign + " ".join(parts)
+
+
+# Sana/yil/valyuta normalizatsiyasi — number_to_uzbek_words'ni tashqaridan
+# oladi (speech_normalizer.py bilan aylanma import bo'lmasligi uchun).
+_normalize_dates_and_currency = _make_normalizer(number_to_uzbek_words)
 
 
 _PERCENT_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s?%")
@@ -208,8 +214,10 @@ def _replace_urls(text: str) -> str:
 def _rule_based_optimize(text: str, overrides: dict[str, str]) -> str:
     if not text or not text.strip():
         return text
+    text = normalize_apostrophes(text)
     text = _replace_urls(text)
     text = _apply_pronunciation_dict(text, overrides)
+    text = _normalize_dates_and_currency(text)
     text = convert_numbers_in_text(text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -310,4 +318,7 @@ def optimize_segments(segments: list[dict]) -> list[dict]:
         return rule_based
 
     logger.info("LLM speech optimization ishlamoqda...")
-    return _llm_optimize(rule_based)
+    optimized = _llm_optimize(rule_based)
+    # LLM o'z chiqishida boshqa apostrof shaklini ishlatgan bo'lishi mumkin —
+    # yakuniy o'tishda yana kanonik shaklga keltiramiz.
+    return [{**seg, "text": normalize_apostrophes(seg.get("text", ""))} for seg in optimized]
