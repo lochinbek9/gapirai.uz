@@ -15,6 +15,7 @@ from backend.services.auth import get_current_user, get_optional_user
 from backend.workers.tasks import process_video
 from backend.config import get_settings
 from backend.services.click_service import calculate_price
+from backend.services.rate_limiter import rate_limit
 
 settings = get_settings()
 router = APIRouter(prefix="/api", tags=["dubbing"])
@@ -96,7 +97,7 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
     )
 
 
-@router.get("/video-info")
+@router.get("/video-info", dependencies=[Depends(rate_limit("video_info", 20, 600))])
 async def video_info(url: str) -> VideoInfoResponse:
     try:
         info = get_video_info(url)
@@ -105,7 +106,7 @@ async def video_info(url: str) -> VideoInfoResponse:
         raise HTTPException(status_code=400, detail=f"Video ma'lumot olishda xatolik: {str(e)}")
 
 
-@router.post("/jobs", status_code=201)
+@router.post("/jobs", status_code=201, dependencies=[Depends(rate_limit("create_job", 8, 600))])
 async def create_job(
     request: CreateJobRequest,
     db: Session = Depends(get_db),
@@ -321,7 +322,7 @@ class FeedbackRequest(BaseModel):
     speed_ok: Optional[bool] = None
 
 
-@router.post("/jobs/{job_id}/feedback")
+@router.post("/jobs/{job_id}/feedback", dependencies=[Depends(rate_limit("feedback", 20, 600))])
 async def submit_feedback(
     job_id: uuid.UUID,
     req: FeedbackRequest,

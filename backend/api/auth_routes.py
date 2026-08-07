@@ -10,6 +10,7 @@ from backend.services.email_service import (
     send_password_reset_email,
     CODE_TTL_MINUTES,
 )
+from backend.services.rate_limiter import rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -80,7 +81,7 @@ def _issue_code(user: User, db: Session) -> str:
     return code
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", 5, 600))])
 async def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
@@ -104,7 +105,7 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)) -> Pendi
     return PendingVerificationResponse(email=user.email, message="Tasdiqlash kodi emailingizga yuborildi.")
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit("login", 10, 600))])
 async def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
@@ -119,7 +120,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVeri
     return PendingVerificationResponse(email=user.email, message="Tasdiqlash kodi emailingizga yuborildi.")
 
 
-@router.post("/verify-code")
+@router.post("/verify-code", dependencies=[Depends(rate_limit("verify_code", 10, 600))])
 async def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user or not user.verification_code:
@@ -141,7 +142,7 @@ async def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> 
     )
 
 
-@router.post("/resend-code")
+@router.post("/resend-code", dependencies=[Depends(rate_limit("resend_code", 5, 600))])
 async def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
@@ -154,7 +155,7 @@ async def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> 
     return PendingVerificationResponse(email=user.email, message="Kod qayta yuborildi.")
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", dependencies=[Depends(rate_limit("forgot_password", 5, 600))])
 async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
@@ -167,7 +168,7 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     return PendingVerificationResponse(email=user.email, message="Parolni tiklash kodi emailingizga yuborildi.")
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=[Depends(rate_limit("reset_password", 10, 600))])
 async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> AuthResponse:
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")

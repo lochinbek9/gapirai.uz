@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func
 from backend.models.database import SessionLocal, User, DubbingJob
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
+from backend.services.rate_limiter import rate_limit
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
@@ -14,7 +15,7 @@ def _check_admin(x_admin_key: str = Header(None)) -> None:
         raise HTTPException(status_code=401, detail="Ruxsat yo'q.")
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit("admin_login", 10, 600))])
 async def admin_login(x_admin_key: str = Header(None)):
     _check_admin(x_admin_key)
     return {"ok": True}
