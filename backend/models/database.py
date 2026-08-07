@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, String, DateTime, Enum, Float, Integer, Text, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 import enum
 from datetime import datetime
@@ -62,6 +62,15 @@ class DubbingJob(Base):
     translated_text = Column(Text)
     srt_content = Column(Text)
     uzbek_srt_content = Column(Text)   # O'zbekcha subtitrlar (WebVTT format)
+
+    # Checkpoint uchun: har bosqichning xom (timestamp'li) segment ro'yxati.
+    # Pipeline qayta ishga tushganda (crash/retry) shu maydonlar orqali
+    # qaysi bosqichlar allaqachon bajarilganini bilib, ulardan o'tkazib
+    # yuboriladi — qimmat/uzoq bosqichlar (transkripsiya, tarjima, LLM
+    # nutq optimizatsiyasi) qayta bajarilmaydi.
+    transcript_segments = Column(JSONB, nullable=True)
+    translated_segments = Column(JSONB, nullable=True)
+    speech_segments = Column(JSONB, nullable=True)
 
     original_video_path = Column(String(500))
     dubbed_audio_path = Column(String(500))
@@ -151,6 +160,15 @@ def create_tables():
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false"))
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(6)"))
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code_expires_at TIMESTAMP"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS transcript_segments JSONB"))
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS translated_segments JSONB"))
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS speech_segments JSONB"))
             connection.commit()
     except Exception:
         pass
