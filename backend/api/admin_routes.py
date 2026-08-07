@@ -24,6 +24,15 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
         status_rows = db.query(DubbingJob.status, func.count(DubbingJob.id)).group_by(DubbingJob.status).all()
         jobs_by_status = {(s.value if hasattr(s, "value") else str(s)): c for s, c in status_rows}
 
+        error_code_rows = (
+            db.query(DubbingJob.error_code, func.count(DubbingJob.id))
+            .filter(DubbingJob.error_code.isnot(None))
+            .group_by(DubbingJob.error_code)
+            .order_by(func.count(DubbingJob.id).desc())
+            .all()
+        )
+        jobs_by_error_code = {code: c for code, c in error_code_rows}
+
         total_jobs = db.query(DubbingJob).count()
         jobs_with_user = db.query(DubbingJob).filter(DubbingJob.user_id.isnot(None)).count()
         jobs_7d = db.query(DubbingJob).filter(DubbingJob.created_at > now - timedelta(days=7)).count()
@@ -51,6 +60,7 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "with_registered_user": jobs_with_user,
                 "anonymous": total_jobs - jobs_with_user,
                 "by_status": jobs_by_status,
+                "by_error_code": jobs_by_error_code,
                 "last_7d": jobs_7d,
                 "last_24h": jobs_24h,
             },

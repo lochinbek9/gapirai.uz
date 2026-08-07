@@ -79,6 +79,7 @@ class DubbingJob(Base):
     output_video_url = Column(String(500))
 
     error_message = Column(Text)
+    error_code = Column(String(50), nullable=True)  # masalan: VIDEO_UNAVAILABLE, TRANSCRIBE_FAILED, TIMEOUT
     rating = Column(Integer, nullable=True)
     feedback_comment = Column(Text, nullable=True)
     feedback_created_at = Column(DateTime, nullable=True)
@@ -171,6 +172,13 @@ def create_tables():
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS transcript_segments JSONB"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS translated_segments JSONB"))
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS speech_segments JSONB"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS error_code VARCHAR(50)"))
             connection.commit()
     except Exception:
         pass

@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from datetime import datetime
 from celery import Task
+from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
@@ -124,6 +125,16 @@ def _detect_gender(transcript_text: str) -> str:
         return "male"
 
 
+def _error_code_for(exc: Exception, current_stage: str) -> str:
+    """Xatolikni qisqa toifaga ajratadi (admin panel/monitoring uchun)."""
+    code = getattr(exc, "code", None)
+    if code:
+        return code
+    if isinstance(exc, SoftTimeLimitExceeded):
+        return "TIMEOUT"
+    return f"{current_stage}_FAILED"
+
+
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
@@ -136,6 +147,7 @@ def process_video(self: Task, job_id: str) -> dict:
     db = SessionLocal()
     stage_timings: dict = {}
     pipeline_start = time.monotonic()
+    current_stage = "INIT"
 
     try:
         job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -149,6 +161,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # Checkpoint: agar video+audio disk'da hali ham mavjud bo'lsa (masalan
         # oldingi urinish shu yerdan keyin qulagan bo'lsa), qayta yuklab
         # olinmaydi — YouTube'ga behuda so'rov yuborilmaydi.
+        current_stage = "DOWNLOAD"
         stage_t0 = time.monotonic()
         audio_path = str(job_dir / "audio.wav")
         if job.original_video_path and Path(job.original_video_path).exists() and Path(audio_path).exists():
@@ -168,6 +181,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # BOSQICH 2: Transkripsiya
         # Checkpoint: xom segmentlar (timestamp bilan) DB'da saqlanadi —
         # ular bo'lsa, qimmat/uzoq transkripsiya qayta bajarilmaydi.
+        current_stage = "TRANSCRIBE"
         stage_t0 = time.monotonic()
         if job.transcript_segments:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
@@ -178,7 +192,7 @@ def process_video(self: Task, job_id: str) -> dict:
             transcript = transcriber.transcribe_audio(audio_path)
             if not transcript["segments"]:
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
-                raise PermanentError("Bu videoda nutq topilmadi.")
+                raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
@@ -188,6 +202,7 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "ok")
 
         # BOSQICH 3: Jins aniqlash (foydalanuvchi tanlamagan bo'lsa avtomatik)
+        current_stage = "GENDER"
         stage_t0 = time.monotonic()
         if job.speaker_gender:
             gender = job.speaker_gender
@@ -206,6 +221,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # BOSQICH 4: Tarjima
         # Checkpoint: tarjima qilingan segmentlar saqlanadi — Google
         # Translate'ga qayta murojaat qilinmaydi.
+        current_stage = "TRANSLATE"
         stage_t0 = time.monotonic()
         if job.translated_segments:
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
@@ -223,6 +239,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # Faqat TTS kirishi uchun — subtitr matni yuqoridagi tarjimadan o'zgarishsiz qoladi,
         # chunki "JWT" -> "Jey Vi Ti" kabi og'zaki shakllar yozma subtitrda g'alati ko'rinadi.
         # Checkpoint: bu bosqich LLM chaqiruvi bo'lishi mumkin (pullik) — natija saqlanadi.
+        current_stage = "SPEECH_OPT"
         stage_t0 = time.monotonic()
         if job.speech_segments:
             _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "skipped")
@@ -237,6 +254,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # BOSQICH 5: TTS (jinsga mos ovoz)
         # Checkpoint: agar birlashtirilgan dublyaj audiosi allaqachon
         # diskda bo'lsa, ElevenLabs'ga qayta pul to'lab sintez qilinmaydi.
+        current_stage = "TTS"
         stage_t0 = time.monotonic()
         if job.dubbed_audio_path and Path(job.dubbed_audio_path).exists():
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "skipped")
@@ -256,6 +274,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # BOSQICH 6: Birlashtirish
         # Checkpoint: yakuniy video allaqachon tayyor bo'lsa, ffmpeg qayta
         # ishlamaydi.
+        current_stage = "MERGE"
         stage_t0 = time.monotonic()
         if job.output_video_path and Path(job.output_video_path).exists():
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
@@ -303,6 +322,7 @@ def process_video(self: Task, job_id: str) -> dict:
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
             "status": JobStatus.FAILED,
             "error_message": str(exc),
+            "error_code": _error_code_for(exc, current_stage),
             "updated_at": datetime.utcnow(),
         })
         db.commit()
@@ -322,6 +342,7 @@ def process_video(self: Task, job_id: str) -> dict:
             if job:
                 job.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
                 job.error_message = str(exc)
+                job.error_code = _error_code_for(exc, current_stage)
                 job.updated_at = datetime.utcnow()
                 db.commit()
             db.close()
@@ -331,6 +352,7 @@ def process_video(self: Task, job_id: str) -> dict:
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
             "status": JobStatus.FAILED,
             "error_message": str(exc),
+            "error_code": _error_code_for(exc, current_stage),
             "updated_at": datetime.utcnow(),
         })
         db.commit()

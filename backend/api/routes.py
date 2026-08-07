@@ -68,6 +68,7 @@ class JobResponse(BaseModel):
     transcript_text: Optional[str] = None
     translated_text: Optional[str] = None
     error_message: Optional[str] = None
+    error_code: Optional[str] = None
     created_at: Optional[str] = None
     speaker_gender: Optional[str] = None
     voice_gender_setting: Optional[str] = None
@@ -106,6 +107,7 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         transcript_text=job.transcript_text,
         translated_text=job.translated_text,
         error_message=job.error_message,
+        error_code=job.error_code,
         created_at=job.created_at.isoformat() if job.created_at else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,

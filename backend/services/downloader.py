@@ -211,7 +211,8 @@ def get_video_info(youtube_url: str) -> dict:
                 ) from e2
             if _is_permanent_download_error(err_str):
                 raise PermanentError(
-                    "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin."
+                    "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                    code="VIDEO_UNAVAILABLE",
                 ) from e2
             raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
 
@@ -260,7 +261,8 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
                 ) from e2
             if _is_permanent_download_error(err_str):
                 raise PermanentError(
-                    "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin."
+                    "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                    code="VIDEO_UNAVAILABLE",
                 ) from e2
             raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
 
@@ -285,7 +287,8 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
             pass
         raise PermanentError(
             f"Video hajmi ruxsat etilgan chegaradan katta ({file_size / (1024**3):.1f} GB > "
-            f"{MAX_DOWNLOAD_SIZE_BYTES / (1024**3):.0f} GB)."
+            f"{MAX_DOWNLOAD_SIZE_BYTES / (1024**3):.0f} GB).",
+            code="FILE_TOO_LARGE",
         )
 
     audio_file = job_dir / "audio.wav"

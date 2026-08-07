@@ -10,6 +10,7 @@ export interface AdminStats {
     with_registered_user: number
     anonymous: number
     by_status: Record<string, number>
+    by_error_code: Record<string, number>
     last_7d: number
     last_24h: number
   }

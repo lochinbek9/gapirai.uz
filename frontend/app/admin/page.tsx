@@ -213,6 +213,19 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+          {Object.keys(stats.jobs.by_error_code).length > 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Xatolik turlari</p>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                {Object.entries(stats.jobs.by_error_code).map(([code, count]) => (
+                  <div key={code} className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 sm:px-4 py-2 flex items-center gap-2">
+                    <span className="text-xs text-red-300">{code}</span>
+                    <span className="text-sm font-bold text-white">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Payments */}
