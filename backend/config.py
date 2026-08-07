@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # ElevenLabs TTS
     ELEVENLABS_API_KEY: str = ""
-    ELEVENLABS_VOICE_ID_MALE: str = "cjVigY5qzO86Huf0OWal"    # Eric (Smooth, Trustworthy)
+    ELEVENLABS_VOICE_ID_MALE: str = "bIHbv24MWmeRgasZH58o"    # Will (Relaxed Optimist)
     ELEVENLABS_VOICE_ID_FEMALE: str = "EXAVITQu4vr4xnSDxMaL"  # Sarah (Mature, Reassuring)
     ELEVENLABS_MODEL: str = "eleven_multilingual_v2"
     ELEVENLABS_STABILITY: float = 0.45
