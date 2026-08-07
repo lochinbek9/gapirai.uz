@@ -53,6 +53,15 @@ def get_current_user(
     return user
 
 
+def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Faqat role='admin' bo'lgan, login qilgan foydalanuvchini o'tkazadi."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu bo'limga faqat administratorlar kira oladi.")
+    return current_user
+
+
 def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),

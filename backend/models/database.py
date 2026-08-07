@@ -38,6 +38,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False, nullable=False)
     verification_code = Column(String(6))
     verification_code_expires_at = Column(DateTime)
+    role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
 
     jobs = relationship("DubbingJob", back_populates="user", lazy="dynamic")
@@ -160,6 +161,7 @@ def create_tables():
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false"))
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(6)"))
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code_expires_at TIMESTAMP"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'"))
             connection.commit()
     except Exception:
         pass

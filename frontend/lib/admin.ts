@@ -17,26 +17,9 @@ export interface AdminStats {
   recent_users: { email: string; created_at: string | null; is_verified: boolean }[]
 }
 
-const ADMIN_KEY_STORAGE = 'admin_key'
-
-export function getAdminKey(): string | null {
-  if (typeof window === 'undefined') return null
-  return sessionStorage.getItem(ADMIN_KEY_STORAGE)
-}
-
-export function setAdminKey(key: string) {
-  sessionStorage.setItem(ADMIN_KEY_STORAGE, key)
-}
-
-export function clearAdminKey() {
-  sessionStorage.removeItem(ADMIN_KEY_STORAGE)
-}
-
-export async function apiAdminLogin(key: string): Promise<void> {
-  await axios.post(`${API_URL}/admin/login`, {}, { headers: { 'X-Admin-Key': key } })
-}
-
-export async function apiAdminStats(key: string): Promise<AdminStats> {
-  const res = await axios.get(`${API_URL}/admin/stats`, { headers: { 'X-Admin-Key': key } })
+export async function apiAdminStats(token: string): Promise<AdminStats> {
+  const res = await axios.get(`${API_URL}/admin/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   return res.data
 }

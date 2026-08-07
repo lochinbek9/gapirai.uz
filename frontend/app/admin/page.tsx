@@ -1,7 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Loader2, Users, Video, Wallet, LogOut, RefreshCw } from 'lucide-react'
-import { AdminStats, apiAdminLogin, apiAdminStats, getAdminKey, setAdminKey, clearAdminKey } from '@/lib/admin'
+import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
+import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn } from 'lucide-react'
+import { AdminStats, apiAdminStats } from '@/lib/admin'
+import { getToken } from '@/lib/auth'
+import { useAuth } from '@/hooks/useAuth'
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Navbatda",
@@ -30,69 +33,62 @@ function Card({ label, value, icon }: { label: string; value: string | number; i
   )
 }
 
+function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNode; title: string; message: string; action?: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+          {icon}
+        </div>
+        <div className="space-y-1">
+          <h1 className="text-lg font-extrabold text-white">{title}</h1>
+          <p className="text-xs text-gray-400 leading-relaxed">{message}</p>
+        </div>
+        {action}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPage() {
-  const [password, setPassword] = useState('')
-  const [authed, setAuthed] = useState(false)
-  const [checking, setChecking] = useState(true)
-  const [loginError, setLoginError] = useState('')
-  const [loginLoading, setLoginLoading] = useState(false)
+  const { user, loading: authLoading, isLoggedIn, logout } = useAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
-  const [statsError, setStatsError] = useState('')
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
+  const [errorDetail, setErrorDetail] = useState('')
   const [refreshing, setRefreshing] = useState(false)
 
-  async function loadStats(key: string) {
-    try {
-      const data = await apiAdminStats(key)
-      setStats(data)
-      setStatsError('')
-      setAuthed(true)
-    } catch (err: any) {
-      clearAdminKey()
-      setAuthed(false)
-      setStatsError(err?.response?.data?.detail || 'Statistikani yuklashda xatolik')
+  const loadStats = useCallback(async () => {
+    const token = getToken()
+    if (!token) {
+      setErrorKind('unauthorized')
+      return
     }
-  }
-
-  useEffect(() => {
-    const key = getAdminKey()
-    if (key) {
-      loadStats(key).finally(() => setChecking(false))
-    } else {
-      setChecking(false)
+    try {
+      const data = await apiAdminStats(token)
+      setStats(data)
+      setErrorKind(null)
+    } catch (err: any) {
+      const httpStatus = err?.response?.status
+      if (httpStatus === 401) setErrorKind('unauthorized')
+      else if (httpStatus === 403) setErrorKind('forbidden')
+      else setErrorKind('other')
+      setErrorDetail(err?.response?.data?.detail || 'Statistikani yuklashda xatolik')
     }
   }, [])
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoginError('')
-    setLoginLoading(true)
-    try {
-      await apiAdminLogin(password)
-      setAdminKey(password)
-      await loadStats(password)
-    } catch (err: any) {
-      setLoginError(err?.response?.data?.detail || "Parol noto'g'ri")
-    } finally {
-      setLoginLoading(false)
-    }
-  }
+  useEffect(() => {
+    if (authLoading) return
+    loadStats().finally(() => setStatsLoading(false))
+  }, [authLoading, loadStats])
 
   async function handleRefresh() {
-    const key = getAdminKey()
-    if (!key) return
     setRefreshing(true)
-    await loadStats(key)
+    await loadStats()
     setRefreshing(false)
   }
 
-  function handleLogout() {
-    clearAdminKey()
-    setAuthed(false)
-    setStats(null)
-    setPassword('')
-  }
-
-  if (checking) {
+  if (authLoading || statsLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
@@ -100,38 +96,59 @@ export default function AdminPage() {
     )
   }
 
-  if (!authed || !stats) {
+  if (errorKind === 'unauthorized' || !isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <form onSubmit={handleLogin} className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
-          <div className="text-center space-y-1">
-            <h1 className="text-lg font-extrabold text-white">Admin panel</h1>
-            <p className="text-xs text-gray-400">GapirAI.uz statistikasi</p>
-          </div>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Admin paroli"
-            required
-            autoFocus
-            className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
-          />
-          {(loginError || statsError) && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-5 py-3 text-red-400 text-xs font-semibold">
-              {loginError || statsError}
-            </div>
-          )}
-          <button
-            type="submit"
-            disabled={loginLoading}
-            className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+      <CenteredMessage
+        icon={<LogIn className="w-6 h-6" />}
+        title="Tizimga kiring"
+        message="Admin panelni ko'rish uchun avval saytga oddiy hisobingiz bilan kiring."
+        action={
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-2xl transition-all text-sm"
           >
-            {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Kirish
+            Kirish sahifasiga o'tish
+          </Link>
+        }
+      />
+    )
+  }
+
+  if (errorKind === 'forbidden') {
+    return (
+      <CenteredMessage
+        icon={<ShieldAlert className="w-6 h-6" />}
+        title="Ruxsat yo'q"
+        message={`${user?.email || 'Bu hisob'} uchun admin panelga kirish huquqi yo'q.`}
+        action={
+          <button
+            onClick={logout}
+            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-3 rounded-2xl transition-all text-sm"
+          >
+            <LogOut className="w-4 h-4" />
+            Chiqish
           </button>
-        </form>
-      </div>
+        }
+      />
+    )
+  }
+
+  if (errorKind === 'other' || !stats) {
+    return (
+      <CenteredMessage
+        icon={<ShieldAlert className="w-6 h-6" />}
+        title="Xatolik"
+        message={errorDetail || 'Statistikani yuklab bo\'lmadi.'}
+        action={
+          <button
+            onClick={() => { setStatsLoading(true); loadStats().finally(() => setStatsLoading(false)) }}
+            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-3 rounded-2xl transition-all text-sm"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Qayta urinish
+          </button>
+        }
+      />
     )
   }
 
@@ -141,7 +158,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-extrabold text-white">Admin panel</h1>
-            <p className="text-xs text-gray-400 mt-1">GapirAI.uz statistikasi</p>
+            <p className="text-xs text-gray-400 mt-1">{user?.email}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -153,7 +170,7 @@ export default function AdminPage() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={handleLogout}
+              onClick={logout}
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition"
               aria-label="Chiqish"
             >

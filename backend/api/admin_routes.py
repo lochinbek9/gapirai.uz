@@ -1,29 +1,17 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from backend.models.database import SessionLocal, User, DubbingJob
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
-from backend.services.rate_limiter import rate_limit
+from backend.services.auth import get_current_admin_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
 
 
-def _check_admin(x_admin_key: str = Header(None)) -> None:
-    if not settings.ADMIN_PASSWORD or x_admin_key != settings.ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Ruxsat yo'q.")
-
-
-@router.post("/login", dependencies=[Depends(rate_limit("admin_login", 10, 600))])
-async def admin_login(x_admin_key: str = Header(None)):
-    _check_admin(x_admin_key)
-    return {"ok": True}
-
-
 @router.get("/stats")
-async def admin_stats(x_admin_key: str = Header(None)):
-    _check_admin(x_admin_key)
+async def admin_stats(current_user: User = Depends(get_current_admin_user)):
     db = SessionLocal()
     try:
         now = datetime.utcnow()

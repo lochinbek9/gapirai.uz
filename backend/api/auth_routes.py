@@ -138,7 +138,7 @@ async def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> 
     token = create_access_token(str(user.id), user.email)
     return AuthResponse(
         access_token=token,
-        user={"id": str(user.id), "name": user.name, "email": user.email},
+        user={"id": str(user.id), "name": user.name, "email": user.email, "role": user.role},
     )
 
 
@@ -190,7 +190,7 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
     token = create_access_token(str(user.id), user.email)
     return AuthResponse(
         access_token=token,
-        user={"id": str(user.id), "name": user.name, "email": user.email},
+        user={"id": str(user.id), "name": user.name, "email": user.email, "role": user.role},
     )
 
 
@@ -200,5 +200,6 @@ async def me(current_user: User = Depends(get_current_user)) -> dict:
         "id": str(current_user.id),
         "name": current_user.name,
         "email": current_user.email,
+        "role": current_user.role,
         "created_at": current_user.created_at.isoformat(),
     }

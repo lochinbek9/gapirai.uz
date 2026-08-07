@@ -65,9 +65,6 @@ class Settings(BaseSettings):
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
 
-    # Admin panel
-    ADMIN_PASSWORD: str = ""
-
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"
