@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from pathlib import Path
 from datetime import datetime
 from celery import Task
@@ -66,6 +67,33 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
     db.commit()
 
 
+_STAGE_ICONS = {"ok": "✅", "skipped": "⏭️", "error": "❌"}
+
+
+def _record_stage(stage_timings: dict, job_id: str, stage: str, start: float, status: str, detail: str = "") -> None:
+    """Bir bosqich tugagach chaqiriladi — davomiylikni saqlaydi va bitta
+    izchil formatli log qatorini chiqaradi (masalan monitoring/log
+    qidiruvida grep qilish uchun oson bo'lsin deb)."""
+    duration = time.monotonic() - start
+    stage_timings[stage] = {"duration": duration, "status": status, "detail": detail}
+    icon = _STAGE_ICONS.get(status, "•")
+    suffix = f" — {detail}" if detail else ""
+    logger.info(f"[{job_id}] STAGE={stage} duration={duration:.1f}s status={status} {icon}{suffix}")
+
+
+def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, final_status: str) -> None:
+    """Job tugagach (COMPLETED/FAILED/retry oldidan) yagona, o'qish oson
+    hisobot bloki — qaysi bosqich qancha vaqt olganini bir qarashda ko'rish
+    uchun."""
+    total = time.monotonic() - total_start
+    lines = [f"JOB {job_id} [{final_status}]"]
+    for stage, info in stage_timings.items():
+        icon = _STAGE_ICONS.get(info["status"], "•")
+        lines.append(f"  {stage:<12} {info['duration']:>7.1f}s {icon} {info['status']}")
+    lines.append(f"  {'TOTAL':<12} {total:>7.1f}s")
+    logger.info("\n".join(lines))
+
+
 def _detect_gender(transcript_text: str) -> str:
     """Detect speaker gender with OpenAI."""
     try:
@@ -106,6 +134,8 @@ def _detect_gender(transcript_text: str) -> str:
 )
 def process_video(self: Task, job_id: str) -> dict:
     db = SessionLocal()
+    stage_timings: dict = {}
+    pipeline_start = time.monotonic()
 
     try:
         job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -119,9 +149,10 @@ def process_video(self: Task, job_id: str) -> dict:
         # Checkpoint: agar video+audio disk'da hali ham mavjud bo'lsa (masalan
         # oldingi urinish shu yerdan keyin qulagan bo'lsa), qayta yuklab
         # olinmaydi — YouTube'ga behuda so'rov yuborilmaydi.
+        stage_t0 = time.monotonic()
         audio_path = str(job_dir / "audio.wav")
         if job.original_video_path and Path(job.original_video_path).exists() and Path(audio_path).exists():
-            logger.info(f"[{job_id}] Yuklash allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
             video_path = job.original_video_path
         else:
             _update_job(db, job, JobStatus.DOWNLOADING, 5.0, "YouTube'dan yuklanmoqda...")
@@ -132,18 +163,21 @@ def process_video(self: Task, job_id: str) -> dict:
             db.commit()
             video_path = download_result["video_path"]
             audio_path = download_result["audio_path"]
+            _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "ok")
 
         # BOSQICH 2: Transkripsiya
         # Checkpoint: xom segmentlar (timestamp bilan) DB'da saqlanadi —
         # ular bo'lsa, qimmat/uzoq transkripsiya qayta bajarilmaydi.
+        stage_t0 = time.monotonic()
         if job.transcript_segments:
-            logger.info(f"[{job_id}] Transkripsiya allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
             segments = job.transcript_segments
             transcript_text = job.transcript_text or ""
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             transcript = transcriber.transcribe_audio(audio_path)
             if not transcript["segments"]:
+                _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.")
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
@@ -151,10 +185,13 @@ def process_video(self: Task, job_id: str) -> dict:
             db.commit()
             segments = transcript["segments"]
             transcript_text = transcript["text"]
+            _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "ok")
 
         # BOSQICH 3: Jins aniqlash (foydalanuvchi tanlamagan bo'lsa avtomatik)
+        stage_t0 = time.monotonic()
         if job.speaker_gender:
             gender = job.speaker_gender
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped")
         else:
             setting = job.voice_gender_setting or "auto"
             if setting in ("male", "female"):
@@ -164,12 +201,14 @@ def process_video(self: Task, job_id: str) -> dict:
                 gender = _detect_gender(transcript_text)
             job.speaker_gender = gender
             db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "ok")
 
         # BOSQICH 4: Tarjima
         # Checkpoint: tarjima qilingan segmentlar saqlanadi — Google
         # Translate'ga qayta murojaat qilinmaydi.
+        stage_t0 = time.monotonic()
         if job.translated_segments:
-            logger.info(f"[{job_id}] Tarjima allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
             translated_segments = job.translated_segments
         else:
             _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
@@ -178,25 +217,29 @@ def process_video(self: Task, job_id: str) -> dict:
             job.uzbek_srt_content = _segments_to_vtt(translated_segments)
             job.translated_segments = translated_segments
             db.commit()
+            _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "ok")
 
         # BOSQICH 4.5: Nutq uchun optimallashtirish (raqamlar, qisqartmalar, og'zaki uslub)
         # Faqat TTS kirishi uchun — subtitr matni yuqoridagi tarjimadan o'zgarishsiz qoladi,
         # chunki "JWT" -> "Jey Vi Ti" kabi og'zaki shakllar yozma subtitrda g'alati ko'rinadi.
         # Checkpoint: bu bosqich LLM chaqiruvi bo'lishi mumkin (pullik) — natija saqlanadi.
+        stage_t0 = time.monotonic()
         if job.speech_segments:
-            logger.info(f"[{job_id}] Nutq optimizatsiyasi allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "skipped")
             speech_segments = job.speech_segments
         else:
             _update_job(db, job, JobStatus.SYNCING, 50.0, "Matn tabiiy talaffuzga moslashtirilmoqda...")
             speech_segments = speech_optimizer.optimize_segments(translated_segments)
             job.speech_segments = speech_segments
             db.commit()
+            _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "ok")
 
         # BOSQICH 5: TTS (jinsga mos ovoz)
         # Checkpoint: agar birlashtirilgan dublyaj audiosi allaqachon
         # diskda bo'lsa, ElevenLabs'ga qayta pul to'lab sintez qilinmaydi.
+        stage_t0 = time.monotonic()
         if job.dubbed_audio_path and Path(job.dubbed_audio_path).exists():
-            logger.info(f"[{job_id}] TTS allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "TTS", stage_t0, "skipped")
             dubbed_audio_path = job.dubbed_audio_path
         else:
             voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
@@ -208,12 +251,14 @@ def process_video(self: Task, job_id: str) -> dict:
             )
             job.dubbed_audio_path = dubbed_audio_path
             db.commit()
+            _record_stage(stage_timings, job_id, "TTS", stage_t0, "ok")
 
         # BOSQICH 6: Birlashtirish
         # Checkpoint: yakuniy video allaqachon tayyor bo'lsa, ffmpeg qayta
         # ishlamaydi.
+        stage_t0 = time.monotonic()
         if job.output_video_path and Path(job.output_video_path).exists():
-            logger.info(f"[{job_id}] Birlashtirish allaqachon bajarilgan — o'tkazib yuborildi.")
+            _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
             final_output = job.output_video_path
         else:
             _update_job(db, job, JobStatus.MERGING, 85.0, "Video birlashtirilmoqda...")
@@ -229,6 +274,7 @@ def process_video(self: Task, job_id: str) -> dict:
             job.output_video_path = final_output
             job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
             db.commit()
+            _record_stage(stage_timings, job_id, "MERGE", stage_t0, "ok")
 
         # Upload files to S3 if configured
         try:
@@ -247,6 +293,7 @@ def process_video(self: Task, job_id: str) -> dict:
         db.commit()
 
         _cleanup_upload_dir(job_id)
+        _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED")
 
         return {"job_id": job_id, "status": "completed", "output_url": job.output_video_url}
 
@@ -260,6 +307,7 @@ def process_video(self: Task, job_id: str) -> dict:
         })
         db.commit()
         _cleanup_upload_dir(job_id)
+        _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
 
     except Exception as exc:
@@ -277,6 +325,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 job.updated_at = datetime.utcnow()
                 db.commit()
             db.close()
+            _log_pipeline_summary(job_id, stage_timings, pipeline_start, f"RETRY {self.request.retries + 1}/{self.max_retries}")
             raise self.retry(exc=exc, countdown=countdown)
 
         db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
@@ -287,6 +336,7 @@ def process_video(self: Task, job_id: str) -> dict:
         db.commit()
 
         _cleanup_upload_dir(job_id)
+        _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (max retries)")
 
         raise exc
 
