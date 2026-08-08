@@ -160,6 +160,12 @@ _HALF_DECIMAL_RE = re.compile(r"(-?\d+)[.,]5\b")
 _DECIMAL_RE = re.compile(r"(-?\d+)[.,](\d+)")
 _INTEGER_RE = re.compile(r"-?\d+")
 
+# "6.3 million" -> 6 300 000 -> "olti million uch yuz ming" (nuqta o'qish emas)
+_SCALE_VALUES = {"ming": 1_000, "million": 1_000_000, "milliard": 1_000_000_000, "trillion": 1_000_000_000_000}
+_DECIMAL_SCALE_RE = re.compile(
+    r"(-?\d+)[.,](\d+)\s?(ming|million|milliard|trillion)\b", re.IGNORECASE
+)
+
 
 def _convert_number_match(int_str: str) -> str:
     try:
@@ -174,6 +180,20 @@ def convert_numbers_in_text(text: str) -> str:
     Tartib muhim: foiz va kasrlar ("3.5", "100%") butun son regexidan oldin
     ishlanishi kerak, aks holda "3" va "5" alohida-alohida o'girilib ketadi.
     """
+    def _decimal_scale_sub(m: re.Match) -> str:
+        whole_str, frac_str, scale_word = m.group(1), m.group(2), m.group(3).lower()
+        scale = _SCALE_VALUES[scale_word]
+        whole = int(whole_str)
+        frac_value = round(int(frac_str) * scale / (10 ** len(frac_str)))
+        sign = -1 if whole < 0 else 1
+        total = sign * (abs(whole) * scale + frac_value)
+        return number_to_uzbek_words(total)
+
+    # "6.3 million" kabi o'nlik+shkala birikmasi — foiz/oddiy kasr
+    # qoidalaridan OLDIN ishlanishi kerak, aks holda "6.3" alohida
+    # "olti nuqta uch" deb o'qilib, "million" so'zi orqada qolib ketadi.
+    text = _DECIMAL_SCALE_RE.sub(_decimal_scale_sub, text)
+
     def _percent_sub(m: re.Match) -> str:
         num = m.group(1).replace(",", ".")
         if "." in num:
