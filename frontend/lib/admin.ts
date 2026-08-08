@@ -16,6 +16,13 @@ export interface AdminStats {
   }
   payments: { approved_count: number; revenue_total_uzs: number }
   recent_users: { email: string; created_at: string | null; is_verified: boolean }[]
+  trends: {
+    daily: { date: string; users: number; jobs: number }[]
+    today: { users: number; jobs: number }
+    yesterday: { users: number; jobs: number }
+    this_month: { users: number; jobs: number }
+    last_month: { users: number; jobs: number }
+  }
 }
 
 export async function apiAdminStats(token: string): Promise<AdminStats> {

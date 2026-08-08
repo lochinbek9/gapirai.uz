@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from backend.models.database import SessionLocal, User, DubbingJob
@@ -8,6 +8,25 @@ from backend.services.auth import get_current_admin_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
+
+TREND_DAYS = 30
+
+
+def _daily_counts(db, model, since: datetime) -> dict[str, int]:
+    rows = (
+        db.query(func.date(model.created_at).label("day"), func.count(model.id))
+        .filter(model.created_at >= since)
+        .group_by("day")
+        .all()
+    )
+    return {str(day): count for day, count in rows}
+
+
+def _period_count(db, model, start: datetime, end: datetime | None = None):
+    q = db.query(model).filter(model.created_at >= start)
+    if end is not None:
+        q = q.filter(model.created_at <= end)
+    return q.count()
 
 
 @router.get("/stats")
@@ -48,6 +67,39 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
             for u in db.query(User).order_by(User.created_at.desc()).limit(10).all()
         ]
 
+        # ── Trendlar: kunlik ro'yxatdan o'tish/video soni, bugun/kecha,
+        # bu oy/o'tgan oy solishtiruvi — admin panelda grafik uchun.
+        trend_since = now - timedelta(days=TREND_DAYS)
+        user_daily = _daily_counts(db, User, trend_since)
+        job_daily = _daily_counts(db, DubbingJob, trend_since)
+
+        daily = []
+        for i in range(TREND_DAYS, -1, -1):
+            d = (now - timedelta(days=i)).date()
+            key = str(d)
+            daily.append({"date": key, "users": user_daily.get(key, 0), "jobs": job_daily.get(key, 0)})
+
+        today_key = str(now.date())
+        yesterday_key = str((now - timedelta(days=1)).date())
+
+        this_month_start = datetime(now.year, now.month, 1)
+        last_month_end = this_month_start - timedelta(seconds=1)
+        last_month_start = datetime(last_month_end.year, last_month_end.month, 1)
+
+        trends = {
+            "daily": daily,
+            "today": {"users": user_daily.get(today_key, 0), "jobs": job_daily.get(today_key, 0)},
+            "yesterday": {"users": user_daily.get(yesterday_key, 0), "jobs": job_daily.get(yesterday_key, 0)},
+            "this_month": {
+                "users": _period_count(db, User, this_month_start),
+                "jobs": _period_count(db, DubbingJob, this_month_start),
+            },
+            "last_month": {
+                "users": _period_count(db, User, last_month_start, last_month_end),
+                "jobs": _period_count(db, DubbingJob, last_month_start, last_month_end),
+            },
+        }
+
         return {
             "users": {
                 "total": total_users,
@@ -69,6 +121,7 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "revenue_total_uzs": float(revenue_total or 0),
             },
             "recent_users": recent_users,
+            "trends": trends,
         }
     finally:
         db.close()

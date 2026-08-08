@@ -33,6 +33,152 @@ function Card({ label, value, icon }: { label: string; value: string | number; i
   )
 }
 
+const SHORT_MONTHS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek']
+
+function formatShortDate(dateStr?: string) {
+  if (!dateStr) return ''
+  const [, m, d] = dateStr.split('-').map(Number)
+  return `${d}-${SHORT_MONTHS[m - 1]}`
+}
+
+function TrendChart({
+  data,
+  color,
+  label,
+}: {
+  data: { date: string; value: number }[]
+  color: string
+  label: string
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const width = 600
+  const height = 160
+  const padTop = 12
+  const padBottom = 22
+  const padX = 8
+  const plotW = width - padX * 2
+  const plotH = height - padTop - padBottom
+  const n = data.length
+  const maxVal = Math.max(1, ...data.map((d) => d.value))
+
+  const points = data.map((d, i) => ({
+    x: padX + (n <= 1 ? 0 : (i / (n - 1)) * plotW),
+    y: padTop + plotH - (d.value / maxVal) * plotH,
+    ...d,
+  }))
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')
+  const areaPath =
+    n > 0
+      ? `${linePath} L${points[n - 1].x.toFixed(2)},${padTop + plotH} L${points[0].x.toFixed(2)},${padTop + plotH} Z`
+      : ''
+
+  function handleMove(e: React.MouseEvent<SVGRectElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const relX = ((e.clientX - rect.left) / rect.width) * width
+    let nearest = 0
+    let best = Infinity
+    points.forEach((p, i) => {
+      const dist = Math.abs(p.x - relX)
+      if (dist < best) {
+        best = dist
+        nearest = i
+      }
+    })
+    setHoverIdx(nearest)
+  }
+
+  const gridLines = [0.25, 0.5, 0.75].map((f) => padTop + plotH * f)
+  const labelIdxs = n > 1 ? Array.from(new Set([0, Math.floor((n - 1) / 2), n - 1])) : [0]
+  const hp = hoverIdx !== null ? points[hoverIdx] : null
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className="text-xs font-bold text-gray-300">{label}</span>
+      </div>
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-[160px]"
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          {gridLines.map((y, i) => (
+            <line key={i} x1={padX} x2={width - padX} y1={y} y2={y} stroke="#2c2c2a" strokeWidth={1} />
+          ))}
+          <line x1={padX} x2={width - padX} y1={padTop + plotH} y2={padTop + plotH} stroke="#383835" strokeWidth={1} />
+          {areaPath && <path d={areaPath} fill={color} opacity={0.1} stroke="none" />}
+          {linePath && (
+            <path d={linePath} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          )}
+          {points.length > 0 && (
+            <circle cx={points[n - 1].x} cy={points[n - 1].y} r={4} fill={color} stroke="#1a1a19" strokeWidth={2} />
+          )}
+          {hp && (
+            <>
+              <line x1={hp.x} x2={hp.x} y1={padTop} y2={padTop + plotH} stroke="#898781" strokeWidth={1} strokeDasharray="2,2" />
+              <circle cx={hp.x} cy={hp.y} r={4} fill={color} stroke="#1a1a19" strokeWidth={2} />
+            </>
+          )}
+          {labelIdxs.map((i) => (
+            <text
+              key={i}
+              x={points[i]?.x}
+              y={height - 6}
+              fontSize={9}
+              fill="#898781"
+              textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+            >
+              {formatShortDate(points[i]?.date)}
+            </text>
+          ))}
+          <rect x={0} y={0} width={width} height={height} fill="transparent" onMouseMove={handleMove} />
+        </svg>
+        {hp && (
+          <div
+            className="absolute top-0 bg-black/80 border border-white/10 rounded-lg px-2 py-1 text-[11px] pointer-events-none whitespace-nowrap z-10"
+            style={{ left: `${(hp.x / width) * 100}%`, transform: 'translate(-50%, -110%)' }}
+          >
+            <div className="text-gray-400">{formatShortDate(hp.date)}</div>
+            <div className="text-white font-bold">{hp.value}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DeltaCard({
+  label,
+  value,
+  previousValue,
+  previousLabel,
+}: {
+  label: string
+  value: number
+  previousValue: number
+  previousLabel: string
+}) {
+  const diff = value - previousValue
+  const isUp = diff > 0
+  const isDown = diff < 0
+  const color = isUp ? '#0ca30c' : isDown ? '#e66767' : '#898781'
+  const sign = isUp ? '+' : ''
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 min-w-0">
+      <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest break-words leading-tight">{label}</p>
+      <div className="flex items-end gap-2 mt-1 flex-wrap">
+        <p className="text-xl sm:text-2xl font-extrabold text-white">{value}</p>
+        <span className="text-[11px] font-bold mb-1" style={{ color }}>
+          {sign}{diff} ({previousLabel}: {previousValue})
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNode; title: string; message: string; action?: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
@@ -178,6 +324,49 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {/* Trends */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Trendlar</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <DeltaCard
+              label="Ro'yxatdan o'tish (bugun)"
+              value={stats.trends.today.users}
+              previousValue={stats.trends.yesterday.users}
+              previousLabel="kecha"
+            />
+            <DeltaCard
+              label="Video (bugun)"
+              value={stats.trends.today.jobs}
+              previousValue={stats.trends.yesterday.jobs}
+              previousLabel="kecha"
+            />
+            <DeltaCard
+              label="Ro'yxatdan o'tish (bu oy)"
+              value={stats.trends.this_month.users}
+              previousValue={stats.trends.last_month.users}
+              previousLabel="o'tgan oy"
+            />
+            <DeltaCard
+              label="Video (bu oy)"
+              value={stats.trends.this_month.jobs}
+              previousValue={stats.trends.last_month.jobs}
+              previousLabel="o'tgan oy"
+            />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TrendChart
+              label="Ro'yxatdan o'tishlar (oxirgi 30 kun)"
+              color="#3987e5"
+              data={stats.trends.daily.map((d) => ({ date: d.date, value: d.users }))}
+            />
+            <TrendChart
+              label="Video buyurtmalar (oxirgi 30 kun)"
+              color="#199e70"
+              data={stats.trends.daily.map((d) => ({ date: d.date, value: d.jobs }))}
+            />
+          </div>
+        </section>
 
         {/* Users */}
         <section className="space-y-3">
