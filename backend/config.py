@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
 
+    # Admin panel — role='admin' bo'lsa ham, faqat shu ro'yxatdagi email
+    # kira oladi (vergul bilan ajratilgan). Bo'sh bo'lsa, faqat role tekshiriladi.
+    ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com"
+
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"

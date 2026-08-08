@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from backend.models.database import User, get_db
+from backend.config import get_settings
 
 SECRET_KEY = "ai-dubber-secret-key-2024-uzbek-platform"
 ALGORITHM = "HS256"
@@ -56,8 +57,14 @@ def get_current_user(
 def get_current_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Faqat role='admin' bo'lgan, login qilgan foydalanuvchini o'tkazadi."""
-    if current_user.role != "admin":
+    """Faqat role='admin' VA ADMIN_ALLOWED_EMAILS ro'yxatidagi hisobni
+    o'tkazadi — ikki qavatli tekshiruv, kelajakda role tasodifan boshqa
+    hisobga berilib qolsa ham, faqat ro'yxatdagi email kira oladi."""
+    settings = get_settings()
+    allowed_emails = {
+        e.strip().lower() for e in settings.ADMIN_ALLOWED_EMAILS.split(",") if e.strip()
+    }
+    if current_user.role != "admin" or (allowed_emails and current_user.email.lower() not in allowed_emails):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu bo'limga faqat administratorlar kira oladi.")
     return current_user
 
