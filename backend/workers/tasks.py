@@ -190,7 +190,7 @@ def process_video(self: Task, job_id: str) -> dict:
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             transcript = transcriber.transcribe_audio(audio_path)
-            if not transcript["segments"]:
+            if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             job.transcript_text = transcript["text"]

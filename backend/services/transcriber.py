@@ -1,3 +1,4 @@
+import re
 import subprocess
 import tempfile
 import time
@@ -13,6 +14,18 @@ settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 _CHUNK_DURATION_SECONDS = 8 * 60
 _CHUNK_BITRATE = "64k"
+
+# Whisper faqat cholg'u ohangini "♪♪" yoki "[Music]"/"(applause)" kabi
+# belgi bilan qaytarishi mumkin — bular haqiqiy nutq emas.
+_NON_SPEECH_RE = re.compile(r"[♩-♯]|\[[^\]]*\]|\([^)]*\)")
+
+
+def has_speech(segments: list[dict]) -> bool:
+    """Segmentlar orasida kamida bitta haqiqiy nutq (so'z) bor-yo'qligini tekshiradi."""
+    for seg in segments:
+        if _NON_SPEECH_RE.sub("", seg.get("text", "")).strip():
+            return True
+    return False
 
 
 def _get_client() -> OpenAI:
