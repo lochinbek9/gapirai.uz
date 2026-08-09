@@ -1,8 +1,11 @@
+import json
+import os
 import re
 import subprocess
 import tempfile
 import time
 import random
+import threading
 import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -14,6 +17,30 @@ settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 _CHUNK_DURATION_SECONDS = 8 * 60
 _CHUNK_BITRATE = "64k"
+
+# OpenAI'ning krediti tugaganda (insufficient_quota/credit_balance_exhausted)
+# qayta urinish befoyda — darhol Gemini'ga (Vertex AI orqali) o'tish uchun
+# aniqlanadi. Boshqa vaqtinchalik 429'lar odatdagidek qayta uriniladi.
+_NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
+
+_gemini_local = threading.local()
+
+
+def _get_gemini_transcribe_client():
+    if not hasattr(_gemini_local, "client"):
+        from google import genai
+
+        if settings.GEMINI_USE_VERTEX:
+            if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
+            _gemini_local.client = genai.Client(
+                vertexai=True,
+                project=settings.GCP_PROJECT_ID,
+                location=settings.GCP_LOCATION,
+            )
+        else:
+            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_local.client
 
 # Whisper faqat cholg'u ohangini "♪♪" yoki "[Music]"/"(applause)" kabi
 # belgi bilan qaytarishi mumkin — bular haqiqiy nutq emas.
@@ -103,9 +130,11 @@ def call_openai_with_retry(api_func, *args, **kwargs):
         try:
             return api_func(*args, **kwargs)
         except RateLimitError as e:
+            if any(marker in str(e) for marker in _NO_RETRY_ERROR_MARKERS):
+                raise e
             if attempt == max_attempts - 1:
                 raise e
-            
+
             retry_after = 5.0
             try:
                 if hasattr(e, "response") and e.response is not None:
@@ -156,6 +185,71 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dic
         (response_data.get("text") or "").strip(),
         response_data.get("language") or "en",
     )
+
+
+_TRANSCRIBE_PROMPT = (
+    "Transcribe this audio clip verbatim in English, exactly as spoken. "
+    "Split the transcription into short natural subtitle-style segments "
+    "(roughly one sentence or clause each). For each segment, give its "
+    "start and end time in seconds, measured from the very start of THIS "
+    "audio clip (0.0 = beginning of the clip). Silent/music-only clips "
+    "should return an empty segments list.\n\n"
+    'Respond with ONLY this JSON shape, no other text:\n'
+    '{"segments": [{"start": 0.0, "end": 2.4, "text": "..."}, ...]}'
+)
+
+
+def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
+    """OpenAI muqobili sifatida — Vertex AI orqali Gemini bilan transkripsiya.
+    Whisper'ning audio-alignment aniqligiga teng emas, lekin OpenAI krediti
+    tugagan holatlarda navbatni to'xtatib qo'ymaslik uchun yetarli."""
+    from google.genai import types
+
+    audio_bytes = chunk_path.read_bytes()
+    config = types.GenerateContentConfig(
+        temperature=0.0,
+        response_mime_type="application/json",
+    )
+    contents = [
+        types.Part.from_bytes(data=audio_bytes, mime_type="audio/mpeg"),
+        _TRANSCRIBE_PROMPT,
+    ]
+
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        try:
+            response = _get_gemini_transcribe_client().models.generate_content(
+                model=settings.GEMINI_TRANSCRIBE_MODEL,
+                contents=contents,
+                config=config,
+            )
+            result = json.loads(response.text)
+            raw_segments = result.get("segments", []) if isinstance(result, dict) else result
+
+            segments = []
+            text_parts = []
+            for seg in raw_segments or []:
+                text = (seg.get("text") or "").strip()
+                start = seg.get("start")
+                end = seg.get("end")
+                if not text or start is None or end is None:
+                    continue
+                text_parts.append(text)
+                segments.append({
+                    "start": round(float(start) + offset_seconds, 3),
+                    "end": round(float(end) + offset_seconds, 3),
+                    "text": text,
+                })
+            return segments, " ".join(text_parts), "en"
+        except Exception as e:
+            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+            is_bad_json = isinstance(e, json.JSONDecodeError)
+            if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
+                raise
+            backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
+            logger.warning(f"Gemini transkripsiya xato — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts}): {e}")
+            time.sleep(backoff)
+    return [], "", "en"
 
 
 def transcribe_audio(audio_path: str) -> dict:
@@ -212,17 +306,26 @@ def transcribe_audio(audio_path: str) -> dict:
     full_text_parts = []
     language = "en"
 
+    def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str]:
+        try:
+            return _transcribe_chunk(cpath, offset_seconds=offset)
+        except Exception as e:
+            if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
+                raise
+            logger.warning(f"OpenAI transkripsiya muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
+            return _transcribe_chunk_gemini(cpath, offset_seconds=offset)
+
     with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
         chunk_paths = _chunk_audio(audio_path, Path(temp_dir))
-        
+
         if len(chunk_paths) == 1:
             chunk_results = [
-                (0, _transcribe_chunk(chunk_paths[0], offset_seconds=0))
+                (0, _transcribe_chunk_with_fallback(chunk_paths[0], 0))
             ]
         else:
             def _process_chunk(args):
                 idx, cpath = args
-                return idx, _transcribe_chunk(cpath, offset_seconds=idx * _CHUNK_DURATION_SECONDS)
+                return idx, _transcribe_chunk_with_fallback(cpath, idx * _CHUNK_DURATION_SECONDS)
 
             with ThreadPoolExecutor(max_workers=min(len(chunk_paths), 4)) as executor:
                 chunk_results = list(executor.map(_process_chunk, enumerate(chunk_paths)))
