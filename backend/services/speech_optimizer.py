@@ -281,7 +281,7 @@ def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
     )
     try:
         response = _get_client().chat.completions.create(
-            model=settings.OPENAI_MODEL,
+            model=settings.OPENAI_LIGHT_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": instruction},

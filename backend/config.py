@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
+    # Nutq optimallashtirish (raqam/ohang moslashtirish) va jins aniqlash kabi
+    # mexanik, sifatga unchalik sezgir bo'lmagan vazifalar uchun — har bir
+    # video uchun to'liq segment hajmini qayta ishlaydi, shuning uchun
+    # OPENAI_MODEL (tarjima uchun ajratilgan, sifatga sezgir) dan alohida,
+    # ancha arzon model ishlatiladi.
+    OPENAI_LIGHT_MODEL: str = "gpt-4o-mini"
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""

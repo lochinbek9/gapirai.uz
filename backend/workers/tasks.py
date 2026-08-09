@@ -101,7 +101,7 @@ def _detect_gender(transcript_text: str) -> str:
         snippet = transcript_text[:1000]
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         resp = client.chat.completions.create(
-            model=settings.OPENAI_MODEL if settings.OPENAI_MODEL else "gpt-4o",
+            model=settings.OPENAI_LIGHT_MODEL,
             messages=[
                 {
                     "role": "system",
