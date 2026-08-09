@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     GEMINI_MALE_VOICE: str = "Charon"
     GEMINI_FEMALE_VOICE: str = "Autonoe"
 
+    # Vertex AI orqali ulanish (AI Studio'ning "preview" modellar uchun qattiq
+    # kunlik chegarasini chetlab o'tish uchun — Vertex AI daqiqalik Dynamic
+    # Shared Quota ishlatadi, kunlik qattiq devor yo'q, va kerak bo'lsa
+    # Google'dan rasman oshirtirish so'ralishi mumkin).
+    GEMINI_USE_VERTEX: bool = False
+    GCP_PROJECT_ID: str = ""
+    GCP_LOCATION: str = "us-central1"
+    GOOGLE_APPLICATION_CREDENTIALS: str = ""
+
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
     AZURE_SPEECH_REGION: str = "eastus"

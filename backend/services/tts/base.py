@@ -46,6 +46,23 @@ class TTSProvider(ABC):
         """1 000 belgi uchun taxminiy narx (USD). Default: 0."""
         return 0.0
 
+    def synthesize_batch(
+        self,
+        segments: list[dict],
+        output_dir: str,
+        voice_name: str | None = None,
+    ) -> dict[int, str]:
+        """
+        Bir nechta segmentni bitta chaqiruvda (yoki provayderga xos optimal
+        usulda) sintez qiladi — daqiqalik/kunlik so'rov-soni limitiga ega
+        provayderlar (masalan Gemini) uchun foydali. Default: qo'llab-
+        quvvatlanmaydi (bo'sh natija — chaqiruvchi oddiy bir-bir yo'lga o'tadi).
+
+        Returns: {segment_id: wav_fayl_yo'li} — faqat muvaffaqiyatli
+        sintez qilingan segmentlar uchun.
+        """
+        return {}
+
     def _is_female(self, voice_name: str | None) -> bool:
         """voice_name orqali gender aniqlash yordamchi metodi."""
         if not voice_name:

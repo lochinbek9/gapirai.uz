@@ -152,13 +152,30 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
             audio = audio[:-silence_len]
         return audio.normalize(headroom=2.0)
 
+    # Ba'zi provayderlar (masalan Gemini) bir nechta segmentni BITTA so'rovda
+    # sintez qila oladi — bu daqiqalik/kunlik so'rov-soni limitiga tegishni
+    # kamaytiradi. Oldindan tayyorlab qo'yamiz; muvaffaqiyatsiz bo'lgan
+    # segmentlar pastdagi oddiy bir-bir yo'lga avtomatik qaytadi.
+    pre_synthesized: dict[int, str] = {}
+    if not settings.FREE_MODE:
+        primary_provider = get_provider()
+        try:
+            pre_synthesized = primary_provider.synthesize_batch(segments, str(output_path), voice_name=voice_name)
+        except Exception as exc:
+            logger.warning(f"Batch sintez muvaffaqiyatsiz, oddiy usulga o'tildi: {exc}")
+        if pre_synthesized:
+            logger.info(f"Batch orqali oldindan tayyorlandi: {len(pre_synthesized)}/{len(segments)} segment")
+
     def _process_single_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
         if not text:
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
-        engine = _synthesize_text(text, str(seg_file), voice_name=voice_name)
+        if seg["id"] in pre_synthesized:
+            engine = get_provider().name
+        else:
+            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name)
         if seg_file.exists():
             audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
             return (idx, {
