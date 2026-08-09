@@ -292,7 +292,24 @@ def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
         result = json.loads(response.choices[0].message.content)
         optimized = result.get("segments") if isinstance(result, dict) else result
         if isinstance(optimized, list) and optimized and "text" in optimized[0]:
-            return optimized
+            # LLM 'id'/'start'/'end' ni tashlab qoldirishi yoki
+            # o'zgartirishi mumkin — TTS bosqichida KeyError('id') bilan
+            # butun jobni qulatmasligi uchun ular hech qachon modeldan
+            # ishonib olinmaydi, faqat 'text' olinadi.
+            if len(optimized) != len(segments):
+                logger.warning(
+                    f"LLM optimize segment soni mos kelmadi (original={len(segments)}, "
+                    f"natija={len(optimized)}) — pozitsiya bo'yicha moslashtirilmoqda."
+                )
+            reconciled = []
+            for i, orig in enumerate(segments):
+                text = orig.get("text", "")
+                if i < len(optimized) and isinstance(optimized[i], dict):
+                    candidate = optimized[i].get("text")
+                    if candidate:
+                        text = candidate
+                reconciled.append({**orig, "text": text})
+            return reconciled
     except Exception as e:
         logger.warning(f"LLM speech optimization chunk failed, falling back to rule-based output only: {e}")
     return segments

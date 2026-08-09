@@ -142,6 +142,13 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # Tarjima/optimallashtirish bosqichlaridagi LLM ba'zan 'id' maydonini
+    # tashlab qoldirishi kuzatilgan (KeyError('id') bilan butun jobni
+    # qulatgan) — shu yerda oxirgi himoya sifatida tekshiriladi.
+    for i, seg in enumerate(segments):
+        if "id" not in seg:
+            seg["id"] = i
+
     # 1. Har bir segmentni parallel ravishda sintez qilish
     def _clean_audio(audio: AudioSegment) -> AudioSegment:
         # Bosh va oxiridagi bo'sh sukunatni tozalash (audio o'z-o'zidan 200-400ms qisqaradi va aniqroq bo'ladi)

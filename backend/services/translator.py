@@ -187,6 +187,28 @@ def _extract_segments_from_result(result: dict | list, original: list[dict]) -> 
     return original
 
 
+def _reconcile_segments(original: list[dict], translated: list[dict]) -> list[dict]:
+    """LLM ba'zan 'id'/'start'/'end' maydonlarini o'zgartirib yuboradi yoki
+    butunlay tashlab qoldiradi (JSON tuzilishi cheklovi bo'lsa ham) — bu
+    keyinroq TTS bosqichida KeyError('id') bilan butun jobni qulatadi.
+    Shuning uchun id/start/end HECH QACHON modeldan ishonib olinmaydi —
+    faqat 'text' olinadi, qolgani original segmentdan tiklanadi."""
+    if len(translated) != len(original):
+        logger.warning(
+            f"Tarjima segmentlar soni mos kelmadi (original={len(original)}, "
+            f"natija={len(translated)}) — pozitsiya bo'yicha moslashtirilmoqda."
+        )
+    reconciled = []
+    for i, orig in enumerate(original):
+        text = orig.get("text", "")
+        if i < len(translated) and isinstance(translated[i], dict):
+            candidate = translated[i].get("text")
+            if candidate:
+                text = candidate
+        reconciled.append({**orig, "text": text})
+    return reconciled
+
+
 def _get_client() -> OpenAI:
     if not client:
         raise RuntimeError("OPENAI_API_KEY not set")
@@ -249,7 +271,7 @@ def _translate_chunk_openai(segments: list[dict], clean_segments: list[dict]) ->
 
     content = response.choices[0].message.content
     result = json.loads(content)
-    return _extract_segments_from_result(result, segments)
+    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
 
 
 def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
@@ -278,7 +300,7 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
                 config=config,
             )
             result = json.loads(response.text)
-            return _extract_segments_from_result(result, segments)
+            return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
         except Exception as e:
             is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
             is_bad_json = isinstance(e, json.JSONDecodeError)
