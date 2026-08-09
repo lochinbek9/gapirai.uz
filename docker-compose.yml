@@ -59,6 +59,7 @@ services:
       - ./outputs:/app/outputs
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
+      - ${HOME}/.secrets/gapirai:/app/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,6 +89,7 @@ services:
       - ./outputs:/app/outputs
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
+      - ${HOME}/.secrets/gapirai:/app/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy
