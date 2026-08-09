@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash"
+
+    # Tarjima provayderi: "openai" | "gemini"
+    TRANSLATE_PROVIDER: str = "openai"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""

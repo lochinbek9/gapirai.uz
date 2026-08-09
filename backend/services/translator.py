@@ -12,6 +12,18 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 
+_gemini_client = None
+
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        if not settings.GEMINI_API_KEY:
+            raise RuntimeError("GEMINI_API_KEY not set")
+        from google import genai
+        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_client
+
 
 def translate_free_google(text: str, target_lang: str = "uz") -> str:
     url = "https://translate.googleapis.com/translate_a/single"
@@ -185,14 +197,9 @@ def call_openai_with_retry(api_func, *args, **kwargs):
             time.sleep(sleep_time)
 
 
-def _translate_chunk(segments: list[dict]) -> list[dict]:
-    """Bir bo'lak segmentlarni tarjima qilish."""
-    clean_segments = [
-        {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
-    ]
+def _build_instruction(clean_segments: list[dict]) -> str:
     user_message = json.dumps(clean_segments, ensure_ascii=True, indent=2)
-
-    instruction = (
+    return (
         "Quyidagi segmentlarni O'ZBEK TILIGA tarjima qiling.\n"
         "MUHIM: faqat 'text' maydonini tarjima qiling.\n"
         "id, start, end — o'zgartirmang.\n"
@@ -200,6 +207,10 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
         '{"segments": [{"id": ..., "start": ..., "end": ..., "text": "O\'ZBEKCHA TARJIMA"}, ...]}\n\n'
         f"{user_message}"
     )
+
+
+def _translate_chunk_openai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    instruction = _build_instruction(clean_segments)
 
     response = call_openai_with_retry(
         _get_client().chat.completions.create,
@@ -215,6 +226,51 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
     content = response.choices[0].message.content
     result = json.loads(content)
     return _extract_segments_from_result(result, segments)
+
+
+def call_gemini_with_retry(api_func, *args, **kwargs):
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        try:
+            return api_func(*args, **kwargs)
+        except Exception as e:
+            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+            if attempt == max_attempts - 1 or not is_rate_limit:
+                raise
+            backoff = (2 ** attempt) + random.uniform(0.1, 1.0)
+            logger.warning(f"Gemini RateLimit hit. Qayta urinish {backoff:.2f} soniyadan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
+            time.sleep(backoff)
+
+
+def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    from google.genai import types
+
+    instruction = _build_instruction(clean_segments)
+
+    response = call_gemini_with_retry(
+        _get_gemini_client().models.generate_content,
+        model=settings.GEMINI_MODEL,
+        contents=instruction,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.45,
+            response_mime_type="application/json",
+        ),
+    )
+
+    result = json.loads(response.text)
+    return _extract_segments_from_result(result, segments)
+
+
+def _translate_chunk(segments: list[dict]) -> list[dict]:
+    """Bir bo'lak segmentlarni tarjima qilish — TRANSLATE_PROVIDER ga qarab."""
+    clean_segments = [
+        {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
+    ]
+
+    if settings.TRANSLATE_PROVIDER == "gemini":
+        return _translate_chunk_gemini(segments, clean_segments)
+    return _translate_chunk_openai(segments, clean_segments)
 
 
 def translate_full_text(text: str) -> str:
