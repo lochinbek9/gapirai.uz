@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Tarjima provayderi: "openai" | "gemini"
     TRANSLATE_PROVIDER: str = "openai"
 
+    # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
+    GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
+    GEMINI_MALE_VOICE: str = "Charon"
+    GEMINI_FEMALE_VOICE: str = "Autonoe"
+
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
     AZURE_SPEECH_REGION: str = "eastus"
@@ -52,7 +57,7 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "./outputs"
 
     # TTS Provider abstraction
-    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai"
+    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini"
     TTS_PROVIDER: str = "edge"
 
     # ElevenLabs TTS

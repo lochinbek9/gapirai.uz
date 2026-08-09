@@ -33,12 +33,14 @@ def _load_registry() -> dict[str, type]:
     from backend.services.tts.azure_provider import AzureProvider
     from backend.services.tts.edge_provider import EdgeProvider
     from backend.services.tts.openai_provider import OpenAIProvider
+    from backend.services.tts.gemini_provider import GeminiProvider
 
     _REGISTRY = {
         "elevenlabs": ElevenLabsProvider,
         "azure":      AzureProvider,
         "edge":       EdgeProvider,
         "openai":     OpenAIProvider,
+        "gemini":     GeminiProvider,
     }
     return _REGISTRY
 
@@ -48,7 +50,7 @@ def get_provider(name: str | None = None) -> "TTSProvider":
     TTS provider instansini qaytaradi.
 
     Args:
-        name: "elevenlabs" | "azure" | "edge" | "openai" | None
+        name: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | None
               None bo'lsa settings.TTS_PROVIDER ishlatiladi.
     """
     registry = _load_registry()
