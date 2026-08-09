@@ -231,38 +231,42 @@ def _translate_chunk_openai(segments: list[dict], clean_segments: list[dict]) ->
     return _extract_segments_from_result(result, segments)
 
 
-def call_gemini_with_retry(api_func, *args, **kwargs):
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            return api_func(*args, **kwargs)
-        except Exception as e:
-            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
-            if attempt == max_attempts - 1 or not is_rate_limit:
-                raise
-            backoff = (2 ** attempt) + random.uniform(0.1, 1.0)
-            logger.warning(f"Gemini RateLimit hit. Qayta urinish {backoff:.2f} soniyadan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
-            time.sleep(backoff)
-
-
 def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """
+    Gemini ba'zan finish_reason=STOP deb hisoblasa ham, JSON'ni yakuniy
+    yopuvchi qavssiz uzib qo'yadi (model tomonidagi xatti-harakat, token
+    limitiga tegishli emas) — bu taxminan har 3 urinishdan 1 tasida
+    uchraydi. Shuning uchun JSON parse xatosi ham rate-limit kabi qayta
+    urinishga sabab bo'ladi — API chaqiruvining o'zi emas.
+    """
     from google.genai import types
 
     instruction = _build_instruction(clean_segments)
-
-    response = call_gemini_with_retry(
-        _get_gemini_client().models.generate_content,
-        model=settings.GEMINI_MODEL,
-        contents=instruction,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            temperature=0.45,
-            response_mime_type="application/json",
-        ),
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        temperature=0.45,
+        response_mime_type="application/json",
     )
 
-    result = json.loads(response.text)
-    return _extract_segments_from_result(result, segments)
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        try:
+            response = _get_gemini_client().models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=instruction,
+                config=config,
+            )
+            result = json.loads(response.text)
+            return _extract_segments_from_result(result, segments)
+        except Exception as e:
+            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+            is_bad_json = isinstance(e, json.JSONDecodeError)
+            if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
+                raise
+            backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
+            reason = "RateLimit" if is_rate_limit else "noto'g'ri/kesilgan JSON"
+            logger.warning(f"Gemini {reason} — qayta urinish {backoff:.2f}s dan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
+            time.sleep(backoff)
 
 
 def _translate_chunk(segments: list[dict]) -> list[dict]:
