@@ -3,6 +3,7 @@ import re
 import time
 import random
 import logging
+import threading
 import httpx
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI, RateLimitError
@@ -12,17 +13,19 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 
-_gemini_client = None
+# google-genai'ning Client'i parallel oqimlar orasida ulashilganda javoblar
+# aralashib, JSON kesilib qolishiga sabab bo'ladi (thread-safe emas) —
+# shuning uchun har bir thread o'zining alohida clientiga ega bo'ladi.
+_gemini_local = threading.local()
 
 
 def _get_gemini_client():
-    global _gemini_client
-    if _gemini_client is None:
-        if not settings.GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY not set")
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY not set")
+    if not hasattr(_gemini_local, "client"):
         from google import genai
-        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    return _gemini_client
+        _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_local.client
 
 
 def translate_free_google(text: str, target_lang: str = "uz") -> str:
