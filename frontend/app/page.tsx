@@ -84,6 +84,26 @@ function Logo() {
   );
 }
 
+/* ── Update Notice Banner (hero'da slayd bo'lib chiqadi) ── */
+function UpdateNoticeBanner() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+      className="w-full flex justify-center mb-4 sm:mb-6 px-2"
+    >
+      <div className="relative overflow-hidden flex items-center gap-2.5 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl bg-amber-500/10 dark:bg-amber-500/10 border border-amber-500/30 backdrop-blur-md shadow-sm max-w-xl">
+        <span className="absolute inset-0 -translate-x-full animate-[shimmer_3s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-amber-400/20 to-transparent" />
+        <span className="relative w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+        <p className="relative text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-400 leading-snug">
+          Hozirda platformada yangilanishlar ketyapti. Noqulayliklar uchun uzr so'raymiz.
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
 /* ── Welcome Modal (birinchi tashrif) ─────────────── */
 function WelcomeModal({ onClose }: { onClose: () => void }) {
   return (
@@ -348,6 +368,7 @@ export default function Home() {
       </header>
 
       <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
+        <UpdateNoticeBanner />
         <Logo />
 
         <motion.div
