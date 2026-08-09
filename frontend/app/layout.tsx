@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import PlatformFeedbackWidget from "@/components/PlatformFeedbackWidget";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -148,6 +149,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <PlatformFeedbackWidget />
         <Script id="yandex-metrika" strategy="afterInteractive">
           {`
             (function(m,e,t,r,i,k,a){

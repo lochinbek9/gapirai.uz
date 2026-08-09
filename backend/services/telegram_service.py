@@ -82,3 +82,49 @@ def send_telegram_feedback(
     except Exception as exc:
         logger.error(f"Failed to send Telegram notification: {exc}")
     return False
+
+
+def send_telegram_platform_feedback(
+    message: str,
+    rating: int | None = None,
+    user_email: str | None = None,
+) -> bool:
+    """
+    Saytga umumiy (biror videoga bog'liq bo'lmagan) fikr-mulohaza — istalgan
+    tashrif buyuruvchi qoldirishi mumkin bo'lgan "Platforma haqida fikringiz"
+    formasi orqali kelgan xabarni Telegram guruh/kanal/admin chatiga yuboradi.
+    """
+    token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "")
+    target_chat = settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "")
+
+    if not token or not target_chat:
+        logger.warning("TELEGRAM_BOT_TOKEN yoki TELEGRAM_CHAT_ID sozlanmagan — platforma fikri yuborilmadi.")
+        return False
+
+    rating_line = f"⭐ <b>Baho</b>: {'⭐' * rating} ({rating} / 5)\n" if rating else ""
+    user_line = f"👤 <b>Foydalanuvchi</b>: {user_email}\n" if user_email else "👤 <b>Foydalanuvchi</b>: Anonim\n"
+
+    text = (
+        f"💬 <b>PLATFORMA HAQIDA FIKR (GapirAI.uz)</b> 💬\n\n"
+        f"{rating_line}"
+        f"{user_line}"
+        f"📝 <b>Xabar</b>: \"{message.strip()}\""
+    )
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": target_chat,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        res = httpx.post(url, json=payload, timeout=10.0)
+        if res.status_code == 200:
+            logger.info("Telegram platform feedback notification sent")
+            return True
+        logger.warning(f"Telegram API response {res.status_code}: {res.text}")
+    except Exception as exc:
+        logger.error(f"Failed to send Telegram platform feedback notification: {exc}")
+    return False

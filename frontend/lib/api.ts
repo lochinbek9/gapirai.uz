@@ -157,3 +157,11 @@ export async function submitFeedback(
   const res = await apiClient.post(`/api/jobs/${jobId}/feedback`, { rating, comment, ...extra })
   return res.data
 }
+
+export async function submitPlatformFeedback(
+  message: string,
+  rating?: number
+): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post(`/api/platform-feedback`, { message, rating })
+  return res.data
+}

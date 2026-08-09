@@ -343,6 +343,35 @@ async def cancel_job(
     return {"success": True, "message": "Dublyaj bekor qilindi."}
 
 
+class PlatformFeedbackRequest(BaseModel):
+    message: str
+    rating: Optional[int] = None
+
+
+@router.post("/platform-feedback", dependencies=[Depends(rate_limit("platform_feedback", 10, 600))])
+async def submit_platform_feedback(
+    req: PlatformFeedbackRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Fikr matni bo'sh bo'lmasligi kerak.")
+    if req.rating is not None and (req.rating < 1 or req.rating > 5):
+        raise HTTPException(status_code=400, detail="Baho 1 va 5 orasida bo'lishi kerak.")
+
+    try:
+        from backend.services.telegram_service import send_telegram_platform_feedback
+        send_telegram_platform_feedback(
+            message=message,
+            rating=req.rating,
+            user_email=current_user.email if current_user else None,
+        )
+    except Exception:
+        pass
+
+    return {"success": True, "message": "Fikringiz uchun rahmat!"}
+
+
 class FeedbackRequest(BaseModel):
     rating: int  # 1 to 5
     comment: Optional[str] = None
