@@ -311,10 +311,18 @@ export default function Home() {
 
       <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         {/* Left Logo */}
-        <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
-          <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
-        </Link>
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
+          <Link href="/" className="flex items-center transition duration-300 hover:scale-105">
+            <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
+          </Link>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 backdrop-blur-md shadow-sm shrink-0">
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[9px] sm:text-[11px] font-black text-amber-600 dark:text-amber-400 tracking-wider uppercase whitespace-nowrap">
+              Test rejimi
+            </span>
+          </span>
+        </div>
 
         {/* Right Controls */}
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
