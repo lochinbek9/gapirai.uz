@@ -49,10 +49,11 @@ class Settings(BaseSettings):
     GCP_LOCATION: str = "us-central1"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
-    # OpenAI Whisper krediti tugagan holatda transkripsiya uchun zaxira
-    # (faqat Vertex AI orqali — GEMINI_MODEL'dan alohida, chunki u AI Studio
-    # katalogiga mo'ljallangan va Vertex'da mavjud bo'lmasligi mumkin).
-    GEMINI_TRANSCRIBE_MODEL: str = "gemini-2.5-flash"
+    # OpenAI (Whisper/GPT) krediti tugagan holatda transkripsiya va tarjima
+    # uchun Vertex AI zaxirasi ishlatadigan matn modeli — GEMINI_MODEL'dan
+    # alohida, chunki u AI Studio katalogiga mo'ljallangan va Vertex'da
+    # mavjud bo'lmasligi mumkin (masalan "gemini-3.5-flash" Vertex'da 404).
+    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-2.5-flash"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""

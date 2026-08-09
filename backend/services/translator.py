@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 import random
@@ -13,6 +14,10 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 
+# OpenAI'ning krediti tugaganda qayta urinish befoyda — darhol Gemini'ga
+# o'tish uchun aniqlanadi (translate_segments()'dagi avtomatik fallback).
+_NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
+
 # google-genai'ning Client'i parallel oqimlar orasida ulashilganda javoblar
 # aralashib, JSON kesilib qolishiga sabab bo'ladi (thread-safe emas) —
 # shuning uchun har bir thread o'zining alohida clientiga ega bo'ladi.
@@ -20,12 +25,26 @@ _gemini_local = threading.local()
 
 
 def _get_gemini_client():
-    if not settings.GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY not set")
     if not hasattr(_gemini_local, "client"):
         from google import genai
-        _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+        if settings.GEMINI_USE_VERTEX:
+            if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
+            _gemini_local.client = genai.Client(
+                vertexai=True,
+                project=settings.GCP_PROJECT_ID,
+                location=settings.GCP_LOCATION,
+            )
+        elif settings.GEMINI_API_KEY:
+            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        else:
+            raise RuntimeError("GEMINI_API_KEY yoki GEMINI_USE_VERTEX sozlanmagan")
     return _gemini_local.client
+
+
+def _gemini_text_model() -> str:
+    return settings.GEMINI_VERTEX_TEXT_MODEL if settings.GEMINI_USE_VERTEX else settings.GEMINI_MODEL
 
 
 def translate_free_google(text: str, target_lang: str = "uz") -> str:
@@ -180,9 +199,11 @@ def call_openai_with_retry(api_func, *args, **kwargs):
         try:
             return api_func(*args, **kwargs)
         except RateLimitError as e:
+            if any(marker in str(e) for marker in _NO_RETRY_ERROR_MARKERS):
+                raise e
             if attempt == max_attempts - 1:
                 raise e
-            
+
             retry_after = 5.0
             try:
                 if hasattr(e, "response") and e.response is not None:
@@ -252,7 +273,7 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
     for attempt in range(max_attempts):
         try:
             response = _get_gemini_client().models.generate_content(
-                model=settings.GEMINI_MODEL,
+                model=_gemini_text_model(),
                 contents=instruction,
                 config=config,
             )
@@ -270,14 +291,26 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
 
 
 def _translate_chunk(segments: list[dict]) -> list[dict]:
-    """Bir bo'lak segmentlarni tarjima qilish — TRANSLATE_PROVIDER ga qarab."""
+    """Bir bo'lak segmentlarni tarjima qilish — TRANSLATE_PROVIDER ga qarab.
+
+    TRANSLATE_PROVIDER="openai" bo'lsa ham, OpenAI muvaffaqiyatsiz bo'lsa
+    (masalan krediti tugasa) Gemini'ga avtomatik o'tadi — aks holda butun
+    video navbatda qotib qoladi (2026-08-09 OpenAI krediti tugash hodisasi
+    sabab qo'shildi)."""
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
 
     if settings.TRANSLATE_PROVIDER == "gemini":
         return _translate_chunk_gemini(segments, clean_segments)
-    return _translate_chunk_openai(segments, clean_segments)
+
+    try:
+        return _translate_chunk_openai(segments, clean_segments)
+    except Exception as e:
+        if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
+            raise
+        logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
+        return _translate_chunk_gemini(segments, clean_segments)
 
 
 def translate_full_text(text: str) -> str:

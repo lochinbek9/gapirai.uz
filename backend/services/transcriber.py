@@ -219,7 +219,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[l
     for attempt in range(max_attempts):
         try:
             response = _get_gemini_transcribe_client().models.generate_content(
-                model=settings.GEMINI_TRANSCRIBE_MODEL,
+                model=settings.GEMINI_VERTEX_TEXT_MODEL,
                 contents=contents,
                 config=config,
             )
