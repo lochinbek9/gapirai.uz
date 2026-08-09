@@ -15,7 +15,7 @@ const TEST_PRICE_MULTIPLIER = 1.0
 
 function calculateClientPrice(durationMinutes: number): number {
   if (durationMinutes < 60.0) return 0
-  return Math.ceil((Math.ceil(durationMinutes) * 1000) / 60)
+  return Math.ceil(durationMinutes) * 1000
 }
 
 function formatRemainingTime(seconds: number): string {
