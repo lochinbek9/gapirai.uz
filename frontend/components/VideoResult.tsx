@@ -2,22 +2,19 @@
 
 import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Job, getDownloadUrl, formatDuration } from "@/lib/api";
+import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
 import { useState, useEffect } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
-import { getApiUrl } from "@/lib/runtime-config";
 
 interface Props {
   job: Job;
   onReset: () => void;
 }
 
-const API_BASE = getApiUrl();
-
 export default function VideoResult({ job, onReset }: Props) {
   const [showText, setShowText] = useState(false);
   const [copied, setCopied] = useState(false);
-  const videoUrl = `${API_BASE}${job.output_video_url}`;
+  const videoUrl = getVideoUrl(job.job_id);
   const downloadUrl = getDownloadUrl(job.job_id);
 
   useEffect(() => {
