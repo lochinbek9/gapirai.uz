@@ -295,15 +295,25 @@ def process_video(self: Task, job_id: str) -> dict:
             db.commit()
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "ok")
 
-        # Upload files to S3 if configured
+        # Upload files to S3 if configured — muvaffaqiyatli yuklangandan
+        # so'ng lokal nusxa DARHOL o'chiriladi (S3 endi doimiy manba,
+        # disk cheklangan va cheksiz to'planib qolmasligi kerak).
         try:
             from backend.services.storage import upload_file_to_s3
             s3_audio_key = f"dubber/{job_id}/dubbed_audio.wav"
             s3_video_key = f"dubber/{job_id}/dubbed_final.mp4"
             logger.info(f"Uploading output files for job {job_id} to S3...")
 
-            upload_file_to_s3(dubbed_audio_path, s3_audio_key)
-            upload_file_to_s3(final_output, s3_video_key)
+            if upload_file_to_s3(dubbed_audio_path, s3_audio_key):
+                try:
+                    os.remove(dubbed_audio_path)
+                except Exception:
+                    pass
+            if upload_file_to_s3(final_output, s3_video_key):
+                try:
+                    os.remove(final_output)
+                except Exception:
+                    pass
         except Exception as s3_err:
             logger.error(f"S3 upload failed for job {job_id}: {s3_err}")
 
