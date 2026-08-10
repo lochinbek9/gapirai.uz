@@ -99,7 +99,7 @@ export default function Footer() {
                 <Youtube className="w-4 h-4" />
               </a>
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/gapirai_uz/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
