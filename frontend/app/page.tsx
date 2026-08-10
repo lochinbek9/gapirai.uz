@@ -8,6 +8,7 @@ import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
+import AnalysisUrlForm from "@/components/AnalysisUrlForm";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -191,6 +192,7 @@ export default function Home() {
   const [voiceGender, setVoiceGender] = useState("auto");
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [mode, setMode] = useState<"dub" | "analyze">("dub");
   const startRef = useRef<number | null>(null);
 
   const handleCancel = async () => {
@@ -381,16 +383,45 @@ export default function Home() {
           <AnimatePresence mode="wait">
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <UrlInput
-                  url={url}
-                  videoInfo={videoInfo}
-                  loading={loading}
-                  error={error}
-                  voiceGender={voiceGender}
-                  onChange={handleUrlChange}
-                  onGenderChange={setVoiceGender}
-                  onSubmit={handleSubmit}
-                />
+                <div className="flex gap-2 p-1 mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setMode("dub")}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                      mode === "dub"
+                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    Dublyaj qilish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("analyze")}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                      mode === "analyze"
+                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    Video tahlil qilish
+                  </button>
+                </div>
+
+                {mode === "dub" ? (
+                  <UrlInput
+                    url={url}
+                    videoInfo={videoInfo}
+                    loading={loading}
+                    error={error}
+                    voiceGender={voiceGender}
+                    onChange={handleUrlChange}
+                    onGenderChange={setVoiceGender}
+                    onSubmit={handleSubmit}
+                  />
+                ) : (
+                  <AnalysisUrlForm />
+                )}
               </motion.div>
             )}
 

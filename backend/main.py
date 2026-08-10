@@ -11,6 +11,7 @@ from backend.api.routes import router
 from backend.api.auth_routes import router as auth_router
 from backend.api.click_routes import router as click_router
 from backend.api.admin_routes import router as admin_router
+from backend.api.video_analysis_routes import router as video_analysis_router
 
 settings = get_settings()
 
@@ -43,6 +44,32 @@ def recover_stuck_jobs():
         db.close()
 
 
+def recover_stuck_analyses():
+    from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
+    from backend.workers.analysis_tasks import analyze_video_task
+    db = SessionLocal()
+    try:
+        active_statuses = [
+            AnalysisStatus.PENDING,
+            AnalysisStatus.DOWNLOADING,
+            AnalysisStatus.EXTRACTING_AUDIO,
+            AnalysisStatus.TRANSCRIBING,
+            AnalysisStatus.ANALYZING,
+            AnalysisStatus.GENERATING_RESULTS,
+        ]
+        stuck = db.query(VideoAnalysis).filter(VideoAnalysis.status.in_(active_statuses)).all()
+        for analysis in stuck:
+            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} with status {analysis.status}")
+            analysis.status = AnalysisStatus.PENDING
+            analysis.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
+            db.commit()
+            analyze_video_task.apply_async(args=[str(analysis.id)], task_id=str(analysis.id))
+    except Exception as e:
+        print(f"[RECOVERY ERROR] Error during analysis recovery: {e}")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -60,6 +87,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP ERROR] Could not clear Redis locks: {e}")
 
     recover_stuck_jobs()
+    recover_stuck_analyses()
     yield
     # Shutdown (agar kerak bo'lsa)
 
@@ -98,6 +126,7 @@ app.include_router(auth_router)
 app.include_router(router)
 app.include_router(click_router)
 app.include_router(admin_router)
+app.include_router(video_analysis_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")

@@ -169,3 +169,149 @@ export async function submitPlatformFeedback(
   const res = await apiClient.post(`/api/platform-feedback`, { message, rating })
   return res.data
 }
+
+/* ── Video Analysis ────────────────────────────────────────── */
+
+export type AnalysisStatus =
+  | 'pending'
+  | 'downloading'
+  | 'extracting_audio'
+  | 'transcribing'
+  | 'analyzing'
+  | 'generating_results'
+  | 'completed'
+  | 'failed'
+
+export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
+  pending: 'Navbatda',
+  downloading: 'Yuklanmoqda',
+  extracting_audio: 'Audio ajratilmoqda',
+  transcribing: 'Matnga aylantirilmoqda',
+  analyzing: 'AI tahlil qilinmoqda',
+  generating_results: 'Natijalar tayyorlanmoqda',
+  completed: 'Tayyor',
+  failed: 'Xatolik',
+}
+
+export interface TranscriptSegment {
+  start: number
+  end: number
+  text: string
+}
+
+export interface KeyPoint {
+  title: string
+  description: string
+  timestamp: number
+}
+
+export interface Chapter {
+  title: string
+  start: number
+  end: number
+}
+
+export interface QuizQuestion {
+  question: string
+  options: string[]
+  correct_answer: number
+  explanation: string
+  timestamp: number
+}
+
+export interface QAEntry {
+  question: string
+  answer: string
+  timestamps: number[]
+  asked_at: string
+}
+
+export interface VideoAnalysisSummary {
+  short: string
+  medium: string
+  detailed: string
+}
+
+export interface VideoAnalysis {
+  id: string
+  status: AnalysisStatus
+  progress: number
+  status_message?: string
+  youtube_url: string
+  video_title?: string
+  video_duration?: number
+  video_thumbnail?: string
+  language: string
+  summary?: VideoAnalysisSummary
+  key_points?: KeyPoint[]
+  chapters?: Chapter[]
+  notes?: string
+  quiz?: QuizQuestion[]
+  qa_history: QAEntry[]
+  error_message?: string
+  error_code?: string
+  created_at?: string
+}
+
+export async function createAnalysis(youtube_url: string, language: string = 'uz'): Promise<{ analysis_id: string; status: string }> {
+  const res = await apiClient.post('/api/video-analysis', { youtube_url, language })
+  return res.data
+}
+
+export async function getAnalysis(analysisId: string): Promise<VideoAnalysis> {
+  const res = await apiClient.get(`/api/video-analysis/${analysisId}`)
+  return res.data
+}
+
+export async function getTranscript(analysisId: string): Promise<{ segments: TranscriptSegment[] }> {
+  const res = await apiClient.get(`/api/video-analysis/${analysisId}/transcript`)
+  return res.data
+}
+
+export async function askQuestion(analysisId: string, question: string): Promise<QAEntry> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/question`, { question })
+  return res.data
+}
+
+export async function generateQuiz(analysisId: string): Promise<{ quiz: QuizQuestion[] }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/quiz`)
+  return res.data
+}
+
+export async function generateNotes(analysisId: string): Promise<{ notes: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes`)
+  return res.data
+}
+
+export async function searchTranscript(analysisId: string, query: string): Promise<{ results: TranscriptSegment[] }> {
+  const res = await apiClient.get(`/api/video-analysis/${analysisId}/search`, { params: { q: query } })
+  return res.data
+}
+
+const ANALYSIS_KEY = "dubber_last_analysis"
+
+export function saveAnalysisId(id: string) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(ANALYSIS_KEY, JSON.stringify({ id, ts: Date.now() }))
+}
+
+export function loadAnalysisId(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = localStorage.getItem(ANALYSIS_KEY)
+    if (!raw) return null
+    const { id, ts } = JSON.parse(raw)
+    if (Date.now() - ts > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(ANALYSIS_KEY)
+      return null
+    }
+    return id ?? null
+  } catch {
+    return null
+  }
+}
+
+export function clearAnalysisId() {
+  if (typeof window === "undefined") return
+  localStorage.removeItem(ANALYSIS_KEY)
+}

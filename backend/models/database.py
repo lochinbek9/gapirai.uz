@@ -93,6 +93,58 @@ class DubbingJob(Base):
     user = relationship("User", back_populates="jobs")
 
 
+class AnalysisStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    DOWNLOADING = "DOWNLOADING"
+    EXTRACTING_AUDIO = "EXTRACTING_AUDIO"
+    TRANSCRIBING = "TRANSCRIBING"
+    ANALYZING = "ANALYZING"
+    GENERATING_RESULTS = "GENERATING_RESULTS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class VideoAnalysis(Base):
+    """YouTube video -> transcript/summary/chapters/key-points/notes/quiz/Q&A.
+
+    Bir marta transkripsiya va bazaviy tahlil qilinadi (transcript_segments,
+    key_points, chapters); notes/quiz esa so'ralganda "lazy" generatsiya
+    qilinib shu yerga keshlanadi — har safar qayta hisoblanmaydi
+    (backend/api/video_analysis_routes.py).
+    """
+    __tablename__ = "video_analyses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    youtube_url = Column(String(500), nullable=False)
+    video_title = Column(String(500))
+    video_duration = Column(Float)
+    video_thumbnail = Column(String(500))
+    language = Column(String(10), default="uz")
+
+    status = Column(Enum(AnalysisStatus, values_callable=lambda obj: [e.value for e in obj]), default=AnalysisStatus.PENDING, nullable=False)
+    progress = Column(Float, default=0.0)
+    status_message = Column(String(255))
+
+    # [{"start": float, "end": float, "text": str}, ...] — transcriber.py bilan bir xil shakl
+    transcript_segments = Column(JSONB, nullable=True)
+
+    summary = Column(JSONB, nullable=True)        # {"short": str, "medium": str, "detailed": str}
+    key_points = Column(JSONB, nullable=True)      # [{"title","description","timestamp"}]
+    chapters = Column(JSONB, nullable=True)        # [{"title","start","end"}]
+    notes = Column(Text, nullable=True)
+    quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
+    qa_history = Column(JSONB, default=list)       # [{"question","answer","timestamps","asked_at"}]
+
+    error_message = Column(Text, nullable=True)
+    error_code = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+
 class PronunciationMemory(Base):
     """
     O'rganilgan talaffuz tuzatishlari: term -> Azure/Edge TTS uchun og'zaki shakl.

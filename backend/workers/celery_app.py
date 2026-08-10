@@ -7,7 +7,7 @@ celery_app = Celery(
     "ai_dubber",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["backend.workers.tasks"],
+    include=["backend.workers.tasks", "backend.workers.analysis_tasks"],
 )
 
 celery_app.conf.update(
@@ -26,6 +26,10 @@ celery_app.conf.update(
         "backend.workers.tasks.process_video": {
             "queue": "video_processing",
             "rate_limit": "1/m",  # max 1 YouTube download per minute per worker
+        },
+        "backend.workers.analysis_tasks.analyze_video_task": {
+            "queue": "video_processing",  # dublyaj bilan bir xil worker havzasi/navbat
+            "rate_limit": "1/m",
         },
     },
 )
