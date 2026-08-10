@@ -108,7 +108,11 @@ export function getDownloadUrl(jobId: string): string {
 }
 
 export function getVideoUrl(jobId: string): string {
-  return `${API_URL}/outputs/${jobId}/dubbed_final.mp4`
+  // /api/outputs/{id}/video (routes.py) S3'da bo'lsa presigned URL'ga
+  // yo'naltiradi, mavjud bo'lmasa lokal faylga tushadi — statik
+  // /outputs/{id}/... mount'idan farqli, S3'ga yuklangandan keyin lokal
+  // nusxa o'chirilgan videolar uchun ham ishlaydi.
+  return `${API_URL}/api/outputs/${jobId}/video`
 }
 
 export function getAudioUrl(jobId: string): string {
