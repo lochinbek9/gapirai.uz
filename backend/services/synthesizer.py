@@ -17,23 +17,25 @@ settings = get_settings()
 _FRAME_RATE = 24000
 
 # ─────────────────────────────────────────────────────────────
-# Segmentlarni TABIIY nutq uchun qayta guruhlash
+# Segmentlarni TABIIY gapga qayta guruhlash
 # ─────────────────────────────────────────────────────────────
-# Subtitr/Whisper segmentlari INGLIZCHA nutqdagi pauzalarga qarab
-# kesilgan — bitta tugal o'zbekcha gap ko'pincha 2-3 bo'lakka bo'linib
-# qoladi. Har birini ALOHIDA TTS chaqiruviga yuborish har bir bo'lakni
-# mustaqil, kesik-kesik ("robot") ovozda o'qitadi. Shu yerda tugal
-# fikr hosil bo'lguncha (gap oxirigacha tinish belgisi chiqquncha)
-# ketma-ket segmentlar BITTA TTS birligiga birlashtiriladi — subtitr
-# vaqtlanishiga tegmasdan (bu funksiya faqat TTS kirishini o'zgartiradi,
-# translated_segments/uzbek_srt_content bundan oldin allaqachon saqlangan).
+# Whisper segmentlari nutqdagi PAUZALARGA qarab kesilgan, grammatik gap
+# chegarasiga emas — bitta tugal fikr ko'pincha 2-3 bo'lakka bo'linib
+# qoladi. Bu esa faqat TTS'da emas, ANDOZA (tarjima, nutq optimallash)
+# bosqichlarida ham muammo: LLM har bir bo'lakni ALOHIDA qayta yozadi va
+# ko'pincha oxiriga soxta nuqta qo'shib, uni "tugal gap"dek ko'rsatadi
+# (masalan "Bugun." / "Qanday qilib u.") — bu keyingi bosqichlarni ham
+# aldab qo'yadi. Shuning uchun bu funksiya TARJIMADAN OLDIN, xom
+# transkripsiya ustida ishlatiladi (tasks.py) — TTS bosqichida yana
+# xavfsizlik to'ri sifatida qayta chaqiriladi (nutq optimallash o'zi
+# ham uzun gaplarni qayta bo'lib qo'yishi mumkin).
 _GROUP_MAX_GAP_S = 0.6
 _GROUP_MAX_WORDS = 30
 _GROUP_MAX_SPAN_S = 12.0
 _SENTENCE_END_RE = re.compile(r"[.!?…]\s*$")
 
 
-def _group_segments_for_natural_tts(segments: list[dict]) -> list[dict]:
+def group_segments_into_sentences(segments: list[dict]) -> list[dict]:
     groups: list[dict] = []
     current: dict | None = None
 
@@ -202,7 +204,7 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
         if "id" not in seg:
             seg["id"] = i
 
-    segments = _group_segments_for_natural_tts(segments)
+    segments = group_segments_into_sentences(segments)
 
     # 1. Har bir segmentni parallel ravishda sintez qilish
     def _clean_audio(audio: AudioSegment) -> AudioSegment:
@@ -293,11 +295,18 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
                         except Exception:
                             pass
 
-    # 2. Aniq vaqtga sinxronlash (Strict Timestamp Synchronization)
-    # HECH QACHON keyingi segment vaqti surilmaydi — barcha segmentlar o'z vaqtida (lip-sync) chiqadi!
+    # 2. Vaqtga moslashtirish — AUDIO HECH QACHON O'RTADAN KESILMAYDI.
+    # Avval mo''tadil tezlashtiramiz (max 1.45x); shundan keyin ham audio
+    # o'ziga ajratilgan vaqt oralig'idan uzun bo'lsa, KEYINGI segment
+    # boshlanishi shunga mos kechiktiriladi — gap hech qachon so'zning
+    # yarmida kesilib qolmaydi (oldingi versiyada fade-out bilan qirqib
+    # tashlangan, bu "gap oxirigacha aytilmayapti" muammosining asosiy
+    # sababi edi).
+    prev_end_ms = 0
     for i in range(len(seg_data)):
         cur = seg_data[i]
-        start_ms = cur["start_ms"]
+        original_start_ms = cur["start_ms"]
+        start_ms = max(original_start_ms, prev_end_ms)
 
         if i < len(seg_data) - 1:
             slot_ms = seg_data[i + 1]["start_ms"] - start_ms
@@ -306,7 +315,6 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
 
         audio_ms = len(cur["audio"])
 
-        # Agar audio navbatdagi segmentgacha bo'lgan vaqt oralig'idan uzunroq bo'lsa, mos ravishda tezlashtiramiz:
         if slot_ms > 150 and audio_ms > slot_ms:
             factor = audio_ms / slot_ms
             speed_factor = min(factor, 1.45)
@@ -316,11 +324,8 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
                 except Exception:
                     pass
 
-            # Tezlashtirilgandan so'ng ham keyingi segment vaqtiga tutashib ketsa, fade-out bilan keskin ustma-ust tushish oldi olinadi
-            if i < len(seg_data) - 1:
-                max_allowed_ms = seg_data[i + 1]["start_ms"] - start_ms
-                if max_allowed_ms > 100 and len(cur["audio"]) > max_allowed_ms:
-                    cur["audio"] = cur["audio"][:max_allowed_ms].fade_out(25)
+        cur["start_ms"] = start_ms
+        prev_end_ms = start_ms + len(cur["audio"])
 
     # 3. Umumiy audio uzunligini hisoblash
     last = seg_data[-1]

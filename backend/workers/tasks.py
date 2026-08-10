@@ -201,6 +201,12 @@ def process_video(self: Task, job_id: str) -> dict:
             transcript_text = transcript["text"]
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "ok")
 
+        # Whisper segmentlari nutq pauzasiga qarab kesilgan, gap chegarasiga
+        # emas — tarjima/nutq optimallashdan OLDIN tabiiy gaplarga
+        # birlashtiramiz, aks holda LLM har bir bo'lakka soxta nuqta qo'yib,
+        # keyingi bosqichlarni "bu tugal gap" deb aldab qo'yadi.
+        segments = synthesizer.group_segments_into_sentences(segments)
+
         # BOSQICH 3: Jins aniqlash (foydalanuvchi tanlamagan bo'lsa avtomatik)
         current_stage = "GENDER"
         stage_t0 = time.monotonic()
