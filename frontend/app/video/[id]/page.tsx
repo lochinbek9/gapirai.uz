@@ -14,8 +14,8 @@ import FeedbackSection from '@/components/FeedbackSection'
 const TEST_PRICE_MULTIPLIER = 1.0
 
 function calculateClientPrice(durationMinutes: number): number {
-  if (durationMinutes < 60.0) return 0
-  return Math.ceil(durationMinutes) * 1000
+  if (durationMinutes < 45.0) return 0
+  return Math.ceil(durationMinutes) * 500
 }
 
 function formatRemainingTime(seconds: number): string {
@@ -234,7 +234,7 @@ export default function VideoPage() {
                   <div className="space-y-2">
                     <h2 className="text-xl font-extrabold text-white">To'lov kutilmoqda</h2>
                     <p className="text-sm text-slate-400 leading-relaxed">
-                      Ushbu video 1 soat (60 daqiqa) yoki undan uzun bo'lgani sababli, dublyaj xizmati pullik.
+                      Ushbu video 45 daqiqa yoki undan uzun bo'lgani sababli, dublyaj xizmati pullik.
                     </p>
                   </div>
 

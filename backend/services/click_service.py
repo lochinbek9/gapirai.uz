@@ -72,17 +72,17 @@ def validate_signature(params: dict, secret_key: str) -> bool:
 def calculate_price(duration_minutes: float, *, is_first_video: bool = False) -> int:
     """
     Pricing logic:
-    - Videos < 60 minutes (1 hour): free.
-    - Videos >= 60 minutes: 1000 UZS per minute.
-      Example: 60 min → 60,000 UZS, 90 min → 90,000 UZS.
+    - Videos < 45 minutes: free.
+    - Videos >= 45 minutes: 500 UZS per minute.
+      Example: 45 min → 22,500 UZS, 90 min → 45,000 UZS.
     """
-    if duration_minutes < 60.0:
+    if duration_minutes < 45.0:
         return 0
     if is_first_video:
         return 0
 
-    # 1000 UZS per minute (60 min = 60,000 UZS)
-    amount = math.ceil(duration_minutes) * 1000
+    # 500 UZS per minute
+    amount = math.ceil(duration_minutes) * 500
     return normalize_uzs_amount(amount)
 
 

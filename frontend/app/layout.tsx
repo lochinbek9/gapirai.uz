@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: "GapirAI.uz — YouTube videolarni o'zbek tiliga AI dublyaj qilish",
     template: "%s | GapirAI.uz",
   },
-  description: "GapirAI.uz — YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma. 1 soatgacha videolar bepul.",
+  description: "GapirAI.uz — YouTube videolarni sun'iy intellekt yordamida avtomatik o'zbek tiliga dublyaj qiluvchi onlayn platforma. 45 daqiqagacha videolar bepul.",
   keywords: [
     "gapirai",
     "gapirai uz",
