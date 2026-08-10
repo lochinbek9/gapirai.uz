@@ -4,13 +4,14 @@ import { useState } from "react";
 import { ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { createAnalysis, saveAnalysisId } from "@/lib/api";
+import { createAnalysis, saveAnalysisId, ANALYSIS_LANGUAGE_OPTIONS } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function AnalysisUrlForm() {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
+  const [language, setLanguage] = useState("uz");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export default function AnalysisUrlForm() {
     setLoading(true);
     setError(null);
     try {
-      const { analysis_id } = await createAnalysis(url, "uz");
+      const { analysis_id } = await createAnalysis(url, language);
       saveAnalysisId(analysis_id);
       router.push(`/video-analysis/${analysis_id}`);
     } catch (err: any) {
@@ -65,6 +66,24 @@ export default function AnalysisUrlForm() {
             <span className="inline">Nusxani qo'yish</span>
           </button>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
+          Tahlil tili
+        </label>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="glass-input w-full px-3.5 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl text-black dark:text-white text-xs sm:text-sm font-medium focus:outline-none"
+        >
+          {ANALYSIS_LANGUAGE_OPTIONS.map((opt) => (
+            <option key={opt.code} value={opt.code}>{opt.label}</option>
+          ))}
+        </select>
+        <p className="text-[10px] text-slate-400 dark:text-gray-600 ml-1">
+          Transkript doim video'ning original tilida qoladi — bu faqat xulosa, chapterlar, konspekt va test qaysi tilda chiqishini belgilaydi.
+        </p>
       </div>
 
       {!isLoggedIn && (

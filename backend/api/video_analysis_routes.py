@@ -15,6 +15,13 @@ from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
 router = APIRouter(prefix="/api/video-analysis", tags=["video-analysis"])
 _service = VideoAnalysisService()
 
+# Foydalanuvchi tanlashi mumkin bo'lgan tahlil tillari + "original" — bu holda
+# tahlil tili transkripsiyadan keyin aniqlangan video tiliga hal qilinadi
+# (backend/workers/analysis_tasks.py). Video o'zi qaysi tilda bo'lishidan
+# qat'iy nazar, transkript doim original tilda qoladi — faqat tahlil
+# (summary/key_points/chapters/notes/quiz) shu tanlangan tilda chiqadi.
+ALLOWED_ANALYSIS_LANGUAGES = {"uz", "en", "ru", "tr", "kk", "original"}
+
 
 class CreateAnalysisRequest(BaseModel):
     youtube_url: str
@@ -46,6 +53,7 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
         "video_duration": analysis.video_duration,
         "video_thumbnail": analysis.video_thumbnail,
         "language": analysis.language,
+        "video_language": analysis.video_language,
         "summary": analysis.summary,
         "key_points": analysis.key_points,
         "chapters": analysis.chapters,
@@ -66,6 +74,9 @@ async def create_analysis(
 ) -> dict:
     if not _is_valid_youtube_url(request.youtube_url):
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
+
+    if request.language not in ALLOWED_ANALYSIS_LANGUAGES:
+        raise HTTPException(status_code=400, detail="Noto'g'ri tahlil tili.")
 
     try:
         info = get_video_info(request.youtube_url)
@@ -144,7 +155,7 @@ async def ask_question(
 
     qa_history = analysis.qa_history or []
     result = _service.answer_question(
-        analysis.transcript_segments, request.question.strip(), analysis.language, qa_history
+        analysis.transcript_segments, request.question.strip(), qa_history
     )
     entry = {
         "question": request.question.strip(),

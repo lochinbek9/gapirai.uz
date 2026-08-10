@@ -24,13 +24,57 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 _client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
 
+# Tahlil tili sifatida tanlanishi mumkin bo'lgan tillar + "Original" rejimida
+# Whisper aniqlashi mumkin bo'lgan ko'proq tarqalgan video tillari uchun nomlar.
+# Ro'yxatda yo'q kod uchun _language_rule xavfsiz holatda kodning o'zini ishlatadi.
+LANGUAGE_NAMES = {
+    "uz": "o'zbek",
+    "en": "ingliz (English)",
+    "ru": "rus (Русский)",
+    "tr": "turk (Türkçe)",
+    "kk": "qozoq (Қазақша)",
+    "es": "ispan (Español)",
+    "fr": "fransuz (Français)",
+    "de": "nemis (Deutsch)",
+    "ko": "koreys (한국어)",
+    "ja": "yapon (日本語)",
+    "zh": "xitoy (中文)",
+    "ar": "arab (العربية)",
+    "pt": "portugal (Português)",
+    "it": "italyan (Italiano)",
+    "hi": "hind (हिन्दी)",
+}
+
+# OpenAI Whisper API "language" maydonini to'liq ingliz nomi sifatida qaytaradi
+# (masalan "english", "russian"), ISO kod emas. "Original" rejimi va tahlil
+# tili tanlash ISO kodlarga (uz/en/ru/...) asoslangani uchun, transkripsiyadan
+# keyin buni normalize_video_language() orqali kodga aylantiramiz.
+_WHISPER_NAME_TO_CODE = {
+    "uzbek": "uz", "english": "en", "russian": "ru", "turkish": "tr",
+    "kazakh": "kk", "spanish": "es", "french": "fr", "german": "de",
+    "korean": "ko", "japanese": "ja", "chinese": "zh", "arabic": "ar",
+    "portuguese": "pt", "italian": "it", "hindi": "hi",
+}
+
+
+def normalize_video_language(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    raw = raw.strip().lower()
+    return _WHISPER_NAME_TO_CODE.get(raw, raw)
+
+
 def _language_rule(language: str) -> str:
     if language == "uz":
         return """Javobni TABIIY, so'zlashuv uslubidagi O'ZBEK tilida yozing — so'zma-so'z
 tarjima qilmang. Texnik atamalarni (API, backend, frontend, database, server,
 framework kabi va dasturlash tillari/kutubxona nomlari) original holida
 qoldiring, ularni sun'iy o'zbekchalashtirmang."""
-    return f'Javobni "{language}" tilida yozing.'
+    name = LANGUAGE_NAMES.get(language, language)
+    return f"""Javobni TABIIY, so'zlashuv uslubidagi "{name}" tilida yozing — so'zma-so'z,
+sun'iy tarjima uslubida emas. Texnik atamalarni (API, backend, frontend,
+database, server, framework kabi va dasturlash tillari/kutubxona nomlari)
+original holida qoldiring."""
 
 _NO_HALLUCINATION_RULE = """Faqat transkriptda HAQIQATAN aytilgan narsalarga asoslaning. Hech qachon
 transkriptda yo'q ma'lumotni o'ylab topmang yoki taxmin qilmang."""
@@ -212,10 +256,15 @@ JSON formatida qaytaring:
         self,
         segments: list[dict],
         question: str,
-        language: str = "uz",
         qa_history: list[dict] | None = None,
     ) -> dict:
-        """Returns {"answer": str, "timestamps": [float, ...]}."""
+        """Returns {"answer": str, "timestamps": [float, ...]}.
+
+        Javob tili "language" (tahlil tili) bilan emas, savolning o'zi qaysi
+        tilda yozilgan bo'lsa o'sha til bilan belgilanadi — foydalanuvchi bir
+        suhbat ichida tilni erkin almashtira olishi uchun (masalan o'zbekcha
+        so'rab, keyin "Explain it in English" deb yozishi mumkin).
+        """
         history_text = ""
         if qa_history:
             recent = qa_history[-3:]
@@ -225,11 +274,16 @@ JSON formatida qaytaring:
 
         system = f"""Siz video haqida savollarga javob beruvchi yordamchisiz.
 {_NO_HALLUCINATION_RULE}
-{_language_rule(language)}
 
-MUHIM: agar savolga javob transkriptda aniq topilmasa, aynan shunday javob bering:
-"Bu ma'lumot videoda aniq tushuntirilmagan."
-Hech qachon transkriptda yo'q narsani "videoda aytilgan" deb ko'rsatmang.
+MUHIM (til): Javobni foydalanuvchi SAVOLNI yozgan tilda bering — savol qaysi
+tilda yozilgan bo'lsa, javob ham o'sha tilda bo'lsin (masalan savol inglizcha
+bo'lsa, javob ham inglizcha; savol o'zbekcha bo'lsa, javob ham o'zbekcha).
+Bu tahlilning umumiy tilidan mustaqil — foydalanuvchi savolni istalgan tilda
+yozishi mumkin.
+
+MUHIM: agar savolga javob transkriptda aniq topilmasa, foydalanuvchi savol
+yozgan tilda, mazmunan "Bu ma'lumot videoda aniq tushuntirilmagan" deb javob
+bering. Hech qachon transkriptda yo'q narsani "videoda aytilgan" deb ko'rsatmang.
 
 Javobingiz bilan birga, javobga asos bo'lgan transkript qismlarining
 soniyalardagi vaqtlarini (timestamps) ham bering.

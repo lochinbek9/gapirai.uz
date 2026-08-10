@@ -193,6 +193,30 @@ export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
   failed: 'Xatolik',
 }
 
+// Tahlil tili — video tilidan mustaqil: video qaysi tilda bo'lishidan qat'iy
+// nazar, foydalanuvchi tahlil (summary/key_points/chapters/notes/quiz) qaysi
+// tilda chiqishini shu ro'yxatdan tanlaydi. Transcript esa doim video'ning
+// original tilida qoladi. "original" tanlansa, tahlil ham video tilida chiqadi.
+export const ANALYSIS_LANGUAGE_OPTIONS: { code: string; label: string }[] = [
+  { code: 'uz', label: "🇺🇿 O'zbekcha" },
+  { code: 'en', label: '🇬🇧 English' },
+  { code: 'ru', label: '🇷🇺 Русский' },
+  { code: 'tr', label: '🇹🇷 Türkçe' },
+  { code: 'kk', label: '🇰🇿 Қазақша' },
+  { code: 'original', label: '🌐 Original tilda' },
+]
+
+export const LANGUAGE_DISPLAY: Record<string, string> = {
+  uz: "🇺🇿 O'zbekcha", en: '🇬🇧 English', ru: '🇷🇺 Русский', tr: '🇹🇷 Türkçe', kk: '🇰🇿 Қазақша',
+  es: '🇪🇸 Español', fr: '🇫🇷 Français', de: '🇩🇪 Deutsch', ko: '🇰🇷 한국어', ja: '🇯🇵 日本語',
+  zh: '🇨🇳 中文', ar: '🇸🇦 العربية', pt: '🇵🇹 Português', it: '🇮🇹 Italiano', hi: '🇮🇳 हिन्दी',
+}
+
+export function displayLanguage(code?: string | null): string {
+  if (!code) return ''
+  return LANGUAGE_DISPLAY[code] || code
+}
+
 export interface TranscriptSegment {
   start: number
   end: number
@@ -242,6 +266,7 @@ export interface VideoAnalysis {
   video_duration?: number
   video_thumbnail?: string
   language: string
+  video_language?: string
   summary?: VideoAnalysisSummary
   key_points?: KeyPoint[]
   chapters?: Chapter[]

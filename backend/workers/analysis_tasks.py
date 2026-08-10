@@ -9,7 +9,7 @@ from backend.workers.celery_app import celery_app
 from backend.workers.tasks import _record_stage, _log_pipeline_summary, _error_code_for, _cleanup_upload_dir
 from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
 from backend.services import downloader, transcriber
-from backend.services.video_analysis import VideoAnalysisService
+from backend.services.video_analysis import VideoAnalysisService, normalize_video_language
 from backend.services.errors import PermanentError
 from backend.config import get_settings
 
@@ -79,8 +79,17 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
                 _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             analysis.transcript_segments = transcript["segments"]
+            analysis.video_language = normalize_video_language(transcript.get("language"))
             db.commit()
             _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "ok")
+
+        # "Original" tahlil tili tanlangan bo'lsa, endi video tili ma'lum (yo hozir
+        # aniqlandi, yo oldingi urinishdan saqlangan) — shu tilga hal qilamiz va
+        # qayta yozamiz, shunda quiz/notes/Q&A kabi keyingi "lazy" endpointlar buni
+        # qayta hal qilmasdan to'g'ridan-to'g'ri ishlatadi (video_analysis_routes.py).
+        if analysis.language == "original":
+            analysis.language = analysis.video_language or "en"
+            db.commit()
 
         segments = analysis.transcript_segments
 

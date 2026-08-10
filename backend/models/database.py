@@ -120,7 +120,12 @@ class VideoAnalysis(Base):
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
+    # "language" — foydalanuvchi so'ragan tahlil tili (uz/en/ru/tr/kk yoki "original").
+    # "original" video transkripsiyadan keyin aniqlangan video_language'ga hal qilinadi
+    # (backend/workers/analysis_tasks.py) va shu yerga qayta yoziladi — shundan keyin
+    # quiz/notes/Q&A kabi "lazy" endpointlar uni qayta hal qilmasdan to'g'ridan-to'g'ri ishlatadi.
     language = Column(String(10), default="uz")
+    video_language = Column(String(10), nullable=True)  # Whisper aniqlagan original til kodi
 
     status = Column(Enum(AnalysisStatus, values_callable=lambda obj: [e.value for e in obj]), default=AnalysisStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
@@ -231,6 +236,13 @@ def create_tables():
     try:
         with engine.connect() as connection:
             connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS error_code VARCHAR(50)"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS video_language VARCHAR(10)"))
             connection.commit()
     except Exception:
         pass

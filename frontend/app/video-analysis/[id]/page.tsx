@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes,
-  searchTranscript, getTranscript, clearAnalysisId, TranscriptSegment, QuizQuestion,
+  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, TranscriptSegment, QuizQuestion,
 } from "@/lib/api";
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
@@ -197,6 +197,16 @@ export default function VideoAnalysisPage() {
             )}
 
             <h1 className="text-xl font-bold text-white">{analysis.video_title}</h1>
+            <div className="flex flex-wrap gap-2 text-[11px] font-bold text-gray-400">
+              {analysis.video_language && (
+                <span className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
+                  Original: {displayLanguage(analysis.video_language)}
+                </span>
+              )}
+              <span className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
+                Tahlil: {displayLanguage(analysis.language)}
+              </span>
+            </div>
 
             <div className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">
               {TABS.map((t) => (
