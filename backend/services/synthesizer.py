@@ -184,7 +184,7 @@ def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
             except Exception: pass
 
 
-def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str | None = None) -> str:
+def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str | None = None) -> tuple[str, list[dict]]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
 
@@ -193,6 +193,12 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     - Har bir audio segment headroom normalizatsiyadan o'tkaziladi (shirillash to'liq yo'qotiladi).
     - Kerak bo'lsa biroz mo''tadil tezlashtiriladi (max 1.25x).
     - Hali ham yetmasa, keyingi segment boshlanishi keyinroqqa suriladi (gap to'liq tugaydi).
+
+    Returns: (audio_fayl_yo'li, haqiqiy_vaqtlar) — ikkinchisi original
+    Whisper vaqtlaridan siljigan bo'lishi mumkin (yuqoridagi qoida
+    tufayli), shuning uchun chaqiruvchi subtitr matnini SHU vaqtlar bilan
+    qayta qurishi kerak — aks holda subtitr ovozdan orqada/oldinda qolib
+    ketadi.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -327,6 +333,21 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
         cur["start_ms"] = start_ms
         prev_end_ms = start_ms + len(cur["audio"])
 
+    # Subtitr ANIQ shu audio bilan mos kelishi uchun — yuqoridagi moslashtirish
+    # segmentlarni original vaqtidan siljitgan bo'lishi mumkin (gap kesilib
+    # qolmasligi uchun), shuning uchun chaqiruvchiga HAQIQIY (audio bilan mos)
+    # vaqtlar qaytariladi — subtitr shulardan qayta tuziladi, aks holda
+    # subtitr eski, endi noto'g'ri original vaqtda qolib ketardi.
+    actual_timings = [
+        {
+            "id": item["seg_id"],
+            "start": round(item["start_ms"] / 1000, 3),
+            "end": round((item["start_ms"] + len(item["audio"])) / 1000, 3),
+            "text": item["text"],
+        }
+        for item in seg_data
+    ]
+
     # 3. Umumiy audio uzunligini hisoblash
     last = seg_data[-1]
     natural_end_ms = last["start_ms"] + len(last["audio"])
@@ -355,6 +376,6 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
         except Exception:
             pass
 
-    return merged_path
+    return merged_path, actual_timings
 
 

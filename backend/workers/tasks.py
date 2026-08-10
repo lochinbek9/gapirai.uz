@@ -270,10 +270,15 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
             tts_dir = str(output_dir / "tts_segments")
-            dubbed_audio_path = synthesizer.synthesize_segments(
+            dubbed_audio_path, actual_timings = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice
             )
             job.dubbed_audio_path = dubbed_audio_path
+            # Audio gap kesilib qolmasligi uchun original vaqtdan siljigan
+            # bo'lishi mumkin (synthesizer.py) — subtitr shu HAQIQIY
+            # vaqtlar bilan qayta quriladi, aks holda ovoz bilan mos
+            # tushmay qoladi.
+            job.uzbek_srt_content = _segments_to_vtt(actual_timings)
             db.commit()
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "ok")
 
