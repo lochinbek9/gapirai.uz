@@ -19,13 +19,14 @@ class Settings(BaseSettings):
 
     # OpenAI
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    # Tarjima uchun — gpt-4o-mini sifat jihatidan gpt-4o'ga deyarli teng
+    # chiqdi (real taqqoslashda tasdiqlangan), narxi esa ~17x arzon.
+    OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
     # Nutq optimallashtirish (raqam/ohang moslashtirish) va jins aniqlash kabi
-    # mexanik, sifatga unchalik sezgir bo'lmagan vazifalar uchun — har bir
-    # video uchun to'liq segment hajmini qayta ishlaydi, shuning uchun
-    # OPENAI_MODEL (tarjima uchun ajratilgan, sifatga sezgir) dan alohida,
-    # ancha arzon model ishlatiladi.
+    # mexanik, sifatga unchalik sezgir bo'lmagan vazifalar uchun — OPENAI_MODEL
+    # dan alohida saqlanadi, shunda kerak bo'lsa tarjima sifatini mustaqil
+    # oshirish/pasaytirish mumkin, bu vazifalarga ta'sir qilmasdan.
     OPENAI_LIGHT_MODEL: str = "gpt-4o-mini"
 
     # Google AI Studio / Gemini API
