@@ -11,6 +11,28 @@ from backend.services.tts.base import TTSProvider
 logger = logging.getLogger(__name__)
 
 
+def _prosody_for_text(text: str, is_female: bool) -> tuple[str, str]:
+    """Gap turiga (tinish belgisiga) qarab tezlik/ohang tanlaydi — savol,
+    undov va oddiy gap tabiiy ravishda boshqacha talaffuz qilinadi.
+    edge-tts butun matn uchun BITTA rate/pitch qabul qiladi (Azure'dagidek
+    jumla ichida SSML bilan almashtirib bo'lmaydi), shuning uchun bu
+    segment-guruhlash (har chaqiruv ~bitta tabiiy gap) bilan birga eng
+    yaxshi natija beradi."""
+    base_rate = -4 if is_female else -8
+    stripped = text.rstrip()
+
+    if stripped.endswith("?"):
+        rate, pitch = base_rate + 2, ("+8Hz" if is_female else "+5Hz")
+    elif stripped.endswith("!"):
+        rate, pitch = base_rate + 4, ("+6Hz" if is_female else "+4Hz")
+    elif stripped.endswith("..."):
+        rate, pitch = base_rate - 4, "-2Hz"
+    else:
+        rate, pitch = base_rate, ("+2Hz" if is_female else "+0Hz")
+
+    return f"{rate:+d}%", pitch
+
+
 class EdgeProvider(TTSProvider):
     """Microsoft Edge Neural TTS — bepul, native Uzbek ovozlar."""
 
@@ -31,10 +53,8 @@ class EdgeProvider(TTSProvider):
         output_path: str,
         voice_name: str | None = None,
     ) -> bool:
-        chosen_voice = (
-            self.DEFAULT_VOICE_FEMALE if self._is_female(voice_name)
-            else self.DEFAULT_VOICE_MALE
-        )
+        is_female = self._is_female(voice_name)
+        chosen_voice = self.DEFAULT_VOICE_FEMALE if is_female else self.DEFAULT_VOICE_MALE
         clean_text = re.sub(r"<[^>]+>", "", text)
         clean_text = (
             clean_text
@@ -66,8 +86,10 @@ class EdgeProvider(TTSProvider):
         try:
             import edge_tts
 
+            rate, pitch = _prosody_for_text(clean_text, is_female)
+
             async def _run():
-                communicate = edge_tts.Communicate(clean_text, chosen_voice, rate="-2%")
+                communicate = edge_tts.Communicate(clean_text, chosen_voice, rate=rate, pitch=pitch)
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
                     tmp_mp3 = tmp.name
                 try:

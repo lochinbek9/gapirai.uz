@@ -16,6 +16,59 @@ settings = get_settings()
 
 _FRAME_RATE = 24000
 
+# ─────────────────────────────────────────────────────────────
+# Segmentlarni TABIIY nutq uchun qayta guruhlash
+# ─────────────────────────────────────────────────────────────
+# Subtitr/Whisper segmentlari INGLIZCHA nutqdagi pauzalarga qarab
+# kesilgan — bitta tugal o'zbekcha gap ko'pincha 2-3 bo'lakka bo'linib
+# qoladi. Har birini ALOHIDA TTS chaqiruviga yuborish har bir bo'lakni
+# mustaqil, kesik-kesik ("robot") ovozda o'qitadi. Shu yerda tugal
+# fikr hosil bo'lguncha (gap oxirigacha tinish belgisi chiqquncha)
+# ketma-ket segmentlar BITTA TTS birligiga birlashtiriladi — subtitr
+# vaqtlanishiga tegmasdan (bu funksiya faqat TTS kirishini o'zgartiradi,
+# translated_segments/uzbek_srt_content bundan oldin allaqachon saqlangan).
+_GROUP_MAX_GAP_S = 0.6
+_GROUP_MAX_WORDS = 30
+_GROUP_MAX_SPAN_S = 12.0
+_SENTENCE_END_RE = re.compile(r"[.!?…]\s*$")
+
+
+def _group_segments_for_natural_tts(segments: list[dict]) -> list[dict]:
+    groups: list[dict] = []
+    current: dict | None = None
+
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+
+        if current is None:
+            current = {**seg, "text": text}
+            continue
+
+        gap = seg["start"] - current["end"]
+        combined_text = f"{current['text']} {text}"
+        prev_ends_sentence = bool(_SENTENCE_END_RE.search(current["text"]))
+
+        can_merge = (
+            not prev_ends_sentence
+            and gap <= _GROUP_MAX_GAP_S
+            and len(combined_text.split()) <= _GROUP_MAX_WORDS
+            and (seg["end"] - current["start"]) <= _GROUP_MAX_SPAN_S
+        )
+
+        if can_merge:
+            current["text"] = combined_text
+            current["end"] = seg["end"]
+        else:
+            groups.append(current)
+            current = {**seg, "text": text}
+
+    if current:
+        groups.append(current)
+
+    return groups
+
 
 def _synthesize_text(
     text: str,
@@ -148,6 +201,8 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
     for i, seg in enumerate(segments):
         if "id" not in seg:
             seg["id"] = i
+
+    segments = _group_segments_for_natural_tts(segments)
 
     # 1. Har bir segmentni parallel ravishda sintez qilish
     def _clean_audio(audio: AudioSegment) -> AudioSegment:
