@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -88,7 +89,10 @@ export default function AnalysisUrlForm() {
 
       {!isLoggedIn && (
         <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3">
-          Video tahlili uchun tizimga kirish talab qilinadi.
+          Video tahlili uchun{" "}
+          <Link href="/login" className="underline hover:text-amber-500">kiring</Link>
+          {" "}yoki{" "}
+          <Link href="/register" className="underline hover:text-amber-500">ro'yxatdan o'ting</Link>.
         </p>
       )}
 
