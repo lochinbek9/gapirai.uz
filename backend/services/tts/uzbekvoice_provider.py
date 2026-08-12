@@ -37,7 +37,7 @@ _VOICES = [
     {"id": "sevinch", "gender": "female", "language": "uz"},
     {"id": "jasur", "gender": "male", "language": "uz"},
 ]
-_FEMALE_VOICE = "shoira"
+_FEMALE_VOICE = "kamola"
 _MALE_VOICE = "jasur"
 
 
