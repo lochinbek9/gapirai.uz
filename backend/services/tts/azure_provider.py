@@ -96,6 +96,22 @@ class AzureProvider(TTSProvider):
                 if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
                     logger.info(f"Azure TTS: voice={chosen_voice}, chars={len(text)}")
                     return True
+
+                # SDK bu holatda exception ko'tarmaydi — result.reason shunchaki
+                # Canceled bo'ladi. cancellation_details loglanmasa, nima uchun
+                # muvaffaqiyatsiz bo'lgani butunlay ko'rinmas bo'lib qoladi
+                # (productionda 2026-08-12 shu sababli sokin Edge'ga tushib
+                # ketgan — loglarda hech qanday xato ko'rinmagan edi).
+                cd = result.cancellation_details
+                logger.warning(
+                    f"Azure TTS bekor qilindi: reason={cd.reason}, "
+                    f"error_code={cd.error_code}, details={cd.error_details}"
+                )
+                # Autentifikatsiya/kvota xatosi qayta urinish bilan tuzatilmaydi —
+                # har bir urinish bir xil natija beradi, shuning uchun darhol
+                # to'xtatiladi (aks holda har segment uchun keraksiz 2x2s kutish).
+                if cd.error_code == speechsdk.CancellationErrorCode.AuthenticationFailure:
+                    break
                 if attempt < retries - 1:
                     time.sleep(2)
 
