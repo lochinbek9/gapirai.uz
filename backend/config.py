@@ -37,10 +37,17 @@ class Settings(BaseSettings):
     # (past darajadagi dub ham duck'ni ishga tushiradi) va ratio oshirilib
     # (2026-08-12) original deyarli to'liq bostirilishi ta'minlandi — bu
     # foydalanuvchining aniq talabi ("ustidan dublaj qilganda bilinmasin").
-    DUCKING_THRESHOLD: float = 0.025
-    DUCKING_RATIO: float = 20.0
+    # Yana kuchaytirildi (20->30, threshold 0.025->0.018) — foydalanuvchi
+    # yana ham kuchliroq farq so'radi (2026-08-12): "fondagi ovozni
+    # gapirayotganda pastlatib, dublaj ovozini ko'tarib qo'y."
+    DUCKING_THRESHOLD: float = 0.018
+    DUCKING_RATIO: float = 30.0
     DUCKING_ATTACK_MS: int = 5
     DUCKING_RELEASE_MS: int = 400
+    # Dub trekining o'zini ham baland qilish (fonni pasaytirish bilan bir
+    # qatorda) — limiterdan OLDIN qo'llaniladi, shunda hosil bo'lgan
+    # cho'qqilarni limiter xavfsiz ushlab qoladi (clipping bo'lmaydi).
+    VOICE_GAIN_BOOST_DB: float = 4.0
     # Dub ovoz protsessing zanjiri (merger.py): xirillashni kesish, aniqlik
     # uchun subtle boost, dinamika siqish, "s"/"sh" tovushlarini yumshatish,
     # limiter — barchasi bitta filtergraph ichida, alohida ffmpeg pass emas.

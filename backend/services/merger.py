@@ -39,8 +39,10 @@ def _build_audio_filtergraph() -> str:
       release), gap-gap qo'lda hisoblangan oraliqlar emas.
     - dublyaj eshittirishdan oldin ovoz protsessing zanjiridan o'tadi (xirillash
       kesiladi, aniqlik uchun subtle EQ, dinamika siqiladi, "s" tovushlari
-      yumshatiladi, limiter) — shunda "TTS videoning ustiga yopishtirilgandek"
-      emas, videoning o'z ovoz treki kabi eshitiladi.
+      yumshatiladi, keyin baland qilinadi — VOICE_GAIN_BOOST_DB — va nihoyat
+      limiter cho'qqilarni xavfsiz ushlab qoladi) — shunda "TTS videoning
+      ustiga yopishtirilgandek" emas, videoning o'z ovoz treki kabi eshitiladi
+      va fondan sezilarli darajada ajralib turadi.
     - Yakuniy aralashma EBU R128 bo'yicha normallashtiriladi.
     """
     s = settings
@@ -55,6 +57,7 @@ def _build_audio_filtergraph() -> str:
         f"equalizer=f={s.VOICE_EQ_FREQ_HZ}:width_type=q:width=1:g={s.VOICE_EQ_GAIN_DB},"
         f"acompressor=threshold=0.1:ratio={s.VOICE_COMPRESSOR_RATIO}:attack=20:release=250:makeup=1,"
         f"deesser=i=0.2:m=0.5:f=0.5,"
+        f"volume={s.VOICE_GAIN_BOOST_DB}dB,"
         f"alimiter=limit={s.VOICE_LIMITER_LIMIT}:attack=5:release=50[dubproc];"
         f"[ducked][dubproc]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[mixed];"
         f"[mixed]loudnorm=I={s.FINAL_LOUDNORM_I}:TP={s.FINAL_LOUDNORM_TP}:LRA={s.FINAL_LOUDNORM_LRA}[final]"
