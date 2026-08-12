@@ -17,6 +17,15 @@ class SynthesisResult:
     error: str = ""
 
 
+class PermanentTTSError(Exception):
+    """Qayta urinish yoki fallback ma'nosiz bo'lgan xatolik (noto'g'ri API kalit,
+    yaroqsiz kirish matni). synthesize() False qaytarish o'rniga buni ko'tarsa,
+    chaqiruvchi (synthesizer.py) fallback providerga o'tishga urinmaydi — chunki
+    fallback ham xuddi shu sababdan (masalan noto'g'ri matn) ishlamaydi.
+    Vaqtinchalik xatoliklar (timeout, 429, 5xx) uchun False qaytarish davom etadi
+    — bu holatda fallback urinilishi kerak."""
+
+
 class TTSProvider(ABC):
     """
     Barcha TTS provayderlari uchun umumiy interfeys.
@@ -43,8 +52,20 @@ class TTSProvider(ABC):
 
     @property
     def cost_per_1k(self) -> float:
-        """1 000 belgi uchun taxminiy narx (USD). Default: 0."""
+        """1 000 belgi uchun taxminiy narx (provider valyutasida — USD yoki UZS,
+        provider o'zi qaysi birlikda ekanini biladi). Default: 0."""
         return 0.0
+
+    def estimate_cost(self, chars: int) -> float:
+        """Berilgan belgi soni uchun taxminiy narx. Default: chiziqli
+        (chars/1000 * cost_per_1k) — narxlash chiziqli bo'lmagan provayderlar
+        buni ustidan yozishi mumkin."""
+        return chars / 1000 * self.cost_per_1k
+
+    def get_voices(self) -> list[dict]:
+        """Mavjud ovozlar ro'yxati: [{"id": str, "gender": "male"|"female", "language": str}, ...].
+        Default: bo'sh (provider hali ovoz ro'yxatini bermaydi)."""
+        return []
 
     def synthesize_batch(
         self,

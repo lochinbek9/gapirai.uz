@@ -34,6 +34,7 @@ def _load_registry() -> dict[str, type]:
     from backend.services.tts.edge_provider import EdgeProvider
     from backend.services.tts.openai_provider import OpenAIProvider
     from backend.services.tts.gemini_provider import GeminiProvider
+    from backend.services.tts.uzbekvoice_provider import UzbekVoiceProvider
 
     _REGISTRY = {
         "elevenlabs": ElevenLabsProvider,
@@ -41,6 +42,7 @@ def _load_registry() -> dict[str, type]:
         "edge":       EdgeProvider,
         "openai":     OpenAIProvider,
         "gemini":     GeminiProvider,
+        "uzbekvoice": UzbekVoiceProvider,
     }
     return _REGISTRY
 
@@ -69,9 +71,14 @@ def get_provider(name: str | None = None) -> "TTSProvider":
 
 
 def get_fallback_provider() -> "TTSProvider":
-    """Asosiy provider ishlamasa ishlatiladi — har doim Edge TTS (bepul)."""
-    from backend.services.tts.edge_provider import EdgeProvider
-    return EdgeProvider()
+    """Asosiy provider vaqtinchalik xatolik bilan ishlamasa ishlatiladi.
+    settings.TTS_FALLBACK_PROVIDER orqali sozlanadi (default: "edge" — bepul)."""
+    registry = _load_registry()
+    chosen = (settings.TTS_FALLBACK_PROVIDER or "edge").lower().strip()
+    if chosen not in registry:
+        logger.warning(f"Noma'lum TTS_FALLBACK_PROVIDER='{chosen}'. Edge ga o'tildi.")
+        chosen = "edge"
+    return registry[chosen]()
 
 
 def list_providers() -> list[str]:

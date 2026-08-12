@@ -10,6 +10,8 @@ from pathlib import Path
 from pydub import AudioSegment
 from backend.config import get_settings
 from backend.services.tts.factory import get_provider, get_fallback_provider
+from backend.services.tts.base import PermanentTTSError
+from backend.services.tts_cost import log_tts_usage
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -76,21 +78,27 @@ def _synthesize_text(
     text: str,
     output_path: str,
     voice_name: str | None = None,
+    video_id: str | None = None,
+    user_id: str | None = None,
 ) -> str:
     """
     Matnni audioga aylantiradi.
 
     Qatlam 1 — TTS_PROVIDER (default: ElevenLabs).
-    Qatlam 2 — Edge TTS (bepul fallback, agar ELEVENLABS_FALLBACK_TO_EDGE=True).
+    Qatlam 2 — TTS_FALLBACK_PROVIDER (default: Edge, bepul) — faqat VAQTINCHALIK
+    xatolikda (timeout/429/5xx). Provider PermanentTTSError ko'tarsa (noto'g'ri
+    API kalit, yaroqsiz matn) fallbackka urinilmaydi — sabab hal qilinmaguncha
+    fallback ham xuddi shu sababdan ishlamaydi.
 
-    Qaytaradi: ovozni haqiqatda sintez qilgan provider nomi
-    ('elevenlabs' | 'edge') — dublyajda faqat bitta ovoz eshitilishini
-    ta'minlash uchun synthesize_segments() bu qiymatni kuzatib boradi.
+    Qaytaradi: ovozni haqiqatda sintez qilgan provider nomi — dublyajda faqat
+    bitta ovoz eshitilishini ta'minlash uchun synthesize_segments() bu qiymatni
+    kuzatib boradi.
     """
     if settings.FREE_MODE:
         logger.info("FREE_MODE: Edge TTS (bepul) ishlatilmoqda...")
         fallback = get_fallback_provider()
         if fallback.synthesize(text, output_path, voice_name=voice_name):
+            log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
             return fallback.name
         raise RuntimeError("FREE_MODE: Edge TTS muvaffaqiyatsiz.")
 
@@ -98,16 +106,25 @@ def _synthesize_text(
     primary = get_provider()
     logger.info(f"TTS provider: {primary.name} | chars={len(text)}")
 
-    if primary.synthesize(text, output_path, voice_name=voice_name):
-        return primary.name
+    try:
+        if primary.synthesize(text, output_path, voice_name=voice_name):
+            log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id)
+            return primary.name
+    except PermanentTTSError as exc:
+        logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
+        raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback Edge TTS ga o'tilmoqda.")
+    logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback {settings.TTS_FALLBACK_PROVIDER} ga o'tilmoqda.")
 
-    # --- Fallback: Edge TTS ---
+    # --- Fallback: vaqtinchalik xatoliklar uchun ---
     if settings.ELEVENLABS_FALLBACK_TO_EDGE:
         fallback = get_fallback_provider()
-        if fallback.synthesize(text, output_path, voice_name=voice_name):
-            return fallback.name
+        try:
+            if fallback.synthesize(text, output_path, voice_name=voice_name):
+                log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
+                return fallback.name
+        except PermanentTTSError as exc:
+            logger.error(f"{fallback.name} fallback ham doimiy xatolik: {exc}")
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 
@@ -184,7 +201,13 @@ def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
             except Exception: pass
 
 
-def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str | None = None) -> tuple[str, list[dict]]:
+def synthesize_segments(
+    segments: list[dict],
+    output_dir: str,
+    voice_name: str | None = None,
+    video_id: str | None = None,
+    user_id: str | None = None,
+) -> tuple[str, list[dict]]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
 
@@ -245,7 +268,7 @@ def synthesize_segments(segments: list[dict], output_dir: str, voice_name: str |
         if seg["id"] in pre_synthesized:
             engine = get_provider().name
         else:
-            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name)
+            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
         if seg_file.exists():
             audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
             return (idx, {

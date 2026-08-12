@@ -168,6 +168,28 @@ class PronunciationMemory(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TTSUsageLog(Base):
+    """Har bir muvaffaqiyatli TTS sintez chaqiruvi uchun xarajat yozuvi.
+
+    Maqsad: "1 daqiqa dublyaj qilingan video bizga qancha tushadi" savoliga
+    provider bo'yicha aniq javob berish (backend/services/tts_cost.py).
+    currency provider bo'yicha farqlanadi (uzbekvoice -> UZS, qolganlari -> USD)
+    — sun'iy almashtirish kursi bilan bitta valyutaga majburan keltirilmaydi;
+    agregatsiya (provider, currency) bo'yicha guruhlanadi.
+    """
+    __tablename__ = "tts_usage_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider = Column(String(30), nullable=False, index=True)
+    characters = Column(Integer, nullable=False)
+    duration_seconds = Column(Float, nullable=True)  # generatsiya qilingan audio uzunligi
+    estimated_cost = Column(Float, nullable=False)
+    currency = Column(String(10), nullable=False, default="USD")
+    video_id = Column(String(64), nullable=True, index=True)  # DubbingJob yoki VideoAnalysis id (FK emas — ikkalasidan ham bo'lishi mumkin)
+    user_id = Column(String(64), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 def get_db():
     db = SessionLocal()
     try:

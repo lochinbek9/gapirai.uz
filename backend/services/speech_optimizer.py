@@ -59,6 +59,12 @@ PRONUNCIATION_DICT: dict[str, str] = {
     "GPT": "Ji Pi Ti",
     "AI": "Ey Ay",
     "LLM": "El El Em",
+    "CEO": "Si I Ou",
+    "CTO": "Si Ti Ou",
+    "URL": "Yu Ar El",
+    "PDF": "Pi Di Ef",
+    "USB": "Yu Es Bi",
+    "VPN": "Vi Pi En",
 }
 
 # Uzunroq kalitlar avval tekshirilsin (masalan "GitHub" "Git"dan oldin).

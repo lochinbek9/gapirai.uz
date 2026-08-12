@@ -271,7 +271,8 @@ def process_video(self: Task, job_id: str) -> dict:
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
             tts_dir = str(output_dir / "tts_segments")
             dubbed_audio_path, actual_timings = synthesizer.synthesize_segments(
-                speech_segments, tts_dir, voice_name=voice
+                speech_segments, tts_dir, voice_name=voice,
+                video_id=job_id, user_id=(str(job.user_id) if job.user_id else None)
             )
             job.dubbed_audio_path = dubbed_audio_path
             # Audio gap kesilib qolmasligi uchun original vaqtdan siljigan

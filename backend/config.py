@@ -73,8 +73,17 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "./outputs"
 
     # TTS Provider abstraction
-    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini"
+    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | "uzbekvoice"
     TTS_PROVIDER: str = "edge"
+    # Asosiy provider muvaqqat xatolik bilan (timeout/429/5xx) ishlamasa shu
+    # providerga o'tiladi. Doimiy xatolikda (noto'g'ri kalit/kirish) fallback
+    # ishlatilmaydi — backend/services/tts/base.py: PermanentTTSError.
+    TTS_FALLBACK_PROVIDER: str = "edge"
+
+    # UzbekVoiceAI TTS (https://uzbekvoice.ai/videos/api-docs/tts)
+    UZBEKVOICE_API_KEY: str = ""
+    UZBEKVOICE_BASE_URL: str = "https://uzbekvoice.ai/api/v1"
+    UZBEKVOICE_DEFAULT_MODEL: str = "shoira"
 
     # ElevenLabs TTS
     ELEVENLABS_API_KEY: str = ""
