@@ -177,15 +177,27 @@ def _bucket_words_into_segments(words: list[dict], segments: list[dict]) -> None
         })
 
 
-def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str = "en") -> tuple[list[dict], str, str]:
+def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | None = "en") -> tuple[list[dict], str, str]:
+    # OpenAI'ning "language" parametri faqat cheklangan ISO-639-1 ro'yxatini
+    # qabul qiladi — "uz" o'sha ro'yxatda YO'Q va 400 xato bilan rad etiladi
+    # (2026-08-12 productionda tasdiqlangan). Shuning uchun qo'llab-
+    # quvvatlanmagan/berilmagan til uchun bu parametr butunlay
+    # yubormaydi — Whisper avtomatik aniqlaydi (Uzbek uchun ham ishlaydi,
+    # faqat aniq "hint" sifatida berib bo'lmaydi).
+    kwargs = {
+        "file": None,
+        "model": settings.OPENAI_TRANSCRIPTION_MODEL,
+        "response_format": "verbose_json",
+        "timestamp_granularities": ["segment", "word"],
+    }
+    if language:
+        kwargs["language"] = language
+
     with chunk_path.open("rb") as audio_file:
+        kwargs["file"] = audio_file
         response = call_openai_with_retry(
             _get_client().audio.transcriptions.create,
-            file=audio_file,
-            model=settings.OPENAI_TRANSCRIPTION_MODEL,
-            language=language,
-            response_format="verbose_json",
-            timestamp_granularities=["segment", "word"],
+            **kwargs,
         )
 
     response_data = _response_to_dict(response)
@@ -230,8 +242,8 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str = "
 _TRANSCRIBE_LANGUAGE_NAMES = {"en": "English", "uz": "Uzbek"}
 
 
-def _build_transcribe_prompt(language: str) -> str:
-    lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language)
+def _build_transcribe_prompt(language: str | None) -> str:
+    lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language) if language else "whatever language is spoken"
     return (
         f"Transcribe this audio clip verbatim in {lang_name}, exactly as spoken. "
         "Split the transcription into short natural subtitle-style segments "
@@ -244,7 +256,7 @@ def _build_transcribe_prompt(language: str) -> str:
     )
 
 
-def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str = "en") -> tuple[list[dict], str, str]:
+def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = "en") -> tuple[list[dict], str, str]:
     """OpenAI muqobili sifatida — Vertex AI orqali Gemini bilan transkripsiya.
     Whisper'ning audio-alignment aniqligiga teng emas, lekin OpenAI krediti
     tugagan holatlarda navbatni to'xtatib qo'ymaslik uchun yetarli."""
@@ -297,7 +309,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     return [], "", language
 
 
-def transcribe_audio(audio_path: str, language: str = "en") -> dict:
+def transcribe_audio(audio_path: str, language: str | None = "en") -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 

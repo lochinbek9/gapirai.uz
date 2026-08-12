@@ -37,16 +37,19 @@ def _has_consecutive_repeat(words: list[str], run_len: int = _REPEAT_RUN_THRESHO
     return False
 
 
-def check_audio_quality(audio_path: str, expected_text: str, language: str = "uz") -> dict:
+def check_audio_quality(audio_path: str, expected_text: str, language: str | None = None) -> dict:
     """
     Generatsiya qilingan audioni STT orqali qayta tekshiradi.
 
-    language: audio'da qaysi til gapirilishi kutilmoqda — bu audio TTS
-    tomonidan yaratilgan DUBLYAJ chiqishi, standart "uz". Noto'g'ri til
-    berilsa (masalan "en"), Whisper o'zbekcha nutqni inglizchaga zo'rlab
-    talqin qiladi va butun tekshiruv yaroqsiz natija beradi (2026-08-12
-    productionda haqiqiy job'da tasdiqlangan xato — har bir segment
-    "missing_words" bilan muvaffaqiyatsiz bo'lgan edi).
+    language: audio'da qaysi til gapirilishi kutilmoqda. Standart None —
+    OpenAI Whisper API'ning "language" parametri cheklangan ISO-639-1
+    ro'yxatini qabul qiladi va "uz" o'sha ro'yxatda YO'Q (2026-08-12
+    productionda tasdiqlangan: "Language 'uz' is not supported" — 400 xato).
+    Shuning uchun bu yerda hint berilmaydi, Whisper avtomatik aniqlaydi (bu
+    o'zbekcha nutq uchun ham to'g'ri ishlaydi). Oldinroq "en" berilganda esa
+    Whisper o'zbekcha nutqni inglizchaga zo'rlab talqin qilib, butun
+    tekshiruvni yaroqsiz qilgan edi ("missing_words" bilan har bir segment
+    muvaffaqiyatsiz bo'lgan haqiqiy productiondagi xato).
 
     Returns:
         {
