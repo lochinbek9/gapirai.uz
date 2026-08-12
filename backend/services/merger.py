@@ -46,12 +46,18 @@ def _build_audio_filtergraph() -> str:
     - Yakuniy aralashma EBU R128 bo'yicha normallashtiriladi.
     """
     s = settings
+    # ffmpeg'ning sidechaincompress filtri ratio uchun faqat [1, 20] oralig'ini
+    # qabul qiladi — chegaradan tashqari qiymat butun ffmpeg jarayonini xato
+    # bilan to'xtatadi (2026-08-12 productionda haqiqiy job orqali aniqlangan:
+    # "Value 30.0 for parameter 'ratio' out of range [1 - 20]"). Config'dagi
+    # qiymat noto'g'ri sozlansa ham job qulamasligi uchun shu yerda cheklanadi.
+    ducking_ratio = max(1.0, min(20.0, s.DUCKING_RATIO))
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo[orig];"
         f"[1:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
         f"asplit=2[dubsc][dubdsp];"
         f"[orig][dubsc]sidechaincompress="
-        f"threshold={s.DUCKING_THRESHOLD}:ratio={s.DUCKING_RATIO}:"
+        f"threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
         f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1[ducked];"
         f"[dubdsp]highpass=f={s.VOICE_HIGHPASS_HZ},"
         f"equalizer=f={s.VOICE_EQ_FREQ_HZ}:width_type=q:width=1:g={s.VOICE_EQ_GAIN_DB},"

@@ -37,11 +37,16 @@ class Settings(BaseSettings):
     # (past darajadagi dub ham duck'ni ishga tushiradi) va ratio oshirilib
     # (2026-08-12) original deyarli to'liq bostirilishi ta'minlandi — bu
     # foydalanuvchining aniq talabi ("ustidan dublaj qilganda bilinmasin").
-    # Yana kuchaytirildi (20->30, threshold 0.025->0.018) — foydalanuvchi
-    # yana ham kuchliroq farq so'radi (2026-08-12): "fondagi ovozni
-    # gapirayotganda pastlatib, dublaj ovozini ko'tarib qo'y."
+    # Foydalanuvchi yana ham kuchliroq farq so'radi (2026-08-12): "fondagi
+    # ovozni gapirayotganda pastlatib, dublaj ovozini ko'tarib qo'y."
+    # RATIO=20 — ffmpeg'ning sidechaincompress filtri qabul qiladigan ENG
+    # YUQORI qiymat (allaqachon shu chegarada edi; 30 sinab ko'rilganda
+    # ffmpeg xato berdi: "Value out of range [1 - 20]" — productionda
+    # haqiqiy job orqali aniqlangan). Shuning uchun qo'shimcha kuch
+    # THRESHOLD'ni pasaytirish (ko'proq sezgir) va dub'ning o'zini
+    # baland qilish (VOICE_GAIN_BOOST_DB) orqali olinadi.
     DUCKING_THRESHOLD: float = 0.018
-    DUCKING_RATIO: float = 30.0
+    DUCKING_RATIO: float = 20.0
     DUCKING_ATTACK_MS: int = 5
     DUCKING_RELEASE_MS: int = 400
     # Dub trekining o'zini ham baland qilish (fonni pasaytirish bilan bir
