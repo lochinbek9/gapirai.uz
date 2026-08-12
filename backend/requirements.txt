@@ -21,6 +21,7 @@ google-genai==1.3.0
 
 # Video / Audio Processing
 yt-dlp
+bgutil-ytdlp-pot-provider
 moviepy==1.0.3
 pydub==0.25.1
 audioop-lts==0.2.2; python_version>='3.13'

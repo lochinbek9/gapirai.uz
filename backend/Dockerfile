@@ -20,9 +20,13 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# yt-dlp config: enable Deno for PO tokens + EJS for JS challenge solving
+# yt-dlp config: enable Deno for PO tokens + EJS for JS challenge solving +
+# bgutil PO token provider (sidecar container "pot-provider") — without a
+# valid PO token, YouTube serves "UNPLAYABLE" for most videos from datacenter
+# IPs even with valid cookies (confirmed 2026-08-12 on production).
 RUN mkdir -p /root/.config/yt-dlp \
-    && printf '%s\n' '--js-runtimes' 'deno' '--remote-components' 'ejs:github' > /root/.config/yt-dlp/config
+    && printf '%s\n' '--js-runtimes' 'deno' '--remote-components' 'ejs:github' \
+       '--extractor-args' 'youtubepot-bgutilhttp:base_url=http://pot-provider:4416' > /root/.config/yt-dlp/config
 
 # OAuth token cache directory (persisted via volume)
 RUN mkdir -p /root/.cache/yt-dlp
