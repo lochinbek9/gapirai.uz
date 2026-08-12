@@ -116,6 +116,13 @@ class Settings(BaseSettings):
     CLICK_MERCHANT_USER_ID: str = "89102"
     FRONTEND_URL: str = "https://gapirai.uz"
 
+    # yt-dlp orqali YouTube'dan yuklab olishda ishlatiladigan HTTP(S) proxy —
+    # http://user:pass@host:port. AWS/GCP kabi datacenter IP'larni YouTube
+    # ko'pincha bot deb belgilab, PO token/cookie holatidan qat'iy nazar
+    # "Video unavailable" qaytaradi (2026-08-12 productionda tasdiqlangan);
+    # bo'sh bo'lsa proxysiz ishlaydi (lokal/rezident IP uchun kerak emas).
+    YOUTUBE_PROXY_URL: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"

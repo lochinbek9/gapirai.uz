@@ -146,6 +146,9 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         },
     }
 
+    if settings.YOUTUBE_PROXY_URL:
+        opts["proxy"] = settings.YOUTUBE_PROXY_URL
+
     temp_cookie_path = None
     cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
     if use_cookies and os.path.isfile(cookies_target):
