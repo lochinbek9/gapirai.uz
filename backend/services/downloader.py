@@ -146,7 +146,7 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         },
     }
 
-    if settings.YOUTUBE_PROXY_URL:
+    if settings.YOUTUBE_PROXY_ENABLED and settings.YOUTUBE_PROXY_URL:
         opts["proxy"] = settings.YOUTUBE_PROXY_URL
 
     temp_cookie_path = None

@@ -121,6 +121,9 @@ class Settings(BaseSettings):
     # ko'pincha bot deb belgilab, PO token/cookie holatidan qat'iy nazar
     # "Video unavailable" qaytaradi (2026-08-12 productionda tasdiqlangan);
     # bo'sh bo'lsa proxysiz ishlaydi (lokal/rezident IP uchun kerak emas).
+    # ENABLED alohida flag — provayderda muammo chiqsa, URL'ni o'chirmasdan
+    # tezda proxysiz rejimga qaytarish uchun.
+    YOUTUBE_PROXY_ENABLED: bool = True
     YOUTUBE_PROXY_URL: str = ""
 
     class Config:
