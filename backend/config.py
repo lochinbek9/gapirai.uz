@@ -8,6 +8,17 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     FREE_MODE: bool = False
 
+    # Dublyaj pipeline — segment darajasidagi avtomatik QA (audio_qa.py,
+    # tasks.py'ning TTS bosqichiga ulangan). Har bir segment uchun qo'shimcha
+    # Whisper chaqiruvi kerak bo'lgani uchun (haqiqiy, doimiy xarajat),
+    # kerak bo'lsa kodga tegmasdan o'chirish mumkin.
+    ENABLE_SEGMENT_QA: bool = True
+    SEGMENT_QA_THRESHOLD: float = 0.75
+    # Tarjima tayyor bo'lgach, taxminiy TTS davomiyligi original segment
+    # uzunligidan shu nisbatdan ko'p oshsa, bitta cheklangan qisqartirish
+    # bosqichi ishga tushadi (translator.py).
+    DURATION_OVERAGE_TOLERANCE: float = 1.15
+
     # JWT — avval backend/services/auth.py'da hardcoded edi; xuddi shu
     # standart qiymat bilan ko'chirildi, shuning uchun mavjud sessiyalar
     # buzilmaydi. Productionda .env orqali qiymatni almashtirish tavsiya

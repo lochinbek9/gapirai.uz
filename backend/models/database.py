@@ -84,6 +84,13 @@ class DubbingJob(Base):
     translated_segments = Column(JSONB, nullable=True)
     speech_segments = Column(JSONB, nullable=True)
 
+    # Har bir TTS segmentining avtomatik QA natijasi (audio_qa.py):
+    # {seg_id: {"score": float, "flags": [...], "attempts": int}}. Celery
+    # qayta urinishida synthesize_segments() shu maydonga qarab faqat
+    # muvaffaqiyatsiz/yo'q segmentlarnigina qayta sintez qiladi — butun TTS
+    # bosqichini emas.
+    segment_qa = Column(JSONB, nullable=True)
+
     original_video_path = Column(String(500))
     dubbed_audio_path = Column(String(500))
     output_video_path = Column(String(500))
@@ -199,6 +206,26 @@ class TTSUsageLog(Base):
     video_id = Column(String(64), nullable=True, index=True)  # DubbingJob yoki VideoAnalysis id (FK emas — ikkalasidan ham bo'lishi mumkin)
     user_id = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    # True bo'lsa, bu yozuv TTSCache'dan qaytarilgan (haqiqiy sintez bo'lmagan,
+    # estimated_cost=0) — xarajat hisobotida keshning ta'sirini ko'rish uchun.
+    cache_hit = Column(Boolean, nullable=False, default=False)
+
+
+class TTSCache(Base):
+    """Segment darajasidagi TTS audio keshi — bir xil matn+ovoz+provider
+    kombinatsiyasi qayta sintez qilinmasdan S3'dagi mavjud audio qaytariladi
+    (backend/services/tts_cache.py). Lokal diskda emas — job tugagach mahalliy
+    fayllar o'chiriladi (tasks.py), shuning uchun kesh S3'da yashashi shart.
+    """
+    __tablename__ = "tts_cache"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    cache_key = Column(String(64), unique=True, nullable=False, index=True)  # sha256(text+voice+provider)
+    provider = Column(String(30), nullable=False)
+    s3_key = Column(String(500), nullable=False)
+    hit_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class PlanTier(str, enum.Enum):
@@ -336,6 +363,14 @@ def create_tables():
             connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(20) NOT NULL DEFAULT 'password'"))
             connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"))
             connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS segment_qa JSONB"))
+            connection.execute(text("ALTER TABLE tts_usage_logs ADD COLUMN IF NOT EXISTS cache_hit BOOLEAN NOT NULL DEFAULT false"))
             connection.commit()
     except Exception:
         pass

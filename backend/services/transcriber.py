@@ -152,6 +152,31 @@ def call_openai_with_retry(api_func, *args, **kwargs):
             time.sleep(sleep_time)
 
 
+def _bucket_words_into_segments(words: list[dict], segments: list[dict]) -> None:
+    """OpenAI so'z darajasidagi timestamp'lar javobning yuqori darajasida
+    (segmentlar ichida emas) qaytariladi — har bir so'zni o'z vaqt oralig'iga
+    to'g'ri keladigan segmentga joylashtiradi (in-place, segments["words"])."""
+    if not words or not segments:
+        return
+    for seg in segments:
+        seg["words"] = []
+    idx = 0
+    for word in words:
+        w_start = word.get("start")
+        if w_start is None:
+            continue
+        while idx + 1 < len(segments) and w_start >= segments[idx + 1]["start"]:
+            idx += 1
+        # So'z segment oralig'idan chetga chiqib ketishi mumkin (masalan
+        # chunk chegarasida) — eng yaqin segmentga baribir biriktiriladi,
+        # tashlab yuborilmaydi.
+        segments[idx]["words"].append({
+            "word": word.get("word", ""),
+            "start": round(float(w_start), 3),
+            "end": round(float(word.get("end", w_start)), 3),
+        })
+
+
 def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
     with chunk_path.open("rb") as audio_file:
         response = call_openai_with_retry(
@@ -160,7 +185,7 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dic
             model=settings.OPENAI_TRANSCRIPTION_MODEL,
             language="en",
             response_format="verbose_json",
-            timestamp_granularities=["segment"],
+            timestamp_granularities=["segment", "word"],
         )
 
     response_data = _response_to_dict(response)
@@ -179,6 +204,21 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dic
                 "text": text,
             }
         )
+
+    # "word" granularity so'ralganda javob top-level "words" ro'yxatini ham
+    # qaytaradi (segmentlar ichida emas) — offset qo'shib, tegishli
+    # segmentlarga taqsimlanadi.
+    raw_words = response_data.get("words") or []
+    if raw_words and segments:
+        offset_words = []
+        for w in raw_words:
+            w_dict = w if isinstance(w, dict) else _segment_to_dict(w)
+            offset_words.append({
+                "word": w_dict.get("word", ""),
+                "start": w_dict.get("start", 0) + offset_seconds,
+                "end": w_dict.get("end", 0) + offset_seconds,
+            })
+        _bucket_words_into_segments(offset_words, segments)
 
     return (
         segments,

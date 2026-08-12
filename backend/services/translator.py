@@ -335,6 +335,121 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
         return _translate_chunk_gemini(segments, clean_segments)
 
 
+_CALIBRATED_RATE_CACHE: dict = {"value": None, "computed_at": 0.0}
+_DEFAULT_CHARS_PER_SECOND = 15.0  # taxminiy — TTSUsageLog'da hali ma'lumot bo'lmasa
+
+
+def _get_calibrated_chars_per_second() -> float:
+    """TTSUsageLog'dagi haqiqiy sintez natijalaridan o'rtacha belgi/soniya
+    tezligini hisoblaydi (taxmin emas, real ma'lumot). Jarayon davomida
+    keshlanadi — har segment uchun DB so'rov yubormaslik uchun."""
+    now = time.time()
+    if _CALIBRATED_RATE_CACHE["value"] is not None and now - _CALIBRATED_RATE_CACHE["computed_at"] < 3600:
+        return _CALIBRATED_RATE_CACHE["value"]
+
+    rate = _DEFAULT_CHARS_PER_SECOND
+    try:
+        from backend.models.database import SessionLocal, TTSUsageLog
+        db = SessionLocal()
+        try:
+            rows = (
+                db.query(TTSUsageLog)
+                .filter(TTSUsageLog.duration_seconds.isnot(None), TTSUsageLog.duration_seconds > 0, TTSUsageLog.characters > 0)
+                .order_by(TTSUsageLog.created_at.desc())
+                .limit(500)
+                .all()
+            )
+            total_chars = sum(r.characters for r in rows)
+            total_seconds = sum(r.duration_seconds for r in rows)
+            if total_seconds > 0:
+                rate = total_chars / total_seconds
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning(f"Kalibrlangan nutq tezligini olishda xatolik, standart qiymat ishlatiladi: {exc}")
+
+    _CALIBRATED_RATE_CACHE["value"] = rate
+    _CALIBRATED_RATE_CACHE["computed_at"] = now
+    return rate
+
+
+def estimate_duration_seconds(text: str) -> float:
+    """Matn TTS bilan taxminan qancha davom etishini hisoblaydi — haqiqiy
+    sintez qilmasdan, TTSUsageLog'dan kalibrlangan belgi/soniya tezligi
+    orqali. Aniq emas, lekin narxsiz va tez — tarjima uzunligini TTS'dan
+    OLDIN, bitta qo'shimcha API chaqiruvisiz tekshirish uchun yetarli."""
+    chars = len(text or "")
+    if chars == 0:
+        return 0.0
+    return chars / _get_calibrated_chars_per_second()
+
+
+_SHORTEN_SYSTEM_PROMPT = """Siz professional o'zbek dublyaj muharririsiz. Sizga
+o'zbekcha dublyaj matni segmentlari beriladi — ular TTS orqali aytilganda,
+original video segmentining vaqt oralig'iga sig'may qolgan (juda uzun).
+
+Vazifangiz: har bir segment matnini QISQARTIRING, shunda u aytilganda
+belgilangan maksimal davomiylikka (max_seconds) sig'sin, lekin:
+- asosiy ma'no va ohang saqlansin
+- tabiiy, jonli o'zbek tilida qolsin (kitobiy/robot tilga aylanmasin)
+- keraksiz so'zlarni ("va", "ham", "esa", takroriy iboralarni) olib tashlang
+- gapni to'liq, tugallangan holda qoldiring — yarim gap qilib kesmang
+
+JSON formatida qaytaring. Faqat "text" maydonini qisqartiring."""
+
+
+def shorten_segments(segments: list[dict], targets: dict) -> list[dict]:
+    """Berilgan segmentlarni target soniyaga sig'adigan qilib BIR MARTA
+    qisqartiradi (iteratsiya qilmaydi — natija hali ham uzun bo'lsa,
+    synthesizer.py'dagi audio tezlashtirish xavfsizlik to'ri buni hal qiladi).
+
+    targets: {segment_id: max_seconds}. Xatolik bo'lsa original segmentlar
+    o'zgarishsiz qaytariladi — bu bosqich hech qachon pipeline'ni qulatmaydi.
+    """
+    if not segments:
+        return segments
+
+    payload = [{**s, "max_seconds": round(targets.get(s["id"], 0), 2)} for s in segments]
+    clean_payload = [{**s, "text": _clean_text(s.get("text", ""))} for s in payload]
+
+    instruction = (
+        "Quyidagi segmentlarni max_seconds ga sig'adigan qilib qisqartiring.\n"
+        "MUHIM: faqat 'text' maydonini qisqartiring. id, start, end, max_seconds — o'zgartirmang.\n"
+        "JAVOB FORMATI — faqat shu ko'rinishda:\n"
+        '{"segments": [{"id": ..., "start": ..., "end": ..., "text": "QISQARTIRILGAN MATN"}, ...]}\n\n'
+        f"{json.dumps(clean_payload, ensure_ascii=True, indent=2)}"
+    )
+
+    try:
+        if settings.TRANSLATE_PROVIDER == "gemini":
+            from google.genai import types
+            config = types.GenerateContentConfig(
+                system_instruction=_SHORTEN_SYSTEM_PROMPT,
+                temperature=0.4,
+                response_mime_type="application/json",
+            )
+            response = _get_gemini_client().models.generate_content(
+                model=_gemini_text_model(), contents=instruction, config=config,
+            )
+            result = json.loads(response.text)
+        else:
+            response = call_openai_with_retry(
+                _get_client().chat.completions.create,
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": _SHORTEN_SYSTEM_PROMPT},
+                    {"role": "user", "content": instruction},
+                ],
+                temperature=0.4,
+                response_format={"type": "json_object"},
+            )
+            result = json.loads(response.choices[0].message.content)
+        return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+    except Exception as exc:
+        logger.warning(f"Segmentlarni qisqartirishda xatolik — original tarjima saqlanadi: {exc}")
+        return segments
+
+
 def translate_full_text(text: str) -> str:
     """To'liq matnni tarjima qilish (ko'rish uchun)."""
     response = call_openai_with_retry(

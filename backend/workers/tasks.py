@@ -235,6 +235,27 @@ def process_video(self: Task, job_id: str) -> dict:
         else:
             _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
             translated_segments = translator.translate_segments(segments)
+
+            # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
+            # uzunroq chiqqan tarjimalar BIR MARTA qisqartiriladi (haqiqiy
+            # TTS chaqirilmasdan, belgi-tezlik evristikasi bilan taxmin
+            # qilinadi). TRANSLATE checkpoint'i bilan birga saqlanadi —
+            # qayta ishlashda ikkalasi ham birga o'tkazib yuboriladi.
+            over_budget = {}
+            for seg in translated_segments:
+                target = seg.get("end", 0) - seg.get("start", 0)
+                if target <= 0:
+                    continue
+                estimated = translator.estimate_duration_seconds(seg.get("text", ""))
+                if estimated > target * settings.DURATION_OVERAGE_TOLERANCE:
+                    over_budget[seg["id"]] = target
+            if over_budget:
+                logger.info(f"Job {job_id}: {len(over_budget)} segment vaqt byudjetidan oshib ketgan — qisqartirilmoqda.")
+                to_shorten = [s for s in translated_segments if s["id"] in over_budget]
+                shortened = translator.shorten_segments(to_shorten, over_budget)
+                shortened_by_id = {s["id"]: s for s in shortened}
+                translated_segments = [shortened_by_id.get(s["id"], s) for s in translated_segments]
+
             job.translated_text = " ".join(s["text"] for s in translated_segments)
             job.uzbek_srt_content = _segments_to_vtt(translated_segments)
             job.translated_segments = translated_segments
@@ -270,11 +291,16 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
             tts_dir = str(output_dir / "tts_segments")
-            dubbed_audio_path, actual_timings = synthesizer.synthesize_segments(
+            dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
-                video_id=job_id, user_id=(str(job.user_id) if job.user_id else None)
+                video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
+                existing_qa=job.segment_qa,
             )
             job.dubbed_audio_path = dubbed_audio_path
+            # Segment darajasidagi QA checkpoint — Celery qayta urinishida
+            # faqat muvaffaqiyatsiz/tekshirilmagan segmentlar qayta
+            # ishlanadi (synthesizer.py'ning existing_qa parametri orqali).
+            job.segment_qa = qa_results
             # Audio gap kesilib qolmasligi uchun original vaqtdan siljigan
             # bo'lishi mumkin (synthesizer.py) — subtitr shu HAQIQIY
             # vaqtlar bilan qayta quriladi, aks holda ovoz bilan mos

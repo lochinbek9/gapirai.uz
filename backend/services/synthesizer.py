@@ -94,6 +94,13 @@ def _synthesize_text(
     bitta ovoz eshitilishini ta'minlash uchun synthesize_segments() bu qiymatni
     kuzatib boradi.
     """
+    # Kesh faqat SHU YERDA o'qiladi (get_cached) — yozish (store_cached) esa
+    # synthesize_segments()'da, QA o'tgandan KEYIN amalga oshiriladi. Agar
+    # bu yerda darhol yozilsa, QA muvaffaqiyatsiz bo'lib ICHKI qayta urinish
+    # xuddi shu matn/ovoz/provider bilan qayta chaqirilganda, keshdan AYNAN
+    # O'SHA yaroqsiz audio qaytib kelardi — qayta urinish ma'nosiz bo'lardi.
+    from backend.services.tts_cache import get_cached
+
     if settings.FREE_MODE:
         logger.info("FREE_MODE: Edge TTS (bepul) ishlatilmoqda...")
         fallback = get_fallback_provider()
@@ -104,6 +111,13 @@ def _synthesize_text(
 
     # --- Asosiy provider ---
     primary = get_provider()
+
+    # Kesh: bir xil matn+ovoz+provider oldin sintez qilingan bo'lsa, qayta
+    # pul to'lamasdan S3'dan qaytariladi (backend/services/tts_cache.py).
+    if get_cached(text, voice_name, primary.name, output_path):
+        log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
+        return primary.name
+
     logger.info(f"TTS provider: {primary.name} | chars={len(text)}")
 
     try:
@@ -119,6 +133,9 @@ def _synthesize_text(
     # --- Fallback: vaqtinchalik xatoliklar uchun ---
     if settings.ELEVENLABS_FALLBACK_TO_EDGE:
         fallback = get_fallback_provider()
+        if get_cached(text, voice_name, fallback.name, output_path):
+            log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
+            return fallback.name
         try:
             if fallback.synthesize(text, output_path, voice_name=voice_name):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
@@ -207,21 +224,28 @@ def synthesize_segments(
     voice_name: str | None = None,
     video_id: str | None = None,
     user_id: str | None = None,
-) -> tuple[str, list[dict]]:
+    existing_qa: dict | None = None,
+) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
 
     Sinxronizatsiya va sifat strategiyasi:
     - HECH QACHON gap / matn oxiridan kesib tashlanmaydi!
     - Har bir audio segment headroom normalizatsiyadan o'tkaziladi (shirillash to'liq yo'qotiladi).
-    - Kerak bo'lsa biroz mo''tadil tezlashtiriladi (max 1.25x).
+    - Kerak bo'lsa biroz mo''tadil tezlashtiriladi (max 1.45x) yoki (qisqa
+      bo'lsa) sekinlashtiriladi.
     - Hali ham yetmasa, keyingi segment boshlanishi keyinroqqa suriladi (gap to'liq tugaydi).
 
-    Returns: (audio_fayl_yo'li, haqiqiy_vaqtlar) — ikkinchisi original
-    Whisper vaqtlaridan siljigan bo'lishi mumkin (yuqoridagi qoida
+    existing_qa: oldingi Celery urinishidan segment_qa checkpoint'i
+    (backend/models/database.py: DubbingJob.segment_qa) — {seg_id: {"score",
+    "flags", "attempts"}}. Allaqachon o'tgan segmentlar qayta QA qilinmaydi
+    (audio esa TTS keshi orqali baribir qayta pul to'lamasdan olinadi).
+
+    Returns: (audio_fayl_yo'li, haqiqiy_vaqtlar, qa_natijalari) — ikkinchisi
+    original Whisper vaqtlaridan siljigan bo'lishi mumkin (yuqoridagi qoida
     tufayli), shuning uchun chaqiruvchi subtitr matnini SHU vaqtlar bilan
     qayta qurishi kerak — aks holda subtitr ovozdan orqada/oldinda qolib
-    ketadi.
+    ketadi. Uchinchisi — job.segment_qa'ga saqlanadigan yangilangan QA holati.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -324,13 +348,79 @@ def synthesize_segments(
                         except Exception:
                             pass
 
+    # 1.5. Avtomatik QA — har bir segment audiosini qayta STT orqali
+    # tekshiradi (backend/services/audio_qa.py). Muvaffaqiyatsiz segmentlar
+    # BIR MARTA joyida qayta sintez qilinadi (butun TTS bosqichi emas).
+    # Allaqachon o'tgan segmentlar (existing_qa, oldingi Celery urinishidan
+    # checkpoint) qayta tekshirilmaydi — qo'shimcha Whisper chaqiruvi shart
+    # emas. Faqat QA'dan o'tgan audio keshga yoziladi (backend/services/
+    # tts_cache.py) — aks holda yaroqsiz audio keshlanib, keyingi urinishda
+    # AYNAN o'sha yaroqsiz audio qaytib kelardi.
+    qa_results: dict = {str(k): v for k, v in (existing_qa or {}).items()}
+    if settings.ENABLE_SEGMENT_QA:
+        from backend.services.audio_qa import check_audio_quality
+        from backend.services.tts_cache import store_cached
+
+        def _qa_and_maybe_retry(item):
+            seg_id = item["seg_id"]
+            prior = qa_results.get(str(seg_id), {})
+            if prior.get("score", 0) >= settings.SEGMENT_QA_THRESHOLD:
+                return item, prior
+
+            attempts = prior.get("attempts", 0)
+            qa_file = output_path / f"seg_qa_{seg_id:04d}.wav"
+            qa = {"score": 0.0, "flags": ["no_speech"], "recognized_text": "", "missing_word_ratio": 1.0}
+            try:
+                item["audio"].export(str(qa_file), format="wav")
+                qa = check_audio_quality(str(qa_file), item["text"])
+
+                if qa["score"] < settings.SEGMENT_QA_THRESHOLD and attempts < 2:
+                    logger.warning(f"Segment {seg_id} QA'dan o'tmadi (score={qa['score']}, flags={qa['flags']}) — qayta sintez qilinmoqda.")
+                    retry_file = output_path / f"seg_qaretry_{seg_id:04d}.wav"
+                    try:
+                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+                        if retry_file.exists():
+                            item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
+                            item["engine"] = engine
+                            item["audio"].export(str(qa_file), format="wav")
+                            qa = check_audio_quality(str(qa_file), item["text"])
+                    finally:
+                        if retry_file.exists():
+                            try:
+                                retry_file.unlink()
+                            except Exception:
+                                pass
+                    attempts += 1
+
+                qa["attempts"] = attempts
+                if qa["score"] >= settings.SEGMENT_QA_THRESHOLD:
+                    try:
+                        store_cached(item["text"], voice_name, item["engine"], str(qa_file))
+                    except Exception:
+                        pass
+            finally:
+                if qa_file.exists():
+                    try:
+                        qa_file.unlink()
+                    except Exception:
+                        pass
+            return item, qa
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            qa_pairs = list(executor.map(_qa_and_maybe_retry, seg_data))
+        seg_data = [pair[0] for pair in qa_pairs]
+        for item, qa in qa_pairs:
+            qa_results[str(item["seg_id"])] = qa
+
     # 2. Vaqtga moslashtirish — AUDIO HECH QACHON O'RTADAN KESILMAYDI.
     # Avval mo''tadil tezlashtiramiz (max 1.45x); shundan keyin ham audio
     # o'ziga ajratilgan vaqt oralig'idan uzun bo'lsa, KEYINGI segment
     # boshlanishi shunga mos kechiktiriladi — gap hech qachon so'zning
     # yarmida kesilib qolmaydi (oldingi versiyada fade-out bilan qirqib
     # tashlangan, bu "gap oxirigacha aytilmayapti" muammosining asosiy
-    # sababi edi).
+    # sababi edi). Sezilarli QISQA segmentlar esa (o'lik sukunatni
+    # kamaytirish uchun) biroz sekinlashtiriladi — juda katta cho'zish
+    # notabiiy eshitilishi mumkinligi uchun faqat mo''tadil qisqalikda.
     prev_end_ms = 0
     for i in range(len(seg_data)):
         cur = seg_data[i]
@@ -350,6 +440,13 @@ def synthesize_segments(
             if speed_factor > 1.03:
                 try:
                     cur["audio"] = _speedup_audio(cur["audio"], speed_factor)
+                except Exception:
+                    pass
+        elif slot_ms > 150 and audio_ms < slot_ms * 0.7:
+            factor = audio_ms / slot_ms
+            if factor >= 0.5:
+                try:
+                    cur["audio"] = _speedup_audio(cur["audio"], factor)
                 except Exception:
                     pass
 
@@ -399,6 +496,6 @@ def synthesize_segments(
         except Exception:
             pass
 
-    return merged_path, actual_timings
+    return merged_path, actual_timings, qa_results
 
 

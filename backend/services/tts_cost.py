@@ -37,15 +37,20 @@ def log_tts_usage(
     audio_path: str,
     video_id: str | None = None,
     user_id: str | None = None,
+    cache_hit: bool = False,
 ) -> None:
     """Muvaffaqiyatli sintezdan keyin bitta TTSUsageLog yozuvi yaratadi.
     Xatolik bo'lsa (masalan DB vaqtincha mavjud emas) faqat log qiladi —
     dublyaj pipeline'ini hech qachon to'xtatmaydi (cost tracking ikkinchi
-    darajali, asosiy pipeline birinchi)."""
+    darajali, asosiy pipeline birinchi).
+
+    cache_hit=True bo'lsa (backend/services/tts_cache.py), haqiqiy sintez
+    bo'lmagani uchun xarajat 0 — lekin keshning real ta'sirini ko'rish uchun
+    baribir yoziladi (butunlay o'tkazib yuborilmaydi)."""
     try:
         chars = len(text or "")
         currency = "UZS" if provider.name in _UZS_PROVIDERS else "USD"
-        cost = provider.estimate_cost(chars)
+        cost = 0.0 if cache_hit else provider.estimate_cost(chars)
         duration = _get_audio_duration_seconds(audio_path)
 
         db = SessionLocal()
@@ -58,6 +63,7 @@ def log_tts_usage(
                 currency=currency,
                 video_id=video_id,
                 user_id=user_id,
+                cache_hit=cache_hit,
             ))
             db.commit()
         finally:
