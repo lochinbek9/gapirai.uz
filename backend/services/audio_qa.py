@@ -37,9 +37,16 @@ def _has_consecutive_repeat(words: list[str], run_len: int = _REPEAT_RUN_THRESHO
     return False
 
 
-def check_audio_quality(audio_path: str, expected_text: str) -> dict:
+def check_audio_quality(audio_path: str, expected_text: str, language: str = "uz") -> dict:
     """
     Generatsiya qilingan audioni STT orqali qayta tekshiradi.
+
+    language: audio'da qaysi til gapirilishi kutilmoqda — bu audio TTS
+    tomonidan yaratilgan DUBLYAJ chiqishi, standart "uz". Noto'g'ri til
+    berilsa (masalan "en"), Whisper o'zbekcha nutqni inglizchaga zo'rlab
+    talqin qiladi va butun tekshiruv yaroqsiz natija beradi (2026-08-12
+    productionda haqiqiy job'da tasdiqlangan xato — har bir segment
+    "missing_words" bilan muvaffaqiyatsiz bo'lgan edi).
 
     Returns:
         {
@@ -54,7 +61,7 @@ def check_audio_quality(audio_path: str, expected_text: str) -> dict:
         return {"score": 1.0, "flags": [], "recognized_text": "", "missing_word_ratio": 0.0}
 
     try:
-        transcript = transcribe_audio(audio_path)
+        transcript = transcribe_audio(audio_path, language=language)
         recognized_text = transcript.get("text", "") or ""
     except Exception as exc:
         logger.warning(f"Audio QA: STT round-trip xatosi: {exc}")

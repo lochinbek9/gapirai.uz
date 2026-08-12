@@ -177,13 +177,13 @@ def _bucket_words_into_segments(words: list[dict], segments: list[dict]) -> None
         })
 
 
-def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
+def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str = "en") -> tuple[list[dict], str, str]:
     with chunk_path.open("rb") as audio_file:
         response = call_openai_with_retry(
             _get_client().audio.transcriptions.create,
             file=audio_file,
             model=settings.OPENAI_TRANSCRIPTION_MODEL,
-            language="en",
+            language=language,
             response_format="verbose_json",
             timestamp_granularities=["segment", "word"],
         )
@@ -227,19 +227,24 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float) -> tuple[list[dic
     )
 
 
-_TRANSCRIBE_PROMPT = (
-    "Transcribe this audio clip verbatim in English, exactly as spoken. "
-    "Split the transcription into short natural subtitle-style segments "
-    "(roughly one sentence or clause each). For each segment, give its "
-    "start and end time in seconds, measured from the very start of THIS "
-    "audio clip (0.0 = beginning of the clip). Silent/music-only clips "
-    "should return an empty segments list.\n\n"
-    'Respond with ONLY this JSON shape, no other text:\n'
-    '{"segments": [{"start": 0.0, "end": 2.4, "text": "..."}, ...]}'
-)
+_TRANSCRIBE_LANGUAGE_NAMES = {"en": "English", "uz": "Uzbek"}
 
 
-def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[list[dict], str, str]:
+def _build_transcribe_prompt(language: str) -> str:
+    lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language)
+    return (
+        f"Transcribe this audio clip verbatim in {lang_name}, exactly as spoken. "
+        "Split the transcription into short natural subtitle-style segments "
+        "(roughly one sentence or clause each). For each segment, give its "
+        "start and end time in seconds, measured from the very start of THIS "
+        "audio clip (0.0 = beginning of the clip). Silent/music-only clips "
+        "should return an empty segments list.\n\n"
+        'Respond with ONLY this JSON shape, no other text:\n'
+        '{"segments": [{"start": 0.0, "end": 2.4, "text": "..."}, ...]}'
+    )
+
+
+def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str = "en") -> tuple[list[dict], str, str]:
     """OpenAI muqobili sifatida — Vertex AI orqali Gemini bilan transkripsiya.
     Whisper'ning audio-alignment aniqligiga teng emas, lekin OpenAI krediti
     tugagan holatlarda navbatni to'xtatib qo'ymaslik uchun yetarli."""
@@ -252,7 +257,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[l
     )
     contents = [
         types.Part.from_bytes(data=audio_bytes, mime_type="audio/mpeg"),
-        _TRANSCRIBE_PROMPT,
+        _build_transcribe_prompt(language),
     ]
 
     max_attempts = 5
@@ -280,7 +285,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[l
                     "end": round(float(end) + offset_seconds, 3),
                     "text": text,
                 })
-            return segments, " ".join(text_parts), "en"
+            return segments, " ".join(text_parts), language
         except Exception as e:
             is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
             is_bad_json = isinstance(e, json.JSONDecodeError)
@@ -289,13 +294,20 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float) -> tuple[l
             backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
             logger.warning(f"Gemini transkripsiya xato — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts}): {e}")
             time.sleep(backoff)
-    return [], "", "en"
+    return [], "", language
 
 
-def transcribe_audio(audio_path: str) -> dict:
+def transcribe_audio(audio_path: str, language: str = "en") -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
+    language: audio'da qaysi til gapirilishi kutilmoqda ("en" — original
+    video, dublyaj pipeline'ining standart holati; "uz" — dublyaj qilingan
+    audio'ni QA orqali qayta tekshirishda, backend/services/audio_qa.py).
+    Bu OpenAI/Gemini'ga qaysi tilni tinglashini aytadi — noto'g'ri til
+    berilsa, masalan o'zbekcha audio "en" bilan so'ralsa, Whisper uni
+    inglizchaga zo'rlab talqin qilib, butunlay boshqa (yaroqsiz) matn
+    qaytaradi (2026-08-12 productionda tasdiqlangan xato).
     Returns:
         dict: {
             "text": str,           # To'liq matn
@@ -308,9 +320,9 @@ def transcribe_audio(audio_path: str) -> dict:
         try:
             from faster_whisper import WhisperModel
             logger.info("FREE_MODE: Running local faster-whisper transcription (small model on CPU)...")
-            
+
             model = WhisperModel("tiny", device="cpu", compute_type="int8")
-            segments, info = model.transcribe(audio_path, beam_size=5)
+            segments, info = model.transcribe(audio_path, beam_size=5, language=language)
             
             segments_list = []
             full_text_parts = []
@@ -344,16 +356,16 @@ def transcribe_audio(audio_path: str) -> dict:
 
     segments_list = []
     full_text_parts = []
-    language = "en"
+    detected_language = language
 
     def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str]:
         try:
-            return _transcribe_chunk(cpath, offset_seconds=offset)
+            return _transcribe_chunk(cpath, offset_seconds=offset, language=language)
         except Exception as e:
             if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
                 raise
             logger.warning(f"OpenAI transkripsiya muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
-            return _transcribe_chunk_gemini(cpath, offset_seconds=offset)
+            return _transcribe_chunk_gemini(cpath, offset_seconds=offset, language=language)
 
     with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
         chunk_paths = _chunk_audio(audio_path, Path(temp_dir))
@@ -377,7 +389,7 @@ def transcribe_audio(audio_path: str) -> dict:
             if chunk_segments:
                 segments_list.extend(chunk_segments)
             if chunk_language:
-                language = chunk_language
+                detected_language = chunk_language
 
     srt_lines = []
     for i, seg in enumerate(segments_list, start=1):
@@ -393,7 +405,7 @@ def transcribe_audio(audio_path: str) -> dict:
         "text": " ".join(full_text_parts),
         "segments": segments_list,
         "srt": "\n".join(srt_lines),
-        "language": language,
+        "language": detected_language,
     }
 
 
