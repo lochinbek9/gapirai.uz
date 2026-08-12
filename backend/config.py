@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     # kerak (2026-08-12). Qattiqroq chegara ko'proq segmentni original
     # davomiylikka moslab qisqartirishga majbur qiladi, TTS pleyback tezligini
     # sun'iy o'zgartirishga (notabiiy eshitiladi) tayanish o'rniga.
-    DURATION_OVERAGE_TOLERANCE: float = 1.08
+    # Yana ham qattiqlashtirildi (1.08->1.03) — foydalanuvchi keyingi
+    # tinglovda segmentlar orasidagi siljish ("it's a problem" 2.57 o'rniga
+    # 2.58-2.59da chiqishi) hali sezilarli ekanini aytdi. Qisqa segment
+    # sekinlashtirish logikasi ham butunlay olib tashlandi (synthesizer.py)
+    # — endi TTS deyarli har doim tabiiy tezlikda gapiradi, siljish faqat
+    # tarjima bosqichida (matn qisqartirish orqali) oldini olinadi.
+    DURATION_OVERAGE_TOLERANCE: float = 1.03
 
     # Dynamic audio ducking (merger.py) — original audio dub gapirayotganda
     # butunlay o'chirilmaydi, faqat pasaytiriladi (kino dublyajidagi kabi).

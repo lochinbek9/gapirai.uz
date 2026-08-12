@@ -53,10 +53,11 @@ def _build_sentence_body(sentence: str) -> str:
 
 def _build_ssml(text: str, voice_name: str) -> str:
     is_female = "Madina" in voice_name
-    # Avval -4%/-8% edi — real tinglovda ovoz sun'iy "cho'zilgan" eshitildi
-    # (2026-08-12). Kino dublyajida tabiiy tezlik kutiladi, sun'iy
-    # sekinlashtirilgan emas — deyarli neytral tezlikka qaytarildi.
-    rate   = "-2%" if is_female else "-3%"
+    # Avval -4%/-8%, keyin -2%/-3% edi — real tinglovda ovoz hali ham
+    # original ovozdan "sekinroq" his qilindi (2026-08-12). To'liq neytral
+    # (0%) qilindi — Azure'ning o'z tabiiy tezligi eng yaxshi boshlang'ich
+    # nuqta, sun'iy o'zgartirishsiz.
+    rate   = "0%"
     pitch  = "+2%" if is_female else "0%"
 
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())

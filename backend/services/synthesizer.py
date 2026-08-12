@@ -393,19 +393,14 @@ def synthesize_segments(
                     cur["audio"] = _speedup_audio(cur["audio"], speed_factor)
                 except Exception:
                     pass
-        elif slot_ms > 150 and audio_ms < slot_ms * 0.55:
-            # Faqat SEZILARLI qisqa segmentlarda (slotning yarmidan kamida)
-            # va faqat 25%gacha sekinlashtiriladi (factor pastki chegarasi
-            # 0.75) — avvalgi 0.5 chegarasi ovozni "cho'zilib, notabiiy"
-            # eshitilishiga olib kelardi (2026-08-12, real tinglov orqali
-            # aniqlangan). Kino dublyajida ovoz hech qachon sun'iy cho'zilgan
-            # eshitilmasligi kerak — o'lik sukunat qoldirish tabiiyroq.
-            factor = max(audio_ms / slot_ms, 0.75)
-            if factor < 0.97:
-                try:
-                    cur["audio"] = _speedup_audio(cur["audio"], factor)
-                except Exception:
-                    pass
+        # Qisqa segmentlarni sun'iy sekinlashtirish OLIB TASHLANDI (2026-08-12,
+        # real tinglov orqali aniqlangan): foydalanuvchi ovoz tezligi
+        # BIR XILDA, original ovozdek tabiiy bo'lishini so'radi — segmentga
+        # qarab ba'zan tezlashtirilib, ba'zan sekinlashtirilib turishning
+        # o'zi "notekis" hissi berardi. Endi TTS FAQAT o'z tabiiy tezligida
+        # gapiradi (yoki juda uzun bo'lsa yuqoridagi xavfsizlik to'ri bilan
+        # tezlashtiriladi) — qisqa segmentdan keyingi ortiqcha vaqt shunchaki
+        # tabiiy pauza sifatida qoladi, sun'iy cho'zilmaydi.
 
         cur["start_ms"] = start_ms
         prev_end_ms = start_ms + len(cur["audio"])
