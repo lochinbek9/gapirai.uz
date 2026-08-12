@@ -146,56 +146,6 @@ def _synthesize_text(
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 
 
-def _split_into_sentences(text: str) -> list[str]:
-    """Matnni gaplarga bo'lish."""
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    return [s for s in sentences if s.strip()]
-
-
-def _build_ssml(text: str, voice_name: str | None = None) -> str:
-    chosen_voice = voice_name or settings.AZURE_VOICE_NAME
-    is_female = "Madina" in chosen_voice
-
-    if is_female:
-        rate   = "-4%"
-        pitch  = "+2%"
-        volume = "0%"
-    else:
-        rate   = "-8%"
-        pitch  = "0%"
-        volume = "0%"
-
-    sentences = _split_into_sentences(text)
-    ssml_sentences = []
-    for sent in sentences:
-        body = saxutils.escape(sent)
-        if sent.rstrip().endswith("?"):
-            ssml_sentences.append(
-                f'<p><prosody pitch="+4%">{body}</prosody></p>'
-            )
-        elif sent.rstrip().endswith("!"):
-            ssml_sentences.append(
-                f'<p><prosody pitch="+2%">{body}</prosody></p>'
-            )
-        else:
-            ssml_sentences.append(f'<p>{body}</p>')
-
-    inner = "\n".join(ssml_sentences)
-
-    return (
-        '<speak version="1.0" '
-        'xmlns="http://www.w3.org/2001/10/synthesis" '
-        'xmlns:mstts="http://www.w3.org/2001/mstts" '
-        f'xml:lang="uz-UZ">'
-        f'<voice name="{chosen_voice}">'
-        f'<prosody rate="{rate}" pitch="{pitch}" volume="{volume}">'
-        f'{inner}'
-        f'</prosody>'
-        f'</voice>'
-        f'</speak>'
-    )
-
-
 def _speedup_audio(audio: AudioSegment, factor: float) -> AudioSegment:
     """FFmpeg atempo filter bilan audio tezlashtirish (pitch va namuna chastotasi o'zgarmaydi, toza ovoz saqlanadi)."""
     factor = max(0.5, min(2.0, round(factor, 3)))
@@ -443,9 +393,15 @@ def synthesize_segments(
                     cur["audio"] = _speedup_audio(cur["audio"], speed_factor)
                 except Exception:
                     pass
-        elif slot_ms > 150 and audio_ms < slot_ms * 0.7:
-            factor = audio_ms / slot_ms
-            if factor >= 0.5:
+        elif slot_ms > 150 and audio_ms < slot_ms * 0.55:
+            # Faqat SEZILARLI qisqa segmentlarda (slotning yarmidan kamida)
+            # va faqat 25%gacha sekinlashtiriladi (factor pastki chegarasi
+            # 0.75) — avvalgi 0.5 chegarasi ovozni "cho'zilib, notabiiy"
+            # eshitilishiga olib kelardi (2026-08-12, real tinglov orqali
+            # aniqlangan). Kino dublyajida ovoz hech qachon sun'iy cho'zilgan
+            # eshitilmasligi kerak — o'lik sukunat qoldirish tabiiyroq.
+            factor = max(audio_ms / slot_ms, 0.75)
+            if factor < 0.97:
                 try:
                     cur["audio"] = _speedup_audio(cur["audio"], factor)
                 except Exception:

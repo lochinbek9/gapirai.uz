@@ -286,6 +286,12 @@ def process_video(self: Task, job_id: str) -> dict:
         if job.dubbed_audio_path and Path(job.dubbed_audio_path).exists():
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "skipped")
             dubbed_audio_path = job.dubbed_audio_path
+            # Checkpoint orqali qayta tiklangan job uchun aniq segment
+            # vaqtlari qayta hisoblanmaydi (qimmat emas, shunchaki mavjud
+            # emas bu bosqichda) — yakuniy QA (pastda) bunsiz ham
+            # clipping/balandlik tekshiruvlarini bajaradi, faqat dub/fon
+            # balansi tekshiruvi o'tkazib yuboriladi.
+            actual_timings = None
         else:
             voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
@@ -332,6 +338,28 @@ def process_video(self: Task, job_id: str) -> dict:
             job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
             db.commit()
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "ok")
+
+        # Yakuniy aralashma QA — merger.py'ning ducking/mixing natijasini
+        # signal darajasida tekshiradi (clipping, loudness range, dub/fon
+        # balansi). Faqat diagnostika — hozircha alohida retry mexanizmi
+        # yo'q (segment-QA'dan farqli, bu butun videoni qamraydi), shuning
+        # uchun muammo topilsa job baribir COMPLETED bo'ladi, lekin loglarda
+        # aniq ko'rinadi. Local fayl S3'ga yuklanib o'chirilishidan OLDIN
+        # ishlashi kerak.
+        try:
+            from backend.services.audio_qa import check_final_mix_quality
+            final_qa = check_final_mix_quality(final_output, actual_timings)
+            if final_qa["flags"]:
+                logger.warning(
+                    f"Job {job_id}: yakuniy aralashmada muammo(lar) — {final_qa['flags']} "
+                    f"(score={final_qa['score']}, peak={final_qa['peak_dbfs']}dBFS, "
+                    f"LRA={final_qa['loudness_lra']}, dub={final_qa['dub_rms_dbfs']}dBFS, "
+                    f"fon={final_qa['background_rms_dbfs']}dBFS)"
+                )
+            else:
+                logger.info(f"Job {job_id}: yakuniy aralashma QA'dan o'tdi (score={final_qa['score']}).")
+        except Exception as exc:
+            logger.warning(f"Job {job_id}: yakuniy QA ishlamadi (pipeline davom etadi): {exc}")
 
         # Upload files to S3 if configured — muvaffaqiyatli yuklangandan
         # so'ng lokal nusxa DARHOL o'chiriladi (S3 endi doimiy manba,

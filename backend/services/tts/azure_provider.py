@@ -15,15 +15,54 @@ settings = get_settings()
 _AUDIO_FORMAT = speechsdk.SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm
 
 
+# Tabiiy urg'u beriladigan so'zlar — raqamlar va inkor iboralari (odatda
+# gapning eng muhim, "eshitilishi shart" qismi). Apostrof variantlari
+# (', ʻ, ') hisobga olingan, chunki tarjima/optimallash bosqichlaridan
+# qaysi biri ishlatilgani oldindan noma'lum.
+_EMPHASIS_NUMBER_RE = re.compile(r"\b\d+([.,]\d+)?\b")
+_EMPHASIS_NEGATION_RE = re.compile(
+    r"\b(yo['ʻ‘]?q|hech qachon|hech kim|hech narsa|hech qanday|aslo|mumkin emas)\b",
+    re.IGNORECASE,
+)
+
+
+def _emphasize(escaped_text: str) -> str:
+    """Raqamlar va inkor so'zlarini <emphasis> bilan o'raydi.
+
+    Matn AVVAL XML-escape qilingan bo'lishi kerak — raqamlar/o'zbekcha
+    so'zlarda &/</>/" belgilari bo'lmagani uchun bu tartib xavfsiz va
+    qo'shilayotgan teglarni ikki marta escape qilib qo'ymaydi.
+    """
+    escaped_text = _EMPHASIS_NUMBER_RE.sub(
+        lambda m: f'<emphasis level="moderate">{m.group(0)}</emphasis>', escaped_text
+    )
+    escaped_text = _EMPHASIS_NEGATION_RE.sub(
+        lambda m: f'<emphasis level="strong">{m.group(0)}</emphasis>', escaped_text
+    )
+    return escaped_text
+
+
+def _build_sentence_body(sentence: str) -> str:
+    """Bitta gap ichida vergul bo'yicha tabiiy pauza (<break>) qo'shadi va
+    raqam/inkor so'zlarga urg'u beradi — Azure'ning standart, bir xilda
+    o'qiydigan ovozidan farqli, kishi nutqiga yaqinroq ohang uchun."""
+    clauses = sentence.split(",")
+    parts = [_emphasize(saxutils.escape(clause.strip())) for clause in clauses if clause.strip()]
+    return '<break time="150ms"/>'.join(parts)
+
+
 def _build_ssml(text: str, voice_name: str) -> str:
     is_female = "Madina" in voice_name
-    rate   = "-4%" if is_female else "-8%"
+    # Avval -4%/-8% edi — real tinglovda ovoz sun'iy "cho'zilgan" eshitildi
+    # (2026-08-12). Kino dublyajida tabiiy tezlik kutiladi, sun'iy
+    # sekinlashtirilgan emas — deyarli neytral tezlikka qaytarildi.
+    rate   = "-2%" if is_female else "-3%"
     pitch  = "+2%" if is_female else "0%"
 
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     ssml_sentences = []
     for sent in sentences:
-        body = saxutils.escape(sent)
+        body = _build_sentence_body(sent)
         if sent.rstrip().endswith("?"):
             ssml_sentences.append(f'<p><prosody pitch="+4%">{body}</prosody></p>')
         elif sent.rstrip().endswith("!"):

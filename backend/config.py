@@ -16,8 +16,44 @@ class Settings(BaseSettings):
     SEGMENT_QA_THRESHOLD: float = 0.75
     # Tarjima tayyor bo'lgach, taxminiy TTS davomiyligi original segment
     # uzunligidan shu nisbatdan ko'p oshsa, bitta cheklangan qisqartirish
-    # bosqichi ishga tushadi (translator.py).
-    DURATION_OVERAGE_TOLERANCE: float = 1.15
+    # bosqichi ishga tushadi (translator.py). Avval 1.15 edi — foydalanuvchi
+    # aniq talab qildi: "Hello 1 sekundda aytilsa, o'zbekchasi 1.5 sekundda
+    # chiqmasin" — original video ritmiga imkon boricha yaqinroq bo'lishi
+    # kerak (2026-08-12). Qattiqroq chegara ko'proq segmentni original
+    # davomiylikka moslab qisqartirishga majbur qiladi, TTS pleyback tezligini
+    # sun'iy o'zgartirishga (notabiiy eshitiladi) tayanish o'rniga.
+    DURATION_OVERAGE_TOLERANCE: float = 1.08
+
+    # Dynamic audio ducking (merger.py) — original audio dub gapirayotganda
+    # butunlay o'chirilmaydi, faqat pasaytiriladi (kino dublyajidagi kabi).
+    # sidechaincompress dub trekini "trigger" sifatida ishlatadi — original
+    # qanchalik baland/past bo'lishidan qat'i nazar, moslashuvchan pasayadi.
+    # threshold: sidechain (dub) shu darajadan baland bo'lsa duck ishga tushadi.
+    # ratio: qanchalik kuchli pasayish. attack: duck necha ms'da boshlanadi
+    # (tez — dub boshlanishi bilan sezilarli bo'lishi uchun). release: necha
+    # ms'da asl holatga qaytadi (sekinroq — "pumping" effektidan qochish uchun).
+    # threshold/ratio dastlab 0.05/8.0 edi — real tinglovda original ovoz
+    # dub ostida hali sezilib turdi ("bilinib qoladi"). Threshold pasaytirilib
+    # (past darajadagi dub ham duck'ni ishga tushiradi) va ratio oshirilib
+    # (2026-08-12) original deyarli to'liq bostirilishi ta'minlandi — bu
+    # foydalanuvchining aniq talabi ("ustidan dublaj qilganda bilinmasin").
+    DUCKING_THRESHOLD: float = 0.025
+    DUCKING_RATIO: float = 20.0
+    DUCKING_ATTACK_MS: int = 5
+    DUCKING_RELEASE_MS: int = 400
+    # Dub ovoz protsessing zanjiri (merger.py): xirillashni kesish, aniqlik
+    # uchun subtle boost, dinamika siqish, "s"/"sh" tovushlarini yumshatish,
+    # limiter — barchasi bitta filtergraph ichida, alohida ffmpeg pass emas.
+    VOICE_HIGHPASS_HZ: int = 80
+    VOICE_EQ_FREQ_HZ: int = 3000
+    VOICE_EQ_GAIN_DB: float = 2.5
+    VOICE_COMPRESSOR_RATIO: float = 3.0
+    VOICE_LIMITER_LIMIT: float = 0.95
+    # Yakuniy aralashma EBU R128 standartiga normallashtiriladi (I = integrated
+    # loudness, TP = true peak, LRA = loudness range).
+    FINAL_LOUDNORM_I: float = -16.0
+    FINAL_LOUDNORM_TP: float = -1.5
+    FINAL_LOUDNORM_LRA: float = 11.0
 
     # JWT — avval backend/services/auth.py'da hardcoded edi; xuddi shu
     # standart qiymat bilan ko'chirildi, shuning uchun mavjud sessiyalar
