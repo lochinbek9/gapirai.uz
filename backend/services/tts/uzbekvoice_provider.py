@@ -16,16 +16,83 @@ pipeline kutayotgan 24kHz mono PCM WAV formatiga majburan keltiriladi.
 """
 import logging
 import os
+import random
 import subprocess
 import tempfile
+import time
+from contextlib import contextmanager
 
 import requests
+from redis import Redis
 
 from backend.services.tts.base import TTSProvider, PermanentTTSError
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+class _ConcurrencyGate:
+    """
+    Redis-backed semaphore capping simultaneous UzbekVoiceAI requests across
+    ALL celery worker processes/threads (not just within one job) — same
+    pattern as elevenlabs_provider.py's gate.
+
+    Confirmed via a real production job (2026-08-12): UzbekVoiceAI rejects
+    concurrent requests beyond an account-specific limit with a 400
+    "Too many active requests" error. synthesizer.py fires up to 5 segments
+    in parallel (ThreadPoolExecutor), which blew straight past that limit and
+    killed the whole job. Exact account limit is undocumented ("contact
+    support to increase"), so MAX_CONCURRENT starts at 1 until confirmed.
+    """
+
+    KEY = "uzbekvoice:concurrent"
+    MAX_CONCURRENT = 1
+    POLL_INTERVAL = 0.3
+
+    def __init__(self, redis_url: str):
+        self._redis: Redis | None = None
+        self._redis_url = redis_url
+
+    @property
+    def redis(self) -> Redis:
+        if self._redis is None:
+            self._redis = Redis.from_url(self._redis_url, decode_responses=True)
+        return self._redis
+
+    def _try_acquire(self) -> bool:
+        pipe = self.redis.pipeline()
+        pipe.incr(self.KEY)
+        pipe.expire(self.KEY, 90)
+        val = pipe.execute()[0]
+        if val <= self.MAX_CONCURRENT:
+            return True
+        self.redis.decr(self.KEY)
+        return False
+
+    def release(self) -> None:
+        try:
+            self.redis.decr(self.KEY)
+        except Exception:
+            pass
+
+    @contextmanager
+    def slot(self, timeout: float = 40.0):
+        deadline = time.monotonic() + timeout
+        acquired = False
+        try:
+            while time.monotonic() < deadline:
+                if self._try_acquire():
+                    acquired = True
+                    break
+                time.sleep(self.POLL_INTERVAL + random.uniform(0, 0.2))
+            yield acquired
+        finally:
+            if acquired:
+                self.release()
+
+
+_gate = _ConcurrencyGate(settings.REDIS_URL)
 
 # UzbekVoiceAI hujjatida tasdiqlangan ismlar bo'yicha jins taxmini (API hozircha
 # jinsni alohida qaytarmaydi) — mavjud _is_female() ovoz tanlash yo'liga mos kelishi
@@ -107,26 +174,38 @@ class UzbekVoiceProvider(TTSProvider):
             _FEMALE_VOICE if self._is_female(voice_name) else _MALE_VOICE
         )
 
-        try:
-            response = requests.post(
-                f"{settings.UZBEKVOICE_BASE_URL}/tts",
-                headers={
-                    "Authorization": api_key,
-                    "Content-Type": "application/json",
-                },
-                json={"text": clean_text, "model": model, "blocking": True},
-                timeout=60,
-            )
-        except requests.Timeout:
-            logger.warning("UzbekVoiceAI TTS: so'rov muddati tugadi (timeout).")
-            return False
-        except requests.ConnectionError as exc:
-            logger.warning(f"UzbekVoiceAI TTS: ulanish xatosi: {exc}")
-            return False
+        with _gate.slot(timeout=40.0) as acquired:
+            if not acquired:
+                logger.warning("UzbekVoiceAI TTS: concurrency slot bo'shamadi (40s kutildi).")
+                return False
+
+            try:
+                response = requests.post(
+                    f"{settings.UZBEKVOICE_BASE_URL}/tts",
+                    headers={
+                        "Authorization": api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={"text": clean_text, "model": model, "blocking": True},
+                    timeout=60,
+                )
+            except requests.Timeout:
+                logger.warning("UzbekVoiceAI TTS: so'rov muddati tugadi (timeout).")
+                return False
+            except requests.ConnectionError as exc:
+                logger.warning(f"UzbekVoiceAI TTS: ulanish xatosi: {exc}")
+                return False
 
         if response.status_code in (401, 403):
             raise PermanentTTSError(f"UzbekVoiceAI: autentifikatsiya xatosi ({response.status_code}) — API kalitni tekshiring.")
         if response.status_code == 400:
+            # UzbekVoiceAI concurrency-limit xatosini ham 400 bilan qaytaradi
+            # (429 emas) — bu vaqtinchalik holat, _gate uni oldini olishi
+            # kerak, lekin ehtiyot chorasi sifatida bu yerda ham False
+            # qaytaramiz (PermanentTTSError emas), toza fallbackka o'tsin.
+            if "too many active requests" in response.text.lower():
+                logger.warning(f"UzbekVoiceAI TTS: concurrency limit (400): {response.text[:200]}")
+                return False
             raise PermanentTTSError(f"UzbekVoiceAI: yaroqsiz so'rov (400): {response.text[:200]}")
         if response.status_code == 429:
             logger.warning("UzbekVoiceAI TTS: rate limit (429).")
@@ -145,10 +224,12 @@ class UzbekVoiceProvider(TTSProvider):
             return False
 
         # blocking=true har doim ham darhol SUCCESS bilan qaytmaydi — uzunroq
-        # matnda server PENDING holatida ish identifikatorini qaytarishi
-        # kuzatilgan (haqiqiy so'rov bilan tasdiqlangan). Shunday holatda
-        # /tasks?id=... orqali natija tayyor bo'lguncha so'raymiz.
-        if data.get("status") == "PENDING":
+        # matnda server PENDING yoki STARTED holatida ish identifikatorini
+        # qaytarishi kuzatilgan (haqiqiy so'rov bilan tasdiqlangan — bir xil
+        # concurrency-test'da ikkalasi ham chiqqan). Har qanday nihoyaviy
+        # bo'lmagan holatda /tasks?id=... orqali natija tayyor bo'lguncha
+        # so'raymiz (nihoyaviy holatlar _poll_task bilan bir xil ro'yxat).
+        if data.get("status") not in ("SUCCESS", "FAILED", "ERROR"):
             data = self._poll_task(data.get("id"), api_key)
             if data is None:
                 return False
