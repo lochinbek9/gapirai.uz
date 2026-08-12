@@ -1,96 +1,84 @@
-"""Audio QA — TTS chiqishini STT orqali qayta tekshiradi (round-trip QA).
+"""Audio QA — sintez qilingan TTS audio'ni signal darajasida tekshiradi.
 
-Yondashuv (spec §8'dagi ogohlantirishga ko'ra): o'zbek tili agglyutinativ
-bo'lgani uchun butun matnga oddiy CER/WER (belgi-belgi solishtirish) shovqinli
-va noaniq natija beradi. Buning o'rniga so'z-mavjudligi evristikasidan
-foydalaniladi: kutilgan matndagi so'zlar tan olingan matnda bormi (tartibdan
-qat'iy nazar — TTS ba'zan qo'shimchani biroz boshqacha talaffuz qiladi, lekin
-so'z o'zagi STT'da baribir tanilishi kerak).
+STT round-trip yondashuvi (Whisper orqali qayta transkripsiya qilib matn
+mosligini solishtirish) real productionda ishonchli chiqmadi: OpenAI
+Whisper API'ning "language" parametri "uz"ni rad etadi (400: "Language 'uz'
+is not supported"), avtomatik til aniqlash esa qisqa (bir necha soniyalik)
+dublyaj segmentlarida tez-tez boshqa tilga (turkcha/forscha/arabcha yozuvga)
+chalkashib ketadi — ikkalasi ham 2026-08-12 productionda haqiqiy job orqali
+tasdiqlangan. Natijada STT asosidagi QA hech qachon o'tmasdi, faqat har bir
+segment uchun qo'shimcha Whisper chaqiruvi (xarajat) va foydasiz qayta
+sintezga olib kelardi.
 
-Faqat benchmark_tts.py'dan (--qa) chaqiriladi — ishlab chiqarish pipeline'iga
-hali ulanmagan (har bir segmentga qo'shimcha Whisper chaqiruvi = qo'shimcha
-xarajat va kechikish; bu keyingi bosqich, natijalar tasdiqlangandan keyin).
+Shuning uchun QA transkripsiyaga muhtoj bo'lmasdan, to'g'ridan-to'g'ri audio
+signalidan TTS'ning eng keng tarqalgan real nosozliklarini aniqlaydi: bo'sh/
+sukut audio (sintez muvaffaqiyatsiz bo'lgan) va kutilganidan sezilarli
+qisqaroq audio (kesilgan/to'xtab qolgan nutq).
 """
 import logging
-import re
 
-from backend.services.transcriber import transcribe_audio
+from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
 
 logger = logging.getLogger(__name__)
 
-_WORD_RE = re.compile(r"[a-zA-Zʻʼ'А-Яа-яЎўҚқҒғҲҳ]+", re.UNICODE)
-_MISSING_WORDS_THRESHOLD = 0.15  # 15% dan ko'p so'z yo'qolsa -> flag
-_TRUNCATED_RATIO_THRESHOLD = 0.6  # tan olingan so'z soni kutilganning 60%idan kam bo'lsa -> flag
-_REPEAT_RUN_THRESHOLD = 3  # bir xil so'z ketma-ket 3+ marta -> flag
+_SILENCE_THRESH_DB = -40
+_MIN_SILENCE_LEN_MS = 200
+_MAX_SILENT_RATIO = 0.6  # audio'ning 60%+ jim bo'lsa -> "no_speech"
+_MIN_DURATION_RATIO = 0.5  # audio kutilgan davomiylikning 50%idan kam bo'lsa -> "truncated"
 
 
-def _normalize_words(text: str) -> list[str]:
-    return [w.lower() for w in _WORD_RE.findall(text or "")]
-
-
-def _has_consecutive_repeat(words: list[str], run_len: int = _REPEAT_RUN_THRESHOLD) -> bool:
-    if len(words) < run_len:
-        return False
-    for i in range(len(words) - run_len + 1):
-        if len(set(words[i:i + run_len])) == 1:
-            return True
-    return False
-
-
-def check_audio_quality(audio_path: str, expected_text: str, language: str | None = None) -> dict:
+def check_audio_quality(audio_path: str, expected_text: str) -> dict:
     """
-    Generatsiya qilingan audioni STT orqali qayta tekshiradi.
-
-    language: audio'da qaysi til gapirilishi kutilmoqda. Standart None —
-    OpenAI Whisper API'ning "language" parametri cheklangan ISO-639-1
-    ro'yxatini qabul qiladi va "uz" o'sha ro'yxatda YO'Q (2026-08-12
-    productionda tasdiqlangan: "Language 'uz' is not supported" — 400 xato).
-    Shuning uchun bu yerda hint berilmaydi, Whisper avtomatik aniqlaydi (bu
-    o'zbekcha nutq uchun ham to'g'ri ishlaydi). Oldinroq "en" berilganda esa
-    Whisper o'zbekcha nutqni inglizchaga zo'rlab talqin qilib, butun
-    tekshiruvni yaroqsiz qilgan edi ("missing_words" bilan har bir segment
-    muvaffaqiyatsiz bo'lgan haqiqiy productiondagi xato).
+    Sintez qilingan audioni signal darajasida tekshiradi.
 
     Returns:
         {
-            "score": float,          # 0.0-1.0, yuqori = yaxshiroq
-            "flags": list[str],      # "no_speech" | "missing_words" | "repeated_words" | "truncated"
-            "recognized_text": str,
-            "missing_word_ratio": float,
+            "score": float,            # 0.0-1.0, yuqori = yaxshiroq
+            "flags": list[str],        # "no_speech" | "truncated"
+            "duration_seconds": float,
+            "silent_ratio": float,     # audio ichidagi jim qismning ulushi
         }
     """
-    expected_words = _normalize_words(expected_text)
-    if not expected_words:
-        return {"score": 1.0, "flags": [], "recognized_text": "", "missing_word_ratio": 0.0}
+    if not (expected_text or "").strip():
+        return {"score": 1.0, "flags": [], "duration_seconds": 0.0, "silent_ratio": 0.0}
 
     try:
-        transcript = transcribe_audio(audio_path, language=language)
-        recognized_text = transcript.get("text", "") or ""
+        audio = AudioSegment.from_wav(audio_path)
     except Exception as exc:
-        logger.warning(f"Audio QA: STT round-trip xatosi: {exc}")
-        return {"score": 0.0, "flags": ["no_speech"], "recognized_text": "", "missing_word_ratio": 1.0}
+        logger.warning(f"Audio QA: audio faylni o'qishda xatolik: {exc}")
+        return {"score": 0.0, "flags": ["no_speech"], "duration_seconds": 0.0, "silent_ratio": 1.0}
 
-    recognized_words = _normalize_words(recognized_text)
-    if not recognized_words:
-        return {"score": 0.0, "flags": ["no_speech"], "recognized_text": recognized_text, "missing_word_ratio": 1.0}
+    duration_seconds = len(audio) / 1000.0
+    if duration_seconds <= 0:
+        return {"score": 0.0, "flags": ["no_speech"], "duration_seconds": 0.0, "silent_ratio": 1.0}
 
-    recognized_set = set(recognized_words)
-    missing = [w for w in expected_words if w not in recognized_set]
-    missing_ratio = len(missing) / len(expected_words)
+    nonsilent_ranges = detect_nonsilent(
+        audio, min_silence_len=_MIN_SILENCE_LEN_MS, silence_thresh=_SILENCE_THRESH_DB
+    )
+    nonsilent_ms = sum(end - start for start, end in nonsilent_ranges)
+    silent_ratio = round(1.0 - (nonsilent_ms / len(audio)), 3)
 
     flags = []
-    if missing_ratio > _MISSING_WORDS_THRESHOLD:
-        flags.append("missing_words")
-    if _has_consecutive_repeat(recognized_words):
-        flags.append("repeated_words")
-    if len(recognized_words) / len(expected_words) < _TRUNCATED_RATIO_THRESHOLD:
+    if silent_ratio > _MAX_SILENT_RATIO:
+        flags.append("no_speech")
+
+    from backend.services.translator import estimate_duration_seconds
+    expected_duration = estimate_duration_seconds(expected_text)
+    duration_ratio = duration_seconds / expected_duration if expected_duration > 0 else 1.0
+    if duration_ratio < _MIN_DURATION_RATIO:
         flags.append("truncated")
 
-    score = max(0.0, 1.0 - missing_ratio - 0.15 * (len(flags) - (1 if "missing_words" in flags else 0)))
+    if "no_speech" in flags:
+        score = 0.0
+    elif "truncated" in flags:
+        score = max(0.0, round(duration_ratio / _MIN_DURATION_RATIO * 0.5, 3))
+    else:
+        score = round(min(1.0, 1.0 - max(0.0, silent_ratio - 0.1)), 3)
 
     return {
-        "score": round(score, 3),
+        "score": score,
         "flags": flags,
-        "recognized_text": recognized_text,
-        "missing_word_ratio": round(missing_ratio, 3),
+        "duration_seconds": round(duration_seconds, 3),
+        "silent_ratio": silent_ratio,
     }

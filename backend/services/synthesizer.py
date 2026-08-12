@@ -348,14 +348,15 @@ def synthesize_segments(
                         except Exception:
                             pass
 
-    # 1.5. Avtomatik QA — har bir segment audiosini qayta STT orqali
-    # tekshiradi (backend/services/audio_qa.py). Muvaffaqiyatsiz segmentlar
-    # BIR MARTA joyida qayta sintez qilinadi (butun TTS bosqichi emas).
-    # Allaqachon o'tgan segmentlar (existing_qa, oldingi Celery urinishidan
-    # checkpoint) qayta tekshirilmaydi — qo'shimcha Whisper chaqiruvi shart
-    # emas. Faqat QA'dan o'tgan audio keshga yoziladi (backend/services/
-    # tts_cache.py) — aks holda yaroqsiz audio keshlanib, keyingi urinishda
-    # AYNAN o'sha yaroqsiz audio qaytib kelardi.
+    # 1.5. Avtomatik QA — har bir segment audiosini signal darajasida
+    # tekshiradi (backend/services/audio_qa.py: sukut/kesilgan audio
+    # aniqlash, STT'ga tayanmaydi — sababi izoh uchun o'sha faylga qarang).
+    # Muvaffaqiyatsiz segmentlar BIR MARTA joyida qayta sintez qilinadi
+    # (butun TTS bosqichi emas). Allaqachon o'tgan segmentlar (existing_qa,
+    # oldingi Celery urinishidan checkpoint) qayta tekshirilmaydi. Faqat
+    # QA'dan o'tgan audio keshga yoziladi (backend/services/tts_cache.py) —
+    # aks holda yaroqsiz audio keshlanib, keyingi urinishda AYNAN o'sha
+    # yaroqsiz audio qaytib kelardi.
     qa_results: dict = {str(k): v for k, v in (existing_qa or {}).items()}
     if settings.ENABLE_SEGMENT_QA:
         from backend.services.audio_qa import check_audio_quality
@@ -369,7 +370,7 @@ def synthesize_segments(
 
             attempts = prior.get("attempts", 0)
             qa_file = output_path / f"seg_qa_{seg_id:04d}.wav"
-            qa = {"score": 0.0, "flags": ["no_speech"], "recognized_text": "", "missing_word_ratio": 1.0}
+            qa = {"score": 0.0, "flags": ["no_speech"], "duration_seconds": 0.0, "silent_ratio": 1.0}
             try:
                 item["audio"].export(str(qa_file), format="wav")
                 qa = check_audio_quality(str(qa_file), item["text"])
