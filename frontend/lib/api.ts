@@ -250,6 +250,13 @@ export interface QAEntry {
   asked_at: string
 }
 
+export interface BilingualSegment {
+  start: number
+  end: number
+  original: string
+  translated: string
+}
+
 export interface VideoAnalysisSummary {
   short: string
   medium: string
@@ -305,6 +312,11 @@ export async function generateQuiz(analysisId: string): Promise<{ quiz: QuizQues
 
 export async function generateNotes(analysisId: string): Promise<{ notes: string }> {
   const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes`)
+  return res.data
+}
+
+export async function generateBilingual(analysisId: string): Promise<{ segments: BilingualSegment[] }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/bilingual`)
   return res.data
 }
 

@@ -183,6 +183,29 @@ async def get_or_generate_quiz(
     return {"quiz": analysis.quiz}
 
 
+@router.post("/{analysis_id}/bilingual")
+async def get_or_generate_bilingual(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
+        raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
+    if not analysis.bilingual_segments:
+        if analysis.video_language and analysis.video_language == analysis.language:
+            # Tahlil tili video tili bilan bir xil — tarjima ma'nosiz, LLM
+            # chaqiruvisiz original matnni ikkalasi sifatida qaytaramiz.
+            analysis.bilingual_segments = [
+                {"start": s.get("start", 0.0), "end": s.get("end", 0.0), "original": s.get("text", ""), "translated": s.get("text", "")}
+                for s in analysis.transcript_segments
+            ]
+        else:
+            analysis.bilingual_segments = _service.generate_bilingual_segments(analysis.transcript_segments, analysis.language)
+        db.commit()
+    return {"segments": analysis.bilingual_segments}
+
+
 @router.post("/{analysis_id}/notes")
 async def get_or_generate_notes(
     analysis_id: str,

@@ -7,8 +7,8 @@ import {
   ArrowLeft, Loader2, AlertTriangle, Search, Send, CheckCircle2,
 } from "lucide-react";
 import {
-  ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes,
-  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, TranscriptSegment, QuizQuestion,
+  ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
+  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, TranscriptSegment, QuizQuestion, BilingualSegment,
 } from "@/lib/api";
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
@@ -57,6 +57,9 @@ export default function VideoAnalysisPage() {
   const [searchResults, setSearchResults] = useState<TranscriptSegment[] | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
+  const [transcriptView, setTranscriptView] = useState<"normal" | "bilingual">("normal");
+  const [bilingual, setBilingual] = useState<BilingualSegment[] | null>(null);
+  const [bilingualLoading, setBilingualLoading] = useState(false);
 
   useEffect(() => {
     if (is404) router.push("/");
@@ -114,6 +117,25 @@ export default function VideoAnalysisPage() {
       alert("Konspekt yaratishda xatolik yuz berdi.");
     } finally {
       setNotesLoading(false);
+    }
+  };
+
+  const handleToggleBilingual = async () => {
+    if (transcriptView === "bilingual") {
+      setTranscriptView("normal");
+      return;
+    }
+    setTranscriptView("bilingual");
+    if (!id || bilingual) return;
+    setBilingualLoading(true);
+    try {
+      const res = await generateBilingual(id);
+      setBilingual(res.segments);
+    } catch {
+      alert("Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
+      setTranscriptView("normal");
+    } finally {
+      setBilingualLoading(false);
     }
   };
 
@@ -282,35 +304,76 @@ export default function VideoAnalysisPage() {
 
               {tab === "transcript" && (
                 <div className="space-y-4">
-                  <form onSubmit={handleSearch} className="flex gap-2">
-                    <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-                      <Search className="w-4 h-4 text-gray-500" />
-                      <input
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Transkript ichidan qidirish..."
-                        className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
-                      />
-                    </div>
-                    <button type="submit" className="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition">
-                      Qidirish
-                    </button>
-                  </form>
-                  <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
-                    {(searchResults ?? transcript).map((seg, i) => (
+                  {analysis.video_language && analysis.video_language !== analysis.language && (
+                    <div className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
                       <button
-                        key={i}
-                        onClick={() => seek(seg.start)}
-                        className="w-full text-left flex gap-3 items-start hover:bg-white/[0.04] rounded-lg p-2 transition"
+                        onClick={() => setTranscriptView("normal")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${transcriptView === "normal" ? "bg-white/10 text-blue-400" : "text-gray-400 hover:text-gray-200"}`}
                       >
-                        <span className="text-[11px] font-mono text-blue-400 shrink-0 mt-0.5">{formatTs(seg.start)}</span>
-                        <span className="text-sm text-gray-300">{seg.text}</span>
+                        Oddiy
                       </button>
-                    ))}
-                    {searchResults?.length === 0 && (
-                      <p className="text-sm text-gray-500">Hech narsa topilmadi.</p>
-                    )}
-                  </div>
+                      <button
+                        onClick={handleToggleBilingual}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${transcriptView === "bilingual" ? "bg-white/10 text-blue-400" : "text-gray-400 hover:text-gray-200"}`}
+                      >
+                        Bilingual
+                      </button>
+                    </div>
+                  )}
+
+                  {transcriptView === "normal" ? (
+                    <>
+                      <form onSubmit={handleSearch} className="flex gap-2">
+                        <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                          <Search className="w-4 h-4 text-gray-500" />
+                          <input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Transkript ichidan qidirish..."
+                            className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+                          />
+                        </div>
+                        <button type="submit" className="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition">
+                          Qidirish
+                        </button>
+                      </form>
+                      <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
+                        {(searchResults ?? transcript).map((seg, i) => (
+                          <button
+                            key={i}
+                            onClick={() => seek(seg.start)}
+                            className="w-full text-left flex gap-3 items-start hover:bg-white/[0.04] rounded-lg p-2 transition"
+                          >
+                            <span className="text-[11px] font-mono text-blue-400 shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                            <span className="text-sm text-gray-300">{seg.text}</span>
+                          </button>
+                        ))}
+                        {searchResults?.length === 0 && (
+                          <p className="text-sm text-gray-500">Hech narsa topilmadi.</p>
+                        )}
+                      </div>
+                    </>
+                  ) : bilingualLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-400 py-6">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Bilingual ko'rinish tayyorlanmoqda...
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                      {(bilingual ?? []).map((seg, i) => (
+                        <button
+                          key={i}
+                          onClick={() => seek(seg.start)}
+                          className="w-full text-left flex gap-3 items-start hover:bg-white/[0.04] rounded-lg p-2.5 transition border border-white/5"
+                        >
+                          <span className="text-[11px] font-mono text-blue-400 shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                          <div className="space-y-1">
+                            <p className="text-sm text-white">{seg.original}</p>
+                            <p className="text-sm text-gray-400">{seg.translated}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

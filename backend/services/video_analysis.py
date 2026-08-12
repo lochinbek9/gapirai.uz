@@ -301,3 +301,43 @@ JSON formatida qaytaring: {{"answer": "...", "timestamps": [125, 340]}}"""
             "answer": str(result.get("answer", "")).strip() or "Bu ma'lumot videoda aniq tushuntirilmagan.",
             "timestamps": timestamps,
         }
+
+    def generate_bilingual_segments(self, segments: list[dict], target_language: str) -> list[dict]:
+        """Returns [{"start","end","original","translated"}] — Transkript tabidagi
+        "Bilingual" ko'rinishi uchun: har bir gap original tilda va tanlangan
+        tahlil tilida yonma-yon.
+
+        Xom Whisper segmentlari juda qisqa/bo'lakli bo'lishi mumkin (dublyaj
+        pipeline'idagi bilan bir xil muammo), shuning uchun avval to'liq
+        gaplarga guruhlanadi (group_segments_into_sentences — synthesizer.py'dan
+        qayta foydalanish, nusxa ko'chirilmagan).
+        """
+        from backend.services.synthesizer import group_segments_into_sentences
+
+        grouped = group_segments_into_sentences(segments)
+        if not grouped:
+            return []
+
+        numbered = "\n".join(f"{i + 1}. {g['text']}" for i, g in enumerate(grouped))
+        system = f"""Siz video subtitrlarini tarjima qiluvchi mutaxassissiz.
+{_language_rule(target_language)}
+
+Quyida raqamlangan gaplar ro'yxati berilgan. Har birini alohida, kontekstga mos
+tarjima qiling. Texnik atamalarni original holida qoldiring. Tarjimalar sonini
+va tartibini o'zgartirmang — har bir raqamga bitta tarjima mos kelishi kerak.
+
+JSON formatida qaytaring: {{"translations": ["1-tarjima", "2-tarjima", ...]}}"""
+        result = _call_json(system, numbered)
+        translations = result.get("translations") if isinstance(result, dict) else None
+        translations = translations if isinstance(translations, list) else []
+
+        bilingual = []
+        for i, g in enumerate(grouped):
+            translated = str(translations[i]).strip() if i < len(translations) and translations[i] else g["text"]
+            bilingual.append({
+                "start": _safe_float(g.get("start")),
+                "end": _safe_float(g.get("end")),
+                "original": g["text"],
+                "translated": translated,
+            })
+        return bilingual

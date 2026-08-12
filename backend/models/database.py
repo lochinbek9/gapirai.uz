@@ -140,6 +140,7 @@ class VideoAnalysis(Base):
     notes = Column(Text, nullable=True)
     quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
     qa_history = Column(JSONB, default=list)       # [{"question","answer","timestamps","asked_at"}]
+    bilingual_segments = Column(JSONB, nullable=True)  # [{"start","end","original","translated"}] — lazy
 
     error_message = Column(Text, nullable=True)
     error_code = Column(String(50), nullable=True)
@@ -243,6 +244,13 @@ def create_tables():
     try:
         with engine.connect() as connection:
             connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS video_language VARCHAR(10)"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS bilingual_segments JSONB"))
             connection.commit()
     except Exception:
         pass
