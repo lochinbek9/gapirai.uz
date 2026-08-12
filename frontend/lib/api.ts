@@ -107,6 +107,32 @@ export function getDownloadUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/video`
 }
 
+export interface PlanDef {
+  id: string
+  name: string
+  price: number
+  videos_per_period: number
+  free_minutes: number
+  priority: boolean
+  tts_tier: string
+}
+
+export interface CurrentSubscription {
+  plan: string
+  expires_at: string | null
+  videos_used_this_period: number
+}
+
+export async function getPlans(): Promise<{ plans: PlanDef[]; current: CurrentSubscription }> {
+  const res = await apiClient.get('/api/plans')
+  return res.data
+}
+
+export async function subscribeToPlan(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
+  const res = await apiClient.post('/api/plans/subscribe', { plan })
+  return res.data
+}
+
 export function getVideoUrl(jobId: string): string {
   // /api/outputs/{id}/video (routes.py) S3'da bo'lsa presigned URL'ga
   // yo'naltiradi, mavjud bo'lmasa lokal faylga tushadi — statik

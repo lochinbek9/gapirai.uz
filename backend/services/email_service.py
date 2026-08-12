@@ -94,3 +94,54 @@ def send_password_reset_email(to_email: str, code: str, name: str = "") -> bool:
         subject=f"GapirAI.uz parolni tiklash kodi: {code}",
         intro="Parolingizni tiklash uchun tasdiqlash kodingiz:",
     )
+
+
+def send_subscription_reminder_email(to_email: str, name: str, plan_name: str, expires_at_str: str) -> bool:
+    """Tarif obunasi 3 kundan keyin tugashi haqida eslatma yuboradi
+    (backend/scripts/subscription_reminders.py — kunlik cron)."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY sozlanmagan — obuna eslatmasi yuborilmadi.")
+        return False
+
+    greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
+    text_body = (
+        f"{greeting}\n\n"
+        f"\"{plan_name}\" tarifingiz {expires_at_str} sanasida tugaydi. "
+        f"Xizmatdan uzluksiz foydalanish uchun gapirai.uz/dashboard sahifasida tarifni yangilang.\n\n"
+        f"GapirAI.uz jamoasi"
+    )
+    html_body = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="color:#1e293b;margin:0 0 16px;">GapirAI<span style="color:#7c3aed;">.uz</span></h2>
+      <p style="color:#334155;font-size:14px;">{greeting}</p>
+      <p style="color:#334155;font-size:14px;">
+        <strong>{plan_name}</strong> tarifingiz <strong>{expires_at_str}</strong> sanasida tugaydi.
+        Xizmatdan uzluksiz foydalanish uchun tarifni yangilang.
+      </p>
+      <a href="https://gapirai.uz/dashboard" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9);color:#fff;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:12px;margin:16px 0;">Tarifni yangilash</a>
+      <p style="color:#94a3b8;font-size:11px;margin-top:24px;">GapirAI.uz jamoasi</p>
+    </div>
+    """
+
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": f"Tarifingiz {expires_at_str} sanasida tugaydi",
+        "html": html_body,
+        "text": text_body,
+    }
+
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend xatoligi (obuna eslatmasi, {to_email}): {response.status_code} {response.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Obuna eslatmasini yuborishda xatolik ({to_email}): {e}")
+        return False

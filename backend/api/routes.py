@@ -157,12 +157,15 @@ async def create_job(
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
 
-    is_first_video = False
+    # Tarif kvotasi faqat login qilingan foydalanuvchilarga tegishli — anonim
+    # foydalanuvchi hech qachon bepul tarif imtiyoziga ega bo'lmaydi (bugungi
+    # xatti-harakat bilan bir xil), faqat 45 daqiqadan qisqa videolar bepul.
+    covered_by_quota = False
     if current_user:
-        existing_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count()
-        is_first_video = existing_jobs_count == 0
-
-    amount = calculate_price(duration_minutes, is_first_video=is_first_video)
+        from backend.services.plans import check_quota, consume_quota
+        covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
+    else:
+        amount = calculate_price(duration_minutes, is_first_video=False)
 
     job_id = str(uuid.uuid4())
     
@@ -189,6 +192,8 @@ async def create_job(
     db.commit()
 
     if amount == 0:
+        if covered_by_quota and current_user:
+            consume_quota(db, current_user.id, duration_minutes)
         process_video.apply_async(args=[job_id], task_id=job_id)
         return {"job_id": job_id, "status": "pending"}
     

@@ -3,11 +3,51 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl } from '@/lib/api'
+import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
-  Loader2, Trash2, Play, User2, Mic2, MicOff
+  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown
 } from 'lucide-react'
+
+const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
+
+function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null; onRenew: () => void; renewing: boolean }) {
+  if (!sub) return null
+  const planName = PLAN_NAMES[sub.plan] || sub.plan
+  const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
+
+  return (
+    <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner flex items-center justify-between gap-4 mb-6 flex-wrap">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+          <Crown className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
+          <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
+        </div>
+        {sub.plan !== 'free' && (
+          <div className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+            <p>{sub.videos_used_this_period} video ishlatilgan</p>
+            {sub.expires_at && (
+              <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
+                {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+      <Link
+        href="/pricing"
+        onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
+        className="flex items-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md"
+      >
+        {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+        {sub.plan === 'free' ? "Tarifni oshirish" : expiresSoon ? 'Yangilash' : 'Tariflarni ko\'rish'}
+      </Link>
+    </div>
+  )
+}
 
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -106,6 +146,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
+  const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
+  const [renewing, setRenewing] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -118,12 +160,33 @@ export default function DashboardPage() {
         .catch(console.error)
         .finally(() => setJobsLoading(false))
 
+      getPlans().then((res) => setSubscription(res.current)).catch(console.error)
+
       const interval = setInterval(() => {
         listJobs().then(setJobs).catch(console.error)
       }, 5000)
       return () => clearInterval(interval)
     }
   }, [user])
+
+  async function handleRenew() {
+    if (!subscription || subscription.plan === 'free') return
+    setRenewing(true)
+    const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    try {
+      const res = await subscribeToPlan(subscription.plan)
+      if (res.success && res.payment_url) {
+        if (paymentWindow) paymentWindow.location.href = res.payment_url
+        else window.location.href = res.payment_url
+      } else if (paymentWindow) {
+        paymentWindow.close()
+      }
+    } catch {
+      if (paymentWindow) paymentWindow.close()
+    } finally {
+      setRenewing(false)
+    }
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Bu videoni o'chirishni tasdiqlaysizmi?")) return
@@ -197,6 +260,8 @@ export default function DashboardPage() {
             <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{processingCount}</p>
           </div>
         </div>
+
+        <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
 
         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
 

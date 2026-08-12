@@ -190,6 +190,36 @@ class TTSUsageLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class PlanTier(str, enum.Enum):
+    FREE = "free"
+    STANDARD = "standard"
+    PRO = "pro"
+
+
+class Subscription(Base):
+    """Foydalanuvchining oylik tarif obunasi. Har bir userda ko'pi bilan bitta
+    qator bo'ladi (user_id unique) — tarif o'zgartirilganda shu qator yangilanadi,
+    yangi qator ochilmaydi. Aniq tarif ta'riflari (narx/kvota) bazada emas,
+    backend/services/plans.py'dagi PLANS lug'atida — bu jadval faqat "kim qaysi
+    tarifda va qachongacha" holatini saqlaydi.
+
+    Hech qanday qator yo'q foydalanuvchi = FREE tarifda (lazy — birinchi
+    kvota tekshiruvida avtomatik yaratiladi, PronunciationMemory'dagi kabi).
+    """
+    __tablename__ = "subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    plan = Column(Enum(PlanTier, values_callable=lambda obj: [e.value for e in obj]), default=PlanTier.FREE, nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # FREE uchun null (muddatsiz)
+    period_started_at = Column(DateTime, default=datetime.utcnow)  # joriy davr kvotasi shu vaqtdan hisoblanadi
+    videos_used_this_period = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -273,6 +303,13 @@ def create_tables():
     try:
         with engine.connect() as connection:
             connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS bilingual_segments JSONB"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan VARCHAR(20)"))
             connection.commit()
     except Exception:
         pass

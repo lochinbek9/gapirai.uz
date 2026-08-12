@@ -12,6 +12,7 @@ from backend.api.auth_routes import router as auth_router
 from backend.api.click_routes import router as click_router
 from backend.api.admin_routes import router as admin_router
 from backend.api.video_analysis_routes import router as video_analysis_router
+from backend.api.plans_routes import router as plans_router
 
 settings = get_settings()
 
@@ -127,6 +128,7 @@ app.include_router(router)
 app.include_router(click_router)
 app.include_router(admin_router)
 app.include_router(video_analysis_router)
+app.include_router(plans_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")

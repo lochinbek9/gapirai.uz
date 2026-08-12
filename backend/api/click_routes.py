@@ -45,18 +45,18 @@ async def initiate_payment(
         raise HTTPException(status_code=400, detail="Video davomiyligi aniqlanmadi.")
     
     duration_minutes = job.video_duration / 60.0
-    # User's first video is free: check if user has other jobs
-    is_first_video = False
+    # Tarif kvotasi bilan bir xil mantiq — create_job (routes.py) bilan mos
+    # kelishi kerak, aks holda AWAITING_PAYMENT job noto'g'ri qayta narxlanishi mumkin.
+    covered_by_quota = False
     if current_user:
-        other_jobs_count = db.query(DubbingJob).filter(
-            DubbingJob.user_id == current_user.id,
-            DubbingJob.id != job.id
-        ).count()
-        is_first_video = (other_jobs_count == 0)
-
-    amount = calculate_price(duration_minutes, is_first_video=is_first_video)
+        from backend.services.plans import check_quota, consume_quota
+        covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
+    else:
+        amount = calculate_price(duration_minutes, is_first_video=False)
 
     if amount == 0:
+        if covered_by_quota and current_user:
+            consume_quota(db, current_user.id, duration_minutes)
         if job.status == JobStatus.AWAITING_PAYMENT:
             job.status = JobStatus.PENDING
             job.status_message = "Navbatga qo'shildi"
@@ -236,13 +236,18 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     payment.click_status = 1
     payment.click_complete_time = int(time.time())
 
-    # update job status and trigger processing
-    job = db.query(DubbingJob).filter(DubbingJob.id == payment.job_id).first()
-    if job:
-        job.status = JobStatus.PENDING
-        job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
-        process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
-        
+    if payment.plan:
+        # Obuna to'lovi — video emas, tarifni faollashtiradi/uzaytiradi.
+        from backend.services.plans import activate_subscription
+        activate_subscription(db, payment.user_id, payment.plan)
+    else:
+        # update job status and trigger processing
+        job = db.query(DubbingJob).filter(DubbingJob.id == payment.job_id).first()
+        if job:
+            job.status = JobStatus.PENDING
+            job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
+
     db.commit()
 
     return {
