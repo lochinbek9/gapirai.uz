@@ -7,7 +7,7 @@ const API_URL = getApiUrl()
 export interface User {
   id: string
   name: string
-  email: string
+  email: string | null
   role?: string
 }
 
@@ -86,5 +86,32 @@ export async function apiMe(token: string): Promise<User> {
   const res = await axios.get(`${API_URL}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   })
+  return res.data
+}
+
+export interface AuthResult {
+  access_token: string
+  token_type: string
+  user: User
+}
+
+export async function apiGoogleAuth(credential: string): Promise<AuthResult> {
+  const res = await axios.post(`${API_URL}/auth/google`, { credential })
+  return res.data
+}
+
+export interface PhonePendingVerification {
+  pending_verification: true
+  phone: string
+  message: string
+}
+
+export async function apiRequestPhoneCode(phone: string): Promise<PhonePendingVerification> {
+  const res = await axios.post(`${API_URL}/auth/phone/request-code`, { phone })
+  return res.data
+}
+
+export async function apiVerifyPhoneCode(phone: string, code: string): Promise<AuthResult> {
+  const res = await axios.post(`${API_URL}/auth/phone/verify-code`, { phone, code })
   return res.data
 }

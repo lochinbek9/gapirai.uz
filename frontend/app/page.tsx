@@ -289,6 +289,10 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
     setLoading(true);
     setError(null);
     startRef.current = null;

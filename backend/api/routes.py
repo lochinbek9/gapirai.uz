@@ -15,7 +15,6 @@ from backend.services.downloader import get_video_info
 from backend.services.auth import get_current_user, get_optional_user
 from backend.workers.tasks import process_video
 from backend.config import get_settings
-from backend.services.click_service import calculate_price
 from backend.services.rate_limiter import rate_limit
 
 settings = get_settings()
@@ -134,7 +133,7 @@ async def video_info(url: str) -> VideoInfoResponse:
 async def create_job(
     request: CreateJobRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     if not _is_valid_youtube_url(request.youtube_url):
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
@@ -157,18 +156,11 @@ async def create_job(
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
 
-    # Tarif kvotasi faqat login qilingan foydalanuvchilarga tegishli — anonim
-    # foydalanuvchi hech qachon bepul tarif imtiyoziga ega bo'lmaydi (bugungi
-    # xatti-harakat bilan bir xil), faqat 45 daqiqadan qisqa videolar bepul.
-    covered_by_quota = False
-    if current_user:
-        from backend.services.plans import check_quota, consume_quota
-        covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
-    else:
-        amount = calculate_price(duration_minutes, is_first_video=False)
+    from backend.services.plans import check_quota, consume_quota
+    covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
 
     job_id = str(uuid.uuid4())
-    
+
     if amount > 0:
         status = JobStatus.AWAITING_PAYMENT
         status_message = "To'lov kutilmoqda"
@@ -178,7 +170,7 @@ async def create_job(
 
     job = DubbingJob(
         id=job_id,
-        user_id=current_user.id if current_user else None,
+        user_id=current_user.id,
         youtube_url=request.youtube_url,
         video_title=title,
         video_duration=duration,
@@ -192,7 +184,7 @@ async def create_job(
     db.commit()
 
     if amount == 0:
-        if covered_by_quota and current_user:
+        if covered_by_quota:
             consume_quota(db, current_user.id, duration_minutes)
         process_video.apply_async(args=[job_id], task_id=job_id)
         return {"job_id": job_id, "status": "pending"}

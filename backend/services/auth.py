@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from backend.models.database import User, get_db
 from backend.config import get_settings
 
-SECRET_KEY = "ai-dubber-secret-key-2024-uzbek-platform"
+settings = get_settings()
+
+SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 kun
 
@@ -60,11 +62,11 @@ def get_current_admin_user(
     """Faqat role='admin' VA ADMIN_ALLOWED_EMAILS ro'yxatidagi hisobni
     o'tkazadi — ikki qavatli tekshiruv, kelajakda role tasodifan boshqa
     hisobga berilib qolsa ham, faqat ro'yxatdagi email kira oladi."""
-    settings = get_settings()
     allowed_emails = {
         e.strip().lower() for e in settings.ADMIN_ALLOWED_EMAILS.split(",") if e.strip()
     }
-    if current_user.role != "admin" or (allowed_emails and current_user.email.lower() not in allowed_emails):
+    user_email = (current_user.email or "").lower()
+    if current_user.role != "admin" or (allowed_emails and user_email not in allowed_emails):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu bo'limga faqat administratorlar kira oladi.")
     return current_user
 

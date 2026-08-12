@@ -31,13 +31,24 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    # Google yoki telefon orqali ro'yxatdan o'tgan foydalanuvchida email
+    # bo'lmasligi mumkin (telefon-only) yoki parol bo'lmasligi mumkin
+    # (Google/telefon-only) — shuning uchun ikkalasi ham nullable.
+    email = Column(String(255), unique=True, nullable=True, index=True)
     name = Column(String(255), nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)
+    phone = Column(String(20), unique=True, nullable=True, index=True)
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
     is_active = Column(Boolean, default=True)
+    # Uch xil auth usuli ham shu bitta flag orqali ishonch bildiradi — email
+    # kodi, Google (email_verified=true bo'lsa avtomatik), yoki telefon kodi.
     is_verified = Column(Boolean, default=False, nullable=False)
     verification_code = Column(String(6))
     verification_code_expires_at = Column(DateTime)
+    phone_verification_code = Column(String(6))
+    phone_verification_code_expires_at = Column(DateTime)
+    # Faqat ma'lumot uchun — hech qanday kod bu maydonga qarab tarmoqlanmaydi.
+    auth_provider = Column(String(20), nullable=False, default="password")  # "password" | "google" | "phone"
     role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -310,6 +321,21 @@ def create_tables():
     try:
         with engine.connect() as connection:
             connection.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan VARCHAR(20)"))
+            connection.commit()
+    except Exception:
+        pass
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("ALTER TABLE users ALTER COLUMN email DROP NOT NULL"))
+            connection.execute(text("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verification_code VARCHAR(6)"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verification_code_expires_at TIMESTAMP"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(20) NOT NULL DEFAULT 'password'"))
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"))
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
             connection.commit()
     except Exception:
         pass

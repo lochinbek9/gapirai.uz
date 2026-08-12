@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     FREE_MODE: bool = False
 
+    # JWT — avval backend/services/auth.py'da hardcoded edi; xuddi shu
+    # standart qiymat bilan ko'chirildi, shuning uchun mavjud sessiyalar
+    # buzilmaydi. Productionda .env orqali qiymatni almashtirish tavsiya
+    # etiladi (haqiqiy maxfiy qiymat .env.example'ga yozilmaydi).
+    SECRET_KEY: str = "ai-dubber-secret-key-2024-uzbek-platform"
+
     # Database
     DATABASE_URL: str = "postgresql://dubber:dubber123@localhost:5432/dubber_db"
     ASYNC_DATABASE_URL: str = "postgresql+asyncpg://dubber:dubber123@localhost:5432/dubber_db"
@@ -104,6 +110,20 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
+
+    # Google bilan kirish — faqat CLIENT_ID kerak (frontend'dagi Google
+    # Identity Services token beradi, backend uni shu ID orqali tekshiradi;
+    # server-side auth-code almashinuvi ishlatilmagani uchun CLIENT_SECRET
+    # kerak emas). Bo'sh bo'lsa, frontend tugmani ko'rsatmaydi.
+    GOOGLE_CLIENT_ID: str = ""
+
+    # Eskiz.uz SMS OTP (https://notify.eskiz.uz/api) — email+parol orqali
+    # login qilib bearer token oladi (Redis'da keshlanadi, sms_service.py),
+    # Resend'ning statik API key'idan farqli. Bo'sh bo'lsa, SMS yuborilmaydi
+    # va foydalanuvchiga aniq xatolik qaytariladi.
+    ESKIZ_EMAIL: str = ""
+    ESKIZ_PASSWORD: str = ""
+    ESKIZ_FROM: str = "4546"  # Eskiz sandbox/test sender nickname — productionda tasdiqlangan nom kerak
 
     # Admin panel — role='admin' bo'lsa ham, faqat shu ro'yxatdagi email
     # kira oladi (vergul bilan ajratilgan). Bo'sh bo'lsa, faqat role tekshiriladi.

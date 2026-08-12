@@ -5,14 +5,12 @@ import time
 from backend.models.database import get_db, DubbingJob, JobStatus, User
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.click_service import (
-    generate_payment_url, 
-    validate_signature, 
+    generate_payment_url,
+    validate_signature,
     ClickErrors,
-    calculate_price,
     normalize_uzs_amount,
 )
-from typing import Optional
-from backend.services.auth import get_current_user, get_optional_user
+from backend.services.auth import get_current_user
 from backend.config import get_settings
 from backend.workers.tasks import process_video
 
@@ -26,36 +24,33 @@ async def initiate_payment(
     req: InitiatePaymentRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
     settings = get_settings()
     job = db.query(DubbingJob).filter(DubbingJob.id == req.job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    if current_user:
-        if not job.user_id:
-            job.user_id = current_user.id
-            db.commit()
-        elif job.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Sizda bu videoga ruxsat yo'q.")
+    # Eski (login majburiy bo'lishidan oldingi) anonim job'larni da'vo qilish —
+    # yangi job'larda user_id doim create_job orqali o'rnatiladi.
+    if not job.user_id:
+        job.user_id = current_user.id
+        db.commit()
+    elif job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Sizda bu videoga ruxsat yo'q.")
 
     # duration is required to calculate price
     if not job.video_duration:
         raise HTTPException(status_code=400, detail="Video davomiyligi aniqlanmadi.")
-    
+
     duration_minutes = job.video_duration / 60.0
     # Tarif kvotasi bilan bir xil mantiq — create_job (routes.py) bilan mos
     # kelishi kerak, aks holda AWAITING_PAYMENT job noto'g'ri qayta narxlanishi mumkin.
-    covered_by_quota = False
-    if current_user:
-        from backend.services.plans import check_quota, consume_quota
-        covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
-    else:
-        amount = calculate_price(duration_minutes, is_first_video=False)
+    from backend.services.plans import check_quota, consume_quota
+    covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
 
     if amount == 0:
-        if covered_by_quota and current_user:
+        if covered_by_quota:
             consume_quota(db, current_user.id, duration_minutes)
         if job.status == JobStatus.AWAITING_PAYMENT:
             job.status = JobStatus.PENDING
@@ -78,11 +73,9 @@ async def initiate_payment(
         Payment.status == PaymentStatus.PENDING
     ).first()
 
-    user_id_val = current_user.id if current_user else None
-
     if not payment:
         payment = Payment(
-            user_id=user_id_val,
+            user_id=current_user.id,
             job_id=job.id,
             amount=amount,
             provider=PaymentProvider.CLICK,

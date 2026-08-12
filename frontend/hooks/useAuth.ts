@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode, apiForgotPassword, apiResetPassword } from '@/lib/auth'
+import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode, apiForgotPassword, apiResetPassword, apiGoogleAuth, apiRequestPhoneCode, apiVerifyPhoneCode } from '@/lib/auth'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -63,5 +63,31 @@ export function useAuth() {
     setUser(null)
   }, [])
 
-  return { user, loading, login, register, verifyCode, resendCode, forgotPassword, resetPassword, logout, isLoggedIn: !!user }
+  // Google va telefon kirishi bir bosqichli — email kodidan farqli, token
+  // darhol qaytadi.
+  const googleAuth = useCallback(async (credential: string) => {
+    const data = await apiGoogleAuth(credential)
+    setToken(data.access_token)
+    setStoredUser(data.user)
+    setUser(data.user)
+    return data.user
+  }, [])
+
+  const requestPhoneCode = useCallback(async (phone: string) => {
+    return apiRequestPhoneCode(phone)
+  }, [])
+
+  const verifyPhoneCode = useCallback(async (phone: string, code: string) => {
+    const data = await apiVerifyPhoneCode(phone, code)
+    setToken(data.access_token)
+    setStoredUser(data.user)
+    setUser(data.user)
+    return data.user
+  }, [])
+
+  return {
+    user, loading, login, register, verifyCode, resendCode, forgotPassword, resetPassword, logout,
+    googleAuth, requestPhoneCode, verifyPhoneCode,
+    isLoggedIn: !!user,
+  }
 }

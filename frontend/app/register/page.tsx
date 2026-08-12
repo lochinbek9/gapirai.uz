@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import GoogleSignInButton from '@/components/GoogleSignInButton'
 import { Eye, EyeOff, Loader2, Youtube, ArrowLeft } from 'lucide-react'
 
 function MeshBackground() {
@@ -26,8 +27,21 @@ export default function RegisterPage() {
   const [code, setCode] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
-  const { register, verifyCode, resendCode } = useAuth()
+  const { register, verifyCode, resendCode, googleAuth } = useAuth()
   const router = useRouter()
+
+  const handleGoogleCredential = async (credential: string) => {
+    setError('')
+    setLoading(true)
+    try {
+      await googleAuth(credential)
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,6 +109,17 @@ export default function RegisterPage() {
 
         {/* Card */}
         <div className="glass-card rounded-[32px] p-8 sm:p-10">
+          {step === 'form' && (
+            <div className="space-y-6 mb-6">
+              <GoogleSignInButton onCredential={handleGoogleCredential} />
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">yoki</span>
+                <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+              </div>
+            </div>
+          )}
+
           {step === 'form' ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
