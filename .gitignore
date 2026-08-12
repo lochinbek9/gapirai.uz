@@ -4,6 +4,7 @@
 cookies.txt
 *.txt
 !frontend/public/robots.txt
+!mobile/.env.example
 
 # ── Python ───────────────────────────────────────────
 __pycache__/
