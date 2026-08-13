@@ -221,7 +221,7 @@ export default function VideoPage() {
                 className={theaterMode ? '' : 'rounded-2xl'}
               />
             ) : job.status === 'awaiting_payment' ? (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 border border-white/5 shadow-2xl relative overflow-hidden">
+              <div className="min-h-[28rem] bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 border border-white/5 shadow-2xl relative overflow-visible">
                 {/* Visual glow backdrop */}
                 <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
