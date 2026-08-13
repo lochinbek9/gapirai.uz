@@ -199,39 +199,55 @@ def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True):
                 logger.warning(f"Could not remove temp cookie file {temp_cookie_path}: {e}")
 
 
+_BOT_CHECK_MARKERS = ("cookies are no longer valid", "Sign in to confirm you")
+
+
+def _extract_info_dict(ydl, youtube_url: str) -> dict:
+    info = ydl.extract_info(youtube_url, download=False)
+    return {
+        "title": info.get("title", "Unknown"),
+        "duration": info.get("duration", 0),
+        "thumbnail": info.get("thumbnail", ""),
+        "uploader": info.get("uploader", ""),
+    }
+
+
 def get_video_info(youtube_url: str) -> dict:
-    try:
-        with get_yt_dlp(use_cookies=True) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            return {
-                "title": info.get("title", "Unknown"),
-                "duration": info.get("duration", 0),
-                "thumbnail": info.get("thumbnail", ""),
-                "uploader": info.get("uploader", ""),
-            }
-    except Exception as e:
-        logger.warning(f"Extract info with cookies failed ({e}). Retrying without cookies...")
+    # "Sign in to confirm you're not a bot" tekshirilganda PROKSI ROTATSIYA
+    # QILUVCHI IP SIFATIGA BOG'LIQ — cookies yoki PO token doimiy buzuq emas
+    # (2026-08-13 haqiqiy testda tasdiqlangan: xuddi shu so'rov 3 urinishdan
+    # 2 tasida muvaffaqiyatli bo'ldi). Shuning uchun bu xato uchun bir necha
+    # marta (yangi proksi IP bilan) qayta urinish ma'noli — darhol "cookielar
+    # eskirgan" deb xabar berish o'rniga.
+    last_exc: Exception | None = None
+    for attempt in range(3):
         try:
-            with get_yt_dlp(use_cookies=False) as ydl:
-                info = ydl.extract_info(youtube_url, download=False)
-                return {
-                    "title": info.get("title", "Unknown"),
-                    "duration": info.get("duration", 0),
-                    "thumbnail": info.get("thumbnail", ""),
-                    "uploader": info.get("uploader", ""),
-                }
-        except Exception as e2:
-            err_str = f"{e} | {e2}"
-            if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
-                raise RuntimeError(
-                    "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-                ) from e2
-            if _is_permanent_download_error(err_str):
-                raise PermanentError(
-                    "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                    code="VIDEO_UNAVAILABLE",
-                ) from e2
-            raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
+            with get_yt_dlp(use_cookies=True) as ydl:
+                return _extract_info_dict(ydl, youtube_url)
+        except Exception as e:
+            last_exc = e
+            if not any(marker in str(e) for marker in _BOT_CHECK_MARKERS):
+                break  # boshqa turdagi xato — qayta urinish foydasiz
+            if attempt < 2:
+                logger.warning(f"Bot-check xatosi (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
+                time.sleep(2 + random.random() * 2)
+
+    logger.warning(f"Extract info with cookies failed ({last_exc}). Retrying without cookies...")
+    try:
+        with get_yt_dlp(use_cookies=False) as ydl:
+            return _extract_info_dict(ydl, youtube_url)
+    except Exception as e2:
+        err_str = f"{last_exc} | {e2}"
+        if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
+            raise RuntimeError(
+                "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+            ) from e2
+        if _is_permanent_download_error(err_str):
+            raise PermanentError(
+                "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                code="VIDEO_UNAVAILABLE",
+            ) from e2
+        raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
 
 
 def download_video(youtube_url: str, job_id: str) -> dict:
@@ -258,12 +274,26 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
         "merge_output_format": "mp4",
     }
 
-    try:
-        with get_yt_dlp(extra_opts, use_cookies=True) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
-            title = info.get("title", "Unknown")
-            duration = float(info.get("duration", 0) or 0)
-    except Exception as e:
+    last_exc: Exception | None = None
+    info = None
+    for attempt in range(3):
+        try:
+            with get_yt_dlp(extra_opts, use_cookies=True) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+                title = info.get("title", "Unknown")
+                duration = float(info.get("duration", 0) or 0)
+            last_exc = None
+            break
+        except Exception as e:
+            last_exc = e
+            if not any(marker in str(e) for marker in _BOT_CHECK_MARKERS):
+                break
+            if attempt < 2:
+                logger.warning(f"Bot-check xatosi yuklab olishda (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
+                time.sleep(2 + random.random() * 2)
+
+    if last_exc is not None:
+        e = last_exc
         logger.warning(f"Download with cookies failed ({e}). Retrying without cookies...")
         try:
             with get_yt_dlp(extra_opts, use_cookies=False) as ydl:
@@ -272,7 +302,7 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
                 duration = float(info.get("duration", 0) or 0)
         except Exception as e2:
             err_str = f"{e} | {e2}"
-            if "cookies are no longer valid" in err_str or "Sign in to confirm you" in err_str:
+            if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
                 raise RuntimeError(
                     "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
                 ) from e2
