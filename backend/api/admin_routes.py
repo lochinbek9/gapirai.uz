@@ -10,6 +10,8 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
 
 TREND_DAYS = 30
+TREND_MONTHS = 12
+TREND_YEARS = 5
 
 
 def _daily_counts(db, model, since: datetime) -> dict[str, int]:
@@ -20,6 +22,16 @@ def _daily_counts(db, model, since: datetime) -> dict[str, int]:
         .all()
     )
     return {str(day): count for day, count in rows}
+
+
+def _bucketed_counts(db, model, since: datetime, trunc: str) -> dict[str, int]:
+    """`trunc` — Postgres date_trunc birligi ("month"/"year"). Kalitlar
+    "YYYY-MM" (month) yoki "YYYY" (year) shaklida qaytadi — frontend'dagi
+    granularity tugmasi shu formatga mos kunlik/oylik/yillik grafikni tanlaydi."""
+    bucket = func.date_trunc(trunc, model.created_at).label("bucket")
+    rows = db.query(bucket, func.count(model.id)).filter(model.created_at >= since).group_by(bucket).all()
+    fmt = "%Y-%m" if trunc == "month" else "%Y"
+    return {b.strftime(fmt): count for b, count in rows}
 
 
 def _period_count(db, model, start: datetime, end: datetime | None = None):
@@ -79,6 +91,26 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
             key = str(d)
             daily.append({"date": key, "users": user_daily.get(key, 0), "jobs": job_daily.get(key, 0)})
 
+        # Oylik/yillik granularity — kunlik chiziqli grafik bilan bir xil
+        # {date, users, jobs} shakli, faqat sana kaliti "YYYY-MM"/"YYYY".
+        monthly_since = datetime(now.year, now.month, 1) - timedelta(days=31 * (TREND_MONTHS - 1))
+        user_monthly = _bucketed_counts(db, User, monthly_since, "month")
+        job_monthly = _bucketed_counts(db, DubbingJob, monthly_since, "month")
+        monthly = []
+        for i in range(TREND_MONTHS - 1, -1, -1):
+            month_index0 = (now.year * 12 + (now.month - 1)) - i
+            y, m = divmod(month_index0, 12)
+            key = f"{y}-{m + 1:02d}"
+            monthly.append({"date": key, "users": user_monthly.get(key, 0), "jobs": job_monthly.get(key, 0)})
+
+        yearly_since = datetime(now.year - (TREND_YEARS - 1), 1, 1)
+        user_yearly = _bucketed_counts(db, User, yearly_since, "year")
+        job_yearly = _bucketed_counts(db, DubbingJob, yearly_since, "year")
+        yearly = []
+        for i in range(TREND_YEARS - 1, -1, -1):
+            key = str(now.year - i)
+            yearly.append({"date": key, "users": user_yearly.get(key, 0), "jobs": job_yearly.get(key, 0)})
+
         today_key = str(now.date())
         yesterday_key = str((now - timedelta(days=1)).date())
 
@@ -88,6 +120,8 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
 
         trends = {
             "daily": daily,
+            "monthly": monthly,
+            "yearly": yearly,
             "today": {"users": user_daily.get(today_key, 0), "jobs": job_daily.get(today_key, 0)},
             "yesterday": {"users": user_daily.get(yesterday_key, 0), "jobs": job_daily.get(yesterday_key, 0)},
             "this_month": {

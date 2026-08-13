@@ -18,6 +18,8 @@ export interface AdminStats {
   recent_users: { email: string; created_at: string | null; is_verified: boolean }[]
   trends: {
     daily: { date: string; users: number; jobs: number }[]
+    monthly: { date: string; users: number; jobs: number }[]
+    yearly: { date: string; users: number; jobs: number }[]
     today: { users: number; jobs: number }
     yesterday: { users: number; jobs: number }
     this_month: { users: number; jobs: number }

@@ -35,9 +35,21 @@ function Card({ label, value, icon }: { label: string; value: string | number; i
 
 const SHORT_MONTHS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek']
 
+type Granularity = 'daily' | 'monthly' | 'yearly'
+const GRANULARITY_CHART_LABEL: Record<Granularity, string> = {
+  daily: 'oxirgi 30 kun',
+  monthly: 'oxirgi 12 oy',
+  yearly: 'oxirgi 5 yil',
+}
+
+// Granularity'ga qarab sana kaliti "YYYY-MM-DD" (kunlik), "YYYY-MM" (oylik)
+// yoki "YYYY" (yillik) shaklida keladi — har biri o'z formatida ko'rsatiladi.
 function formatShortDate(dateStr?: string) {
   if (!dateStr) return ''
-  const [, m, d] = dateStr.split('-').map(Number)
+  const parts = dateStr.split('-').map(Number)
+  if (parts.length === 1) return String(parts[0])
+  if (parts.length === 2) return `${SHORT_MONTHS[parts[1] - 1]} ${parts[0]}`
+  const [, m, d] = parts
   return `${d}-${SHORT_MONTHS[m - 1]}`
 }
 
@@ -199,6 +211,7 @@ function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNo
 export default function AdminPage() {
   const { user, loading: authLoading, isLoggedIn, logout } = useAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
+  const [granularity, setGranularity] = useState<Granularity>('daily')
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
   const [errorDetail, setErrorDetail] = useState('')
@@ -354,16 +367,35 @@ export default function AdminPage() {
               previousLabel="o'tgan oy"
             />
           </div>
+          <div className="flex items-center gap-2">
+            {([
+              ['daily', 'Kunlik'],
+              ['monthly', 'Oylik'],
+              ['yearly', 'Yillik'],
+            ] as [Granularity, string][]).map(([g, label]) => (
+              <button
+                key={g}
+                onClick={() => setGranularity(g)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  granularity === g
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <TrendChart
-              label="Ro'yxatdan o'tishlar (oxirgi 30 kun)"
+              label={`Ro'yxatdan o'tishlar (${GRANULARITY_CHART_LABEL[granularity]})`}
               color="#3987e5"
-              data={stats.trends.daily.map((d) => ({ date: d.date, value: d.users }))}
+              data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
             />
             <TrendChart
-              label="Video buyurtmalar (oxirgi 30 kun)"
+              label={`Video buyurtmalar (${GRANULARITY_CHART_LABEL[granularity]})`}
               color="#199e70"
-              data={stats.trends.daily.map((d) => ({ date: d.date, value: d.jobs }))}
+              data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
             />
           </div>
         </section>
