@@ -279,6 +279,19 @@ export default function VideoPage() {
                     To'lov tasdiqlangandan so'ng, dublyaj jarayoni avtomatik tarzda boshlanadi.
                   </p>
 
+                  <div className="border-t border-white/10 pt-4">
+                    <p className="text-xs text-slate-400 mb-2">
+                      Tez-tez uzun video dublyaj qilasizmi? Oylik tarifga obuna bo'lib, har safar
+                      alohida to'lov qilmasdan foydalaning.
+                    </p>
+                    <Link
+                      href="/pricing"
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition"
+                    >
+                      Tarif rejalarini ko'rish →
+                    </Link>
+                  </div>
+
                   <button
                     onClick={handleGoHome}
                     className="inline-block text-xs font-semibold text-slate-400 hover:text-white transition pt-2"

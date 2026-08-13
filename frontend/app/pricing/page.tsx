@@ -54,33 +54,32 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-12 px-4 sm:px-6 relative overflow-hidden">
-      <div className="absolute top-0 left-1/3 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/3 w-96 h-96 rounded-full bg-violet-500/10 blur-3xl pointer-events-none" />
+    <div className="min-h-screen relative flex flex-col items-center py-12 px-4 sm:px-6 transition-colors duration-300">
+      <MeshBackground />
 
       <div className="w-full max-w-5xl z-10 space-y-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition duration-200">
+        <Link href="/" className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition duration-200">
           <ArrowLeft className="w-4 h-4" /> Bosh sahifaga qaytish
         </Link>
 
         <div className="text-center space-y-3">
-          <h1 className="text-2xl sm:text-3xl font-black">Tarif rejalari</h1>
-          <p className="text-sm text-slate-400 max-w-xl mx-auto">
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">Tarif rejalari</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xl mx-auto">
             45 daqiqadan qisqa videolar har doim bepul. Uzunroq videolarni tez-tez dublyaj qilsangiz, oylik tarif arzonroq bo'ladi.
           </p>
         </div>
 
         {!isLoggedIn && !authLoading && (
-          <p className="text-center text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto">
+          <p className="text-center text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto">
             Tarifga obuna bo'lish uchun{' '}
-            <Link href="/login" className="underline hover:text-amber-300">kiring</Link>
+            <Link href="/login" className="underline hover:text-amber-700 dark:hover:text-amber-300">kiring</Link>
             {' '}yoki{' '}
-            <Link href="/register" className="underline hover:text-amber-300">ro'yxatdan o'ting</Link>.
+            <Link href="/register" className="underline hover:text-amber-700 dark:hover:text-amber-300">ro'yxatdan o'ting</Link>.
           </p>
         )}
 
         {error && (
-          <p className="text-center text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto">{error}</p>
+          <p className="text-center text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto">{error}</p>
         )}
 
         {loading ? (
@@ -94,8 +93,8 @@ export default function PricingPage() {
               return (
                 <div
                   key={plan.id}
-                  className={`relative bg-slate-900/50 border rounded-[28px] p-6 flex flex-col gap-5 backdrop-blur-xl ${
-                    isPro ? 'border-violet-500/50 shadow-[0_0_40px_-10px] shadow-violet-500/30' : 'border-slate-800/80'
+                  className={`glass-card relative border rounded-[28px] p-6 flex flex-col gap-5 ${
+                    isPro ? 'border-violet-500/50 shadow-[0_0_40px_-10px] shadow-violet-500/30' : 'border-black/5 dark:border-white/5'
                   }`}
                 >
                   {isPro && (
@@ -104,25 +103,25 @@ export default function PricingPage() {
                     </span>
                   )}
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 dark:text-violet-400 flex items-center justify-center">
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black">{plan.name}</h3>
-                      {isCurrent && <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Joriy tarif</span>}
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white">{plan.name}</h3>
+                      {isCurrent && <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Joriy tarif</span>}
                     </div>
                   </div>
 
                   <div>
-                    <span className="text-3xl font-black">{plan.price === 0 ? 'Bepul' : plan.price.toLocaleString('uz-UZ')}</span>
-                    {plan.price > 0 && <span className="text-sm text-slate-400"> so'm/oy</span>}
+                    <span className="text-3xl font-black text-gray-900 dark:text-white">{plan.price === 0 ? 'Bepul' : plan.price.toLocaleString('uz-UZ')}</span>
+                    {plan.price > 0 && <span className="text-sm text-gray-500 dark:text-slate-400"> so'm/oy</span>}
                   </div>
 
-                  <ul className="space-y-2.5 text-sm text-slate-300 flex-1">
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video, {plan.free_minutes} daqiqagacha</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
+                  <ul className="space-y-2.5 text-sm text-gray-600 dark:text-slate-300 flex-1">
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video, {plan.free_minutes} daqiqagacha</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
                   </ul>
 
                   <button
@@ -130,7 +129,7 @@ export default function PricingPage() {
                     disabled={plan.id === 'free' || isCurrent || subscribing === plan.id}
                     className={`w-full py-3 rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2 ${
                       plan.id === 'free' || isCurrent
-                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90'
                     }`}
                   >
@@ -144,8 +143,18 @@ export default function PricingPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   )
+}
+
+function MeshBackground() {
+  return (
+    <div className="mesh-gradient">
+      <div className="mesh-gradient-blob blob-1" />
+      <div className="mesh-gradient-blob blob-2" />
+      <div className="mesh-gradient-blob blob-3" />
+    </div>
+  );
 }
 
 // Login qilinmagan foydalanuvchiga ham tarif tuzilmasini ko'rsatish uchun
