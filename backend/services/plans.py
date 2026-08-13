@@ -75,9 +75,13 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
 
     Returns: (covered_without_payment, price_uzs)
     - 45 daqiqadan qisqa video: har doim (True, 0) — bugungi xatti-harakat, tarifdan mustaqil.
-    - 45+ daqiqa: tarifning kvotasi (videos_per_period, free_minutes) ichiga
-      sig'sa (True, 0) — chaqiruvchi keyin consume_quota() chaqirishi kerak;
-      aks holda (False, narx) — click_service.calculate_price() orqali.
+    - 45+ daqiqa, BEPUL tarif: faqat free_minutes ichiga sig'sa va oylik video-soni
+      kvotasidan oshmasa (True, 0) — free_minutes shu yerda haqiqiy chegara.
+    - 45+ daqiqa, PULLIK tarif (standard/pro): video davomiyligi CHEKLANMAYDI —
+      faqat oylik video-soni kvotasi (videos_per_period) tekshiriladi. Foydalanuvchi
+      tarifga pul to'lagandan keyin uzun video uchun yana to'lov so'ralishi kutilmagan
+      va noto'g'ri edi (aniq foydalanuvchi talabi, 2026-08-13) — free_minutes bu yerda
+      faqat pricing sahifasidagi ko'rsatkich, haqiqiy cheklov emas.
     """
     if duration_minutes < _FREE_THRESHOLD_MINUTES:
         return True, 0
@@ -85,7 +89,12 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
 
-    if duration_minutes <= plan.free_minutes and sub.videos_used_this_period < plan.videos_per_period:
+    if sub.plan == PlanTier.FREE:
+        covered = duration_minutes <= plan.free_minutes and sub.videos_used_this_period < plan.videos_per_period
+    else:
+        covered = sub.videos_used_this_period < plan.videos_per_period
+
+    if covered:
         return True, 0
 
     price = calculate_price(duration_minutes, is_first_video=False)
