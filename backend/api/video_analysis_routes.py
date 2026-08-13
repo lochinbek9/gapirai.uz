@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -79,7 +80,11 @@ async def create_analysis(
         raise HTTPException(status_code=400, detail="Noto'g'ri tahlil tili.")
 
     try:
-        info = get_video_info(request.youtube_url)
+        # Thread'da ishga tushiriladi — get_video_info bloklovchi (yt-dlp
+        # tarmoq so'rovlari + bot-check qayta urinishlarida time.sleep),
+        # to'g'ridan-to'g'ri await qilinsa butun asyncio event loop'ni to'sib
+        # qo'yadi (backend/api/routes.py'da xuddi shu sababdan tuzatilgan).
+        info = await asyncio.to_thread(get_video_info, request.youtube_url)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
 

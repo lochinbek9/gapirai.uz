@@ -1,3 +1,4 @@
+import asyncio
 import re
 import shutil
 import uuid
@@ -123,7 +124,12 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
 @router.get("/video-info", dependencies=[Depends(rate_limit("video_info", 20, 600))])
 async def video_info(url: str) -> VideoInfoResponse:
     try:
-        info = get_video_info(url)
+        # get_video_info bloklovchi (yt-dlp tarmoq so'rovlari + bot-check
+        # qayta urinishlarida time.sleep) — thread'ga chiqarilmasa, butun
+        # asyncio event loop'ni to'sib qo'yadi va HATTO /health kabi
+        # bog'liqsiz so'rovlar ham javob bermay qoladi (2026-08-13
+        # productionda haqiqiy uzilish orqali tasdiqlangan).
+        info = await asyncio.to_thread(get_video_info, url)
         return VideoInfoResponse(**info)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Video ma'lumot olishda xatolik: {str(e)}")
@@ -138,9 +144,10 @@ async def create_job(
     if not _is_valid_youtube_url(request.youtube_url):
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
 
-    # Video ma'lumotlarini yuklash
+    # Video ma'lumotlarini yuklash — thread'da (yuqoridagi /video-info bilan
+    # bir xil sabab: bloklovchi chaqiruv event loop'ni to'smasligi kerak).
     try:
-        info = get_video_info(request.youtube_url)
+        info = await asyncio.to_thread(get_video_info, request.youtube_url)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
 
