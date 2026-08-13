@@ -55,15 +55,6 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
         status_rows = db.query(DubbingJob.status, func.count(DubbingJob.id)).group_by(DubbingJob.status).all()
         jobs_by_status = {(s.value if hasattr(s, "value") else str(s)): c for s, c in status_rows}
 
-        error_code_rows = (
-            db.query(DubbingJob.error_code, func.count(DubbingJob.id))
-            .filter(DubbingJob.error_code.isnot(None))
-            .group_by(DubbingJob.error_code)
-            .order_by(func.count(DubbingJob.id).desc())
-            .all()
-        )
-        jobs_by_error_code = {code: c for code, c in error_code_rows}
-
         total_jobs = db.query(DubbingJob).count()
         jobs_with_user = db.query(DubbingJob).filter(DubbingJob.user_id.isnot(None)).count()
         jobs_7d = db.query(DubbingJob).filter(DubbingJob.created_at > now - timedelta(days=7)).count()
@@ -77,6 +68,30 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
         recent_users = [
             {"email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None, "is_verified": u.is_verified}
             for u in db.query(User).order_by(User.created_at.desc()).limit(10).all()
+        ]
+
+        # Har bir jobning qaysi video, qaysi akkaunt va qachon bo'lganini
+        # to'liq ko'rish uchun — admin panelidagi umumlashtirilgan
+        # "xatolik turlari" kartasi o'rniga individual joblar ro'yxati.
+        recent_jobs_rows = (
+            db.query(DubbingJob, User.email)
+            .outerjoin(User, DubbingJob.user_id == User.id)
+            .order_by(DubbingJob.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        recent_jobs = [
+            {
+                "id": str(job.id),
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "video_title": job.video_title,
+                "youtube_url": job.youtube_url,
+                "user_email": email,
+                "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+                "error_code": job.error_code,
+                "error_message": job.error_message,
+            }
+            for job, email in recent_jobs_rows
         ]
 
         # ── Trendlar: kunlik ro'yxatdan o'tish/video soni, bugun/kecha,
@@ -146,7 +161,6 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "with_registered_user": jobs_with_user,
                 "anonymous": total_jobs - jobs_with_user,
                 "by_status": jobs_by_status,
-                "by_error_code": jobs_by_error_code,
                 "last_7d": jobs_7d,
                 "last_24h": jobs_24h,
             },
@@ -155,6 +169,7 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "revenue_total_uzs": float(revenue_total or 0),
             },
             "recent_users": recent_users,
+            "recent_jobs": recent_jobs,
             "trends": trends,
         }
     finally:

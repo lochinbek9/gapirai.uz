@@ -434,19 +434,6 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-          {Object.keys(stats.jobs.by_error_code).length > 0 && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Xatolik turlari</p>
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                {Object.entries(stats.jobs.by_error_code).map(([code, count]) => (
-                  <div key={code} className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 sm:px-4 py-2 flex items-center gap-2">
-                    <span className="text-xs text-red-300">{code}</span>
-                    <span className="text-sm font-bold text-white">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
 
         {/* Payments */}
@@ -488,6 +475,50 @@ export default function AdminPage() {
                 ))}
                 {stats.recent_users.length === 0 && (
                   <tr><td colSpan={3} className="px-4 sm:px-5 py-6 text-center text-gray-500">Hali user yo'q</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Recent jobs — video, akkaunt va vaqt to'liq ko'rinishi */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi joblar</h2>
+          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sana</th>
+                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Akkaunt</th>
+                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Holat</th>
+                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Xatolik</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recent_jobs.map((j) => (
+                  <tr key={j.id} className="border-b border-white/5 last:border-0">
+                    <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                      {j.created_at ? new Date(j.created_at).toLocaleString('uz-UZ') : '—'}
+                    </td>
+                    <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={j.video_title || j.youtube_url}>
+                      <a href={j.youtube_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 hover:underline">
+                        {j.video_title || j.youtube_url}
+                      </a>
+                    </td>
+                    <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{j.user_email || 'Anonim'}</td>
+                    <td className="px-4 sm:px-5 py-3 whitespace-nowrap">
+                      <span className={j.status === 'FAILED' ? 'text-red-400' : j.status === 'COMPLETED' ? 'text-emerald-400' : 'text-gray-300'}>
+                        {STATUS_LABELS[j.status] || j.status}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-5 py-3 text-red-300 max-w-[220px] truncate" title={j.error_message || undefined}>
+                      {j.error_code || '—'}
+                    </td>
+                  </tr>
+                ))}
+                {stats.recent_jobs.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 sm:px-5 py-6 text-center text-gray-500">Hali job yo'q</td></tr>
                 )}
               </tbody>
             </table>

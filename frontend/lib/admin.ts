@@ -10,12 +10,21 @@ export interface AdminStats {
     with_registered_user: number
     anonymous: number
     by_status: Record<string, number>
-    by_error_code: Record<string, number>
     last_7d: number
     last_24h: number
   }
   payments: { approved_count: number; revenue_total_uzs: number }
   recent_users: { email: string; created_at: string | null; is_verified: boolean }[]
+  recent_jobs: {
+    id: string
+    created_at: string | null
+    video_title: string | null
+    youtube_url: string
+    user_email: string | null
+    status: string
+    error_code: string | null
+    error_message: string | null
+  }[]
   trends: {
     daily: { date: string; users: number; jobs: number }[]
     monthly: { date: string; users: number; jobs: number }[]
