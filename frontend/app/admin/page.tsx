@@ -1,4 +1,10 @@
 'use client'
+// Admin panel doim yangi holatda ko'rsatilishi kerak — Next.js buni statik
+// deb baholab uzoq (s-maxage=1yil) keshlash header'i yuborgan edi, natijada
+// yo'ldagi oraliq keshlar (masalan provayder proksisi) eski versiyani
+// cheksiz saqlab qolgan (2026-08-13, real holatda tasdiqlangan).
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn } from 'lucide-react'
