@@ -16,6 +16,7 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   useEffect(() => {
     if (authLoading) return
@@ -82,14 +83,36 @@ export default function PricingPage() {
           <p className="text-center text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto">{error}</p>
         )}
 
+        <div className="flex items-center justify-center gap-3">
+          <span className={`text-sm font-semibold transition ${billingCycle === 'monthly' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>Oylik</span>
+          <button
+            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+            className="relative w-12 h-7 rounded-full bg-violet-500/20 border border-violet-500/30 transition"
+            aria-label="To'lov davrini almashtirish"
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-violet-500 transition-transform ${
+                billingCycle === 'yearly' ? 'translate-x-[22px]' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+          <span className={`text-sm font-semibold transition flex items-center gap-1.5 ${billingCycle === 'yearly' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
+            Yillik
+            <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full">2 oy bepul</span>
+          </span>
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-violet-400" /></div>
         ) : (
           <div className="grid sm:grid-cols-3 gap-5">
-            {(plans.length ? plans : DEFAULT_PLANS).map((plan) => {
-              const Icon = PLAN_ICONS[plan.id] || Sparkles
-              const isCurrent = current?.plan === plan.id
-              const isPro = plan.id === 'pro'
+            {(plans.length ? plans : DEFAULT_PLANS)
+              .filter((plan) => plan.tier === 'free' || plan.period_days === (billingCycle === 'yearly' ? 365 : 30))
+              .map((plan) => {
+              const Icon = PLAN_ICONS[plan.tier] || Sparkles
+              const isCurrent = current?.plan === plan.tier
+              const isPro = plan.tier === 'pro'
+              const monthlyEquivalent = plan.period_days === 365 ? Math.round(plan.price / 12) : null
               return (
                 <div
                   key={plan.id}
@@ -113,12 +136,19 @@ export default function PricingPage() {
                   </div>
 
                   <div>
-                    <span className="text-3xl font-black text-gray-900 dark:text-white">{plan.price === 0 ? 'Bepul' : plan.price.toLocaleString('uz-UZ')}</span>
+                    <span className="text-3xl font-black text-gray-900 dark:text-white">
+                      {plan.price === 0 ? 'Bepul' : (monthlyEquivalent ?? plan.price).toLocaleString('uz-UZ')}
+                    </span>
                     {plan.price > 0 && <span className="text-sm text-gray-500 dark:text-slate-400"> so'm/oy</span>}
+                    {monthlyEquivalent !== null && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        {plan.price.toLocaleString('uz-UZ')} so'm/yil to'lanadi
+                      </p>
+                    )}
                   </div>
 
                   <ul className="space-y-2.5 text-sm text-gray-600 dark:text-slate-300 flex-1">
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video, {plan.free_minutes} daqiqagacha</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video{plan.price === 0 ? `, ${plan.free_minutes} daqiqagacha` : ', cheklovsiz davomiylik'}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
@@ -161,7 +191,9 @@ function MeshBackground() {
 // (backend /api/plans login talab qiladi) — narxlar backend/services/plans.py
 // bilan bir xil, faqat ko'rsatish uchun.
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge' },
-  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 5, free_minutes: 60, priority: false, tts_tier: 'edge' },
-  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 20, free_minutes: 90, priority: true, tts_tier: 'premium' },
+  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30 },
+  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30 },
+  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365 },
+  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30 },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1490000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365 },
 ]

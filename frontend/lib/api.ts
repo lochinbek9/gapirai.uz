@@ -115,6 +115,8 @@ export interface PlanDef {
   free_minutes: number
   priority: boolean
   tts_tier: string
+  tier: string
+  period_days: number
 }
 
 export interface CurrentSubscription {

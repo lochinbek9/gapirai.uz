@@ -36,6 +36,7 @@ async def list_plans(
                 "id": p.id, "name": p.name, "price": p.price,
                 "videos_per_period": p.videos_per_period, "free_minutes": p.free_minutes,
                 "priority": p.priority, "tts_tier": p.tts_tier,
+                "tier": p.tier.value, "period_days": p.period_days,
             }
             for p in PLANS.values()
         ],
