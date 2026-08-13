@@ -142,7 +142,21 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         "extractor_args": {
             "youtube": {
                 "player_client": ["web", "ios", "android", "mweb"],
-            }
+            },
+            # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
+            # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
+            # yengish uchun ishlatiladi. Avval faqat CLI konfiguratsiya faylida
+            # (backend/Dockerfile: ~/.config/yt-dlp/config) berilgan edi — bu
+            # FAQAT `yt-dlp` buyruq qatoridan chaqirilganda o'qiladi, biz esa
+            # Python API (yt_dlp.YoutubeDL) orqali ishlatamiz, u CLI config
+            # faylini o'qimaydi. Natijada PO token provider hech qachon
+            # haqiqatda ishlatilmagan edi — bu productionda ko'plab haqiqiy
+            # "cookielari eskirgan"/bot-bloklash xatolarining asosiy sababi
+            # bo'lgan (2026-08-13, real job orqali tasdiqlangan: xuddi shu
+            # video PO token'siz muvaffaqiyatsiz, PO token bilan muvaffaqiyatli
+            # bo'ldi). Shuning uchun endi bu yerda, Python opts ichida ham
+            # aniq beriladi.
+            "youtubepot-bgutilhttp": {"base_url": ["http://pot-provider:4416"]},
         },
     }
 
