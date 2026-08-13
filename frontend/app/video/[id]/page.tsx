@@ -232,29 +232,11 @@ export default function VideoPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-xl font-extrabold text-white">To'lov kutilmoqda</h2>
+                    <h2 className="text-xl font-extrabold text-white">Tarif reja kerak</h2>
                     <p className="text-sm text-slate-400 leading-relaxed">
-                      Ushbu video 45 daqiqa yoki undan uzun bo'lgani sababli, dublyaj xizmati pullik.
+                      Ushbu video 45 daqiqadan uzun ({job.video_duration ? formatDuration(job.video_duration) : ''}).
+                      45 daqiqadan uzun videolarni dublyaj qilish uchun tarif rejalaridan biriga obuna bo'lishingiz kerak.
                     </p>
-                  </div>
-
-                  {/* Pricing Details */}
-                  <div className="grid grid-cols-2 gap-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-                    <div className="text-left">
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Davomiylik</p>
-                      <p className="text-lg font-bold text-white mt-1">
-                        {job.video_duration ? formatDuration(job.video_duration) : 'Noma\'lum'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Xizmat haqi</p>
-                      <p className="text-lg font-bold text-blue-400 mt-1">
-                        {job.video_duration ? (() => {
-                          const amount = calculateClientPrice(job.video_duration / 60.0);
-                          return amount.toLocaleString('uz-UZ') + " UZS";
-                        })() : 'Loyiha narxi'}
-                      </p>
-                    </div>
                   </div>
 
                   {paymentError && (
@@ -263,33 +245,29 @@ export default function VideoPage() {
                     </div>
                   )}
 
-                  <button
-                    onClick={handlePayment}
-                    disabled={paymentLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  <Link
+                    href="/pricing"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg"
                   >
-                    {paymentLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      "Click orqali to'lov qilish"
-                    )}
-                  </button>
+                    Tarif rejalarini ko'rish
+                  </Link>
 
                   <p className="text-[11px] text-slate-500">
-                    To'lov tasdiqlangandan so'ng, dublyaj jarayoni avtomatik tarzda boshlanadi.
+                    Obuna bo'lgandan so'ng, shunga o'xshash videolarni qo'shimcha to'lovsiz dublyaj qila olasiz.
                   </p>
 
                   <div className="border-t border-white/10 pt-4">
-                    <p className="text-xs text-slate-400 mb-2">
-                      Tez-tez uzun video dublyaj qilasizmi? Oylik tarifga obuna bo'lib, har safar
-                      alohida to'lov qilmasdan foydalaning.
-                    </p>
-                    <Link
-                      href="/pricing"
-                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition"
+                    <button
+                      onClick={handlePayment}
+                      disabled={paymentLoading}
+                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50"
                     >
-                      Tarif rejalarini ko'rish →
-                    </Link>
+                      {paymentLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin inline" />
+                      ) : (
+                        <>Yoki shu video uchun bir martalik to'lov qiling ({job.video_duration ? calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ') : '...'} UZS)</>
+                      )}
+                    </button>
                   </div>
 
                   <button
