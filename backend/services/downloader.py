@@ -141,7 +141,15 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         },
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "ios", "android", "mweb"],
+                # "web" client ataylab CHIQARIB TASHLANGAN — cookies bilan
+                # ishlatilganda deyarli har doim "Requested format is not
+                # available" xatosiga olib kelardi (2026-08-13, real
+                # foydalanuvchi joblarida tasdiqlangan: xuddi shu video "web"
+                # bilan muvaffaqiyatsiz, faqat ios/android/mweb bilan
+                # muvaffaqiyatli bo'ldi). ios/android/mweb PO token bilan
+                # birga ishonchli ishlaydi, cookies bo'lsa ham ular orqali
+                # qo'llanadi.
+                "player_client": ["ios", "android", "mweb"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
             # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
@@ -175,10 +183,6 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         except Exception as e:
             logger.warning(f"Could not copy cookies file from {cookies_target}: {e}")
             opts["cookiefile"] = cookies_target
-    else:
-        # No cookies or unauthenticated fallback — use iOS/Android/mweb clients
-        opts["extractor_args"]["youtube"]["player_client"] = ["ios", "mweb", "android"]
-
     if extra:
         opts.update(extra)
     return opts, temp_cookie_path
