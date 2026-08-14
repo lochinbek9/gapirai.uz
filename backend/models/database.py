@@ -39,6 +39,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)
     phone = Column(String(20), unique=True, nullable=True, index=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
+    # Telegram bot orqali ulangan bo'lsa to'ldiriladi (backend/telegram_bot.py)
+    # -- job yakunlanganda foydalanuvchiga shu chat'ga xabar yuborish uchun.
+    # Bir xil telefon raqami web'da ham ishlatilgan bo'lsa, xuddi shu
+    # hisobga bog'lanadi (auth_routes.py'dagi phone auth bilan bir xil
+    # ustun) -- kvota/obuna ikkalasida ham baravar ishlaydi.
+    telegram_chat_id = Column(String(50), unique=True, nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     # Uch xil auth usuli ham shu bitta flag orqali ishonch bildiradi — email
     # kodi, Google (email_verified=true bo'lsa avtomatik), yoki telefon kodi.

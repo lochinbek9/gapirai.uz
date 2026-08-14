@@ -84,7 +84,13 @@ def _moderation_check(text: str) -> SafetyResult:
         return SafetyResult(False, "hate_violent_extremism", "Nafrat yoki zo'ravonlikni qo'zg'atuvchi kontent aniqlandi.")
     if getattr(cats, "self_harm", False):
         return SafetyResult(False, "self_harm", "O'ziga zarar yetkazishni targ'ib qiluvchi kontent aniqlandi.")
-    return SafetyResult(False, "policy_violation", "Kontent OpenAI moderatsiya siyosatiga zid deb topildi.")
+    # OpenAI moderation yana ko'plab boshqa kategoriyalarni ham belgilaydi
+    # (masalan, oddiy "harassment" yoki "violence" -- tahdidsiz, nografik) --
+    # bular GapirAI'ning bloklash siyosati doirasiga kirmaydi (faqat diniy,
+    # terroristik, 18+ va bolalarga oid kontent). Filmlar/drama dialoglarida
+    # bunday belgilar tez-tez soxta signal beradi, shuning uchun yuqoridagi
+    # aniq kategoriyalardan birortasi mos kelmasa -- ruxsat beriladi.
+    return SafetyResult(allowed=True)
 
 
 _POLICY_SYSTEM_PROMPT = (

@@ -11,36 +11,21 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, DubbingJob, JobStatus, User, ContentViolation
-from backend.services.downloader import get_video_info
-from backend.services.content_safety import check_safety
+from backend.models.database import get_db, DubbingJob, JobStatus, User
 from backend.services.auth import get_current_user, get_optional_user
-from backend.workers.tasks import process_video
 from backend.config import get_settings
 from backend.services.rate_limiter import rate_limit
+# Job yaratish mantig'i (video ma'lumot olish, Safety Gate, davomiylik
+# chegarasi, kvota) shu yerda -- Telegram bot ham xuddi shu funksiyani
+# chaqiradi, ikki joyda saqlanmaydi.
+from backend.services.job_creation import (
+    MAX_VIDEO_DURATION_MINUTES,
+    is_valid_youtube_url as _is_valid_youtube_url,
+    create_dubbing_job,
+)
 
 settings = get_settings()
 
-# Bitta video shu davomiylikdan uzun bo'lsa rad etiladi — cheksiz uzun
-# (masalan ko'p soatlik jonli efir yozuvi) video butun pipeline'ni juda
-# uzoq vaqt band qilib qo'yishi va API xarajatlarini nazoratsiz oshirib
-# yuborishi mumkin.
-MAX_VIDEO_DURATION_MINUTES = 180
-
-_YOUTUBE_HOSTS = {
-    "youtube.com", "www.youtube.com", "m.youtube.com",
-    "music.youtube.com", "youtu.be",
-}
-
-
-def _is_valid_youtube_url(url: str) -> bool:
-    try:
-        parsed = urlparse(url)
-    except Exception:
-        return False
-    if parsed.scheme not in ("http", "https"):
-        return False
-    return parsed.netloc.lower() in _YOUTUBE_HOSTS
 router = APIRouter(prefix="/api", tags=["dubbing"])
 
 
@@ -142,81 +127,29 @@ async def create_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if not _is_valid_youtube_url(request.youtube_url):
+    # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
+    # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
+    result = await create_dubbing_job(db, current_user, request.youtube_url, request.voice_gender)
+
+    if result.outcome == "invalid_url":
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
-
-    # Video ma'lumotlarini yuklash — thread'da (yuqoridagi /video-info bilan
-    # bir xil sabab: bloklovchi chaqiruv event loop'ni to'smasligi kerak).
-    try:
-        info = await asyncio.to_thread(get_video_info, request.youtube_url)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
-
-    title = info.get("title", "Unknown")
-    duration = info.get("duration", 0)
-    thumbnail = info.get("thumbnail")
-
-    # Safety Gate -- 1-bosqich (metadata). Bloklansa, job umuman
-    # yaratilmaydi va foydalanuvchi hisobiga hech narsa yozilmaydi.
-    metadata_text = f"{title}\n{info.get('description', '')}\nKanal: {info.get('uploader', '')}"
-    safety = check_safety(metadata_text)
-    if not safety.allowed:
-        db.add(ContentViolation(
-            user_id=current_user.id,
-            youtube_url=request.youtube_url,
-            video_title=title,
-            stage="metadata",
-            category=safety.category or "policy_violation",
-            reason=safety.reason or "",
-        ))
-        db.commit()
+    if result.outcome == "fetch_error":
+        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
+    if result.outcome == "blocked":
         raise HTTPException(
             status_code=403,
             detail="Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
         )
-
-    duration_minutes = duration / 60.0
-
-    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+    if result.outcome == "too_long":
         raise HTTPException(
             status_code=400,
-            detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
+            detail=f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
+    if result.outcome == "queued":
+        return {"job_id": result.job_id, "status": "pending"}
 
-    from backend.services.plans import check_quota, consume_quota, get_job_queue
-    covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
-
-    job_id = str(uuid.uuid4())
-
-    if amount > 0:
-        status = JobStatus.AWAITING_PAYMENT
-        status_message = "To'lov kutilmoqda"
-    else:
-        status = JobStatus.PENDING
-        status_message = "Navbatga qo'shildi"
-
-    job = DubbingJob(
-        id=job_id,
-        user_id=current_user.id,
-        youtube_url=request.youtube_url,
-        video_title=title,
-        video_duration=duration,
-        video_thumbnail=thumbnail,
-        voice_gender_setting=request.voice_gender,
-        status=status,
-        progress=0.0,
-        status_message=status_message,
-    )
-    db.add(job)
-    db.commit()
-
-    if amount == 0:
-        if covered_by_quota:
-            consume_quota(db, current_user.id, duration_minutes)
-        process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, current_user.id))
-        return {"job_id": job_id, "status": "pending"}
-    
-    return {"job_id": job_id, "status": "awaiting_payment", "amount": amount}
+    # "awaiting_payment"
+    return {"job_id": result.job_id, "status": "awaiting_payment", "amount": result.amount}
 
 
 @router.get("/jobs/{job_id}")

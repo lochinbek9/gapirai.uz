@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     # zo'ravonlik kontentini job yaratilishidan oldin (metadata) va
     # transkripsiyadan keyin (transkript) bloklaydi.
     CONTENT_SAFETY_ENABLED: bool = True
+
+    # Telegram bot -- @BotFather'dan olingan token. Bo'sh bo'lsa bot
+    # jarayoni ishga tushmaydi va bildirishnomalar jimgina o'tkazib
+    # yuboriladi (backend/services/telegram_notify.py: fail-open).
+    TELEGRAM_BOT_TOKEN: str = ""
     # Tarjima uchun — gpt-4o-mini sifat jihatidan gpt-4o'ga deyarli teng
     # chiqdi (real taqqoslashda tasdiqlangan), narxi esa ~17x arzon.
     OPENAI_MODEL: str = "gpt-4o-mini"

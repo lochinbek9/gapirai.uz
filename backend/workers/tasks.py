@@ -14,6 +14,7 @@ from backend.services.errors import PermanentError
 from backend.services.content_safety import check_safety
 from backend.models.database import ContentViolation
 from backend.services.email_service import send_dubbing_complete_email
+from backend.services.telegram_notify import send_telegram_message
 from backend.config import get_settings
 
 logger = get_task_logger(__name__)
@@ -423,6 +424,16 @@ def process_video(self: Task, job_id: str) -> dict:
             except Exception as email_err:
                 logger.warning(f"Dublyaj tayyor email yuborilmadi (job {job_id}): {email_err}")
 
+        # Telegram bot orqali bog'langan bo'lsa (backend/telegram_bot.py) --
+        # web orqali yaratilgan job bo'lsa ham, foydalanuvchi telefon
+        # raqami botga ham ulangan bo'lsa xabar boradi.
+        if job.user_id and job.user and job.user.telegram_chat_id:
+            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+            send_telegram_message(
+                job.user.telegram_chat_id,
+                f"\u2705 Dublyaj tayyor!\n\n\U0001F3AC {job.video_title or 'Video'}\n\n{frontend_url}/video/{job_id}",
+            )
+
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED")
 
@@ -438,6 +449,11 @@ def process_video(self: Task, job_id: str) -> dict:
             "updated_at": datetime.utcnow(),
         })
         db.commit()
+        if job.user_id and job.user and job.user.telegram_chat_id:
+            send_telegram_message(
+                job.user.telegram_chat_id,
+                f"\u274c Dublyaj bajarilmadi: {job.video_title or 'Video'}\n\n{str(exc)}",
+            )
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
