@@ -216,6 +216,7 @@ def _extract_info_dict(ydl, youtube_url: str) -> dict:
         "duration": info.get("duration", 0),
         "thumbnail": info.get("thumbnail", ""),
         "uploader": info.get("uploader", ""),
+        "description": info.get("description", ""),
     }
 
 

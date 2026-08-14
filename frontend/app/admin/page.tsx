@@ -7,10 +7,23 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn } from 'lucide-react'
-import { AdminStats, apiAdminStats } from '@/lib/admin'
+import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, Ban } from 'lucide-react'
+import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers } from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  sexual_explicit: "Pornografik / 18+ kontent",
+  sexual_minors: "Voyaga yetmaganlar ishtirokidagi jinsiy kontent",
+  sexual_violence: "Zo'rlash yoki jinsiy zo'ravonlik",
+  terrorism_extremism: "Terroristik / ekstremistik targ'ibot",
+  graphic_violence: "Haddan tashqari grafik zo'ravonlik",
+  hate_violent_extremism: "Nafrat yoki zo'ravonlikni qo'zg'atish",
+  self_harm: "O'ziga zarar yetkazishni targ'ib qilish",
+  illegal_activity: "Noqonuniy faoliyatni targ'ib qilish/o'rgatish",
+  religious_content: "Diniy kontent",
+  policy_violation: "Kontent siyosatini buzish",
+}
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Navbatda",
@@ -217,6 +230,7 @@ function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNo
 export default function AdminPage() {
   const { user, loading: authLoading, isLoggedIn, logout } = useAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
+  const [blocked, setBlocked] = useState<BlockedUsersReport | null>(null)
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
@@ -233,6 +247,11 @@ export default function AdminPage() {
       const data = await apiAdminStats(token)
       setStats(data)
       setErrorKind(null)
+      try {
+        setBlocked(await apiAdminBlockedUsers(token))
+      } catch {
+        // Bloklanganlar hisoboti ixtiyoriy -- xato bo'lsa asosiy panelni to'xtatmaydi.
+      }
     } catch (err: any) {
       const httpStatus = err?.response?.status
       if (httpStatus === 401) setErrorKind('unauthorized')
@@ -450,6 +469,75 @@ export default function AdminPage() {
             <Card label="Jami tushum" value={`${stats.payments.revenue_total_uzs.toLocaleString('uz-UZ')} UZS`} icon={<Wallet className="w-5 h-5" />} />
           </div>
         </section>
+
+        {/* Bloklangan foydalanuvchilar -- Content Safety Gate */}
+        {blocked && (
+          <section className="space-y-3">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Kontent siyosati -- bloklanganlar</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <Card label="Bloklangan akkauntlar" value={blocked.total_blocked_accounts} icon={<Ban className="w-5 h-5" />} />
+              <Card label="Jami bloklanishlar" value={blocked.total_violations} icon={<ShieldAlert className="w-5 h-5" />} />
+            </div>
+            {blocked.total_blocked_accounts > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Aloqa</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Necha marta</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">So'nggi marta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {blocked.users.map((u) => (
+                      <tr key={u.user_id} className="border-b border-white/5 last:border-0">
+                        <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{u.name || 'Nomsiz'}</td>
+                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{u.email || u.phone || '—'}</td>
+                        <td className="px-4 sm:px-5 py-3 text-red-300 font-semibold whitespace-nowrap">{u.violation_count}</td>
+                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                          {u.last_violation_at ? new Date(u.last_violation_at).toLocaleString('uz-UZ') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {blocked.recent_violations.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
+                <table className="w-full text-sm min-w-[760px]">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sana</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Bosqich</th>
+                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Toifa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {blocked.recent_violations.map((v) => (
+                      <tr key={v.id} className="border-b border-white/5 last:border-0">
+                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                          {new Date(v.created_at).toLocaleString('uz-UZ')}
+                        </td>
+                        <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={v.video_title || undefined}>
+                          {v.video_title || '—'}
+                        </td>
+                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                          {v.stage === 'metadata' ? 'Sarlavha' : 'Transkript'}
+                        </td>
+                        <td className="px-4 sm:px-5 py-3 text-red-300 whitespace-nowrap">
+                          {CATEGORY_LABELS[v.category] || v.category}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Recent users */}
         <section className="space-y-3">

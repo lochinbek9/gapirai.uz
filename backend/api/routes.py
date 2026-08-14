@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, DubbingJob, JobStatus, User
+from backend.models.database import get_db, DubbingJob, JobStatus, User, ContentViolation
 from backend.services.downloader import get_video_info
+from backend.services.content_safety import check_safety
 from backend.services.auth import get_current_user, get_optional_user
 from backend.workers.tasks import process_video
 from backend.config import get_settings
@@ -154,6 +155,25 @@ async def create_job(
     title = info.get("title", "Unknown")
     duration = info.get("duration", 0)
     thumbnail = info.get("thumbnail")
+
+    # Safety Gate -- 1-bosqich (metadata). Bloklansa, job umuman
+    # yaratilmaydi va foydalanuvchi hisobiga hech narsa yozilmaydi.
+    metadata_text = f"{title}\n{info.get('description', '')}\nKanal: {info.get('uploader', '')}"
+    safety = check_safety(metadata_text)
+    if not safety.allowed:
+        db.add(ContentViolation(
+            user_id=current_user.id,
+            youtube_url=request.youtube_url,
+            video_title=title,
+            stage="metadata",
+            category=safety.category or "policy_violation",
+            reason=safety.reason or "",
+        ))
+        db.commit()
+        raise HTTPException(
+            status_code=403,
+            detail="Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+        )
 
     duration_minutes = duration / 60.0
 

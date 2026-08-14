@@ -42,3 +42,33 @@ export async function apiAdminStats(token: string): Promise<AdminStats> {
   })
   return res.data
 }
+
+
+export interface BlockedUsersReport {
+  total_blocked_accounts: number
+  total_violations: number
+  users: {
+    user_id: string
+    name: string | null
+    email: string | null
+    phone: string | null
+    violation_count: number
+    last_violation_at: string | null
+  }[]
+  recent_violations: {
+    id: string
+    user_id: string
+    video_title: string | null
+    stage: string
+    category: string
+    reason: string | null
+    created_at: string
+  }[]
+}
+
+export async function apiAdminBlockedUsers(token: string): Promise<BlockedUsersReport> {
+  const res = await axios.get(`${API_URL}/admin/blocked-users`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}

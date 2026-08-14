@@ -11,6 +11,8 @@ from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
 from backend.services.errors import PermanentError
+from backend.services.content_safety import check_safety
+from backend.models.database import ContentViolation
 from backend.services.email_service import send_dubbing_complete_email
 from backend.config import get_settings
 
@@ -201,6 +203,30 @@ def process_video(self: Task, job_id: str) -> dict:
             segments = transcript["segments"]
             transcript_text = transcript["text"]
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "ok")
+
+        # Safety Gate -- 2-bosqich (transkript). Sarlavha zararsiz ko'ringan,
+        # lekin videoning haqiqiy nutqi siyosatga zid bo'lgan holatlarni shu
+        # yerda ushlaydi -- tarjima/TTS (qimmat bosqichlar) boshlanishidan OLDIN.
+        current_stage = "SAFETY_CHECK"
+        safety = check_safety(transcript_text)
+        if not safety.allowed:
+            # user_id NOT NULL -- anonim job (deyarli bo'lmaydi, login
+            # majburiy, lekin himoya sifatida) uchun yozuv qo'shmaymiz,
+            # video baribir bloklanadi.
+            if job.user_id is not None:
+                db.add(ContentViolation(
+                    user_id=job.user_id,
+                    youtube_url=job.youtube_url,
+                    video_title=job.video_title,
+                    stage="transcript",
+                    category=safety.category or "policy_violation",
+                    reason=safety.reason or "",
+                ))
+                db.commit()
+            raise PermanentError(
+                "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+                code="CONTENT_BLOCKED",
+            )
 
         # Whisper segmentlari nutq pauzasiga qarab kesilgan, gap chegarasiga
         # emas — tarjima/nutq optimallashdan OLDIN tabiiy gaplarga

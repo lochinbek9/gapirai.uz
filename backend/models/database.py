@@ -258,6 +258,27 @@ class Subscription(Base):
     user = relationship("User")
 
 
+class ContentViolation(Base):
+    """Safety Gate tomonidan bloklangan har bir urinish shu yerda saqlanadi
+    (backend/services/content_safety.py). Ikki bosqichdan biri belgilaydi:
+    "metadata" (job yaratilishidan oldin, sarlavha/tavsif asosida) yoki
+    "transcript" (transkripsiyadan keyin, videoning haqiqiy nutqi asosida).
+    Admin panelda foydalanuvchi bo'yicha guruhlab ko'rsatiladi -- "bloklangan
+    akkauntlar soni va kimligi" talabiga javob beradi."""
+    __tablename__ = "content_violations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    youtube_url = Column(String(500), nullable=False)
+    video_title = Column(String(500))
+    stage = Column(String(20), nullable=False)  # "metadata" | "transcript"
+    category = Column(String(50), nullable=False)
+    reason = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 def get_db():
     db = SessionLocal()
     try:
