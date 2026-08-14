@@ -48,17 +48,21 @@ class Settings(BaseSettings):
     # RATIO=20 — ffmpeg'ning sidechaincompress filtri qabul qiladigan ENG
     # YUQORI qiymat (allaqachon shu chegarada edi; 30 sinab ko'rilganda
     # ffmpeg xato berdi: "Value out of range [1 - 20]" — productionda
-    # haqiqiy job orqali aniqlangan). Shuning uchun qo'shimcha kuch
-    # THRESHOLD'ni pasaytirish (ko'proq sezgir) va dub'ning o'zini
-    # baland qilish (VOICE_GAIN_BOOST_DB) orqali olinadi.
-    DUCKING_THRESHOLD: float = 0.018
+    # haqiqiy job orqali aniqlangan). Bitta 20:1 bosqich ham yetarli
+    # bo'lmadi — foydalanuvchi haqiqiy production videosini tinglab, dub
+    # ostida original hali ham eshitilib, dublyaj ovozi bosilib qolayotganini
+    # xabar qildi (2026-08-14). Shuning uchun merger.py'da sidechaincompress
+    # IKKI marta ketma-ket qo'llaniladi (har biri shu RATIO/THRESHOLD bilan) —
+    # ffmpeg'ning bitta filtrdagi [1,20] chegarasini buzmasdan, effektiv
+    # bosishni chuqurlashtiradi.
+    DUCKING_THRESHOLD: float = 0.012
     DUCKING_RATIO: float = 20.0
     DUCKING_ATTACK_MS: int = 5
     DUCKING_RELEASE_MS: int = 400
     # Dub trekining o'zini ham baland qilish (fonni pasaytirish bilan bir
     # qatorda) — limiterdan OLDIN qo'llaniladi, shunda hosil bo'lgan
     # cho'qqilarni limiter xavfsiz ushlab qoladi (clipping bo'lmaydi).
-    VOICE_GAIN_BOOST_DB: float = 4.0
+    VOICE_GAIN_BOOST_DB: float = 5.0
     # Dub ovoz protsessing zanjiri (merger.py): xirillashni kesish, aniqlik
     # uchun subtle boost, dinamika siqish, "s"/"sh" tovushlarini yumshatish,
     # limiter — barchasi bitta filtergraph ichida, alohida ffmpeg pass emas.

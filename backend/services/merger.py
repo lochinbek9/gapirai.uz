@@ -36,7 +36,13 @@ def _build_audio_filtergraph() -> str:
     - sidechaincompress: dublyaj trekining o'zi "trigger" bo'lib, original
       FAQAT dub gapirayotgan joyda pasayadi — moslashuvchan (baland original
       ko'proq, past original kamroq pasayadi), tekis fade bilan (attack/
-      release), gap-gap qo'lda hisoblangan oraliqlar emas.
+      release), gap-gap qo'lda hisoblangan oraliqlar emas. IKKI marta ketma-
+      ket qo'llaniladi (2026-08-14, real production videosini tinglab
+      tasdiqlangan muammo: bitta bosqich original ovozni yetarlicha
+      bosolmadi, dublyaj ovozi eshitilmay qolgan edi) — ffmpeg bitta
+      sidechaincompress chaqiruvida ratio'ni 20dan oshirishga ruxsat
+      bermaydi, shuning uchun ikkinchi bosqich effektiv bosishni
+      chuqurlashtiradi.
     - dublyaj eshittirishdan oldin ovoz protsessing zanjiridan o'tadi (xirillash
       kesiladi, aniqlik uchun subtle EQ, dinamika siqiladi, "s" tovushlari
       yumshatiladi, keyin baland qilinadi — VOICE_GAIN_BOOST_DB — va nihoyat
@@ -52,13 +58,16 @@ def _build_audio_filtergraph() -> str:
     # "Value 30.0 for parameter 'ratio' out of range [1 - 20]"). Config'dagi
     # qiymat noto'g'ri sozlansa ham job qulamasligi uchun shu yerda cheklanadi.
     ducking_ratio = max(1.0, min(20.0, s.DUCKING_RATIO))
+    duck_stage = (
+        f"sidechaincompress=threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
+        f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1"
+    )
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo[orig];"
         f"[1:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
-        f"asplit=2[dubsc][dubdsp];"
-        f"[orig][dubsc]sidechaincompress="
-        f"threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
-        f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1[ducked];"
+        f"asplit=3[dubsc1][dubsc2][dubdsp];"
+        f"[orig][dubsc1]{duck_stage}[duck1];"
+        f"[duck1][dubsc2]{duck_stage}[ducked];"
         f"[dubdsp]highpass=f={s.VOICE_HIGHPASS_HZ},"
         f"equalizer=f={s.VOICE_EQ_FREQ_HZ}:width_type=q:width=1:g={s.VOICE_EQ_GAIN_DB},"
         f"acompressor=threshold=0.1:ratio={s.VOICE_COMPRESSOR_RATIO}:attack=20:release=250:makeup=1,"
