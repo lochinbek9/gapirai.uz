@@ -139,7 +139,7 @@ def _error_code_for(exc: Exception, current_stage: str) -> str:
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
-    max_retries=3,
+    max_retries=5,
     default_retry_delay=60,
     soft_time_limit=3300,  # 55 daqiqa — osilib qolgan bosqichga ogohlantirish
     time_limit=3600,       # 60 daqiqa — worker'ni majburan to'xtatadi (hard limit)
@@ -418,7 +418,11 @@ def process_video(self: Task, job_id: str) -> dict:
 
     except Exception as exc:
         if self.request.retries < self.max_retries:
-            countdown = min(300, 30 * (2 ** self.request.retries))
+            # 600s'gacha (10 daq) chegaralangan — bugun kuzatilgan naqsh
+            # bo'yicha YouTube'ning vaqtinchalik bot-bloklanishi odatda
+            # ~10-15 daqiqada tozalanadi (2026-08-14); qayta urinishlar
+            # oralig'i shu oynaga yetib borishi uchun oshirildi (avval 300s).
+            countdown = min(600, 30 * (2 ** self.request.retries))
             # Qayta urinishlar mavjud bo'lsa statusni FAILED qilmaymiz, faqat xabarni yangilaymiz.
             # DIQQAT: uploads/ VA job'ning bajarilgan bosqich natijalari
             # (transcript_segments, translated_segments, ...) ATAYLAB

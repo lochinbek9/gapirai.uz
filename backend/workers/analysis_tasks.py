@@ -29,7 +29,7 @@ def _update_analysis(db, analysis: VideoAnalysis, status: AnalysisStatus, progre
 @celery_app.task(
     bind=True,
     name="backend.workers.analysis_tasks.analyze_video_task",
-    max_retries=3,
+    max_retries=5,
     default_retry_delay=60,
     soft_time_limit=2400,  # 40 daqiqa
     time_limit=2700,       # 45 daqiqa
@@ -134,7 +134,8 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
 
     except Exception as exc:
         if self.request.retries < self.max_retries:
-            countdown = min(300, 30 * (2 ** self.request.retries))
+            # backend/workers/tasks.py'dagi bir xil sabab bilan 600s'gacha oshirilgan.
+            countdown = min(600, 30 * (2 ** self.request.retries))
             analysis = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
             if analysis:
                 analysis.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
