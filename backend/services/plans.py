@@ -29,6 +29,13 @@ from backend.services.click_service import calculate_price
 QUOTA_RESET_DAYS = 30  # video-soni kvotasi har doim shuncha kunda qayta boshlanadi
 _FREE_THRESHOLD_MINUTES = 45.0  # click_service.calculate_price bilan bir xil chegara
 
+# Celery navbat nomlari — worker ikkalasini ham tinglaydi (docker-compose.yml,
+# "-Q video_processing_priority,video_processing"), lekin ustuvor navbat
+# BIRINCHI ko'rsatilgan: Redis transport BRPOP bilan navbatlarni shu tartibda
+# tekshiradi, shuning uchun priority navbatidagi job doim birinchi olinadi.
+PRIORITY_QUEUE = "video_processing_priority"
+DEFAULT_QUEUE = "video_processing"
+
 
 @dataclass(frozen=True)
 class PlanDef:
@@ -145,3 +152,17 @@ def activate_subscription(db, user_id, plan_id: str) -> Subscription:
     db.commit()
     db.refresh(sub)
     return sub
+
+
+def get_job_queue(db, user_id) -> str:
+    """Foydalanuvchining joriy tarifiga qarab qaysi Celery navbatiga
+    yuborilishi kerakligini aniqlaydi — Pro/Premium (priority=True)
+    PRIORITY_QUEUE'ga, qolganlari DEFAULT_QUEUE'ga tushadi. Muddati
+    o'tgan/topilmagan obuna FREE deb hisoblanadi (get_or_create_subscription
+    o'zi shuni bajaradi). Anonim job (user_id=None) — Subscription.user_id
+    NOT NULL bo'lgani uchun bazaga tegmasdan darhol DEFAULT_QUEUE."""
+    if user_id is None:
+        return DEFAULT_QUEUE
+    sub = get_or_create_subscription(db, user_id)
+    plan = PLANS[sub.plan.value]
+    return PRIORITY_QUEUE if plan.priority else DEFAULT_QUEUE

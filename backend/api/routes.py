@@ -163,7 +163,7 @@ async def create_job(
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
 
-    from backend.services.plans import check_quota, consume_quota
+    from backend.services.plans import check_quota, consume_quota, get_job_queue
     covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
 
     job_id = str(uuid.uuid4())
@@ -193,7 +193,7 @@ async def create_job(
     if amount == 0:
         if covered_by_quota:
             consume_quota(db, current_user.id, duration_minutes)
-        process_video.apply_async(args=[job_id], task_id=job_id)
+        process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, current_user.id))
         return {"job_id": job_id, "status": "pending"}
     
     return {"job_id": job_id, "status": "awaiting_payment", "amount": amount}

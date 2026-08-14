@@ -46,7 +46,7 @@ async def initiate_payment(
     duration_minutes = job.video_duration / 60.0
     # Tarif kvotasi bilan bir xil mantiq — create_job (routes.py) bilan mos
     # kelishi kerak, aks holda AWAITING_PAYMENT job noto'g'ri qayta narxlanishi mumkin.
-    from backend.services.plans import check_quota, consume_quota
+    from backend.services.plans import check_quota, consume_quota, get_job_queue
     covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
 
     if amount == 0:
@@ -56,7 +56,7 @@ async def initiate_payment(
             job.status = JobStatus.PENDING
             job.status_message = "Navbatga qo'shildi"
             db.commit()
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
         return {"success": True, "message": "Bepul video. Ishlov berish boshlandi.", "amount": 0}
 
     # Check if already paid
@@ -239,7 +239,8 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
         if job:
             job.status = JobStatus.PENDING
             job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id))
+            from backend.services.plans import get_job_queue
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
 
     db.commit()
 
