@@ -11,6 +11,7 @@ from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
 from backend.services.errors import PermanentError
+from backend.services.email_service import send_dubbing_complete_email
 from backend.config import get_settings
 
 logger = get_task_logger(__name__)
@@ -386,6 +387,15 @@ def process_video(self: Task, job_id: str) -> dict:
         _update_job(db, job, JobStatus.COMPLETED, 100.0, "Dublyaj tayyor!")
         job.completed_at = datetime.utcnow()
         db.commit()
+
+        # Anonim (login qilmagan) joblar uchun email yo'q — jim o'tkazib
+        # yuboriladi. Email yuborish muvaffaqiyatsiz bo'lsa ham job
+        # COMPLETED holatida qoladi (bildirishnoma ikkinchi darajali).
+        if job.user_id and job.user and job.user.email:
+            try:
+                send_dubbing_complete_email(job.user.email, job.user.name or "", job.video_title or "Video", job_id)
+            except Exception as email_err:
+                logger.warning(f"Dublyaj tayyor email yuborilmadi (job {job_id}): {email_err}")
 
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED")
