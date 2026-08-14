@@ -358,7 +358,7 @@ export default function Home() {
               className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
             >
               <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
-              Paneli
+              Mening videolarim
             </Link>
           ) : (
             <Link
