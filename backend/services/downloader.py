@@ -121,7 +121,7 @@ class YoutubeRateLimiter:
 _rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
 
 
-def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple[dict, str | None]:
+def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_url: str | None = None) -> tuple[dict, str | None]:
     """yt-dlp options tuned for single-IP anti-blocking.
 
     Auth: cookies.txt (optional). Falls back to unauthenticated iOS/Android client if cookies missing or disabled.
@@ -168,7 +168,10 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
         },
     }
 
-    if settings.YOUTUBE_PROXY_ENABLED and settings.YOUTUBE_PROXY_URL:
+    if proxy_url is not None:
+        if proxy_url:
+            opts["proxy"] = proxy_url
+    elif settings.YOUTUBE_PROXY_ENABLED and settings.YOUTUBE_PROXY_URL:
         opts["proxy"] = settings.YOUTUBE_PROXY_URL
 
     temp_cookie_path = None
@@ -189,9 +192,9 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True) -> tuple
 
 
 @contextmanager
-def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True):
+def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True, proxy_url: str | None = None):
     """Context manager for YoutubeDL instance ensuring temporary cookie files are cleaned up."""
-    opts, temp_cookie_path = _build_yt_opts(extra, use_cookies=use_cookies)
+    opts, temp_cookie_path = _build_yt_opts(extra, use_cookies=use_cookies, proxy_url=proxy_url)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             yield ydl
@@ -236,12 +239,34 @@ def get_video_info(youtube_url: str) -> dict:
                 logger.warning(f"Bot-check xatosi (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
                 time.sleep(2 + random.random() * 2)
 
+    # Datacenter proksi (tezkor) bot-check bilan tugadi — residential proksiga
+    # (sekinroq, lekin YouTube uni oddiy foydalanuvchi deb hisoblaydi) o'tamiz,
+    # faqat SHU holatda, cheklangan trafik hajmini tejash uchun (2026-08-14).
+    if (
+        settings.YOUTUBE_RESIDENTIAL_PROXY_URL
+        and last_exc is not None
+        and any(marker in str(last_exc) for marker in _BOT_CHECK_MARKERS)
+    ):
+        logger.warning("Datacenter proksi bot-check bilan tugadi — residential proksiga o'tilmoqda.")
+        try:
+            with get_yt_dlp(use_cookies=True, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
+                return _extract_info_dict(ydl, youtube_url)
+        except Exception as e_res:
+            last_exc = e_res
+
     logger.warning(f"Extract info with cookies failed ({last_exc}). Retrying without cookies...")
     try:
         with get_yt_dlp(use_cookies=False) as ydl:
             return _extract_info_dict(ydl, youtube_url)
     except Exception as e2:
         err_str = f"{last_exc} | {e2}"
+        if any(marker in err_str for marker in _BOT_CHECK_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
+            try:
+                with get_yt_dlp(use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
+                    return _extract_info_dict(ydl, youtube_url)
+            except Exception as e3:
+                err_str = f"{err_str} | {e3}"
+                e2 = e3
         if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
             raise RuntimeError(
                 "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
@@ -296,6 +321,21 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
                 logger.warning(f"Bot-check xatosi yuklab olishda (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
                 time.sleep(2 + random.random() * 2)
 
+    if (
+        settings.YOUTUBE_RESIDENTIAL_PROXY_URL
+        and last_exc is not None
+        and any(marker in str(last_exc) for marker in _BOT_CHECK_MARKERS)
+    ):
+        logger.warning("Datacenter proksi yuklab olishda bot-check bilan tugadi — residential proksiga o'tilmoqda.")
+        try:
+            with get_yt_dlp(extra_opts, use_cookies=True, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+                title = info.get("title", "Unknown")
+                duration = float(info.get("duration", 0) or 0)
+            last_exc = None
+        except Exception as e_res:
+            last_exc = e_res
+
     if last_exc is not None:
         e = last_exc
         logger.warning(f"Download with cookies failed ({e}). Retrying without cookies...")
@@ -306,16 +346,27 @@ def _do_download(youtube_url: str, job_id: str) -> dict:
                 duration = float(info.get("duration", 0) or 0)
         except Exception as e2:
             err_str = f"{e} | {e2}"
-            if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
-                raise RuntimeError(
-                    "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-                ) from e2
-            if _is_permanent_download_error(err_str):
-                raise PermanentError(
-                    "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                    code="VIDEO_UNAVAILABLE",
-                ) from e2
-            raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
+            if any(marker in err_str for marker in _BOT_CHECK_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
+                try:
+                    with get_yt_dlp(extra_opts, use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
+                        info = ydl.extract_info(youtube_url, download=True)
+                        title = info.get("title", "Unknown")
+                        duration = float(info.get("duration", 0) or 0)
+                        err_str = None
+                except Exception as e3:
+                    err_str = f"{err_str} | {e3}"
+                    e2 = e3
+            if err_str is not None:
+                if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
+                    raise RuntimeError(
+                        "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
+                    ) from e2
+                if _is_permanent_download_error(err_str):
+                    raise PermanentError(
+                        "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                        code="VIDEO_UNAVAILABLE",
+                    ) from e2
+                raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
 
     video_file = None
     for f in job_dir.iterdir():

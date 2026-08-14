@@ -211,6 +211,14 @@ class Settings(BaseSettings):
     YOUTUBE_PROXY_ENABLED: bool = True
     YOUTUBE_PROXY_URL: str = ""
 
+    # Ikkinchi (zaxira) proksi — residential, YOUTUBE_PROXY_URL (datacenter,
+    # tezkor) bot-check xatosiga uchraganda ishlatiladi. Datacenter proksi
+    # tez lekin ko'proq bloklanadi; residential sekin (~1.9 Mbps, 2026-08-13
+    # o'lchangan) lekin YouTube uni oddiy foydalanuvchi deb hisoblaydi.
+    # Aksariyat so'rovlar datacenter orqali muvaffaqiyatli o'tadi — residential
+    # faqat zaxira sifatida, cheklangan trafik hajmini tejash uchun.
+    YOUTUBE_RESIDENTIAL_PROXY_URL: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"
