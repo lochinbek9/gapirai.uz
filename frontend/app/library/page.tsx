@@ -2,11 +2,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Library, Clock, Loader2, Lock, CheckCircle2, X } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { getLibrary, getLibraryAccess, purchaseLibraryAccess, getJob, getVideoUrl, formatDuration, LibraryItem, Job } from '@/lib/api'
+import { ArrowLeft, Library, Clock, Loader2, Lock, CheckCircle2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { getLibrary, getLibraryAccess, purchaseLibraryAccess, formatDuration, LibraryItem } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import VideoPlayer from '@/components/VideoPlayer'
 
 const LIBRARY_ACCESS_PRICE = 5000
 
@@ -20,9 +19,7 @@ export default function LibraryPage() {
 
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [purchaseLoading, setPurchaseLoading] = useState(false)
-
-  const [viewingJob, setViewingJob] = useState<Job | null>(null)
-  const [viewingLoading, setViewingLoading] = useState<string | null>(null)
+  const [openingId, setOpeningId] = useState<string | null>(null)
 
   useEffect(() => {
     getLibrary(24, 0)
@@ -58,7 +55,7 @@ export default function LibraryPage() {
     }
   }
 
-  const handleOpen = async (item: LibraryItem) => {
+  const handleOpen = (item: LibraryItem) => {
     if (authLoading) return
     if (!isLoggedIn) {
       router.push('/login')
@@ -68,16 +65,8 @@ export default function LibraryPage() {
       handlePurchase()
       return
     }
-    setViewingLoading(item.job_id)
-    setError(null)
-    try {
-      const job = await getJob(item.job_id)
-      setViewingJob(job)
-    } catch (err: any) {
-      setError("Videoni ochishda xatolik yuz berdi.")
-    } finally {
-      setViewingLoading(null)
-    }
+    setOpeningId(item.job_id)
+    router.push(`/library/${item.job_id}`)
   }
 
   return (
@@ -149,7 +138,7 @@ export default function LibraryPage() {
                 <motion.button
                   key={item.job_id}
                   onClick={() => handleOpen(item)}
-                  disabled={viewingLoading !== null}
+                  disabled={openingId !== null}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="text-left rounded-2xl overflow-hidden bg-black/[0.02] dark:bg-slate-950/40 border border-black/5 dark:border-slate-800/80 hover:border-violet-400/50 transition disabled:opacity-60"
@@ -172,7 +161,7 @@ export default function LibraryPage() {
                         <Lock className="w-6 h-6 text-white/90" />
                       </div>
                     )}
-                    {viewingLoading === item.job_id && (
+                    {openingId === item.job_id && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
                       </div>
@@ -187,38 +176,6 @@ export default function LibraryPage() {
           )}
         </div>
       </div>
-
-      <AnimatePresence>
-        {viewingJob && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => setViewingJob(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              className="relative w-full max-w-3xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setViewingJob(null)}
-                className="absolute -top-10 right-0 sm:-right-10 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition"
-                aria-label="Yopish"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="rounded-2xl overflow-hidden shadow-2xl">
-                <VideoPlayer src={getVideoUrl(viewingJob.job_id)} subtitlesContent={viewingJob.uzbek_srt_content} />
-              </div>
-              <p className="mt-3 text-sm font-bold text-white/90 line-clamp-2">{viewingJob.video_title}</p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
