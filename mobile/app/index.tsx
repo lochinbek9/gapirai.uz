@@ -28,9 +28,14 @@ export default function HomeScreen() {
             GapirAI<ThemedText style={[styles.headerLogo, { color: colors.accent }]}>.uz</ThemedText>
           </ThemedText>
           {status === 'signedIn' && user ? (
-            <Pressable onPress={() => signOut()} hitSlop={8}>
-              <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Chiqish</ThemedText>
-            </Pressable>
+            <ThemedView style={styles.headerActions}>
+              <Pressable onPress={() => router.push('/dashboard')} hitSlop={8}>
+                <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Videolarim</ThemedText>
+              </Pressable>
+              <Pressable onPress={() => signOut()} hitSlop={8}>
+                <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Chiqish</ThemedText>
+              </Pressable>
+            </ThemedView>
           ) : (
             <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={8}>
               <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Kirish</ThemedText>
@@ -77,12 +82,29 @@ export default function HomeScreen() {
             </ThemedView>
 
             {mode === 'dub' ? <DubForm /> : <AnalyzeForm />}
+
+            <ThemedView style={[styles.footerLinks, { borderTopColor: colors.border }]}>
+              {FOOTER_LINKS.map(({ href, label }) => (
+                <Pressable key={href} onPress={() => router.push(href)} hitSlop={6}>
+                  <ThemedText variant="secondary" style={styles.footerLink}>
+                    {label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ThemedView>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
   );
 }
+
+const FOOTER_LINKS: { href: '/about' | '/faq' | '/privacy' | '/terms'; label: string }[] = [
+  { href: '/about', label: 'Loyiha haqida' },
+  { href: '/faq', label: 'FAQ' },
+  { href: '/privacy', label: 'Maxfiylik siyosati' },
+  { href: '/terms', label: 'Foydalanish shartlari' },
+];
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -100,6 +122,12 @@ const styles = StyleSheet.create({
   headerAction: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -150,5 +178,19 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 18,
+    marginTop: 10,
+    width: '100%',
+  },
+  footerLink: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

@@ -28,6 +28,13 @@
       "runtimeArgs": ["compose", "up", "flower"],
       "cwd": "/Users/user/Desktop/ai-dubber",
       "port": 5555
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web"],
+      "cwd": "/Users/user/Desktop/ai-dubber/mobile",
+      "port": 8081
     }
   ]
 }

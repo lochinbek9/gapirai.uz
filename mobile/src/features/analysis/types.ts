@@ -89,9 +89,29 @@ export interface AnalysisSummary {
   detailed: string;
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correct_answer: number;
+  explanation: string;
+  timestamp: number;
+}
+
+export interface QAEntry {
+  question: string;
+  answer: string;
+  timestamps: number[];
+  asked_at: string;
+}
+
+export interface BilingualSegment {
+  start: number;
+  end: number;
+  original: string;
+  translated: string;
+}
+
 // Full shape from backend/api/video_analysis_routes.py's _analysis_to_dict.
-// Notes/quiz/qa_history are Phase 7 scope — typed here since the backend
-// object includes them, but not rendered until Phase 7.
 export interface VideoAnalysis {
   id: string;
   status: AnalysisStatus;
@@ -107,8 +127,8 @@ export interface VideoAnalysis {
   key_points?: KeyPoint[];
   chapters?: Chapter[];
   notes?: string;
-  quiz?: unknown[];
-  qa_history: unknown[];
+  quiz?: QuizQuestion[];
+  qa_history: QAEntry[];
   error_message?: string;
   error_code?: string;
   created_at?: string;
