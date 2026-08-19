@@ -71,9 +71,18 @@ def generate_payme_checkout_url(
     amount_tiyin: int,
     return_url: str,
     lang: str = "uz",
+    sandbox: bool = False,
 ) -> str:
     """https://developer.help.paycom.uz/initsializatsiya-platezhey/otpravka-cheka-po-metodu-get
-    Format: https://checkout.paycom.uz/base64(m=...;ac.field=value;a=...;c=...;l=...)"""
+    Format: https://<host>/base64(m=...;ac.field=value;a=...;c=...;l=...)
+
+    sandbox=True -> checkout.test.paycom.uz (kassa faqat TEST_KEY bilan
+    ro'yxatdan o'tgan bo'lsa, production checkout.paycom.uz "Поставщик не
+    найден или заблокирован" deb rad etadi -- 2026-08-19, haqiqiy checkoutda
+    tasdiqlangan xato). Diqqat: bare "test.paycom.uz" (checkout. prefiksisiz)
+    sandbox TEST BOSHQARUV PANELI ("Песочница Paycom" -- Merchant API'ni
+    qo'lda sinash uchun), haqiqiy checkout sahifasi emas -- shuning uchun
+    checkout ham "checkout." subdomeni bilan bo'lishi shart."""
     params = (
         f"m={merchant_id};"
         f"ac.{account_field}={account_value};"
@@ -82,4 +91,5 @@ def generate_payme_checkout_url(
         f"l={lang}"
     )
     encoded = base64.b64encode(params.encode("utf-8")).decode("ascii")
-    return f"https://checkout.paycom.uz/{encoded}"
+    host = "checkout.test.paycom.uz" if sandbox else "checkout.paycom.uz"
+    return f"https://{host}/{encoded}"

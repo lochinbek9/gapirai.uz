@@ -221,6 +221,13 @@ class Settings(BaseSettings):
     PAYME_MERCHANT_ID: str = ""
     PAYME_KEY: str = ""
     PAYME_TEST_KEY: str = ""
+    # Kassa Payme kabinetida hali production uchun faollashtirilmagan bo'lsa
+    # True qoldiring -- checkout havolalari test.paycom.uz'ga yo'naltiriladi.
+    # PAYME_KEY to'ldirilgan bo'lishi kassa faollashganini ANGLATMAYDI (haqiqiy
+    # checkoutda "Поставщик не найден или заблокирован" xatosi orqali
+    # 2026-08-19 aniqlangan) -- shuning uchun bu alohida, qo'lda boshqariladigan
+    # flag. Payme kassani production uchun tasdiqlagach, False qiling.
+    PAYME_SANDBOX_MODE: bool = True
 
     FRONTEND_URL: str = "https://gapirai.uz"
 

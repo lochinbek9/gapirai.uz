@@ -56,6 +56,13 @@ def _build_checkout_url(request: Request, payment: Payment, return_path: str) ->
         account_value=str(payment.id),
         amount_tiyin=_amount_tiyin(payment.amount),
         return_url=return_url,
+        # Kassa Payme kabinetida production uchun hali faollashtirilmagan
+        # bo'lsa (PAYME_SANDBOX_MODE=True), checkout sandbox (test.paycom.uz)
+        # domeniga yo'naltiriladi -- aks holda Payme "Поставщик не найден"
+        # deb rad etadi (2026-08-19, haqiqiy checkoutda tasdiqlangan). Bu
+        # PAYME_KEY to'ldirilgan-to'ldirilmaganidan MUSTAQIL -- key mavjud
+        # bo'lishi kassa faollashganini anglatmaydi.
+        sandbox=settings.PAYME_SANDBOX_MODE,
     )
 
 
@@ -200,9 +207,11 @@ async def initiate_library_payment(
 # ─────────────────────────────────────────────────────────────────────────
 
 def _find_by_account(db: Session, params: dict):
-    account = params.get("account") or {}
+    account = params.get("account")
+    if not isinstance(account, dict):
+        return None
     payment_id = account.get(ACCOUNT_FIELD)
-    if not payment_id:
+    if not payment_id or not isinstance(payment_id, str):
         return None
     try:
         return db.query(Payment).filter(Payment.id == payment_id).first()
