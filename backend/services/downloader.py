@@ -207,6 +207,16 @@ def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True, proxy_url: s
 
 
 _BOT_CHECK_MARKERS = ("cookies are no longer valid", "Sign in to confirm you")
+# 2026-08-19: "Requested format is not available" (cookies bilan autentifikatsiyalangan
+# sessiyada ba'zan boshqacha format ro'yxati qaytadi) va "HTTP Error 403" (signed
+# URL/IP vaqtincha bloklangan) ham amalda xuddi bot-check kabi -- residential
+# proksiga o'tish ular uchun ham hal qiluvchi bo'lgani real ishlab chiqarish
+# job'ida tasdiqlangan. Shuning uchun bular ESKALATSIYA (residential proksiga
+# o'tish) qarorlarida _BOT_CHECK_MARKERS o'rniga shu kengroq to'plam
+# ishlatiladi -- lekin foydalanuvchiga ko'rsatiladigan yakuniy "cookielar
+# eskirgan" xabari FAQAT haqiqiy bot-check uchun qoladi (_BOT_CHECK_MARKERS),
+# aks holda noto'g'ri tashxis bo'lib qoladi.
+_PROXY_ESCALATION_MARKERS = _BOT_CHECK_MARKERS + ("Requested format is not available", "HTTP Error 403")
 
 
 def _extract_info_dict(ydl, youtube_url: str) -> dict:
@@ -234,7 +244,7 @@ def get_video_info(youtube_url: str) -> dict:
                 return _extract_info_dict(ydl, youtube_url)
         except Exception as e:
             last_exc = e
-            if not any(marker in str(e) for marker in _BOT_CHECK_MARKERS):
+            if not any(marker in str(e) for marker in _PROXY_ESCALATION_MARKERS):
                 break  # boshqa turdagi xato — qayta urinish foydasiz
             if attempt < 2:
                 logger.warning(f"Bot-check xatosi (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
@@ -246,7 +256,7 @@ def get_video_info(youtube_url: str) -> dict:
     if (
         settings.YOUTUBE_RESIDENTIAL_PROXY_URL
         and last_exc is not None
-        and any(marker in str(last_exc) for marker in _BOT_CHECK_MARKERS)
+        and any(marker in str(last_exc) for marker in _PROXY_ESCALATION_MARKERS)
     ):
         logger.warning("Datacenter proksi bot-check bilan tugadi — residential proksiga o'tilmoqda.")
         try:
@@ -261,7 +271,7 @@ def get_video_info(youtube_url: str) -> dict:
             return _extract_info_dict(ydl, youtube_url)
     except Exception as e2:
         err_str = f"{last_exc} | {e2}"
-        if any(marker in err_str for marker in _BOT_CHECK_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
+        if any(marker in err_str for marker in _PROXY_ESCALATION_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
             try:
                 with get_yt_dlp(use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
                     return _extract_info_dict(ydl, youtube_url)
@@ -316,7 +326,7 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
             break
         except Exception as e:
             last_exc = e
-            if not any(marker in str(e) for marker in _BOT_CHECK_MARKERS):
+            if not any(marker in str(e) for marker in _PROXY_ESCALATION_MARKERS):
                 break
             if attempt < 2:
                 logger.warning(f"Bot-check xatosi yuklab olishda (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
@@ -325,7 +335,7 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
     if (
         settings.YOUTUBE_RESIDENTIAL_PROXY_URL
         and last_exc is not None
-        and any(marker in str(last_exc) for marker in _BOT_CHECK_MARKERS)
+        and any(marker in str(last_exc) for marker in _PROXY_ESCALATION_MARKERS)
     ):
         logger.warning("Datacenter proksi yuklab olishda bot-check bilan tugadi — residential proksiga o'tilmoqda.")
         try:
@@ -347,7 +357,7 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
                 duration = float(info.get("duration", 0) or 0)
         except Exception as e2:
             err_str = f"{e} | {e2}"
-            if any(marker in err_str for marker in _BOT_CHECK_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
+            if any(marker in err_str for marker in _PROXY_ESCALATION_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
                 try:
                     with get_yt_dlp(extra_opts, use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
                         info = ydl.extract_info(youtube_url, download=True)
