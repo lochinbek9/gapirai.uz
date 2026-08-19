@@ -70,6 +70,7 @@ class JobResponse(BaseModel):
     feedback_voice_ok: Optional[bool] = None
     feedback_translation_ok: Optional[bool] = None
     feedback_speed_ok: Optional[bool] = None
+    content_flagged: Optional[bool] = None
 
 
 def _job_to_response(job: DubbingJob) -> JobResponse:
@@ -109,6 +110,7 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         feedback_voice_ok=job.feedback_voice_ok,
         feedback_translation_ok=job.feedback_translation_ok,
         feedback_speed_ok=job.feedback_speed_ok,
+        content_flagged=job.content_flagged,
     )
 
 
@@ -217,6 +219,7 @@ async def list_public_library(
         .filter(
             DubbingJob.status == JobStatus.COMPLETED,
             DubbingJob.source_job_id.is_(None),
+            DubbingJob.content_flagged.is_(False),
             DubbingJob.youtube_url.notin_(flagged_urls),
         )
         .order_by(DubbingJob.created_at.desc())
@@ -236,6 +239,78 @@ async def list_public_library(
         )
         for j in jobs
     ]
+
+
+@router.get("/library/{job_id}/eligible")
+async def library_item_eligible(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Bitta job hozir ham ommaviy kutubxonaga mos keladimi -- tomosha
+    sahifasi (/library/[id]) to'g'ridan-to'g'ri havola orqali ochilganda
+    ham kontent xavfsizligi bo'yicha keyinchalik bayroqlangan videoni
+    ko'rsatmaslik uchun ishlatiladi (GET /api/library ro'yxati o'zi bunday
+    videoni ko'rsatmaydi, lekin uni bilgan odam to'g'ridan-to'g'ri havola
+    bilan ochib olishi mumkin edi -- shu bo'shliqni yopadi)."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED or job.source_job_id is not None or job.content_flagged:
+        return {"eligible": False}
+    flagged = db.query(ContentViolation).filter(ContentViolation.youtube_url == job.youtube_url).first()
+    return {"eligible": flagged is None}
+
+
+@router.get("/library/{job_id}/resolutions")
+async def list_library_resolutions(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """list_resolutions bilan bir xil, lekin sifat cheklovi TOMOSHABIN
+    (current_user) tarifiga qarab hisoblanadi, video egasiniki emas --
+    kutubxonada tomosha qilayotgan odam ko'pincha video egasi emas
+    (2026-08-19, foydalanuvchi so'rovi)."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+
+    from backend.services.plans import get_max_resolution_for_user, RESOLUTION_ORDER
+    max_idx = RESOLUTION_ORDER.index(get_max_resolution_for_user(db, current_user.id))
+
+    variant_status = {
+        v.resolution: v.status
+        for v in db.query(ResolutionVariant).filter(ResolutionVariant.job_id == job.storage_id).all()
+    }
+
+    resolutions = []
+    for i, res in enumerate(RESOLUTION_ORDER):
+        available = i <= max_idx
+        status = "ready" if res == "720p" else variant_status.get(res, "not_requested")
+        resolutions.append({"resolution": res, "available": available, "status": status})
+
+    return {"resolutions": resolutions}
+
+
+@router.post("/library/{job_id}/resolutions/{resolution}")
+async def request_library_resolution(
+    job_id: uuid.UUID,
+    resolution: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """request_resolution bilan bir xil, lekin TOMOSHABIN tarifi bo'yicha
+    (yuqoridagi list_library_resolutions bilan bir xil sabab)."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+
+    from backend.services.plans import get_max_resolution_for_user
+    from backend.services.resolution_variants import request_resolution as _request_resolution
+    result = _request_resolution(db, job, resolution, max_resolution_override=get_max_resolution_for_user(db, current_user.id))
+
+    if result.outcome == "invalid":
+        raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
+    if result.outcome == "forbidden":
+        raise HTTPException(status_code=403, detail="Bu sifat sizning tarif rejangizda mavjud emas.")
+    if result.outcome == "ready":
+        return {"status": "ready", "download_url": result.download_url}
+    return {"status": "processing"}
 
 
 @router.get("/library/access")

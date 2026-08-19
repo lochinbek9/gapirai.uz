@@ -38,6 +38,7 @@ export interface Job {
   expected_end_time?: string
   rating?: number
   feedback_comment?: string
+  content_flagged?: boolean
 }
 
 export type JobStatus =
@@ -118,6 +119,11 @@ export async function getLibraryAccess(): Promise<{ has_access: boolean }> {
   return res.data
 }
 
+export async function getLibraryEligible(jobId: string): Promise<{ eligible: boolean }> {
+  const res = await apiClient.get(`/api/library/${jobId}/eligible`)
+  return res.data
+}
+
 export async function purchaseLibraryAccess(): Promise<{ success: boolean; payment_url?: string; payment_id?: string; amount: number; message?: string }> {
   const res = await apiClient.post('/api/library/purchase')
   return res.data
@@ -145,6 +151,19 @@ export async function getJobResolutions(jobId: string): Promise<{ resolutions: R
 
 export async function requestResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
   const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`)
+  return res.data
+}
+
+// Kutubxona (Ommaviy videolar) uchun -- sifat cheklovi TOMOSHABIN tarifiga
+// qarab hisoblanadi, video egasiniki emas (backend/api/routes.py:
+// list_library_resolutions / request_library_resolution).
+export async function getLibraryJobResolutions(jobId: string): Promise<{ resolutions: ResolutionOption[] }> {
+  const res = await apiClient.get(`/api/library/${jobId}/resolutions`)
+  return res.data
+}
+
+export async function requestLibraryResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/library/${jobId}/resolutions/${resolution}`)
   return res.data
 }
 

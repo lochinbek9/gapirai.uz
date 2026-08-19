@@ -113,6 +113,10 @@ class DubbingJob(Base):
     # chaqirilganmi) -- pipeline 5 marta urinib ham muvaffaqiyatsiz tugasa,
     # backend/workers/tasks.py shu bayroqqa qarab kvotani avtomatik qaytaradi.
     quota_consumed = Column(Boolean, default=False, nullable=False)
+    # 2026-08-19: Safety Gate ogohlantirish (blocklamaydi, lekin kategoriya
+    # topilgan) bergan bo'lsa true -- frontend foydalanuvchiga "video tayyor,
+    # lekin ommaviy kutubxonaga chiqarilmaydi" xabarini shu orqali ko'rsatadi.
+    content_flagged = Column(Boolean, default=False, nullable=False)
     rating = Column(Integer, nullable=True)
     feedback_comment = Column(Text, nullable=True)
     feedback_created_at = Column(DateTime, nullable=True)

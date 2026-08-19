@@ -73,6 +73,15 @@ def get_max_resolution_for_job(db, job) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
+def get_max_resolution_for_user(db, user_id) -> str:
+    """get_max_resolution_for_job'ning tomoshabin-versiyasi -- Ommaviy
+    videolar kutubxonasida (2026-08-19) sifat cheklovi VIDEO EGASI emas,
+    TOMOSHA QILAYOTGAN odamning tarifiga qarab belgilanishi kerak (login
+    kutubxonada shart, shuning uchun requester har doim ma'lum)."""
+    sub = get_or_create_subscription(db, user_id)
+    return PLANS[sub.plan.value].max_resolution
+
+
 def get_or_create_subscription(db, user_id) -> Subscription:
     sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
     if sub is None:

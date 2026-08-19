@@ -116,19 +116,24 @@ class ResolutionRequestResult:
     download_url: str | None = None
 
 
-def request_resolution(db, job, resolution: str) -> ResolutionRequestResult:
+def request_resolution(db, job, resolution: str, max_resolution_override: str | None = None) -> ResolutionRequestResult:
     """Web (routes.py) va Telegram bot (telegram_bot.py) ikkalasi ham
     chaqiradigan yagona kirish nuqtasi -- tarif tekshiruvi, 720p uchun
     darhol javob, 360p/1080p uchun keshdan yoki Celery task orqali
     generatsiya faqat BITTA joyda yozilgan (job_creation.py bilan bir xil
-    naqsh)."""
+    naqsh).
+
+    max_resolution_override -- Ommaviy videolar kutubxonasida tomosha
+    qilayotgan odam job egasi bo'lmasligi mumkin (2026-08-19); shu holatda
+    routes.py TOMOSHABIN tarifini shu orqali uzatadi, aks holda odatdagidek
+    job egasining tarifi tekshiriladi (get_max_resolution_for_job)."""
     from backend.models.database import ResolutionVariant
     from backend.services.plans import get_max_resolution_for_job, RESOLUTION_ORDER
 
     if resolution not in RESOLUTION_ORDER:
         return ResolutionRequestResult(outcome="invalid")
 
-    max_res = get_max_resolution_for_job(db, job)
+    max_res = max_resolution_override or get_max_resolution_for_job(db, job)
     if RESOLUTION_ORDER.index(resolution) > RESOLUTION_ORDER.index(max_res):
         return ResolutionRequestResult(outcome="forbidden")
 

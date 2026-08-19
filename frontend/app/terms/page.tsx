@@ -43,12 +43,18 @@ export default function TermsPage() {
 
             <section className="space-y-2">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">3. Foydalanish cheklovlari</h2>
-              <p>Foydalanuvchilarga quyidagilar qat'iyan taqiqlanadi:</p>
+              <p>Foydalanuvchilarga quyidagilarni dublyaj qilish qat'iyan tavsiya etilmaydi:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Qonunga xilof, zo'ravonlik, nafrat uyg'otuvchi yoki kattalar uchun mo'ljallangan kontentlarni dublyaj qilish;</li>
+                <li>Qonunga xilof, zo'ravonlik, nafrat uyg'otuvchi, terrorizm/ekstremizmni targ'ib qiluvchi yoki kattalar (18+) uchun mo'ljallangan kontent;</li>
+                <li>Bolalarga nisbatan jinsiy zo'ravonlik/ekspluatatsiya tasvirlangan kontent (CSAM) — bunday kontent uchun dublyaj so'rovi <strong>hech qanday holatda</strong> bajarilmaydi va hisob qaydnomasi bloklanishi mumkin;</li>
                 <li>Platforma infratuzilmasiga zarar yetkazish, sun'iy yuklamalar (DDoS) hosil qilish yoki tizimni skanerlash;</li>
                 <li>Dublyaj natijalarini uchinchi shaxslarning mualliflik huquqlarini buzgan holda tijoriy maqsadlarda tarqatish.</li>
               </ul>
+              <p>
+                Yuqoridagi diniy, 18+, zo'ravonlik va shunga o'xshash kategoriyalar (CSAM bundan mustasno) uchun dublyaj
+                jarayonining o'zi to'xtatilmaydi — video shaxsiy foydalanish uchun tayyorlanadi. Lekin bunday video hech qachon
+                "Ommaviy videolar" ochiq kutubxonasiga chiqarilmaydi va boshqa foydalanuvchilarga ko'rsatilmaydi.
+              </p>
             </section>
 
             <section className="space-y-2">

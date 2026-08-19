@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check } from "lucide-react";
+import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
 import { useState, useEffect } from "react";
@@ -74,6 +74,21 @@ export default function VideoResult({ job, onReset }: Props) {
           <p className="text-[11px] text-emerald-600/60 dark:text-emerald-400/60 font-medium transition-colors">Video muvaffaqiyatli qayta ishlandi</p>
         </div>
       </motion.div>
+
+      {job.content_flagged && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-3xl px-6 py-4 transition-colors"
+        >
+          <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+            Video tayyor va shaxsiy foydalanish uchun mavjud, lekin kontent siyosatimizga ko'ra
+            (diniy, 18+, zo'ravonlik yoki shunga o'xshash kategoriya) <strong>Ommaviy videolar</strong> kutubxonasiga
+            chiqarilmaydi. Iltimos, keyingi safar bunday kontentni yubormaslikni so'raymiz.
+          </p>
+        </motion.div>
+      )}
 
       {/* ── Video Player ──────────────────────────── */}
       <motion.div 

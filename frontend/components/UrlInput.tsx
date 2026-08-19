@@ -90,6 +90,11 @@ export default function UrlInput({
             <span className="inline">Nusxani qo'yish</span>
           </button>
         </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed ml-1">
+          Diniy, 18+, zo'ravonlik yoki noqonuniy faoliyatga oid videolarni yubormang — bunday
+          kontent ommaviy videolar kutubxonasiga chiqarilmaydi (bolalarga oid jinsiy kontent esa
+          umuman qabul qilinmaydi).
+        </p>
       </div>
 
       {/* Video preview */}

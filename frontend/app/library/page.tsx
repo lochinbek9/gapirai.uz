@@ -20,13 +20,33 @@ export default function LibraryPage() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [purchaseLoading, setPurchaseLoading] = useState(false)
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const PAGE_SIZE = 24
 
   useEffect(() => {
-    getLibrary(24, 0)
-      .then(setItems)
+    getLibrary(PAGE_SIZE, 0)
+      .then((res) => {
+        setItems(res)
+        setHasMore(res.length === PAGE_SIZE)
+      })
       .catch(() => setError("Ro'yxatni yuklashda xatolik yuz berdi."))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const res = await getLibrary(PAGE_SIZE, items.length)
+      setItems((prev) => [...prev, ...res])
+      setHasMore(res.length === PAGE_SIZE)
+    } catch {
+      setError("Ko'proq videolarni yuklashda xatolik yuz berdi.")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     if (authLoading || !isLoggedIn) return
@@ -133,6 +153,7 @@ export default function LibraryPage() {
           )}
 
           {!loading && items.length > 0 && (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {items.map((item) => (
                 <motion.button
@@ -173,6 +194,19 @@ export default function LibraryPage() {
                 </motion.button>
               ))}
             </div>
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/10 border border-black/5 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-slate-200 transition disabled:opacity-60"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Ko'proq yuklash
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

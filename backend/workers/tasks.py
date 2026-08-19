@@ -241,6 +241,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 reason=safety.reason or "",
                 blocked=False,
             ))
+            job.content_flagged = True
             db.commit()
 
         # Whisper segmentlari nutq pauzasiga qarab kesilgan, gap chegarasiga

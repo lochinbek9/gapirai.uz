@@ -123,6 +123,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         ))
         db.commit()
         return JobCreationResult(outcome="blocked", video_title=title)
+    metadata_flagged = bool(safety.category)
     if safety.category:
         db.add(ContentViolation(
             user_id=user.id,
@@ -160,6 +161,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         status=status,
         progress=0.0,
         status_message=status_message,
+        content_flagged=metadata_flagged,
     )
     db.add(job)
     db.commit()
