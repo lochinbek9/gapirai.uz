@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getErrorMessage } from '../../src/api/errors';
@@ -13,19 +13,26 @@ import {
   type AnalysisVideoPlayerHandle,
 } from '../../src/features/analysis/components/AnalysisVideoPlayer';
 import { useAnalysisJob } from '../../src/features/analysis/hooks/useAnalysisJob';
-import { ANALYSIS_STATUS_LABELS, displayLanguage, type TranscriptSegment } from '../../src/features/analysis/types';
+import {
+  ANALYSIS_STATUS_LABELS,
+  displayLanguage,
+  type BilingualSegment,
+  type QAEntry,
+  type QuizQuestion,
+  type TranscriptSegment,
+} from '../../src/features/analysis/types';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { formatTimestamp } from '../../src/utils/format';
 import { extractYouTubeId } from '../../src/utils/youtube';
 
-// Notes / Quiz / Q&A are Phase 7 scope — not implemented here yet, per
-// MOBILE_INTEGRATION_AUDIT.md §8 (they're lazily generated backend endpoints
-// distinct from the eager summary/key_points/chapters this screen shows).
-type Tab = 'summary' | 'chapters' | 'transcript';
+type Tab = 'summary' | 'chapters' | 'transcript' | 'notes' | 'quiz' | 'qa';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'summary', label: 'Xulosa' },
   { key: 'chapters', label: 'Chapterlar' },
   { key: 'transcript', label: 'Transkript' },
+  { key: 'notes', label: 'Konspekt' },
+  { key: 'quiz', label: 'Test' },
+  { key: 'qa', label: 'Savol-javob' },
 ];
 
 export default function VideoAnalysisScreen() {
@@ -35,6 +42,20 @@ export default function VideoAnalysisScreen() {
   const playerRef = useRef<AnalysisVideoPlayerHandle>(null);
   const [tab, setTab] = useState<Tab>('summary');
 
+  const [notes, setNotes] = useState<string | null>(null);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [qaHistory, setQaHistory] = useState<QAEntry[]>([]);
+  const [question, setQuestion] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TranscriptSegment[] | null>(null);
+  const [transcriptView, setTranscriptView] = useState<'normal' | 'bilingual'>('normal');
+  const [bilingual, setBilingual] = useState<BilingualSegment[] | null>(null);
+  const [bilingualLoading, setBilingualLoading] = useState(false);
+
   const isDone = analysis?.status === 'completed';
 
   const transcriptQuery = useQuery({
@@ -43,8 +64,83 @@ export default function VideoAnalysisScreen() {
     enabled: isDone && tab === 'transcript',
   });
 
+  useEffect(() => {
+    if (analysis?.notes) setNotes(analysis.notes);
+    if (analysis?.quiz) setQuiz(analysis.quiz);
+    if (analysis?.qa_history) setQaHistory(analysis.qa_history);
+  }, [analysis]);
+
   const seek = (seconds: number) => playerRef.current?.seekTo(seconds);
   const videoId = analysis ? extractYouTubeId(analysis.youtube_url) : null;
+  const showBilingualToggle = !!(analysis?.video_language && analysis.video_language !== analysis.language);
+
+  const handleGenerateNotes = async () => {
+    if (!id) return;
+    setNotesLoading(true);
+    try {
+      const res = await analysisApi.generateNotes(id);
+      setNotes(res.notes);
+    } catch {
+      Alert.alert('Xatolik', 'Konspekt yaratishda xatolik yuz berdi.');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    if (!id) return;
+    setQuizLoading(true);
+    try {
+      const res = await analysisApi.generateQuiz(id);
+      setQuiz(res.quiz);
+    } catch {
+      Alert.alert('Xatolik', 'Test yaratishda xatolik yuz berdi.');
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleAsk = async () => {
+    if (!id || !question.trim()) return;
+    setAsking(true);
+    try {
+      const entry = await analysisApi.askQuestion(id, question.trim());
+      setQaHistory((prev) => [...prev, entry]);
+      setQuestion('');
+    } catch {
+      Alert.alert('Xatolik', 'Savolga javob berishda xatolik yuz berdi.');
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const handleToggleBilingual = async () => {
+    if (transcriptView === 'bilingual') {
+      setTranscriptView('normal');
+      return;
+    }
+    setTranscriptView('bilingual');
+    if (!id || bilingual) return;
+    setBilingualLoading(true);
+    try {
+      const res = await analysisApi.generateBilingual(id);
+      setBilingual(res.segments);
+    } catch {
+      Alert.alert('Xatolik', "Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
+      setTranscriptView('normal');
+    } finally {
+      setBilingualLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!id || !searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    const res = await analysisApi.searchTranscript(id, searchQuery.trim());
+    setSearchResults(res.results);
+  };
 
   return (
     <>
@@ -126,7 +222,12 @@ export default function VideoAnalysisScreen() {
                 </ThemedView>
               </ThemedView>
 
-              <ThemedView style={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.tabsScroll}
+                contentContainerStyle={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
                 {TABS.map((t) => (
                   <Pressable
                     key={t.key}
@@ -136,7 +237,7 @@ export default function VideoAnalysisScreen() {
                     <ThemedText style={[styles.tabLabel, tab === t.key && { color: colors.accent }]}>{t.label}</ThemedText>
                   </Pressable>
                 ))}
-              </ThemedView>
+              </ScrollView>
 
               {tab === 'summary' && (
                 <ScrollView contentContainerStyle={styles.tabContent}>
@@ -193,30 +294,293 @@ export default function VideoAnalysisScreen() {
               )}
 
               {tab === 'transcript' && (
-                <FlatList<TranscriptSegment>
-                  data={transcriptQuery.data?.segments || []}
-                  keyExtractor={(_, i) => `segment-${i}`}
-                  contentContainerStyle={styles.tabContent}
-                  ListEmptyComponent={
-                    transcriptQuery.isLoading ? (
+                transcriptView === 'bilingual' ? (
+                  bilingualLoading ? (
+                    <ThemedView style={styles.center}>
                       <ActivityIndicator color={colors.accent} />
-                    ) : (
-                      <ThemedText variant="secondary">Transkript topilmadi.</ThemedText>
-                    )
-                  }
-                  renderItem={({ item }) => (
-                    <Pressable onPress={() => seek(item.start)} style={styles.transcriptRow}>
-                      <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{formatTimestamp(item.start)}</ThemedText>
-                      <ThemedText style={styles.transcriptText}>{item.text}</ThemedText>
+                      <ThemedText variant="secondary" style={{ marginTop: 10 }}>
+                        Bilingual ko&apos;rinish tayyorlanmoqda...
+                      </ThemedText>
+                    </ThemedView>
+                  ) : (
+                    <FlatList<BilingualSegment>
+                      data={bilingual || []}
+                      keyExtractor={(_, i) => `bilingual-${i}`}
+                      contentContainerStyle={styles.tabContent}
+                      ListHeaderComponent={
+                        <ThemedView style={{ marginBottom: 10 }}>
+                          <TranscriptViewToggle
+                            transcriptView={transcriptView}
+                            onNormal={() => setTranscriptView('normal')}
+                            onBilingual={handleToggleBilingual}
+                            colors={colors}
+                          />
+                        </ThemedView>
+                      }
+                      renderItem={({ item }) => (
+                        <Pressable
+                          onPress={() => seek(item.start)}
+                          style={[styles.bilingualRow, { borderColor: colors.border }]}
+                        >
+                          <ThemedText style={[styles.timestamp, { color: colors.accent }]}>
+                            {formatTimestamp(item.start)}
+                          </ThemedText>
+                          <ThemedView style={{ flex: 1, gap: 4 }}>
+                            <ThemedText style={styles.transcriptText}>{item.original}</ThemedText>
+                            <ThemedText variant="secondary" style={styles.transcriptText}>
+                              {item.translated}
+                            </ThemedText>
+                          </ThemedView>
+                        </Pressable>
+                      )}
+                    />
+                  )
+                ) : (
+                  <FlatList<TranscriptSegment>
+                    data={searchResults ?? transcriptQuery.data?.segments ?? []}
+                    keyExtractor={(_, i) => `segment-${i}`}
+                    contentContainerStyle={styles.tabContent}
+                    keyboardShouldPersistTaps="handled"
+                    ListHeaderComponent={
+                      <ThemedView style={{ gap: 10, marginBottom: 10 }}>
+                        {showBilingualToggle && (
+                          <TranscriptViewToggle
+                            transcriptView={transcriptView}
+                            onNormal={() => setTranscriptView('normal')}
+                            onBilingual={handleToggleBilingual}
+                            colors={colors}
+                          />
+                        )}
+                        <ThemedView style={{ flexDirection: 'row', gap: 8 }}>
+                          <TextInput
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                            placeholder="Transkript ichidan qidirish..."
+                            placeholderTextColor={colors.textSecondary}
+                            style={[
+                              styles.textInput,
+                              { flex: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.textPrimary },
+                            ]}
+                          />
+                          <Pressable
+                            onPress={handleSearch}
+                            style={[styles.searchButton, { backgroundColor: colors.accentGlow }]}
+                          >
+                            <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>Qidirish</ThemedText>
+                          </Pressable>
+                        </ThemedView>
+                      </ThemedView>
+                    }
+                    ListEmptyComponent={
+                      transcriptQuery.isLoading ? (
+                        <ActivityIndicator color={colors.accent} />
+                      ) : (
+                        <ThemedText variant="secondary">
+                          {searchResults ? 'Hech narsa topilmadi.' : 'Transkript topilmadi.'}
+                        </ThemedText>
+                      )
+                    }
+                    renderItem={({ item }) => (
+                      <Pressable onPress={() => seek(item.start)} style={styles.transcriptRow}>
+                        <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{formatTimestamp(item.start)}</ThemedText>
+                        <ThemedText style={styles.transcriptText}>{item.text}</ThemedText>
+                      </Pressable>
+                    )}
+                  />
+                )
+              )}
+
+              {tab === 'notes' && (
+                <ScrollView contentContainerStyle={styles.tabContent}>
+                  {notes ? (
+                    <ThemedText style={styles.summaryText}>{notes}</ThemedText>
+                  ) : (
+                    <Pressable
+                      onPress={handleGenerateNotes}
+                      disabled={notesLoading}
+                      style={[styles.generateButton, { backgroundColor: colors.accentGlow, opacity: notesLoading ? 0.6 : 1 }]}
+                    >
+                      {notesLoading && <ActivityIndicator color={colors.accent} style={{ marginRight: 8 }} />}
+                      <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                        {notesLoading ? 'Yaratilmoqda...' : 'Konspekt tuzish'}
+                      </ThemedText>
                     </Pressable>
                   )}
-                />
+                </ScrollView>
+              )}
+
+              {tab === 'quiz' && (
+                <ScrollView contentContainerStyle={[styles.tabContent, { gap: 14 }]}>
+                  {!quiz ? (
+                    <Pressable
+                      onPress={handleGenerateQuiz}
+                      disabled={quizLoading}
+                      style={[styles.generateButton, { backgroundColor: colors.accentGlow, opacity: quizLoading ? 0.6 : 1 }]}
+                    >
+                      {quizLoading && <ActivityIndicator color={colors.accent} style={{ marginRight: 8 }} />}
+                      <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                        {quizLoading ? 'Yaratilmoqda...' : 'Test tuzish'}
+                      </ThemedText>
+                    </Pressable>
+                  ) : (
+                    quiz.map((q, qi) => {
+                      const chosen = quizAnswers[qi];
+                      const showResult = chosen !== undefined;
+                      return (
+                        <ThemedView
+                          key={qi}
+                          style={[styles.quizCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                        >
+                          <ThemedText style={styles.rowTitle}>
+                            {qi + 1}. {q.question}
+                          </ThemedText>
+                          <ThemedView style={{ gap: 6 }}>
+                            {q.options.map((opt, oi) => {
+                              const isChosen = chosen === oi;
+                              const isCorrect = oi === q.correct_answer;
+                              const optionColor =
+                                showResult && isCorrect
+                                  ? colors.success
+                                  : showResult && isChosen
+                                    ? colors.danger
+                                    : colors.textPrimary;
+                              const optionBg =
+                                showResult && isCorrect
+                                  ? `${colors.success}26`
+                                  : showResult && isChosen
+                                    ? `${colors.danger}26`
+                                    : colors.background;
+                              const optionBorder =
+                                showResult && isCorrect
+                                  ? colors.success
+                                  : showResult && isChosen
+                                    ? colors.danger
+                                    : colors.border;
+                              return (
+                                <Pressable
+                                  key={oi}
+                                  disabled={showResult}
+                                  onPress={() => setQuizAnswers((prev) => ({ ...prev, [qi]: oi }))}
+                                  style={[styles.quizOption, { backgroundColor: optionBg, borderColor: optionBorder }]}
+                                >
+                                  <ThemedText style={{ color: optionColor, fontSize: 13, fontWeight: '500' }}>{opt}</ThemedText>
+                                </Pressable>
+                              );
+                            })}
+                          </ThemedView>
+                          {showResult && (
+                            <ThemedView style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                              <Pressable onPress={() => seek(q.timestamp)}>
+                                <ThemedText style={[styles.timestamp, { color: colors.accent }]}>
+                                  {formatTimestamp(q.timestamp)}
+                                </ThemedText>
+                              </Pressable>
+                              <ThemedText variant="secondary" style={[styles.rowDescription, { flex: 1 }]}>
+                                {q.explanation}
+                              </ThemedText>
+                            </ThemedView>
+                          )}
+                        </ThemedView>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              )}
+
+              {tab === 'qa' && (
+                <ThemedView style={[styles.tabContent, { flex: 1, gap: 14 }]}>
+                  <ScrollView style={{ maxHeight: 380 }} contentContainerStyle={{ gap: 16 }} keyboardShouldPersistTaps="handled">
+                    {qaHistory.length === 0 && (
+                      <ThemedText variant="secondary">Video haqida savol bering.</ThemedText>
+                    )}
+                    {qaHistory.map((qa, i) => (
+                      <ThemedView key={i} style={{ gap: 6 }}>
+                        <ThemedText style={styles.rowTitle}>{qa.question}</ThemedText>
+                        <ThemedText variant="secondary" style={styles.summaryText}>
+                          {qa.answer}
+                        </ThemedText>
+                        {qa.timestamps?.length > 0 && (
+                          <ThemedView style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {qa.timestamps.map((ts, ti) => (
+                              <Pressable key={ti} onPress={() => seek(ts)}>
+                                <ThemedText style={[styles.timestamp, { color: colors.accent, backgroundColor: colors.accentGlow }]}>
+                                  {formatTimestamp(ts)}
+                                </ThemedText>
+                              </Pressable>
+                            ))}
+                          </ThemedView>
+                        )}
+                      </ThemedView>
+                    ))}
+                  </ScrollView>
+                  <ThemedView style={{ flexDirection: 'row', gap: 8 }}>
+                    <TextInput
+                      value={question}
+                      onChangeText={setQuestion}
+                      onSubmitEditing={handleAsk}
+                      returnKeyType="send"
+                      placeholder="Video haqida savol bering..."
+                      placeholderTextColor={colors.textSecondary}
+                      style={[
+                        styles.textInput,
+                        { flex: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.textPrimary },
+                      ]}
+                    />
+                    <Pressable
+                      onPress={handleAsk}
+                      disabled={asking || !question.trim()}
+                      style={[
+                        styles.sendButton,
+                        { backgroundColor: colors.accentGlow, opacity: asking || !question.trim() ? 0.5 : 1 },
+                      ]}
+                    >
+                      {asking ? (
+                        <ActivityIndicator color={colors.accent} />
+                      ) : (
+                        <ThemedText style={{ color: colors.accent, fontWeight: '800', fontSize: 16 }}>➤</ThemedText>
+                      )}
+                    </Pressable>
+                  </ThemedView>
+                </ThemedView>
               )}
             </ThemedView>
           )}
         </SafeAreaView>
       </ThemedView>
     </>
+  );
+}
+
+function TranscriptViewToggle({
+  transcriptView,
+  onNormal,
+  onBilingual,
+  colors,
+}: {
+  transcriptView: 'normal' | 'bilingual';
+  onNormal: () => void;
+  onBilingual: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
+}) {
+  return (
+    <ThemedView style={[styles.viewToggle, { backgroundColor: colors.background, borderColor: colors.border }]}>
+      <Pressable
+        onPress={onNormal}
+        style={[styles.viewToggleOption, transcriptView === 'normal' && { backgroundColor: colors.surface }]}
+      >
+        <ThemedText style={[styles.tabLabel, transcriptView === 'normal' && { color: colors.accent }]}>Oddiy</ThemedText>
+      </Pressable>
+      <Pressable
+        onPress={onBilingual}
+        style={[styles.viewToggleOption, transcriptView === 'bilingual' && { backgroundColor: colors.surface }]}
+      >
+        <ThemedText style={[styles.tabLabel, transcriptView === 'bilingual' && { color: colors.accent }]}>
+          Bilingual
+        </ThemedText>
+      </Pressable>
+    </ThemedView>
   );
 }
 
@@ -242,8 +606,9 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingTop: 10 },
   badge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   badgeText: { fontSize: 11, fontWeight: '700' },
-  tabs: { flexDirection: 'row', marginHorizontal: 20, marginTop: 14, borderRadius: 14, borderWidth: 1, padding: 4, gap: 4 },
-  tab: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  tabsScroll: { marginHorizontal: 20, marginTop: 14, flexGrow: 0 },
+  tabs: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, gap: 4 },
+  tab: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center' },
   tabLabel: { fontSize: 12, fontWeight: '700' },
   tabContent: { padding: 20, gap: 10 },
   sectionLabel: {
@@ -267,4 +632,20 @@ const styles = StyleSheet.create({
   transcriptRow: { flexDirection: 'row', gap: 10, paddingVertical: 8 },
   timestamp: { fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   transcriptText: { flex: 1, fontSize: 13, fontWeight: '500', lineHeight: 19 },
+  bilingualRow: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
+  viewToggle: { flexDirection: 'row', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 3, gap: 3 },
+  viewToggleOption: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
+  textInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, fontWeight: '500' },
+  searchButton: { paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sendButton: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  generateButton: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  quizCard: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
+  quizOption: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
 });

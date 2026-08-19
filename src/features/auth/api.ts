@@ -38,6 +38,11 @@ export async function resetPassword(email: string, code: string, newPassword: st
   return res.data;
 }
 
+export async function googleAuth(credential: string): Promise<AuthResponse> {
+  const res = await apiClient.post<AuthResponse>('/auth/google', { credential });
+  return res.data;
+}
+
 export async function me(): Promise<User> {
   const res = await apiClient.get<User>('/auth/me');
   return res.data;
