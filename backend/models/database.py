@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, DateTime, Enum, Float, Integer, Text, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, String, DateTime, Enum, Float, Integer, Text, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -9,7 +9,7 @@ from backend.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(settings.DATABASE_URL, pool_size=3, max_overflow=2)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -39,6 +39,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)
     phone = Column(String(20), unique=True, nullable=True, index=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
+    # Telegram bot orqali ulangan bo'lsa to'ldiriladi (backend/telegram_bot.py)
+    # -- job yakunlanganda foydalanuvchiga shu chat'ga xabar yuborish uchun.
+    # Bir xil telefon raqami web'da ham ishlatilgan bo'lsa, xuddi shu
+    # hisobga bog'lanadi (auth_routes.py'dagi phone auth bilan bir xil
+    # ustun) -- kvota/obuna ikkalasida ham baravar ishlaydi.
+    telegram_chat_id = Column(String(50), unique=True, nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     # Uch xil auth usuli ham shu bitta flag orqali ishonch bildiradi — email
     # kodi, Google (email_verified=true bo'lsa avtomatik), yoki telefon kodi.
@@ -51,6 +57,9 @@ class User(Base):
     auth_provider = Column(String(20), nullable=False, default="password")  # "password" | "google" | "phone"
     role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
+    # 2026-08-19: bir martalik to'lov -- Ommaviy videolar (/library)
+    # kutubxonasiga umrbod kirish, tarif kvotasidan mustaqil.
+    library_access_purchased_at = Column(DateTime, nullable=True)
 
     jobs = relationship("DubbingJob", back_populates="user", lazy="dynamic")
 
@@ -61,6 +70,8 @@ class DubbingJob(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     youtube_url = Column(String(500), nullable=False)
+    youtube_video_id = Column(String(20), nullable=True, index=True)  # kesh qidiruvi uchun (backend/services/job_creation.py)
+    source_job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True)  # kesh-hit -- asl job'ga ishora
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -109,6 +120,15 @@ class DubbingJob(Base):
     completed_at = Column(DateTime)
 
     user = relationship("User", back_populates="jobs")
+
+    @property
+    def storage_id(self) -> str:
+        """S3 kalitlari qaysi job ID ostida saqlanganini aniqlaydi -- kesh-hit
+        joblar uchun bu ASL job'ning ID'si (source_job_id), oddiy joblar
+        uchun o'zining ID'si. Barcha S3 kalit hisoblovchi kod (routes.py
+        download endpointlari, resolution_variants.py) shu propertydan
+        foydalanadi, job.id'dan emas."""
+        return str(self.source_job_id or self.id)
 
 
 class AnalysisStatus(str, enum.Enum):
@@ -254,6 +274,47 @@ class Subscription(Base):
     videos_used_this_period = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class ResolutionVariant(Base):
+    """Video ma'lumot bazasida rezolyutsiya kesimidagi versiyalar --
+    360p/1080p bosqichma-bosqich, faqat haqiqatan so'ralganda yaratiladi
+    (backend/services/resolution_variants.py). 720p uchun qator yaratilmaydi
+    -- u allaqachon master fayl (dubber/{job_id}/dubbed_final.mp4)."""
+    __tablename__ = "resolution_variants"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=False, index=True)
+    resolution = Column(String(10), nullable=False)  # "360p" | "1080p"
+    status = Column(String(20), default="pending")   # pending|processing|ready|failed
+    s3_key = Column(String(500), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("job_id", "resolution"),)
+
+
+class ContentViolation(Base):
+    """Safety Gate tomonidan bloklangan har bir urinish shu yerda saqlanadi
+    (backend/services/content_safety.py). Ikki bosqichdan biri belgilaydi:
+    "metadata" (job yaratilishidan oldin, sarlavha/tavsif asosida) yoki
+    "transcript" (transkripsiyadan keyin, videoning haqiqiy nutqi asosida).
+    Admin panelda foydalanuvchi bo'yicha guruhlab ko'rsatiladi -- "bloklangan
+    akkauntlar soni va kimligi" talabiga javob beradi."""
+    __tablename__ = "content_violations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    youtube_url = Column(String(500), nullable=False)
+    video_title = Column(String(500))
+    stage = Column(String(20), nullable=False)  # "metadata" | "transcript"
+    category = Column(String(50), nullable=False)
+    reason = Column(Text)
+    blocked = Column(Boolean, default=True, nullable=False)  # False = faqat ogohlantirish, video bloklanmadi (2026-08-16)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
 

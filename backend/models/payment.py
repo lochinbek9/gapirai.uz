@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Integer, BigInteger
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Integer, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -24,6 +24,7 @@ class Payment(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True) # Linked to a video dubbing job
     plan = Column(String(20), nullable=True)  # "standard" | "pro" — set instead of job_id for a subscription renewal payment
+    is_library_access = Column(Boolean, default=False, nullable=False)  # 2026-08-19: Ommaviy videolar kutubxonasiga bir martalik kirish to'lovi -- job_id/plan ikkalasi ham bo'sh
     amount = Column(Float, nullable=False)
     provider = Column(Enum(PaymentProvider), default=PaymentProvider.CLICK)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)

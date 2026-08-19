@@ -48,15 +48,27 @@ async def initiate_payment(
     # kelishi kerak, aks holda AWAITING_PAYMENT job noto'g'ri qayta narxlanishi mumkin.
     from backend.services.plans import check_quota, consume_quota, get_job_queue
     covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
+    if job.source_job_id and not covered_by_quota:
+        # Kesh-hit job -- davomiylikka bog'liq narx emas, qat'iy arzon narx
+        # (backend/services/job_creation.py: CACHE_HIT_PRICE bilan bir xil).
+        from backend.services.job_creation import CACHE_HIT_PRICE
+        amount = CACHE_HIT_PRICE
 
     if amount == 0:
         if covered_by_quota:
             consume_quota(db, current_user.id, duration_minutes)
         if job.status == JobStatus.AWAITING_PAYMENT:
-            job.status = JobStatus.PENDING
-            job.status_message = "Navbatga qo'shildi"
-            db.commit()
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
+            if job.source_job_id:
+                from datetime import datetime
+                job.status = JobStatus.COMPLETED
+                job.status_message = "Dublyaj tayyor!"
+                job.completed_at = datetime.utcnow()
+                db.commit()
+            else:
+                job.status = JobStatus.PENDING
+                job.status_message = "Navbatga qo'shildi"
+                db.commit()
+                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
         return {"success": True, "message": "Bepul video. Ishlov berish boshlandi.", "amount": 0}
 
     # Check if already paid
@@ -229,7 +241,14 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     payment.click_status = 1
     payment.click_complete_time = int(time.time())
 
-    if payment.plan:
+    if payment.is_library_access:
+        # Ommaviy videolar kutubxonasiga bir martalik kirish -- job_id yoki
+        # plan bilan bog'liq emas, faqat userga umrbod belgi qo'yiladi.
+        from datetime import datetime
+        user = db.query(User).filter(User.id == payment.user_id).first()
+        if user and user.library_access_purchased_at is None:
+            user.library_access_purchased_at = datetime.utcnow()
+    elif payment.plan:
         # Obuna to'lovi — video emas, tarifni faollashtiradi/uzaytiradi.
         from backend.services.plans import activate_subscription
         activate_subscription(db, payment.user_id, payment.plan)
@@ -237,10 +256,18 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
         # update job status and trigger processing
         job = db.query(DubbingJob).filter(DubbingJob.id == payment.job_id).first()
         if job:
-            job.status = JobStatus.PENDING
-            job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
-            from backend.services.plans import get_job_queue
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
+            if job.source_job_id:
+                # Kesh-hit job -- qayta ishlov shart emas, natija allaqachon
+                # asl job'da tayyor (backend/services/job_creation.py).
+                from datetime import datetime
+                job.status = JobStatus.COMPLETED
+                job.status_message = "Dublyaj tayyor!"
+                job.completed_at = datetime.utcnow()
+            else:
+                job.status = JobStatus.PENDING
+                job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
+                from backend.services.plans import get_job_queue
+                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
 
     db.commit()
 

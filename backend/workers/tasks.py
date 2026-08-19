@@ -11,7 +11,10 @@ from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
 from backend.services.errors import PermanentError
+from backend.services.content_safety import check_safety
+from backend.models.database import ContentViolation
 from backend.services.email_service import send_dubbing_complete_email
+from backend.services.telegram_notify import send_telegram_message
 from backend.config import get_settings
 
 logger = get_task_logger(__name__)
@@ -201,6 +204,44 @@ def process_video(self: Task, job_id: str) -> dict:
             segments = transcript["segments"]
             transcript_text = transcript["text"]
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "ok")
+
+        # Safety Gate -- 2-bosqich (transkript). Sarlavha zararsiz ko'ringan,
+        # lekin videoning haqiqiy nutqi siyosatga zid bo'lgan holatlarni shu
+        # yerda ushlaydi -- tarjima/TTS (qimmat bosqichlar) boshlanishidan OLDIN.
+        current_stage = "SAFETY_CHECK"
+        safety = check_safety(transcript_text)
+        if not safety.allowed:
+            # Faqat CSAM (sexual_minors) shu yerga yetib keladi -- yagona
+            # qat'iy blok. user_id NOT NULL -- anonim job (deyarli
+            # bo'lmaydi, login majburiy, lekin himoya sifatida) uchun
+            # yozuv qo'shmaymiz, video baribir bloklanadi.
+            if job.user_id is not None:
+                db.add(ContentViolation(
+                    user_id=job.user_id,
+                    youtube_url=job.youtube_url,
+                    video_title=job.video_title,
+                    stage="transcript",
+                    category=safety.category or "policy_violation",
+                    reason=safety.reason or "",
+                    blocked=True,
+                ))
+                db.commit()
+            raise PermanentError(
+                "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+                code="CONTENT_BLOCKED",
+            )
+        if safety.category and job.user_id is not None:
+            # Ogohlantirish -- pipeline to'xtamaydi, faqat qayd etiladi.
+            db.add(ContentViolation(
+                user_id=job.user_id,
+                youtube_url=job.youtube_url,
+                video_title=job.video_title,
+                stage="transcript",
+                category=safety.category,
+                reason=safety.reason or "",
+                blocked=False,
+            ))
+            db.commit()
 
         # Whisper segmentlari nutq pauzasiga qarab kesilgan, gap chegarasiga
         # emas — tarjima/nutq optimallashdan OLDIN tabiiy gaplarga
@@ -397,6 +438,26 @@ def process_video(self: Task, job_id: str) -> dict:
             except Exception as email_err:
                 logger.warning(f"Dublyaj tayyor email yuborilmadi (job {job_id}): {email_err}")
 
+        # Telegram bot orqali bog'langan bo'lsa (backend/telegram_bot.py) --
+        # web orqali yaratilgan job bo'lsa ham, foydalanuvchi telefon
+        # raqami botga ham ulangan bo'lsa xabar boradi. Rezolyutsiya
+        # tugmalari tarifga qarab cheklanadi (backend/services/plans.py) --
+        # tugma bosilganda telegram_bot.py resolution_variants.request_resolution()
+        # ni chaqiradi, xuddi veb bilan bir xil.
+        if job.user_id and job.user and job.user.telegram_chat_id:
+            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+            from backend.services.plans import get_max_resolution_for_job, RESOLUTION_ORDER
+            max_res = get_max_resolution_for_job(db, job)
+            allowed = RESOLUTION_ORDER[: RESOLUTION_ORDER.index(max_res) + 1]
+            keyboard = {"inline_keyboard": [[
+                {"text": res, "callback_data": f"res:{job_id}:{res}"} for res in allowed
+            ]]}
+            send_telegram_message(
+                job.user.telegram_chat_id,
+                f"\u2705 Dublyaj tayyor!\n\n\U0001F3AC {job.video_title or 'Video'}\n\n{frontend_url}/video/{job_id}\n\nYuklab olish uchun sifatni tanlang:",
+                reply_markup=keyboard,
+            )
+
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED")
 
@@ -412,6 +473,11 @@ def process_video(self: Task, job_id: str) -> dict:
             "updated_at": datetime.utcnow(),
         })
         db.commit()
+        if job.user_id and job.user and job.user.telegram_chat_id:
+            send_telegram_message(
+                job.user.telegram_chat_id,
+                f"\u274c Dublyaj bajarilmadi: {job.video_title or 'Video'}\n\n{str(exc)}",
+            )
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc

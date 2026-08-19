@@ -4,43 +4,34 @@ import shutil
 import uuid
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, DubbingJob, JobStatus, User
-from backend.services.downloader import get_video_info
+from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant, ContentViolation
+from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user, get_optional_user
-from backend.workers.tasks import process_video
 from backend.config import get_settings
 from backend.services.rate_limiter import rate_limit
+# Job yaratish mantig'i (video ma'lumot olish, Safety Gate, davomiylik
+# chegarasi, kvota) shu yerda -- Telegram bot ham xuddi shu funksiyani
+# chaqiradi, ikki joyda saqlanmaydi.
+from backend.services.job_creation import (
+    MAX_VIDEO_DURATION_MINUTES,
+    is_valid_youtube_url as _is_valid_youtube_url,
+    create_dubbing_job,
+)
+from backend.services.click_service import generate_payment_url
+import time
 
 settings = get_settings()
 
-# Bitta video shu davomiylikdan uzun bo'lsa rad etiladi — cheksiz uzun
-# (masalan ko'p soatlik jonli efir yozuvi) video butun pipeline'ni juda
-# uzoq vaqt band qilib qo'yishi va API xarajatlarini nazoratsiz oshirib
-# yuborishi mumkin.
-MAX_VIDEO_DURATION_MINUTES = 180
-
-_YOUTUBE_HOSTS = {
-    "youtube.com", "www.youtube.com", "m.youtube.com",
-    "music.youtube.com", "youtu.be",
-}
-
-
-def _is_valid_youtube_url(url: str) -> bool:
-    try:
-        parsed = urlparse(url)
-    except Exception:
-        return False
-    if parsed.scheme not in ("http", "https"):
-        return False
-    return parsed.netloc.lower() in _YOUTUBE_HOSTS
 router = APIRouter(prefix="/api", tags=["dubbing"])
+
+LIBRARY_ACCESS_PRICE = 5_000  # so'm -- Ommaviy videolar kutubxonasiga bir martalik, umrbod kirish narxi
 
 
 class CreateJobRequest(BaseModel):
@@ -141,62 +132,33 @@ async def create_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if not _is_valid_youtube_url(request.youtube_url):
+    # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
+    # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
+    result = await create_dubbing_job(db, current_user, request.youtube_url, request.voice_gender)
+
+    if result.outcome == "invalid_url":
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
-
-    # Video ma'lumotlarini yuklash — thread'da (yuqoridagi /video-info bilan
-    # bir xil sabab: bloklovchi chaqiruv event loop'ni to'smasligi kerak).
-    try:
-        info = await asyncio.to_thread(get_video_info, request.youtube_url)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
-
-    title = info.get("title", "Unknown")
-    duration = info.get("duration", 0)
-    thumbnail = info.get("thumbnail")
-
-    duration_minutes = duration / 60.0
-
-    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+    if result.outcome == "fetch_error":
+        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
+    if result.outcome == "blocked":
+        raise HTTPException(
+            status_code=403,
+            detail="Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+        )
+    if result.outcome == "too_long":
         raise HTTPException(
             status_code=400,
-            detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
+            detail=f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
+    if result.outcome == "queued":
+        return {"job_id": result.job_id, "status": "pending"}
+    if result.outcome == "ready":
+        # Kesh-hit, bepul/kvota bilan qoplangan -- darhol tayyor (job DB'da
+        # allaqachon COMPLETED, backend/services/job_creation.py).
+        return {"job_id": result.job_id, "status": "completed"}
 
-    from backend.services.plans import check_quota, consume_quota, get_job_queue
-    covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
-
-    job_id = str(uuid.uuid4())
-
-    if amount > 0:
-        status = JobStatus.AWAITING_PAYMENT
-        status_message = "To'lov kutilmoqda"
-    else:
-        status = JobStatus.PENDING
-        status_message = "Navbatga qo'shildi"
-
-    job = DubbingJob(
-        id=job_id,
-        user_id=current_user.id,
-        youtube_url=request.youtube_url,
-        video_title=title,
-        video_duration=duration,
-        video_thumbnail=thumbnail,
-        voice_gender_setting=request.voice_gender,
-        status=status,
-        progress=0.0,
-        status_message=status_message,
-    )
-    db.add(job)
-    db.commit()
-
-    if amount == 0:
-        if covered_by_quota:
-            consume_quota(db, current_user.id, duration_minutes)
-        process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, current_user.id))
-        return {"job_id": job_id, "status": "pending"}
-    
-    return {"job_id": job_id, "status": "awaiting_payment", "amount": amount}
+    # "awaiting_payment"
+    return {"job_id": result.job_id, "status": "awaiting_payment", "amount": result.amount}
 
 
 @router.get("/jobs/{job_id}")
@@ -224,6 +186,126 @@ async def list_jobs(
         .all()
     )
     return [_job_to_response(j) for j in jobs]
+
+
+class LibraryItem(BaseModel):
+    job_id: str
+    youtube_url: str
+    video_title: Optional[str] = None
+    video_duration: Optional[float] = None
+    video_thumbnail: Optional[str] = None
+    speaker_gender: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+@router.get("/library", dependencies=[Depends(rate_limit("library", 60, 600))])
+async def list_public_library(
+    limit: int = Query(24, le=60),
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> list[LibraryItem]:
+    """Ommaviy katalog -- barcha tugallangan, ASL (source_job_id yo'q,
+    ya'ni kesh-nusxa emas) joblar, hech qanday login talab qilinmaydi.
+    ContentViolation'da qayd etilgan (hatto faqat ogohlantirish darajasida
+    ham) URL'lar bu ro'yxatda ko'rinmaydi -- ochiq kashfiyot ro'yxati
+    to'g'ridan-to'g'ri so'ralgan (bilingan URL) qayta yuklashdan farqli
+    o'laroq ancha kengroq auditoriyaga chiqadi, shuning uchun bu yerda
+    ehtiyotkorroq filtr qo'llaymiz."""
+    flagged_urls = db.query(ContentViolation.youtube_url).distinct()
+    jobs = (
+        db.query(DubbingJob)
+        .filter(
+            DubbingJob.status == JobStatus.COMPLETED,
+            DubbingJob.source_job_id.is_(None),
+            DubbingJob.youtube_url.notin_(flagged_urls),
+        )
+        .order_by(DubbingJob.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [
+        LibraryItem(
+            job_id=str(j.id),
+            youtube_url=j.youtube_url,
+            video_title=j.video_title,
+            video_duration=j.video_duration,
+            video_thumbnail=j.video_thumbnail,
+            speaker_gender=j.speaker_gender,
+            created_at=j.created_at.isoformat() if j.created_at else None,
+        )
+        for j in jobs
+    ]
+
+
+@router.get("/library/access")
+async def get_library_access(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return {"has_access": current_user.library_access_purchased_at is not None}
+
+
+@router.post("/library/purchase")
+async def purchase_library_access(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Ommaviy videolar kutubxonasiga bir martalik kirish to'lovi -- job_id
+    yoki plan bilan bog'liq emas (Payment.is_library_access orqali
+    ajratiladi, backend/api/click_routes.py:click_complete)."""
+    if current_user.library_access_purchased_at is not None:
+        return {"success": True, "message": "Kirish huquqi allaqachon mavjud.", "amount": 0}
+
+    existing_pending = db.query(Payment).filter(
+        Payment.user_id == current_user.id,
+        Payment.is_library_access.is_(True),
+        Payment.status == PaymentStatus.PENDING,
+    ).first()
+
+    if not existing_pending:
+        payment = Payment(
+            user_id=current_user.id,
+            is_library_access=True,
+            amount=LIBRARY_ACCESS_PRICE,
+            provider=PaymentProvider.CLICK,
+            status=PaymentStatus.PENDING,
+            click_create_time=int(time.time()),
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    else:
+        payment = existing_pending
+
+    merchant_id = settings.CLICK_MERCHANT_ID or "56653"
+    service_id = settings.CLICK_SERVICE_ID or "108780"
+    merchant_user_id = getattr(settings, "CLICK_MERCHANT_USER_ID", "") or "89102"
+
+    origin_header = request.headers.get("origin") or request.headers.get("referer")
+    if origin_header:
+        parsed = urlparse(origin_header)
+        base_origin = f"{parsed.scheme}://{parsed.netloc}"
+        return_url = f"{base_origin}/library"
+    else:
+        frontend_url = settings.FRONTEND_URL or "https://gapirai.uz"
+        return_url = f"{frontend_url.rstrip('/')}/library"
+
+    payment_url = generate_payment_url(
+        merchant_id=merchant_id,
+        service_id=service_id,
+        transaction_param=str(payment.id),
+        amount=LIBRARY_ACCESS_PRICE,
+        return_url=return_url,
+        merchant_user_id=merchant_user_id,
+    )
+
+    return {
+        "success": True,
+        "payment_url": payment_url,
+        "payment_id": str(payment.id),
+        "amount": LIBRARY_ACCESS_PRICE,
+    }
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
@@ -265,7 +347,7 @@ async def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import generate_presigned_download_url
-        s3_key = f"dubber/{job_id}/dubbed_audio.wav"
+        s3_key = f"dubber/{job.storage_id}/dubbed_audio.wav"
         presigned_url = generate_presigned_download_url(s3_key)
         if presigned_url:
             return Response(status_code=307, headers={"Location": presigned_url})
@@ -287,7 +369,7 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import generate_presigned_download_url
-        s3_key = f"dubber/{job_id}/dubbed_final.mp4"
+        s3_key = f"dubber/{job.storage_id}/dubbed_final.mp4"
         presigned_url = generate_presigned_download_url(s3_key)
         if presigned_url:
             return Response(status_code=307, headers={"Location": presigned_url})
@@ -298,6 +380,53 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"dubbed_{safe_title or job_id}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+
+
+@router.get("/jobs/{job_id}/resolutions")
+async def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Tarif bo'yicha ruxsat etilgan va tayyor rezolyutsiyalar ro'yxati.
+    720p har doim "ready" -- u master fayl, alohida generatsiya kerak emas."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+
+    from backend.services.plans import get_max_resolution_for_job, RESOLUTION_ORDER
+    max_idx = RESOLUTION_ORDER.index(get_max_resolution_for_job(db, job))
+
+    variant_status = {
+        v.resolution: v.status
+        for v in db.query(ResolutionVariant).filter(ResolutionVariant.job_id == job.storage_id).all()
+    }
+
+    resolutions = []
+    for i, res in enumerate(RESOLUTION_ORDER):
+        available = i <= max_idx
+        status = "ready" if res == "720p" else variant_status.get(res, "not_requested")
+        resolutions.append({"resolution": res, "available": available, "status": status})
+
+    return {"resolutions": resolutions}
+
+
+@router.post("/jobs/{job_id}/resolutions/{resolution}")
+async def request_resolution(job_id: uuid.UUID, resolution: str, db: Session = Depends(get_db)):
+    """Berilgan rezolyutsiyani so'raydi -- 720p darhol qaytadi (master fayl),
+    360p/1080p mavjud bo'lmasa Celery task navbatga qo'yiladi va "processing"
+    qaytariladi (frontend buni pollaydi). Mantiq resolution_variants.py'da --
+    Telegram bot ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+
+    from backend.services.resolution_variants import request_resolution as _request_resolution
+    result = _request_resolution(db, job, resolution)
+
+    if result.outcome == "invalid":
+        raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
+    if result.outcome == "forbidden":
+        raise HTTPException(status_code=403, detail="Bu sifat sizning tarif rejangizda mavjud emas.")
+    if result.outcome == "ready":
+        return {"status": "ready", "download_url": result.download_url}
+    return {"status": "processing"}
 
 
 @router.post("/jobs/{job_id}/cancel")

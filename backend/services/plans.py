@@ -47,16 +47,30 @@ class PlanDef:
     priority: bool
     tts_tier: str  # "edge" | "premium"
     tier: PlanTier  # Subscription.plan ustuniga yoziladigan haqiqiy tier
+    max_resolution: str  # "360p" | "720p" | "1080p" -- yuklab olish uchun maksimal ruxsat etilgan sifat
     period_days: int = 30  # to'lov davri: 30 = oylik, 365 = yillik
 
 
 PLANS: dict[str, PlanDef] = {
-    "free": PlanDef(id="free", name="Bepul", price=0, videos_per_period=1, free_minutes=45.0, priority=False, tts_tier="edge", tier=PlanTier.FREE),
-    "standard": PlanDef(id="standard", name="Standart", price=49_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD),
-    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, period_days=365),
-    "pro": PlanDef(id="pro", name="Pro", price=149_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO),
-    "pro_yearly": PlanDef(id="pro_yearly", name="Pro (yillik)", price=1_490_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, period_days=365),
+    "free": PlanDef(id="free", name="Bepul", price=0, videos_per_period=1, free_minutes=45.0, priority=False, tts_tier="edge", tier=PlanTier.FREE, max_resolution="360p"),
+    "standard": PlanDef(id="standard", name="Standart", price=49_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p"),
+    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p", period_days=365),
+    "pro": PlanDef(id="pro", name="Pro", price=149_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, max_resolution="1080p"),
+    "pro_yearly": PlanDef(id="pro_yearly", name="Pro (yillik)", price=1_490_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, max_resolution="1080p", period_days=365),
 }
+
+RESOLUTION_ORDER = ["360p", "720p", "1080p"]
+
+
+def get_max_resolution_for_job(db, job) -> str:
+    """Job egasining JORIY tarifiga qarab -- login qilmagan/egasiz job uchun
+    "free" deb hisoblanadi. Yuklab olish havolasi odatda login holatisiz ham
+    ochiladi (mavjud /outputs endpointlari auth talab qilmaydi), shuning
+    uchun REQUESTER emas, JOB EGASI tarifi tekshiriladi."""
+    if job.user_id is None:
+        return "360p"
+    sub = get_or_create_subscription(db, job.user_id)
+    return PLANS[sub.plan.value].max_resolution
 
 
 def get_or_create_subscription(db, user_id) -> Subscription:

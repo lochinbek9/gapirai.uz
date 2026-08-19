@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
-from backend.models.database import SessionLocal, User, DubbingJob
+from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
 from backend.services.auth import get_current_admin_user
@@ -171,6 +171,69 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
             "recent_users": recent_users,
             "recent_jobs": recent_jobs,
             "trends": trends,
+        }
+    finally:
+        db.close()
+
+
+@router.get("/blocked-users")
+async def blocked_users(current_user: User = Depends(get_current_admin_user)):
+    """Content Safety Gate tomonidan bloklangan foydalanuvchilar ro'yxati --
+    har bir foydalanuvchi bo'yicha guruhlangan, nechta marta bloklangani va
+    eng so'nggi bloklanish sanasi bilan (backend/services/content_safety.py,
+    backend/models/database.py: ContentViolation)."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(
+                ContentViolation.user_id,
+                User.name,
+                User.email,
+                User.phone,
+                func.count(ContentViolation.id).label("violation_count"),
+                func.max(ContentViolation.created_at).label("last_violation_at"),
+            )
+            .join(User, User.id == ContentViolation.user_id)
+            .filter(ContentViolation.blocked.is_(True))
+            .group_by(ContentViolation.user_id, User.name, User.email, User.phone)
+            .order_by(func.count(ContentViolation.id).desc())
+            .all()
+        )
+        users = [
+            {
+                "user_id": str(r.user_id),
+                "name": r.name,
+                "email": r.email,
+                "phone": r.phone,
+                "violation_count": r.violation_count,
+                "last_violation_at": r.last_violation_at.isoformat() if r.last_violation_at else None,
+            }
+            for r in rows
+        ]
+        recent = (
+            db.query(ContentViolation)
+            .filter(ContentViolation.blocked.is_(True))
+            .order_by(ContentViolation.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        recent_violations = [
+            {
+                "id": str(v.id),
+                "user_id": str(v.user_id),
+                "video_title": v.video_title,
+                "stage": v.stage,
+                "category": v.category,
+                "reason": v.reason,
+                "created_at": v.created_at.isoformat(),
+            }
+            for v in recent
+        ]
+        return {
+            "total_blocked_accounts": len(users),
+            "total_violations": sum(u["violation_count"] for u in users),
+            "users": users,
+            "recent_violations": recent_violations,
         }
     finally:
         db.close()

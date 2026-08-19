@@ -98,6 +98,31 @@ export async function deleteJob(jobId: string): Promise<void> {
   await apiClient.delete(`/api/jobs/${jobId}`)
 }
 
+export interface LibraryItem {
+  job_id: string
+  youtube_url: string
+  video_title: string | null
+  video_duration: number | null
+  video_thumbnail: string | null
+  speaker_gender: string | null
+  created_at: string | null
+}
+
+export async function getLibrary(limit: number = 24, offset: number = 0): Promise<LibraryItem[]> {
+  const res = await apiClient.get('/api/library', { params: { limit, offset } })
+  return res.data
+}
+
+export async function getLibraryAccess(): Promise<{ has_access: boolean }> {
+  const res = await apiClient.get('/api/library/access')
+  return res.data
+}
+
+export async function purchaseLibraryAccess(): Promise<{ success: boolean; payment_url?: string; payment_id?: string; amount: number; message?: string }> {
+  const res = await apiClient.post('/api/library/purchase')
+  return res.data
+}
+
 export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/click/initiate', { job_id: jobId })
   return res.data
@@ -105,6 +130,22 @@ export async function initiateClickPayment(jobId: string): Promise<{ success: bo
 
 export function getDownloadUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/video`
+}
+
+export interface ResolutionOption {
+  resolution: string
+  available: boolean
+  status: string
+}
+
+export async function getJobResolutions(jobId: string): Promise<{ resolutions: ResolutionOption[] }> {
+  const res = await apiClient.get(`/api/jobs/${jobId}/resolutions`)
+  return res.data
+}
+
+export async function requestResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`)
+  return res.data
 }
 
 export interface PlanDef {
@@ -117,6 +158,7 @@ export interface PlanDef {
   tts_tier: string
   tier: string
   period_days: number
+  max_resolution: string
 }
 
 export interface CurrentSubscription {

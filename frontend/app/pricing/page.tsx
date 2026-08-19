@@ -151,6 +151,7 @@ export default function PricingPage() {
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video{plan.price === 0 ? `, ${plan.free_minutes} daqiqagacha` : ', cheklovsiz davomiylik'}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Yuklab olish sifati: {plan.max_resolution} gacha</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
                   </ul>
 
@@ -191,9 +192,9 @@ function MeshBackground() {
 // (backend /api/plans login talab qiladi) — narxlar backend/services/plans.py
 // bilan bir xil, faqat ko'rsatish uchun.
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30 },
-  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30 },
-  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365 },
-  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30 },
-  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1490000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365 },
+  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
+  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
+  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
+  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1490000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365, max_resolution: '1080p' },
 ]

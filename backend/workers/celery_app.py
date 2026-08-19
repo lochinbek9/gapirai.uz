@@ -7,7 +7,7 @@ celery_app = Celery(
     "ai_dubber",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["backend.workers.tasks", "backend.workers.analysis_tasks"],
+    include=["backend.workers.tasks", "backend.workers.analysis_tasks", "backend.workers.resolution_tasks"],
 )
 
 celery_app.conf.update(
@@ -35,6 +35,11 @@ celery_app.conf.update(
         "backend.workers.analysis_tasks.analyze_video_task": {
             "queue": "video_processing",  # ustuvorlik tizimiga kirmaydi, doim standart navbat
             "rate_limit": "1/m",
+        },
+        "backend.workers.resolution_tasks.generate_resolution_variant_task": {
+            "queue": "video_processing",  # aniq queue ko'rsatilmasa Celery'ning
+            # o'zi "celery" default navbatiga tushar edi -- worker'lar faqat
+            # video_processing/video_processing_priority'ni tinglaydi.
         },
     },
 )

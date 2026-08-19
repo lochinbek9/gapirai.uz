@@ -2,14 +2,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getDownloadUrl, getAudioUrl, initiateClickPayment, clearJobId, cancelJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, clearJobId, cancelJob } from '@/lib/api'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
-  Download, ArrowLeft, Youtube, ChevronDown, ChevronUp,
+  ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
+import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -367,14 +368,7 @@ export default function VideoPage() {
               {job.status === 'completed' && (
                 <div className="space-y-6 pt-1">
                   <div>
-                    <a
-                      href={getDownloadUrl(id)}
-                      download
-                      className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition hover:scale-105"
-                    >
-                      <Download className="w-5 h-5" />
-                      Yuklab olish (MP4)
-                    </a>
+                    <ResolutionDownloadButtons jobId={id} />
                   </div>
 
                   {/* Feedback rating component */}

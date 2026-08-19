@@ -216,6 +216,7 @@ def _extract_info_dict(ydl, youtube_url: str) -> dict:
         "duration": info.get("duration", 0),
         "thumbnail": info.get("thumbnail", ""),
         "uploader": info.get("uploader", ""),
+        "description": info.get("description", ""),
     }
 
 
@@ -279,10 +280,10 @@ def get_video_info(youtube_url: str) -> dict:
         raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
 
 
-def download_video(youtube_url: str, job_id: str) -> dict:
+def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
     _rate_limiter.acquire()
     try:
-        return _do_download(youtube_url, job_id)
+        return _do_download(youtube_url, job_id, max_height=max_height)
     except Exception:
         _rate_limiter.mark_failure()
         raise
@@ -292,14 +293,14 @@ def download_video(youtube_url: str, job_id: str) -> dict:
         _rate_limiter.release()
 
 
-def _do_download(youtube_url: str, job_id: str) -> dict:
+def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
     job_dir = Path(settings.UPLOAD_DIR) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
 
     video_tpl = str(job_dir / "video.%(ext)s")
     extra_opts = {
         "outtmpl": video_tpl,
-        "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
     }
 
