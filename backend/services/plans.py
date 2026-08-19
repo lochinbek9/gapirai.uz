@@ -144,6 +144,17 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
     db.commit()
 
 
+def refund_quota(db, user_id) -> None:
+    """consume_quota() bilan sarflangan kvotani qaytaradi -- job pipeline
+    5 marta urinib ham muvaffaqiyatsiz tugasa chaqiriladi
+    (backend/workers/tasks.py). DubbingJob.quota_consumed=True bo'lgandagina
+    chaqiriladi, shuning uchun qisqa (kvotasiz) videolar bu yerga kelmaydi."""
+    sub = get_or_create_subscription(db, user_id)
+    if sub.videos_used_this_period > 0:
+        sub.videos_used_this_period -= 1
+        db.commit()
+
+
 def activate_subscription(db, user_id, plan_id: str) -> Subscription:
     """To'lov muvaffaqiyatli bo'lgandan keyin chaqiriladi — obunani tanlangan
     tarifning to'lov davriga (plan.period_days: oylik=30, yillik=365) ko'ra

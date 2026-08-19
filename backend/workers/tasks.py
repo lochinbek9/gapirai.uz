@@ -511,7 +511,31 @@ def process_video(self: Task, job_id: str) -> dict:
             "error_code": _error_code_for(exc, current_stage),
             "updated_at": datetime.utcnow(),
         })
+
+        # Kvota qaytarish -- bepul/kvota bilan boshlangan job 5 marta
+        # urinib ham muvaffaqiyatsiz tugasa, sarflangan kvota userga qaytadi
+        # (2026-08-19, foydalanuvchi so'rovi). Pullik (Click) job'lar uchun
+        # avtomatik pul qaytarish integratsiyasi yo'q -- Payment.needs_refund
+        # true qilinadi, admin panelda qo'lda qaytarish uchun ko'rsatiladi.
+        if job.quota_consumed and job.user_id:
+            from backend.services.plans import refund_quota
+            refund_quota(db, job.user_id)
+            job.quota_consumed = False
+        else:
+            from backend.models.payment import Payment, PaymentStatus
+            paid = db.query(Payment).filter(
+                Payment.job_id == job_id, Payment.status == PaymentStatus.APPROVED
+            ).first()
+            if paid:
+                paid.needs_refund = True
+
         db.commit()
+
+        if job.user_id and job.user and job.user.telegram_chat_id:
+            send_telegram_message(
+                job.user.telegram_chat_id,
+                f"\u274c Dublyaj bajarilmadi (bir necha marta urinildi): {job.video_title or 'Video'}\n\n{str(exc)}",
+            )
 
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (max retries)")

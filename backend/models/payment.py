@@ -34,6 +34,11 @@ class Payment(Base):
     click_status = Column(Integer)
     click_create_time = Column(Integer)
     click_complete_time = Column(Integer)
+    # 2026-08-19: pullik job 5 marta urinib ham muvaffaqiyatsiz tugasa
+    # (backend/workers/tasks.py) shu bayroq true qilinadi -- Click orqali
+    # avtomatik pul qaytarish integratsiyasi yo'q, shuning uchun admin panelda
+    # ko'rsatilib, qo'lda qaytariladi.
+    needs_refund = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, Ban } from 'lucide-react'
-import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers } from '@/lib/admin'
+import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers, RefundsNeededReport, apiAdminRefundsNeeded } from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -231,6 +231,7 @@ export default function AdminPage() {
   const { user, loading: authLoading, isLoggedIn, logout } = useAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [blocked, setBlocked] = useState<BlockedUsersReport | null>(null)
+  const [refunds, setRefunds] = useState<RefundsNeededReport | null>(null)
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
@@ -251,6 +252,11 @@ export default function AdminPage() {
         setBlocked(await apiAdminBlockedUsers(token))
       } catch {
         // Bloklanganlar hisoboti ixtiyoriy -- xato bo'lsa asosiy panelni to'xtatmaydi.
+      }
+      try {
+        setRefunds(await apiAdminRefundsNeeded(token))
+      } catch {
+        // Qaytarish hisoboti ixtiyoriy -- xato bo'lsa asosiy panelni to'xtatmaydi.
       }
     } catch (err: any) {
       const httpStatus = err?.response?.status
@@ -536,6 +542,44 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
+          </section>
+        )}
+
+        {/* Qaytarilishi kerak bo'lgan to'lovlar -- 5 marta urinib ham muvaffaqiyatsiz tugagan pullik joblar */}
+        {refunds && refunds.payments.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lov qaytarilishi kerak</h2>
+            <Card
+              label="Jami qaytarilishi kerak"
+              value={`${refunds.total_amount.toLocaleString('uz-UZ')} so'm`}
+              icon={<Wallet className="w-5 h-5" />}
+            />
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
+              <table className="w-full text-sm min-w-[820px]">
+                <thead>
+                  <tr className="border-b border-white/10 text-left">
+                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
+                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Aloqa</th>
+                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Summa</th>
+                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Click tranzaksiya</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {refunds.payments.map((p) => (
+                    <tr key={p.payment_id} className="border-b border-white/5 last:border-0">
+                      <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{p.user_name || 'Nomsiz'}</td>
+                      <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{p.user_email || p.user_phone || '—'}</td>
+                      <td className="px-4 sm:px-5 py-3 text-amber-300 font-semibold whitespace-nowrap">{p.amount.toLocaleString('uz-UZ')} so'm</td>
+                      <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={p.video_title || undefined}>
+                        {p.video_title || '—'}
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{p.click_transaction_id || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 

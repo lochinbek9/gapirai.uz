@@ -109,6 +109,10 @@ class DubbingJob(Base):
 
     error_message = Column(Text)
     error_code = Column(String(50), nullable=True)  # masalan: VIDEO_UNAVAILABLE, TRANSCRIBE_FAILED, TIMEOUT
+    # 2026-08-19: shu job uchun tarif kvotasi sarflanganmi (consume_quota
+    # chaqirilganmi) -- pipeline 5 marta urinib ham muvaffaqiyatsiz tugasa,
+    # backend/workers/tasks.py shu bayroqqa qarab kvotani avtomatik qaytaradi.
+    quota_consumed = Column(Boolean, default=False, nullable=False)
     rating = Column(Integer, nullable=True)
     feedback_comment = Column(Text, nullable=True)
     feedback_created_at = Column(DateTime, nullable=True)

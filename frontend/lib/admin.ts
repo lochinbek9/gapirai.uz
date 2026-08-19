@@ -72,3 +72,25 @@ export async function apiAdminBlockedUsers(token: string): Promise<BlockedUsersR
   })
   return res.data
 }
+
+export interface RefundsNeededReport {
+  total_amount: number
+  payments: {
+    payment_id: string
+    user_name: string | null
+    user_email: string | null
+    user_phone: string | null
+    amount: number
+    video_title: string | null
+    error_message: string | null
+    click_transaction_id: string | null
+    paid_at: string | null
+  }[]
+}
+
+export async function apiAdminRefundsNeeded(token: string): Promise<RefundsNeededReport> {
+  const res = await axios.get(`${API_URL}/admin/refunds-needed`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}

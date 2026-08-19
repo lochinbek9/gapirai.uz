@@ -237,3 +237,41 @@ async def blocked_users(current_user: User = Depends(get_current_admin_user)):
         }
     finally:
         db.close()
+
+
+@router.get("/refunds-needed")
+async def refunds_needed(current_user: User = Depends(get_current_admin_user)):
+    """Pullik (Click) job 5 marta urinib ham muvaffaqiyatsiz tugagan
+    to'lovlar -- Click orqali avtomatik pul qaytarish integratsiyasi yo'q
+    (backend/workers/tasks.py: Payment.needs_refund), shuning uchun bu
+    yerda ko'rsatilib, admin Click ilovasi orqali qo'lda qaytaradi."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Payment, User, DubbingJob)
+            .join(User, User.id == Payment.user_id)
+            .outerjoin(DubbingJob, DubbingJob.id == Payment.job_id)
+            .filter(Payment.needs_refund.is_(True))
+            .order_by(Payment.updated_at.desc())
+            .all()
+        )
+        payments = [
+            {
+                "payment_id": str(p.id),
+                "user_name": u.name,
+                "user_email": u.email,
+                "user_phone": u.phone,
+                "amount": p.amount,
+                "video_title": j.video_title if j else None,
+                "error_message": j.error_message if j else None,
+                "click_transaction_id": p.click_transaction_id,
+                "paid_at": p.updated_at.isoformat() if p.updated_at else None,
+            }
+            for p, u, j in rows
+        ]
+        return {
+            "total_amount": sum(p["amount"] for p in payments),
+            "payments": payments,
+        }
+    finally:
+        db.close()

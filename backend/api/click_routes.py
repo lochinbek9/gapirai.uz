@@ -57,6 +57,7 @@ async def initiate_payment(
     if amount == 0:
         if covered_by_quota:
             consume_quota(db, current_user.id, duration_minutes)
+            job.quota_consumed = True
         if job.status == JobStatus.AWAITING_PAYMENT:
             if job.source_job_id:
                 from datetime import datetime

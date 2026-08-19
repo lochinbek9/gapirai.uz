@@ -167,6 +167,8 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
     if amount == 0:
         if covered_by_quota:
             consume_quota(db, user.id, duration_minutes)
+            job.quota_consumed = True
+            db.commit()
         process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
         return JobCreationResult(outcome="queued", job_id=job_id, video_title=title, duration_minutes=duration_minutes)
 
@@ -213,6 +215,7 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
     if amount == 0:
         if covered_by_quota:
             consume_quota(db, user.id, duration_minutes)
+            job.quota_consumed = True
         job.status = JobStatus.COMPLETED
         job.status_message = "Dublyaj tayyor!"
         job.completed_at = datetime.utcnow()
