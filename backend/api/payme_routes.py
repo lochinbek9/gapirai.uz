@@ -234,6 +234,19 @@ def _account_error(req_id):
     )
 
 
+def _account_busy_error(req_id):
+    """CreateTransaction hujjati: "Следует бронировать заказ покупателя...
+    до оплаты или отмены по таймауту" -- hisob allaqachon BOSHQA (hali
+    yakunlanmagan) tranzaksiya bilan band bo'lsa, bu ham "account" xatosi
+    hisoblanadi (-31050 -- -31099), umumiy -31008 emas (rasmiy sandbox
+    sertifikatsiya testi shuni talab qiladi, 2026-08-19 tasdiqlangan)."""
+    return payme_error(
+        PaymeErrors.INVALID_ACCOUNT,
+        "Bu hisob band -- boshqa tranzaksiya bilan qulflangan.", "Счёт занят другой транзакцией.", "Account is busy with another transaction.",
+        data=ACCOUNT_FIELD, request_id=req_id,
+    )
+
+
 def _handle_check_perform_transaction(db: Session, params: dict, req_id):
     payment = _find_by_account(db, params)
     if not payment or payment.status not in (PaymentStatus.PENDING,):
@@ -279,7 +292,7 @@ def _handle_create_transaction(db: Session, params: dict, req_id):
     # Shu Payment allaqachon boshqa Payme tranzaksiyasi bilan band bo'lsa (masalan
     # avvalgi urinish hali muddati o'tmagan) -- yangisini rad etamiz.
     if payment.payme_transaction_id and payment.payme_transaction_id != txn_id:
-        return payme_error(PaymeErrors.CANNOT_PERFORM_OPERATION, "Amalni bajarib bo'lmadi.", "Невозможно выполнить операцию.", "Cannot perform operation.", request_id=req_id)
+        return _account_busy_error(req_id)
 
     payment.payme_transaction_id = txn_id
     payment.payme_state = 1

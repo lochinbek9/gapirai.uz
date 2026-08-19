@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import boto3
 import logging
@@ -45,7 +46,14 @@ def upload_file_to_s3(file_path: str, object_name: str) -> bool:
         return False
 
     try:
-        s3_client.upload_file(file_path, bucket, object_name)
+        # boto3 upload_file() Content-Type'ni o'zi taxmin qilmaydi (aws-cli'dan
+        # farqli) -- ko'rsatilmasa S3 "binary/octet-stream" bilan saqlaydi,
+        # bu esa brauzerning <video>/<audio> teglari inline ijro etishdan bosh
+        # tortishiga olib keladi (qora ekran, xatosiz) -- 2026-08-19,
+        # kutubxona video pleyeri orqali aniqlangan haqiqiy xato.
+        content_type, _ = mimetypes.guess_type(object_name)
+        extra_args = {"ContentType": content_type} if content_type else None
+        s3_client.upload_file(file_path, bucket, object_name, ExtraArgs=extra_args)
         logger.info(f"Successfully uploaded {file_path} to S3 as {object_name}")
         return True
     except Exception as e:
@@ -77,9 +85,19 @@ def generate_presigned_download_url(object_name: str, expiration: int = 3600) ->
         return None
 
     try:
+        params = {"Bucket": bucket, "Key": object_name}
+        # Ilgari yuklangan fayllarning ko'pi S3'da noto'g'ri "binary/octet-stream"
+        # Content-Type bilan saqlangan (yuklash ExtraArgs bermagan edi) --
+        # brauzer <video>/<audio> shu turni ko'rib inline ijrodan bosh tortadi
+        # (qora ekran). ResponseContentType obyektning o'zini o'zgartirmasdan,
+        # shu bitta so'rov uchun to'g'ri turni majburlaydi -- mavjud fayllarni
+        # qayta yuklashsiz tuzatadi (2026-08-19).
+        content_type, _ = mimetypes.guess_type(object_name)
+        if content_type:
+            params["ResponseContentType"] = content_type
         response = s3_client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": bucket, "Key": object_name},
+            Params=params,
             ExpiresIn=expiration,
         )
         return response
