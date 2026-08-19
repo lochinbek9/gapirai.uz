@@ -336,112 +336,15 @@ def get_db():
 
 
 def create_tables():
-    from sqlalchemy import text
-    try:
-        with engine.connect() as connection:
-            for val in ['awaiting_payment', 'AWAITING_PAYMENT']:
-                try:
-                    connection.execute(text(f"ALTER TYPE jobstatus ADD VALUE '{val}'"))
-                    connection.commit()
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE payments ALTER COLUMN user_id DROP NOT NULL"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE payments ALTER COLUMN click_prepare_id TYPE BIGINT"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS rating INT"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_comment TEXT"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_created_at TIMESTAMP"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_voice_ok BOOLEAN"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_translation_ok BOOLEAN"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS feedback_speed_ok BOOLEAN"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code VARCHAR(6)"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code_expires_at TIMESTAMP"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS transcript_segments JSONB"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS translated_segments JSONB"))
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS speech_segments JSONB"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS error_code VARCHAR(50)"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS video_language VARCHAR(10)"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE video_analyses ADD COLUMN IF NOT EXISTS bilingual_segments JSONB"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan VARCHAR(20)"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE users ALTER COLUMN email DROP NOT NULL"))
-            connection.execute(text("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verification_code VARCHAR(6)"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verification_code_expires_at TIMESTAMP"))
-            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(20) NOT NULL DEFAULT 'password'"))
-            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"))
-            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
-            connection.commit()
-    except Exception:
-        pass
-
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS segment_qa JSONB"))
-            connection.execute(text("ALTER TABLE tts_usage_logs ADD COLUMN IF NOT EXISTS cache_hit BOOLEAN NOT NULL DEFAULT false"))
-            connection.commit()
-    except Exception:
-        pass
-
+    # 2026-08-19: bu yerda ilgari o'nlab bir martalik "ALTER TABLE ... ADD
+    # COLUMN IF NOT EXISTS" iboralari bor edi -- ularning BARCHASI allaqachon
+    # qo'llanilgan (tekshirilgan: barcha ustun/indekslar production'da
+    # mavjud). Har biri ACCESS EXCLUSIVE qulf talab qilardi va backend HAR
+    # safar qayta ishga tushganda ishga tushardi -- agar shu payt boshqa
+    # birorta ulanish (masalan Celery worker) dubbing_jobs'da ochiq
+    # tranzaksiyaga ega bo'lsa, bu butun saytni bir necha daqiqaga
+    # to'xtatib qo'yardi (2026-08-19 kechasi bir necha marta shu tarzda
+    # tanaffus bo'ldi -- ildiz sababi shu edi). Yangi ustun kerak bo'lsa,
+    # bir martalik `ALTER TABLE` to'g'ridan-to'g'ri production DB'da qo'lda
+    # bajariladi (bu funksiyaga umuman qo'shilmaydi).
     Base.metadata.create_all(bind=engine)
