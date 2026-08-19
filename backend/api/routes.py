@@ -270,8 +270,11 @@ async def list_library_resolutions(
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
 
-    from backend.services.plans import get_max_resolution_for_user, RESOLUTION_ORDER
-    max_idx = RESOLUTION_ORDER.index(get_max_resolution_for_user(db, current_user.id))
+    from backend.services.plans import RESOLUTION_ORDER
+    # 2026-08-19: foydalanuvchi so'rovi bilan kutubxonada 1080p VAQTINCHA barcha
+    # tomoshabinlar uchun bepul -- get_max_resolution_for_user() chaqiruvi
+    # o'chirilgan, qaytarish uchun uni tiklash kifoya.
+    max_idx = len(RESOLUTION_ORDER) - 1
 
     variant_status = {
         v.resolution: v.status
@@ -300,9 +303,10 @@ async def request_library_resolution(
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
 
-    from backend.services.plans import get_max_resolution_for_user
     from backend.services.resolution_variants import request_resolution as _request_resolution
-    result = _request_resolution(db, job, resolution, max_resolution_override=get_max_resolution_for_user(db, current_user.id))
+    # 2026-08-19: yuqoridagi list_library_resolutions bilan bir xil sabab --
+    # kutubxonada 1080p vaqtincha barcha tomoshabinlar uchun bepul.
+    result = _request_resolution(db, job, resolution, max_resolution_override="1080p")
 
     if result.outcome == "invalid":
         raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
