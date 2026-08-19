@@ -213,6 +213,15 @@ class Settings(BaseSettings):
     CLICK_SERVICE_ID: str = "108780"
     CLICK_SECRET_KEY: str = "Pbxfw7SaMso"
     CLICK_MERCHANT_USER_ID: str = "89102"
+
+    # Payme (Paycom) Payment -- Merchant API (backend/api/payme_routes.py).
+    # PAYME_KEY ishlab chiqarish (checkout.paycom.uz) uchun, PAYME_TEST_KEY
+    # esa pesochnitsa (test.paycom.uz) uchun -- ikkalasi ham Basic Auth
+    # orqali kiruvchi so'rovlarni tekshirishda ishlatiladi.
+    PAYME_MERCHANT_ID: str = ""
+    PAYME_KEY: str = ""
+    PAYME_TEST_KEY: str = ""
+
     FRONTEND_URL: str = "https://gapirai.uz"
 
     # yt-dlp orqali YouTube'dan yuklab olishda ishlatiladigan HTTP(S) proxy —

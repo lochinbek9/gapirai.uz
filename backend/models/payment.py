@@ -34,6 +34,19 @@ class Payment(Base):
     click_status = Column(Integer)
     click_create_time = Column(Integer)
     click_complete_time = Column(Integer)
+
+    # Payme (Paycom) Merchant API (backend/api/payme_routes.py) -- Payme
+    # o'zining "id"si orqali tranzaksiyani kuzatadi (CreateTransaction'da
+    # beriladi, keyingi Perform/Cancel/Check so'rovlarida shu orqali
+    # qidiriladi). payme_state Payme'ning holat mashinasi: 1=yaratilgan,
+    # 2=tasdiqlangan, -1=tasdiqlanmasdan bekor qilingan, -2=tasdiqlangandan
+    # keyin bekor qilingan.
+    payme_transaction_id = Column(String, index=True, nullable=True)
+    payme_state = Column(Integer, nullable=True)
+    payme_create_time = Column(BigInteger, nullable=True)
+    payme_perform_time = Column(BigInteger, nullable=True)
+    payme_cancel_time = Column(BigInteger, nullable=True)
+    payme_cancel_reason = Column(Integer, nullable=True)
     # 2026-08-19: pullik job 5 marta urinib ham muvaffaqiyatsiz tugasa
     # (backend/workers/tasks.py) shu bayroq true qilinadi -- Click orqali
     # avtomatik pul qaytarish integratsiyasi yo'q, shuning uchun admin panelda

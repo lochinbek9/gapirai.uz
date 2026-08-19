@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
-import { getPlans, subscribeToPlan, PlanDef, CurrentSubscription } from '@/lib/api'
+import { getPlans, subscribeToPlan, subscribeToPlanPayme, PlanDef, CurrentSubscription } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
@@ -29,7 +29,7 @@ export default function PricingPage() {
       .finally(() => setLoading(false))
   }, [authLoading])
 
-  const handleSubscribe = async (planId: string) => {
+  const handleSubscribe = async (planId: string, provider: 'click' | 'payme' = 'click') => {
     if (!isLoggedIn) {
       router.push('/login')
       return
@@ -38,7 +38,7 @@ export default function PricingPage() {
     setError(null)
     const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
-      const res = await subscribeToPlan(planId)
+      const res = await (provider === 'payme' ? subscribeToPlanPayme(planId) : subscribeToPlan(planId))
       if (res.success && res.payment_url) {
         if (paymentWindow) paymentWindow.location.href = res.payment_url
         else window.location.href = res.payment_url
@@ -156,7 +156,7 @@ export default function PricingPage() {
                   </ul>
 
                   <button
-                    onClick={() => plan.id !== 'free' && handleSubscribe(plan.id)}
+                    onClick={() => plan.id !== 'free' && handleSubscribe(plan.id, 'click')}
                     disabled={plan.id === 'free' || isCurrent || subscribing === plan.id}
                     className={`w-full py-3 rounded-2xl font-bold text-sm transition flex items-center justify-center gap-2 ${
                       plan.id === 'free' || isCurrent
@@ -166,8 +166,17 @@ export default function PricingPage() {
                   >
                     {subscribing === plan.id ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Kutilmoqda...</>
-                    ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? "Hozirgi tarif" : 'Tanlash'}
+                    ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? "Hozirgi tarif" : 'Click orqali tanlash'}
                   </button>
+                  {plan.id !== 'free' && !isCurrent && (
+                    <button
+                      onClick={() => handleSubscribe(plan.id, 'payme')}
+                      disabled={subscribing === plan.id}
+                      className="w-full py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                    >
+                      Payme orqali to'lash
+                    </button>
+                  )}
                 </div>
               )
             })}

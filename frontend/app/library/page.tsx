@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Library, Clock, Loader2, Lock, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getLibrary, getLibraryAccess, purchaseLibraryAccess, formatDuration, LibraryItem } from '@/lib/api'
+import { getLibrary, getLibraryAccess, purchaseLibraryAccess, purchaseLibraryAccessPayme, formatDuration, LibraryItem } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 
 const LIBRARY_ACCESS_PRICE = 5000
@@ -55,7 +55,7 @@ export default function LibraryPage() {
       .catch(() => setHasAccess(false))
   }, [authLoading, isLoggedIn])
 
-  const handlePurchase = async () => {
+  const handlePurchase = async (provider: 'click' | 'payme' = 'click') => {
     if (!isLoggedIn) {
       router.push('/login')
       return
@@ -63,7 +63,7 @@ export default function LibraryPage() {
     setPurchaseLoading(true)
     setError(null)
     try {
-      const res = await purchaseLibraryAccess()
+      const res = await (provider === 'payme' ? purchaseLibraryAccessPayme() : purchaseLibraryAccess())
       if (res.payment_url) {
         window.location.href = res.payment_url
       } else {
@@ -118,14 +118,25 @@ export default function LibraryPage() {
                 <p className="text-sm font-black text-gray-900 dark:text-white">Kutubxonaga umrbod kirish — {LIBRARY_ACCESS_PRICE.toLocaleString('uz-UZ')} so'm</p>
                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Bir martalik to'lov — barcha (hozirgi va kelajakdagi) dublyaj qilingan videolarni cheksiz tomosha qiling</p>
               </div>
-              <button
-                onClick={handlePurchase}
-                disabled={purchaseLoading}
-                className="shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl btn-premium font-extrabold text-xs uppercase tracking-wide disabled:opacity-60"
-              >
-                {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                {isLoggedIn ? "Kirish huquqini olish" : "Kirib, huquq olish"}
-              </button>
+              <div className="shrink-0 flex items-center gap-2">
+                <button
+                  onClick={() => handlePurchase('click')}
+                  disabled={purchaseLoading}
+                  className="flex items-center gap-2 px-5 py-3 rounded-2xl btn-premium font-extrabold text-xs uppercase tracking-wide disabled:opacity-60"
+                >
+                  {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  {isLoggedIn ? "Click orqali to'lash" : "Kirib, huquq olish"}
+                </button>
+                {isLoggedIn && (
+                  <button
+                    onClick={() => handlePurchase('payme')}
+                    disabled={purchaseLoading}
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/[0.03] dark:bg-white/5 hover:bg-black/[0.06] dark:hover:bg-white/10 border border-black/10 dark:border-white/10 font-extrabold text-xs uppercase tracking-wide text-gray-700 dark:text-slate-200 disabled:opacity-60 transition"
+                  >
+                    Payme orqali to'lash
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

@@ -242,33 +242,8 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     payment.click_status = 1
     payment.click_complete_time = int(time.time())
 
-    if payment.is_library_access:
-        # Ommaviy videolar kutubxonasiga bir martalik kirish -- job_id yoki
-        # plan bilan bog'liq emas, faqat userga umrbod belgi qo'yiladi.
-        from datetime import datetime
-        user = db.query(User).filter(User.id == payment.user_id).first()
-        if user and user.library_access_purchased_at is None:
-            user.library_access_purchased_at = datetime.utcnow()
-    elif payment.plan:
-        # Obuna to'lovi — video emas, tarifni faollashtiradi/uzaytiradi.
-        from backend.services.plans import activate_subscription
-        activate_subscription(db, payment.user_id, payment.plan)
-    else:
-        # update job status and trigger processing
-        job = db.query(DubbingJob).filter(DubbingJob.id == payment.job_id).first()
-        if job:
-            if job.source_job_id:
-                # Kesh-hit job -- qayta ishlov shart emas, natija allaqachon
-                # asl job'da tayyor (backend/services/job_creation.py).
-                from datetime import datetime
-                job.status = JobStatus.COMPLETED
-                job.status_message = "Dublyaj tayyor!"
-                job.completed_at = datetime.utcnow()
-            else:
-                job.status = JobStatus.PENDING
-                job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
-                from backend.services.plans import get_job_queue
-                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
+    from backend.services.payment_fulfillment import apply_successful_payment
+    apply_successful_payment(db, payment)
 
     db.commit()
 

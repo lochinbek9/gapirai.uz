@@ -129,8 +129,18 @@ export async function purchaseLibraryAccess(): Promise<{ success: boolean; payme
   return res.data
 }
 
+export async function purchaseLibraryAccessPayme(): Promise<{ success: boolean; payment_url?: string; payment_id?: string; amount: number; message?: string }> {
+  const res = await apiClient.post('/api/payments/payme/initiate-library')
+  return res.data
+}
+
 export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/click/initiate', { job_id: jobId })
+  return res.data
+}
+
+export async function initiatePaymePayment(jobId: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
+  const res = await apiClient.post('/api/payments/payme/initiate', { job_id: jobId })
   return res.data
 }
 
@@ -193,6 +203,11 @@ export async function getPlans(): Promise<{ plans: PlanDef[]; current: CurrentSu
 
 export async function subscribeToPlan(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/plans/subscribe', { plan })
+  return res.data
+}
+
+export async function subscribeToPlanPayme(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
+  const res = await apiClient.post('/api/payments/payme/initiate-subscription', { plan })
   return res.data
 }
 

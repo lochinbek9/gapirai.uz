@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, clearJobId, cancelJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob } from '@/lib/api'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
@@ -151,7 +151,7 @@ export default function VideoPage() {
   const videoSrc = getVideoUrl(id)
   const audioUrl = job.status === 'completed' ? getAudioUrl(id) : undefined
 
-  const handlePayment = async () => {
+  const handlePayment = async (provider: 'click' | 'payme' = 'click') => {
     if (!id) return
     setPaymentLoading(true)
     setPaymentError(null)
@@ -160,7 +160,7 @@ export default function VideoPage() {
     const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
 
     try {
-      const res = await initiateClickPayment(id)
+      const res = await (provider === 'payme' ? initiatePaymePayment(id) : initiateClickPayment(id))
       if (res.success && res.payment_url) {
         paidAmountRef.current = res.amount
         paymentIdRef.current = res.payment_id || null
@@ -257,17 +257,24 @@ export default function VideoPage() {
                     Obuna bo'lgandan so'ng, shunga o'xshash videolarni qo'shimcha to'lovsiz dublyaj qila olasiz.
                   </p>
 
-                  <div className="border-t border-white/10 pt-4">
+                  <div className="border-t border-white/10 pt-4 space-y-2">
                     <button
-                      onClick={handlePayment}
+                      onClick={() => handlePayment('click')}
                       disabled={paymentLoading}
-                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50"
+                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50 block"
                     >
                       {paymentLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin inline" />
                       ) : (
-                        <>Yoki shu video uchun bir martalik to'lov qiling ({job.video_duration ? calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ') : '...'} UZS)</>
+                        <>Click orqali bir martalik to'lov qiling ({job.video_duration ? calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ') : '...'} UZS)</>
                       )}
+                    </button>
+                    <button
+                      onClick={() => handlePayment('payme')}
+                      disabled={paymentLoading}
+                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50 block"
+                    >
+                      Payme orqali to'lash
                     </button>
                   </div>
 
