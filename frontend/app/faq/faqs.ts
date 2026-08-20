@@ -1,11 +1,11 @@
 export const FAQS = [
   {
     q: "GapirAI.uz qanday ishlaydi?",
-    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
+    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi hamda zamonaviy nutq sintezi texnologiyasi yordamida o'zbek tilida tabiiy ovoz beradi."
   },
   {
     q: "Platformadan foydalanish bepulmi?",
-    a: "Ha, davomiyligi 1 soat (60 daqiqa) gacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. 1 soatdan uzun videolarni dublyaj qilish uchun esa Click tizimi orqali to'lov amalga oshirilishi talab qilinadi."
+    a: "Ha, davomiyligi 45 daqiqagacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. 45 daqiqadan uzun videolarni dublyaj qilish uchun esa Click yoki Payme orqali to'lov amalga oshirilishi talab qilinadi."
   },
   {
     q: "Dublyaj qilish qancha vaqt oladi?",

@@ -123,7 +123,7 @@ def _issue_phone_code(user: User, db: Session) -> str:
 
 
 @router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", 5, 600))])
-async def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
+def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
     if db.query(User).filter(User.email == req.email.lower()).first():
@@ -147,7 +147,7 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)) -> Pendi
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", 10, 600))])
-async def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
+def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
@@ -162,7 +162,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVeri
 
 
 @router.post("/verify-code", dependencies=[Depends(rate_limit("verify_code", 10, 600))])
-async def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user or not user.verification_code:
         raise HTTPException(status_code=400, detail="Kod topilmadi. Qaytadan urinib ko'ring.")
@@ -184,7 +184,7 @@ async def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> 
 
 
 @router.post("/google", dependencies=[Depends(rate_limit("google_auth", 20, 600))])
-async def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthResponse:
     """Google Identity Services token orqali kirish/ro'yxatdan o'tish —
     bir bosqichli (email kodi shart emas, Google email'ni allaqachon
     tasdiqlagan). Email bir xil bo'lgan mavjud parol-akkount bo'lsa, o'shanga
@@ -225,7 +225,7 @@ async def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> 
 
 
 @router.post("/phone/request-code", dependencies=[Depends(rate_limit("phone_request_code", 3, 600))])
-async def phone_request_code(req: PhoneRequestCodeRequest, db: Session = Depends(get_db)) -> PhonePendingVerificationResponse:
+def phone_request_code(req: PhoneRequestCodeRequest, db: Session = Depends(get_db)) -> PhonePendingVerificationResponse:
     """Telefon orqali kirish/ro'yxatdan o'tish — kod SMS orqali yuboriladi,
     parol yoki ism shart emas (kod o'zi tasdiqlash vazifasini bajaradi)."""
     phone = req.phone.strip()
@@ -247,7 +247,7 @@ async def phone_request_code(req: PhoneRequestCodeRequest, db: Session = Depends
 
 
 @router.post("/phone/verify-code", dependencies=[Depends(rate_limit("phone_verify_code", 10, 600))])
-async def phone_verify_code(req: PhoneVerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def phone_verify_code(req: PhoneVerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
     phone = req.phone.strip()
     user = db.query(User).filter(User.phone == phone).first()
     if not user or not user.phone_verification_code:
@@ -270,7 +270,7 @@ async def phone_verify_code(req: PhoneVerifyCodeRequest, db: Session = Depends(g
 
 
 @router.post("/resend-code", dependencies=[Depends(rate_limit("resend_code", 5, 600))])
-async def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
+def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
@@ -283,7 +283,7 @@ async def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> 
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit("forgot_password", 5, 600))])
-async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
@@ -296,7 +296,7 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
 
 
 @router.post("/reset-password", dependencies=[Depends(rate_limit("reset_password", 10, 600))])
-async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> AuthResponse:
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
 
@@ -322,7 +322,7 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
 
 
 @router.get("/me")
-async def me(current_user: User = Depends(get_current_user)) -> dict:
+def me(current_user: User = Depends(get_current_user)) -> dict:
     return {
         "id": str(current_user.id),
         "name": current_user.name,

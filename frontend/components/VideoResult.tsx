@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
 import { useState, useEffect } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
+import { trackEvent } from "@/lib/analytics";
 
 interface Props {
   job: Job;
@@ -141,6 +142,7 @@ export default function VideoResult({ job, onReset }: Props) {
         <motion.a
           href={downloadUrl}
           download
+          onClick={() => trackEvent("video_downloaded", { format: "video" })}
           whileHover={{ y: -2 }}
           whileTap={{ y: 0 }}
           className="btn-premium w-full flex items-center justify-center gap-3

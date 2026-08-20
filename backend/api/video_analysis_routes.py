@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,8 @@ from backend.services.video_analysis import VideoAnalysisService
 from backend.services.rate_limiter import rate_limit
 from backend.workers.analysis_tasks import analyze_video_task
 from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/video-analysis", tags=["video-analysis"])
 _service = VideoAnalysisService()
@@ -86,7 +89,8 @@ async def create_analysis(
         # qo'yadi (backend/api/routes.py'da xuddi shu sababdan tuzatilgan).
         info = await asyncio.to_thread(get_video_info, request.youtube_url)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {str(e)}")
+        logger.exception(f"video_info xato (tahlil): {request.youtube_url}")
+        raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
 
     duration_minutes = info.get("duration", 0) / 60.0
     if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
@@ -116,7 +120,7 @@ async def create_analysis(
 
 
 @router.get("/{analysis_id}")
-async def get_analysis(
+def get_analysis(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -126,7 +130,7 @@ async def get_analysis(
 
 
 @router.get("/{analysis_id}/transcript")
-async def get_transcript(
+def get_transcript(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -136,7 +140,7 @@ async def get_transcript(
 
 
 @router.get("/{analysis_id}/chapters")
-async def get_chapters(
+def get_chapters(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -146,7 +150,7 @@ async def get_chapters(
 
 
 @router.post("/{analysis_id}/question", dependencies=[Depends(rate_limit("video_analysis_question", 20, 600))])
-async def ask_question(
+def ask_question(
     analysis_id: str,
     request: QuestionRequest,
     db: Session = Depends(get_db),
@@ -174,7 +178,7 @@ async def ask_question(
 
 
 @router.post("/{analysis_id}/quiz")
-async def get_or_generate_quiz(
+def get_or_generate_quiz(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -189,7 +193,7 @@ async def get_or_generate_quiz(
 
 
 @router.post("/{analysis_id}/bilingual")
-async def get_or_generate_bilingual(
+def get_or_generate_bilingual(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -212,7 +216,7 @@ async def get_or_generate_bilingual(
 
 
 @router.post("/{analysis_id}/notes")
-async def get_or_generate_notes(
+def get_or_generate_notes(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -227,7 +231,7 @@ async def get_or_generate_notes(
 
 
 @router.get("/{analysis_id}/search")
-async def search_transcript(
+def search_transcript(
     analysis_id: str,
     q: str,
     db: Session = Depends(get_db),

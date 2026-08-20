@@ -77,11 +77,12 @@ class Settings(BaseSettings):
     FINAL_LOUDNORM_TP: float = -1.5
     FINAL_LOUDNORM_LRA: float = 11.0
 
-    # JWT — avval backend/services/auth.py'da hardcoded edi; xuddi shu
-    # standart qiymat bilan ko'chirildi, shuning uchun mavjud sessiyalar
-    # buzilmaydi. Productionda .env orqali qiymatni almashtirish tavsiya
-    # etiladi (haqiqiy maxfiy qiymat .env.example'ga yozilmaydi).
-    SECRET_KEY: str = "ai-dubber-secret-key-2024-uzbek-platform"
+    # JWT imzolash kaliti — MAJBURIY .env orqali beriladi. Bo'sh bo'lsa
+    # (yoki eski, kodda commit qilingan qiymat ishlatilsa) istalgan kishi
+    # o'zi token yasab, istalgan foydalanuvchi (shu jumladan admin) nomidan
+    # kira oladi — 2026-08-20 audit paytida topilgan va tuzatilgan (server
+    # .env'ga haqiqiy tasodifiy qiymat qo'shildi).
+    SECRET_KEY: str = ""
 
     # Database
     DATABASE_URL: str = "postgresql://dubber:dubber123@localhost:5432/dubber_db"
@@ -181,8 +182,9 @@ class Settings(BaseSettings):
     ELEVENLABS_SPEED: float = 1.0
     ELEVENLABS_FALLBACK_TO_EDGE: bool = True
 
-    # Telegram Notification Bot
-    TELEGRAM_BOT_TOKEN: str = "8931174655:AAGS1PQsYiazxd5HjDet_kt4Y8mUVLqhHtU"
+    # Telegram Notification Bot -- token .env orqali beriladi (yuqoridagi
+    # TELEGRAM_BOT_TOKEN maydoni bilan bir xil; ilgari shu yerda ikkinchi
+    # marta e'lon qilinib, haqiqiy tokenni kod ichida ochib qo'ygan edi).
     TELEGRAM_CHAT_ID: str = "-1004431243067"
 
     # Resend (email tasdiqlash kodlari uchun — gapirai.uz domenida SPF/DKIM tasdiqlangan)
@@ -211,7 +213,7 @@ class Settings(BaseSettings):
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
     CLICK_SERVICE_ID: str = "108780"
-    CLICK_SECRET_KEY: str = "Pbxfw7SaMso"
+    CLICK_SECRET_KEY: str = ""
     CLICK_MERCHANT_USER_ID: str = "89102"
 
     # Payme (Paycom) Payment -- Merchant API (backend/api/payme_routes.py).
@@ -228,6 +230,23 @@ class Settings(BaseSettings):
     # 2026-08-19 aniqlangan) -- shuning uchun bu alohida, qo'lda boshqariladigan
     # flag. Payme kassani production uchun tasdiqlagach, False qiling.
     PAYME_SANDBOX_MODE: bool = True
+
+    # Uzum Bank (Merchant webhook API) -- integratsiya hali ishlab chiqilmoqda
+    # (2026-08-20). Uzum bizga POST /check, /create, /confirm, /reverse,
+    # /status so'rovlarini shu login/parol bilan Basic Auth orqali yuboradi
+    # -- Click/Payme'dan farqli, bu qiymatlarni BIZ tanlaymiz va Uzum'ga
+    # beramiz (ular bizga bermaydi). UZUM_SERVICE_ID ham shunday -- test
+    # bosqichida biz belgilaymiz, keyin Uzum production ID beradi.
+    UZUM_WEBHOOK_USERNAME: str = ""
+    UZUM_WEBHOOK_PASSWORD: str = ""
+    UZUM_SERVICE_ID: int = 1
+
+    # Paynet (UZPAYNET) Universal Web-Service (JSON-RPC 2.0, Basic Auth) --
+    # backend/api/paynet_routes.py. Xuddi Uzum kabi, login/parol va
+    # serviceId'ni BIZ tanlaymiz va Paynet'ga beramiz (ular bermaydi).
+    PAYNET_USERNAME: str = ""
+    PAYNET_PASSWORD: str = ""
+    PAYNET_SERVICE_ID: int = 1
 
     FRONTEND_URL: str = "https://gapirai.uz"
 

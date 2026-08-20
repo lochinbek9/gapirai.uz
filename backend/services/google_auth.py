@@ -33,7 +33,9 @@ def verify_google_token(credential: str) -> dict:
     try:
         payload = id_token.verify_oauth2_token(credential, _request, settings.GOOGLE_CLIENT_ID)
     except ValueError as exc:
-        raise GoogleTokenError(f"Google token yaroqsiz: {exc}") from exc
+        # Xom kutubxona xatosini (google-auth) foydalanuvchiga ko'rsatmaymiz.
+        logger.warning(f"Google token tekshiruvi muvaffaqiyatsiz: {exc}")
+        raise GoogleTokenError("Google token yaroqsiz yoki muddati o'tgan. Qaytadan urinib ko'ring.") from exc
 
     email = payload.get("email")
     if not email:

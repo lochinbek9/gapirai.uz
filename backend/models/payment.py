@@ -15,6 +15,8 @@ class PaymentStatus(str, enum.Enum):
 class PaymentProvider(str, enum.Enum):
     CLICK = "click"
     PAYME = "payme"
+    PAYNET = "paynet"
+    UZUM = "uzum"
     MANUAL = "manual"
 
 class Payment(Base):
@@ -52,7 +54,30 @@ class Payment(Base):
     # avtomatik pul qaytarish integratsiyasi yo'q, shuning uchun admin panelda
     # ko'rsatilib, qo'lda qaytariladi.
     needs_refund = Column(Boolean, default=False, nullable=False)
-    
+
+    # Paynet (UZPAYNET) Universal Web-Service -- JSON-RPC 2.0, Basic Auth
+    # (backend/api/paynet_routes.py). transactionId Paynet tomonidan
+    # PerformTransaction so'rovida beriladi -- Payme'dan farqli, alohida
+    # Create bosqichi yo'q, PerformTransaction bir zumda yaratadi va
+    # tasdiqlaydi. providerTrnId (raqamli, Paynet'ga qaytariladigan) esa
+    # payment.id'dan CRC32 orqali hisoblanadi (paynet_service.provider_trn_id),
+    # alohida ustun sifatida saqlanmaydi.
+    paynet_transaction_id = Column(BigInteger, index=True, nullable=True)
+    paynet_perform_time = Column(DateTime, nullable=True)
+    paynet_cancel_time = Column(DateTime, nullable=True)
+
+    # Uzum Bank Merchant webhook (backend/api/uzum_routes.py) -- RASMIY
+    # spetsifikatsiya (developer.uzumbank.uz/merchant, 2026-08-20).
+    # uzum_account_id -- Uzum'ning "account" maydoni oddiy RAQAM ko'rinishida
+    # keladi (Payment.id UUID emas), shuning uchun Click'dagi crc32 naqshi
+    # bilan hisoblanadi va SAQLANADI (indekslangan qidiruv uchun).
+    # uzum_transaction_id -- Uzum'ning "transId" (UUID-shaklidagi string).
+    uzum_account_id = Column(BigInteger, index=True, nullable=True)
+    uzum_transaction_id = Column(String, index=True, nullable=True)
+    uzum_create_time = Column(DateTime, nullable=True)
+    uzum_confirm_time = Column(DateTime, nullable=True)
+    uzum_cancel_time = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

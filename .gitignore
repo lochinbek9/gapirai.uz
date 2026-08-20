@@ -28,6 +28,10 @@ outputs/
 frontend/.next/
 frontend/node_modules/
 frontend/out/
+frontend/tsconfig.tsbuildinfo
+
+# ── Keys ─────────────────────────────────────────────
+*.pem
 
 # ── macOS ────────────────────────────────────────────
 .DS_Store

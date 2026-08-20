@@ -20,7 +20,7 @@ class InitiatePaymentRequest(BaseModel):
     job_id: str
 
 @router.post("/initiate")
-async def initiate_payment(
+def initiate_payment(
     req: InitiatePaymentRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -141,7 +141,7 @@ async def click_prepare(request: Request, db: Session = Depends(get_db)):
     print(f">>> [CLICK PREPARE WEBHOOK RECEIVED]: {data}", flush=True)
     
     settings = get_settings()
-    secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
+    secret_key = settings.CLICK_SECRET_KEY
     
     if not validate_signature(data, secret_key):
         return {"error": ClickErrors.SIGN_CHECK_FAILED, "error_note": "Invalid signature"}
@@ -189,7 +189,7 @@ async def click_complete(request: Request, db: Session = Depends(get_db)):
     print(f">>> [CLICK COMPLETE WEBHOOK RECEIVED]: {data}", flush=True)
     
     settings = get_settings()
-    secret_key = settings.CLICK_SECRET_KEY or "Pbxfw7SaMso"
+    secret_key = settings.CLICK_SECRET_KEY
     
     if not validate_signature(data, secret_key):
         return {"error": ClickErrors.SIGN_CHECK_FAILED, "error_note": "Invalid signature"}

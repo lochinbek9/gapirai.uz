@@ -13,6 +13,60 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+/**
+ * Har qanday API xatosini (axios error) foydalanuvchiga xavfsiz ko'rsatish
+ * mumkin bo'lgan shaklga keltiradi -- "nima bo'ldi" (message), "qayta
+ * urinish mumkinmi" (retryable) va tarmoq xatosimi (isNetworkError).
+ *
+ * Backend'ning `detail` matnlari allaqachon o'zbek tilida va xavfsiz
+ * (backend/api/*.py) -- bu funksiya ularni o'zgartirmaydi, faqat:
+ *   1. Javob umuman kelmagan holatni (tarmoq/timeout) alohida aniqlaydi
+ *      -- avval bu ham xuddi 5xx bilan bir xil umumiy xabar olardi
+ *      (frontend/hooks/useJobPolling.ts'dagi eski xatti-harakat).
+ *   2. `detail` maydoni yo'q/matn bo'lmagan holatlar uchun xavfsiz
+ *      standart xabar beradi (hech qachon xom axios/tarmoq ichki
+ *      xabarini ko'rsatmaydi).
+ */
+export interface ApiErrorInfo {
+  message: string
+  retryable: boolean
+  isNetworkError: boolean
+  status?: number
+}
+
+export function parseApiError(err: unknown): ApiErrorInfo {
+  const anyErr = err as any
+
+  if (!anyErr?.response) {
+    // Javob umuman kelmadi -- tarmoq uzilgan, so'rov muddati tugagan yoki
+    // server butunlay ishlamayapti.
+    return {
+      message: "Server bilan aloqa o'rnatib bo'lmadi. Internet aloqangizni tekshiring va qaytadan urinib ko'ring.",
+      retryable: true,
+      isNetworkError: true,
+    }
+  }
+
+  const status: number = anyErr.response.status
+  const detail = anyErr.response.data?.detail
+
+  if (status >= 500) {
+    return {
+      message: typeof detail === 'string' && detail ? detail : "Serverda kutilmagan xatolik yuz berdi. Birozdan so'ng qaytadan urinib ko'ring.",
+      retryable: true,
+      isNetworkError: false,
+      status,
+    }
+  }
+
+  return {
+    message: typeof detail === 'string' && detail ? detail : "So'rovda xatolik yuz berdi.",
+    retryable: status === 429, // faqat "juda ko'p so'rov" holatida qayta urinish mantiqiy
+    isNetworkError: false,
+    status,
+  }
+}
+
 export interface VideoInfo {
   title: string
   duration: number
@@ -25,6 +79,7 @@ export interface Job {
   status: JobStatus
   progress: number
   status_message?: string
+  youtube_url?: string
   video_title?: string
   video_duration?: number
   video_thumbnail?: string
@@ -34,6 +89,7 @@ export interface Job {
   error_message?: string
   created_at?: string
   speaker_gender?: string
+  voice_gender_setting?: string
   uzbek_srt_content?: string
   expected_end_time?: string
   rating?: number

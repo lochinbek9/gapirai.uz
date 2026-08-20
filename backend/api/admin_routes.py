@@ -42,7 +42,7 @@ def _period_count(db, model, start: datetime, end: datetime | None = None):
 
 
 @router.get("/stats")
-async def admin_stats(current_user: User = Depends(get_current_admin_user)):
+def admin_stats(current_user: User = Depends(get_current_admin_user)):
     db = SessionLocal()
     try:
         now = datetime.utcnow()
@@ -177,7 +177,7 @@ async def admin_stats(current_user: User = Depends(get_current_admin_user)):
 
 
 @router.get("/blocked-users")
-async def blocked_users(current_user: User = Depends(get_current_admin_user)):
+def blocked_users(current_user: User = Depends(get_current_admin_user)):
     """Content Safety Gate tomonidan bloklangan foydalanuvchilar ro'yxati --
     har bir foydalanuvchi bo'yicha guruhlangan, nechta marta bloklangani va
     eng so'nggi bloklanish sanasi bilan (backend/services/content_safety.py,
@@ -240,7 +240,7 @@ async def blocked_users(current_user: User = Depends(get_current_admin_user)):
 
 
 @router.get("/refunds-needed")
-async def refunds_needed(current_user: User = Depends(get_current_admin_user)):
+def refunds_needed(current_user: User = Depends(get_current_admin_user)):
     """Pullik (Click) job 5 marta urinib ham muvaffaqiyatsiz tugagan
     to'lovlar -- Click orqali avtomatik pul qaytarish integratsiyasi yo'q
     (backend/workers/tasks.py: Payment.needs_refund), shuning uchun bu

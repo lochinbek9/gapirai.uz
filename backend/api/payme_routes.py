@@ -75,7 +75,7 @@ class InitiateJobPaymentRequest(BaseModel):
 
 
 @router.post("/initiate")
-async def initiate_job_payment(
+def initiate_job_payment(
     req: InitiateJobPaymentRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -150,7 +150,7 @@ class InitiateSubscriptionRequest(BaseModel):
 
 
 @router.post("/initiate-subscription")
-async def initiate_subscription_payment(
+def initiate_subscription_payment(
     req: InitiateSubscriptionRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -174,7 +174,7 @@ async def initiate_subscription_payment(
 
 
 @router.post("/initiate-library")
-async def initiate_library_payment(
+def initiate_library_payment(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -362,6 +362,20 @@ def _handle_cancel_transaction(db: Session, params: dict, req_id):
 
     reason = params.get("reason")
     was_performed = payment.payme_state == 2
+
+    # Payme spetsifikatsiyasi (CancelTransaction sahifasi): agar buyurtma
+    # to'liq bajarilgan bo'lsa ("Товар или услуга предоставлена покупателю
+    # в полном объеме"), bekor qilish RAD ETILISHI kerak (-31007) --
+    # avvalgi kod buni tekshirmasdan har doim bekor qilishga ruxsat berardi.
+    if was_performed and payment.job_id:
+        job = db.query(DubbingJob).filter(DubbingJob.id == payment.job_id).first()
+        if job and job.status == JobStatus.COMPLETED:
+            return payme_error(
+                PaymeErrors.ORDER_ALREADY_FULFILLED,
+                "Buyurtma bajarilgan, bekor qilib bo'lmaydi.", "Заказ выполнен. Невозможно отменить транзакцию.", "Order already fulfilled.",
+                request_id=req_id,
+            )
+
     payment.payme_state = -2 if was_performed else -1
     payment.payme_cancel_time = now_ms()
     payment.payme_cancel_reason = reason

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
 import { getPlans, subscribeToPlan, subscribeToPlanPayme, PlanDef, CurrentSubscription } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { trackEvent } from '@/lib/analytics'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
 
@@ -40,6 +41,8 @@ export default function PricingPage() {
     try {
       const res = await (provider === 'payme' ? subscribeToPlanPayme(planId) : subscribeToPlan(planId))
       if (res.success && res.payment_url) {
+        trackEvent('payment_started', { provider, plan: planId })
+        try { sessionStorage.setItem('pending_subscription_payment', planId) } catch {}
         if (paymentWindow) paymentWindow.location.href = res.payment_url
         else window.location.href = res.payment_url
       } else {

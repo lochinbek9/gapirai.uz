@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import { Eye, EyeOff, Loader2, Youtube, ArrowLeft, Phone } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics'
 
 const PHONE_RE = /^\+998\d{9}$/
 
@@ -53,6 +54,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyCode(email, code)
+      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
@@ -80,6 +82,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await googleAuth(credential)
+      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
@@ -112,6 +115,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyPhoneCode(phone, phoneCode)
+      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')

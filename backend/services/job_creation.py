@@ -10,8 +10,11 @@ from datetime import datetime
 from typing import Literal
 from urllib.parse import urlparse
 import asyncio
+import logging
 import re
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
@@ -99,7 +102,15 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
     try:
         info = await asyncio.to_thread(get_video_info, youtube_url)
     except Exception as e:
-        return JobCreationResult(outcome="fetch_error", error_detail=str(e))
+        # Xom kutubxona xatosini (yt-dlp/YouTube API) foydalanuvchiga
+        # ko'rsatmaymiz -- faqat serverda log qilamiz, xavfsiz umumiy
+        # xabar qaytaramiz (backend/api/routes.py va telegram_bot.py
+        # ikkalasi ham shu error_detail'ni to'g'ridan-to'g'ri ko'rsatadi).
+        logger.exception(f"get_video_info xato: {youtube_url}")
+        return JobCreationResult(
+            outcome="fetch_error",
+            error_detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.",
+        )
 
     title = info.get("title", "Unknown")
     duration = info.get("duration", 0)

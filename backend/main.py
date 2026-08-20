@@ -3,7 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import logging
 import os
+import uuid
+
+# Root logger sozlanmagan bo'lsa, backend/services/**'dagi 25+ modulning
+# logger.info/warning/error() chaqiruvlari jim yo'qolib ketadi (faqat
+# WARNING+ logging.lastResort orqali stderr'ga chiqadi) -- worker
+# konteyneridan farqli o'laroq (Celery o'zi logging'ni sozlaydi), FastAPI
+# jarayoni buni hech qachon o'z-o'zidan sozlamagan. telegram_bot.py'dagi
+# bilan bir xil format ishlatiladi (2026-08-20).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 from backend.config import get_settings
 from backend.models.database import create_tables
@@ -11,6 +25,8 @@ from backend.api.routes import router
 from backend.api.auth_routes import router as auth_router
 from backend.api.click_routes import router as click_router
 from backend.api.payme_routes import router as payme_router
+from backend.api.paynet_routes import router as paynet_router
+from backend.api.uzum_routes import router as uzum_router
 from backend.api.admin_routes import router as admin_router
 from backend.api.video_analysis_routes import router as video_analysis_router
 from backend.api.plans_routes import router as plans_router
@@ -102,10 +118,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — Next.js frontendi uchun
+# CORS — Next.js frontendi uchun. Ilgari "*" (istalgan sayt) edi -- 2026-08-20
+# audit paytida wildcard CORS aniqlanib, haqiqiy ruxsat etilgan originlar
+# ro'yxatiga almashtirildi (www ham gapirai.uz bilan bir xil saytni
+# ko'rsatadi -- nginx/DNS orqali tasdiqlangan, shuning uchun ro'yxatda).
+_allowed_origins = [
+    settings.FRONTEND_URL,
+    "https://www.gapirai.uz",
+    "http://localhost:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(dict.fromkeys(_allowed_origins)),  # tartibni saqlab dublikatlarni olib tashlaydi
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,9 +139,18 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    """Barcha ushlanmagan xatoliklar shu yerga tushadi. Avval bu yerda
+    xom `str(exc)` to'g'ridan-to'g'ri foydalanuvchiga qaytarilardi (ichki
+    xato matnini, ba'zan fayl yo'llari yoki kutubxona ichki tafsilotlarini
+    ochib qo'yardi) va hech qayerda log qilinmasdi. Endi: to'liq
+    traceback serverda log qilinadi (qisqa xato ID bilan, docker compose
+    logs orqali ko'rinadi), foydalanuvchiga esa faqat xavfsiz umumiy xabar
+    + shu ID qaytariladi."""
+    error_id = uuid.uuid4().hex[:8]
+    logger.exception(f"[{error_id}] Ushlanmagan xatolik: {request.method} {request.url.path}")
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={"detail": f"Kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring. (Xato ID: {error_id})"},
         headers={
             "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
             "Access-Control-Allow-Credentials": "true",
@@ -129,6 +162,8 @@ app.include_router(auth_router)
 app.include_router(router)
 app.include_router(click_router)
 app.include_router(payme_router)
+app.include_router(paynet_router)
+app.include_router(uzum_router)
 app.include_router(admin_router)
 app.include_router(video_analysis_router)
 app.include_router(plans_router)

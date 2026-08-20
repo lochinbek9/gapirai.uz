@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
@@ -14,6 +15,15 @@ import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import { LayoutDashboard, LogIn, X, UserPlus, Library } from "lucide-react";
+import BeforeAfterSection from "@/components/landing/BeforeAfterSection";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import FeaturesSection from "@/components/landing/FeaturesSection";
+import UseCasesSection from "@/components/landing/UseCasesSection";
+import SocialProofSection from "@/components/landing/SocialProofSection";
+import PricingPreviewSection from "@/components/landing/PricingPreviewSection";
+import FaqPreviewSection from "@/components/landing/FaqPreviewSection";
+import TrustSection from "@/components/landing/TrustSection";
+import FinalCtaSection from "@/components/landing/FinalCtaSection";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -266,6 +276,11 @@ export default function Home() {
   }, [jobId]);
 
   useEffect(() => {
+    trackEvent("landing_view");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!jobId || !job) return;
     if (job.status === "completed" || job.status === "failed") return;
     if (!startRef.current) startRef.current = Date.now();
@@ -283,6 +298,7 @@ export default function Home() {
     if (!isYoutube) return;
     try {
       setVideoInfo(await getVideoInfo(value));
+      trackEvent("url_entered");
     } catch { /* Fail silently */ }
   };
 
@@ -293,6 +309,7 @@ export default function Home() {
       router.push('/login');
       return;
     }
+    trackEvent("dubbing_started");
     setLoading(true);
     setError(null);
     startRef.current = null;
@@ -380,7 +397,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
+      <div id="start" className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
         <UpdateNoticeBanner />
         <Logo />
 
@@ -446,7 +463,7 @@ export default function Home() {
               </motion.div>
             )}
 
-            {phase === "processing" && job && (
+            {(phase === "processing" || phase === "error") && job && (
               <motion.div key="processing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 {job.video_title && (
                   <div className="pb-4 border-b border-black/5 dark:border-white/5 transition-colors">
@@ -455,6 +472,14 @@ export default function Home() {
                   </div>
                 )}
                 <StepProgress job={job} elapsed={elapsed} onCancel={handleCancel} cancelLoading={cancelLoading} />
+                {phase === "error" && (
+                  <button
+                    onClick={handleReset}
+                    className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
+                  >
+                    Qayta boshlash
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -463,40 +488,28 @@ export default function Home() {
                 <VideoResult job={job} onReset={handleReset} />
               </motion.div>
             )}
-
-            {phase === "error" && job && (
-              <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-2">
-                  <div className="w-8 h-8 text-blue-500">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 transition-colors">
-                  <h3 className="text-blue-500 dark:text-blue-400 font-bold mb-2">Xatolik yuz berdi</h3>
-                  <p className="text-sm text-blue-500/60 dark:text-blue-400/60 leading-relaxed">{job.error_message}</p>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
-                >
-                  Qayta boshlash
-                </button>
-              </motion.div>
-            )}
           </AnimatePresence>
         </motion.div>
       </div>
+
+      <BeforeAfterSection />
+      <HowItWorksSection />
+      <FeaturesSection />
+      <UseCasesSection />
+      <SocialProofSection />
+      <PricingPreviewSection />
+      <FaqPreviewSection />
+      <TrustSection />
+      <FinalCtaSection />
 
       {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
         <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            GapirAI.uz (Gapir AI) — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Programmasi
+            Sun'iy intellekt asosidagi avtomatik dublyaj platformasi
           </h2>
           <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj programmasi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
+            <strong>GapirAI.uz</strong> ingliz tilidagi va boshqa xorijiy videolarni soniyalar ichida professional darajada o'zbek tiliga tarjima va dublyaj qilib beradi. OpenAI Whisper nutqni aniqlash, ilg'or neyron tarjima modellari va zamonaviy nutq sintezi texnologiyalaridan foydalanib, platforma videodagi har bir spikerning jinsini aniqlaydi va ularga mos, jonli, tabiiy ovozda gapirtiradi — 45 daqiqagacha bo'lgan videolarni bepul sinab ko'rishingiz mumkin.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import shutil
 import uuid
@@ -14,6 +15,7 @@ from typing import Optional
 from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant, ContentViolation
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user, get_optional_user
+from backend.services.downloader import get_video_info
 from backend.config import get_settings
 from backend.services.rate_limiter import rate_limit
 # Job yaratish mantig'i (video ma'lumot olish, Safety Gate, davomiylik
@@ -28,6 +30,7 @@ from backend.services.click_service import generate_payment_url
 import time
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["dubbing"])
 
@@ -52,6 +55,7 @@ class JobResponse(BaseModel):
     status: str
     progress: float
     status_message: Optional[str] = None
+    youtube_url: Optional[str] = None
     video_title: Optional[str] = None
     video_duration: Optional[float] = None
     video_thumbnail: Optional[str] = None
@@ -92,6 +96,7 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         status=status_str,
         progress=job.progress or 0.0,
         status_message=job.status_message,
+        youtube_url=job.youtube_url,
         video_title=job.video_title,
         video_duration=job.video_duration,
         video_thumbnail=job.video_thumbnail,
@@ -125,7 +130,10 @@ async def video_info(url: str) -> VideoInfoResponse:
         info = await asyncio.to_thread(get_video_info, url)
         return VideoInfoResponse(**info)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Video ma'lumot olishda xatolik: {str(e)}")
+        # Xom kutubxona xatosini (yt-dlp/YouTube API) foydalanuvchiga
+        # ko'rsatmaymiz -- faqat serverda log qilamiz.
+        logger.exception(f"video_info xato: {url}")
+        raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
 
 
 @router.post("/jobs", status_code=201, dependencies=[Depends(rate_limit("create_job", 8, 600))])
@@ -164,7 +172,7 @@ async def create_job(
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobResponse:
+def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobResponse:
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
@@ -172,7 +180,7 @@ async def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> JobRespon
 
 
 @router.get("/jobs")
-async def list_jobs(
+def list_jobs(
     limit: int = Query(20, le=100),
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -201,7 +209,7 @@ class LibraryItem(BaseModel):
 
 
 @router.get("/library", dependencies=[Depends(rate_limit("library", 60, 600))])
-async def list_public_library(
+def list_public_library(
     limit: int = Query(24, le=60),
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -242,7 +250,7 @@ async def list_public_library(
 
 
 @router.get("/library/{job_id}/eligible")
-async def library_item_eligible(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def library_item_eligible(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """Bitta job hozir ham ommaviy kutubxonaga mos keladimi -- tomosha
     sahifasi (/library/[id]) to'g'ridan-to'g'ri havola orqali ochilganda
     ham kontent xavfsizligi bo'yicha keyinchalik bayroqlangan videoni
@@ -257,7 +265,7 @@ async def library_item_eligible(job_id: uuid.UUID, db: Session = Depends(get_db)
 
 
 @router.get("/library/{job_id}/resolutions")
-async def list_library_resolutions(
+def list_library_resolutions(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -291,7 +299,7 @@ async def list_library_resolutions(
 
 
 @router.post("/library/{job_id}/resolutions/{resolution}")
-async def request_library_resolution(
+def request_library_resolution(
     job_id: uuid.UUID,
     resolution: str,
     db: Session = Depends(get_db),
@@ -318,14 +326,14 @@ async def request_library_resolution(
 
 
 @router.get("/library/access")
-async def get_library_access(
+def get_library_access(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     return {"has_access": current_user.library_access_purchased_at is not None}
 
 
 @router.post("/library/purchase")
-async def purchase_library_access(
+def purchase_library_access(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -388,7 +396,7 @@ async def purchase_library_access(
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
-async def delete_job(
+def delete_job(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -404,7 +412,7 @@ async def delete_job(
 
 
 @router.get("/jobs/{job_id}/subtitles.vtt")
-async def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """O'zbekcha subtitrlarni WebVTT formatida qaytarish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.uzbek_srt_content:
@@ -417,7 +425,7 @@ async def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/outputs/{job_id}/audio")
-async def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Dublyaj qilingan audioni WAV formatida yuklab olish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
@@ -440,7 +448,7 @@ async def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/outputs/{job_id}/video")
-async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
@@ -462,7 +470,7 @@ async def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/jobs/{job_id}/resolutions")
-async def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Tarif bo'yicha ruxsat etilgan va tayyor rezolyutsiyalar ro'yxati.
     720p har doim "ready" -- u master fayl, alohida generatsiya kerak emas."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -487,7 +495,7 @@ async def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/jobs/{job_id}/resolutions/{resolution}")
-async def request_resolution(job_id: uuid.UUID, resolution: str, db: Session = Depends(get_db)):
+def request_resolution(job_id: uuid.UUID, resolution: str, db: Session = Depends(get_db)):
     """Berilgan rezolyutsiyani so'raydi -- 720p darhol qaytadi (master fayl),
     360p/1080p mavjud bo'lmasa Celery task navbatga qo'yiladi va "processing"
     qaytariladi (frontend buni pollaydi). Mantiq resolution_variants.py'da --
@@ -509,7 +517,7 @@ async def request_resolution(job_id: uuid.UUID, resolution: str, db: Session = D
 
 
 @router.post("/jobs/{job_id}/cancel")
-async def cancel_job(
+def cancel_job(
     job_id: uuid.UUID,
     db: Session = Depends(get_db)
 ):
@@ -561,7 +569,7 @@ class PlatformFeedbackRequest(BaseModel):
 
 
 @router.post("/platform-feedback", dependencies=[Depends(rate_limit("platform_feedback", 10, 600))])
-async def submit_platform_feedback(
+def submit_platform_feedback(
     req: PlatformFeedbackRequest,
     current_user: Optional[User] = Depends(get_optional_user),
 ):
@@ -594,7 +602,7 @@ class FeedbackRequest(BaseModel):
 
 
 @router.post("/jobs/{job_id}/feedback", dependencies=[Depends(rate_limit("feedback", 20, 600))])
-async def submit_feedback(
+def submit_feedback(
     job_id: uuid.UUID,
     req: FeedbackRequest,
     db: Session = Depends(get_db),

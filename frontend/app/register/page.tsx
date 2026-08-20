@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import { Eye, EyeOff, Loader2, Youtube, ArrowLeft } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics'
 
 function MeshBackground() {
   return (
@@ -35,6 +36,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await googleAuth(credential)
+      trackEvent('signup')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
@@ -63,6 +65,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await verifyCode(email, code)
+      trackEvent('signup')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')

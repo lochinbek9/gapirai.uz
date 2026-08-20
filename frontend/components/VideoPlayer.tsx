@@ -7,6 +7,7 @@ import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   Settings, RectangleHorizontal, Rows3
 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 /* ── VTT ──────────────────────────────────────────── */
 interface Cue { start: number; end: number; text: string }
@@ -386,7 +387,7 @@ export default function VideoPlayer({
                 type="range" min="0" max="1" step="0.05"
                 value={muted ? 0 : volume}
                 onChange={changeVol}
-                className="w-20 accent-blue-500 cursor-pointer"
+                className="hidden sm:block w-20 accent-blue-500 cursor-pointer"
               />
             </div>
 
@@ -424,7 +425,7 @@ export default function VideoPlayer({
                 download
                 title="Audio yuklab olish (MP3)"
                 className="flex-shrink-0 text-white/50 hover:text-white transition"
-                onClick={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); trackEvent("video_downloaded", { format: "audio" }); }}
               >
                 <HeadphonesIcon />
               </a>
@@ -435,7 +436,7 @@ export default function VideoPlayer({
               <button
                 onClick={onTheaterToggle}
                 title={theaterMode ? "Oddiy ko'rinish" : "Keng ekran (Theater)"}
-                className="flex-shrink-0 text-white/50 hover:text-white transition"
+                className="hidden sm:block flex-shrink-0 text-white/50 hover:text-white transition"
               >
                 {theaterMode
                   ? <Rows3 className="w-5 h-5" />

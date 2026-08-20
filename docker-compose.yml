@@ -79,7 +79,7 @@ services:
         condition: service_healthy
       pot-provider:
         condition: service_started
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 
   # ──────────────────────────────
   # Celery Worker

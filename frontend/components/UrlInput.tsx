@@ -84,10 +84,11 @@ export default function UrlInput({
           <button
             type="button"
             onClick={handlePaste}
-            className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
+            aria-label="Nusxani qo'yish"
+            className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl p-2.5 sm:px-4 sm:py-2 transition-all flex-shrink-0"
           >
             <ClipboardPaste size={13} />
-            <span className="inline">Nusxani qo'yish</span>
+            <span className="hidden sm:inline">Nusxani qo'yish</span>
           </button>
         </div>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed ml-1">

@@ -23,7 +23,7 @@ def _subscription_to_dict(sub) -> dict:
 
 
 @router.get("")
-async def list_plans(
+def list_plans(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> dict:
@@ -50,7 +50,7 @@ class SubscribeRequest(BaseModel):
 
 
 @router.post("/subscribe")
-async def subscribe(
+def subscribe(
     body: SubscribeRequest,
     request: Request,
     db: Session = Depends(get_db),

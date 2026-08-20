@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Download, Loader2, Lock, RotateCw } from 'lucide-react'
 import { getJobResolutions, requestResolution, ResolutionOption } from '@/lib/api'
+import { trackEvent } from '@/lib/analytics'
 
 interface ResolutionDownloadButtonsProps {
   jobId: string
@@ -62,6 +63,7 @@ export default function ResolutionDownloadButtons({ jobId }: ResolutionDownloadB
     try {
       const res = await requestResolution(jobId, opt.resolution)
       if (res.status === 'ready' && res.download_url) {
+        trackEvent('video_downloaded', { format: 'video', resolution: opt.resolution })
         triggerDownload(res.download_url)
         setBusy((b) => ({ ...b, [opt.resolution]: false }))
         refresh()

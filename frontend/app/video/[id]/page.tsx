@@ -11,6 +11,8 @@ import {
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
+import { STEPS as PIPELINE_STEPS, getCurrentStep } from '@/components/StepProgress'
+import { trackEvent, trackOnce } from '@/lib/analytics'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -119,6 +121,7 @@ export default function VideoPage() {
       if (amount > 0) {
         const orderId = paymentIdRef.current || id
         sessionStorage.setItem(trackKey, '1')
+        trackOnce(id, 'payment_completed')
         ;(window as any).dataLayer = (window as any).dataLayer || []
         ;(window as any).dataLayer.push({
           ecommerce: {
@@ -162,6 +165,7 @@ export default function VideoPage() {
     try {
       const res = await (provider === 'payme' ? initiatePaymePayment(id) : initiateClickPayment(id))
       if (res.success && res.payment_url) {
+        trackEvent('payment_started', { provider })
         paidAmountRef.current = res.amount
         paymentIdRef.current = res.payment_id || null
         if (paymentWindow) {
@@ -287,7 +291,7 @@ export default function VideoPage() {
                 </div>
               </div>
             ) : job.status === 'failed' ? (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
+              <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
                 <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
                 <div className="text-center space-y-4 max-w-md z-10">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
@@ -310,15 +314,41 @@ export default function VideoPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
+              <div className="min-h-[22rem] sm:min-h-0 sm:aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
                 <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
                 <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                
+
                 <div className="text-center space-y-4 max-w-sm z-10">
                   <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto" />
                   <div className="space-y-1">
                     <p className="text-white font-semibold text-lg">{job.status_message || 'Qayta ishlanmoqda...'}</p>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Progress: {job.progress}%</p>
+                  </div>
+
+                  {/* Bosqichlar -- foiz o'rniga (backend haqiqiy % bermaydi) */}
+                  <div className="flex items-center justify-center gap-2">
+                    {PIPELINE_STEPS.map((step, i) => {
+                      const current = getCurrentStep(job.status)
+                      const isDone = current > i
+                      const isActive = current === i
+                      return (
+                        <div key={step.key} className="flex flex-col items-center gap-1">
+                          <div
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs transition-all duration-300 ${
+                              isDone
+                                ? 'bg-emerald-500 text-white'
+                                : isActive
+                                ? 'bg-blue-500 text-white animate-pulse'
+                                : 'bg-white/5 text-slate-600'
+                            }`}
+                          >
+                            {isDone ? '✓' : step.icon}
+                          </div>
+                          <span className={`text-[9px] font-semibold ${isActive ? 'text-blue-400' : isDone ? 'text-emerald-500' : 'text-slate-600'}`}>
+                            {step.label}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
 
                   {job.expected_end_time && (

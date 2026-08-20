@@ -178,7 +178,7 @@ export default function LibraryPage() {
                   <div className="relative aspect-video bg-black/10 dark:bg-black/30">
                     {item.video_thumbnail && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.video_thumbnail} alt={item.video_title || ''} className="w-full h-full object-cover" />
+                      <img src={item.video_thumbnail} alt={item.video_title || ''} loading="lazy" className="w-full h-full object-cover" />
                     )}
                     <span className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600/90 text-white text-[10px] font-bold">
                       <CheckCircle2 className="w-3 h-3" /> Dublyaj qilingan

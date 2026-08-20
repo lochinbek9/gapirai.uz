@@ -98,9 +98,9 @@ export default function AboutClient() {
             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
               <Cpu className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-black dark:text-white">Whisper + GPT-4o Texnologiyasi</h3>
+            <h3 className="text-lg font-bold text-black dark:text-white">Whisper + GPT-4o mini Texnologiyasi</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
-              OpenAI Whisper orqali nutq aniq matnga o'tkaziladi. GPT-4o esa o'zbek tilining boy va oqilona grammatikasiga mos holda matnni yuqori aniqlikda tarjima qiladi.
+              OpenAI Whisper orqali nutq aniq matnga o'tkaziladi. GPT-4o mini esa o'zbek tilining boy va oqilona grammatikasiga mos holda matnni yuqori aniqlikda tarjima qiladi.
             </p>
           </motion.div>
 
@@ -130,7 +130,7 @@ export default function AboutClient() {
             </div>
             <h3 className="text-lg font-bold text-black dark:text-white">Xavfsiz va Qulay Boshqaruv</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
-              Tayyorlangan barcha dublyaj qilingan videolaringiz shaxsiy panelingizda tartibli saqlanadi. Istalgan vaqtda ko'rishingiz va yuklab olishingiz mumkin.
+              Tayyorlangan dublyaj qilingan videolaringiz shaxsiy panelingizda tartibli saqlanadi. Video va audio fayllar 3 kun davomida ko'rish va yuklab olish uchun mavjud bo'ladi.
             </p>
           </motion.div>
         </div>

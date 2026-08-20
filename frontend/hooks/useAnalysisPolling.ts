@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getAnalysis, VideoAnalysis, AnalysisStatus } from "@/lib/api";
+import { getAnalysis, VideoAnalysis, AnalysisStatus, parseApiError } from "@/lib/api";
 
 const TERMINAL_STATUSES: AnalysisStatus[] = ["completed", "failed"];
 const POLL_INTERVAL = 2000; // 2 soniya
@@ -32,7 +32,8 @@ export function useAnalysisPolling(analysisId: string | null) {
           setError("Tahlil topilmadi.");
           return;
         }
-        setError("Server bilan aloqa yo'q. Qayta urinilmoqda...");
+        const info = parseApiError(err);
+        setError(info.message);
         timerRef.current = setTimeout(poll, POLL_INTERVAL * 2);
       }
     };
