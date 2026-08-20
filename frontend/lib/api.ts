@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getToken } from './auth'
+import { getToken, clearAuth } from './auth'
 import { getApiUrl } from './runtime-config'
 
 const API_URL = getApiUrl()
@@ -12,6 +12,26 @@ apiClient.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
+
+// Token yaroqsiz bo'lib qolsa (masalan server tomonda imzolash kaliti
+// almashtirilsa) useAuth ilgari cache'langan foydalanuvchini ko'rsatishda
+// davom etardi -- "kirgan" ko'rinib, har bir so'rov jimgina 401 bilan
+// muvaffaqiyatsiz tugardi. Endi shu yerda bir joyda tozalanadi va foydalanuvchi
+// qayta kirish sahifasiga yo'naltiriladi.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error?.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      clearAuth()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
 /**
  * Har qanday API xatosini (axios error) foydalanuvchiga xavfsiz ko'rsatish
