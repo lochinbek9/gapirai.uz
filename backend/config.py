@@ -249,6 +249,14 @@ class Settings(BaseSettings):
     # faqat zaxira sifatida, cheklangan trafik hajmini tejash uchun.
     YOUTUBE_RESIDENTIAL_PROXY_URL: str = ""
 
+    # YouTube Data API v3 (https://console.cloud.google.com) -- video metadata
+    # (sarlavha/davomiylik/thumbnail) olishda yt-dlp skrapping o'rniga rasman
+    # API ishlatiladi, bot-check xavfisiz. Bo'sh bo'lsa, eski yt-dlp yo'liga
+    # tushadi. Faqat METADATA uchun -- video faylining o'zini yuklab olish
+    # (dublyaj uchun) hamon yt-dlp orqali, chunki Data API video oqimini
+    # bermaydi (2026-08-20, rezident proksi balansi tugagach qo'shildi).
+    YOUTUBE_DATA_API_KEY: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"

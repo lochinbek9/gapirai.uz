@@ -3,6 +3,7 @@ Downloader — yt-dlp with cookies auth, iOS fallback, and Redis-based rate limi
 Single-IP safe: prevents hammering YouTube even under concurrent job requests.
 """
 import os
+import re
 import time
 import random
 import logging
@@ -10,6 +11,7 @@ import subprocess
 import tempfile
 import shutil
 from contextlib import contextmanager
+import requests
 import yt_dlp
 from pathlib import Path
 from redis import Redis
@@ -230,7 +232,76 @@ def _extract_info_dict(ydl, youtube_url: str) -> dict:
     }
 
 
+_YT_VIDEO_ID_RE = re.compile(
+    r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|embed/)|music\.youtube\.com/watch\?v=)"
+    r"([A-Za-z0-9_-]{11})"
+)
+
+_ISO8601_DURATION_RE = re.compile(
+    r"P(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?"
+)
+
+
+def _parse_iso8601_duration(duration: str) -> int:
+    """YouTube Data API "PT4M13S" formatidagi davomiylikni sekundga o'giradi."""
+    m = _ISO8601_DURATION_RE.match(duration or "")
+    if not m:
+        return 0
+    hours, minutes, seconds = (int(g) if g else 0 for g in m.groups())
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _get_video_info_via_api(youtube_url: str) -> dict | None:
+    """YouTube Data API v3 orqali metadata olish -- yt-dlp skrapping talab
+    qilmagani uchun bot-check xavfi umuman yo'q. API kalit sozlanmagan yoki
+    video ID ajratilmasa None qaytadi (chaqiruvchi yt-dlp'ga tushadi)."""
+    if not settings.YOUTUBE_DATA_API_KEY:
+        return None
+    m = _YT_VIDEO_ID_RE.search(youtube_url or "")
+    if not m:
+        return None
+    video_id = m.group(1)
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={
+                "part": "snippet,contentDetails",
+                "id": video_id,
+                "key": settings.YOUTUBE_DATA_API_KEY,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        items = resp.json().get("items", [])
+        if not items:
+            return None
+        snippet = items[0].get("snippet", {})
+        content_details = items[0].get("contentDetails", {})
+        thumbnails = snippet.get("thumbnails", {})
+        thumbnail = (
+            thumbnails.get("maxres")
+            or thumbnails.get("high")
+            or thumbnails.get("medium")
+            or thumbnails.get("default")
+            or {}
+        ).get("url", "")
+        return {
+            "title": snippet.get("title", "Unknown"),
+            "duration": _parse_iso8601_duration(content_details.get("duration", "")),
+            "thumbnail": thumbnail,
+            "uploader": snippet.get("channelTitle", ""),
+            "description": snippet.get("description", ""),
+        }
+    except Exception as e:
+        logger.warning(f"YouTube Data API orqali metadata olishda xatolik ({e}) — yt-dlp'ga tushilmoqda.")
+        return None
+
+
 def get_video_info(youtube_url: str) -> dict:
+    api_result = _get_video_info_via_api(youtube_url)
+    if api_result is not None:
+        return api_result
+
     # "Sign in to confirm you're not a bot" tekshirilganda PROKSI ROTATSIYA
     # QILUVCHI IP SIFATIGA BOG'LIQ — cookies yoki PO token doimiy buzuq emas
     # (2026-08-13 haqiqiy testda tasdiqlangan: xuddi shu so'rov 3 urinishdan
