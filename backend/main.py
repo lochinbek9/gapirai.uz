@@ -167,10 +167,12 @@ def recover_stuck_resolution_variants(redis_conn):
         db.close()
 
 
-def recover_stuck_analyses(redis_conn=None):
-    """recover_stuck_jobs() bilan bir xil naqsh -- qarang shu funksiyaning
-    izohi (DB-claim faqat o'qish uchun, navbatga-qo'yish dedup'i Redis
-    SETNX bilan)."""
+
+def recover_stuck_analyses():
+    """recover_stuck_jobs bilan bir xil FILTER — eskirgan VideoAnalysis'lar
+    qayta enqueue qilinadi, jonli ishlab turganlariga tegmaydi."""
+    from datetime import timedelta
+    from datetime import datetime
     from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
     from backend.workers.analysis_tasks import analyze_video_task
     db = SessionLocal()
@@ -183,27 +185,15 @@ def recover_stuck_analyses(redis_conn=None):
             AnalysisStatus.ANALYZING,
             AnalysisStatus.GENERATING_RESULTS,
         ]
-        now = datetime.utcnow()
-        candidates = db.query(VideoAnalysis).filter(
-            VideoAnalysis.status.in_(active_statuses),
-            (VideoAnalysis.processing_claim_token.is_(None)) | (VideoAnalysis.processing_lease_expires_at < now),
-        ).all()
-        for analysis in candidates:
-            if analysis.recovery_attempt_count >= RECOVERY_MAX_ATTEMPTS:
-                analysis.status = AnalysisStatus.FAILED
-                analysis.status_message = "Jarayon bir necha marta qayta tiklanishga urinildi, lekin muvaffaqiyatsiz bo'ldi."
-                analysis.error_code = analysis.error_code or "RECOVERY_EXHAUSTED"
-                analysis.updated_at = now
-                db.commit()
-                print(f"[RECOVERY] Analysis {analysis.id} recovery_attempt_count={analysis.recovery_attempt_count} limitga yetdi -- FAILED deb belgilandi.")
-                continue
-
-            if not _redis_recovery_claim(redis_conn, f"recovery_claim:analysis:{analysis.id}"):
-                print(f"[RECOVERY] Skipping analysis {analysis.id} -- another process already claimed it.")
-                continue
-
-            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} with status {analysis.status} (attempt {analysis.recovery_attempt_count + 1}/{RECOVERY_MAX_ATTEMPTS})")
-            analysis.recovery_attempt_count += 1
+        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
+        stuck = (
+            db.query(VideoAnalysis)
+            .filter(VideoAnalysis.status.in_(active_statuses))
+            .filter(VideoAnalysis.updated_at < cutoff)
+            .all()
+        )
+        for analysis in stuck:
+            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} (updated_at={analysis.updated_at})")
             analysis.status = AnalysisStatus.PENDING
             analysis.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
@@ -243,7 +233,7 @@ async def lifespan(app: FastAPI):
 
     recover_stuck_jobs(r)
     recover_stuck_resolution_variants(r)
-    recover_stuck_analyses(r)
+    recover_stuck_analyses()
     yield
     # Shutdown (agar kerak bo'lsa)
 
