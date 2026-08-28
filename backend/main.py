@@ -35,6 +35,7 @@ from backend.api.uzum_routes import router as uzum_router
 from backend.api.admin_routes import router as admin_router
 from backend.api.video_analysis_routes import router as video_analysis_router
 from backend.api.plans_routes import router as plans_router
+from backend.api.learn_routes import router as learn_router
 
 settings = get_settings()
 
@@ -47,13 +48,6 @@ settings = get_settings()
 # deb belgilanadi -- mavjud upload-recovery UI (fallback_available) shu
 # orqali foydalanuvchiga ko'rinadi, cheksiz sukut aylanish o'rniga.
 RECOVERY_MAX_ATTEMPTS = 5
-
-# Analiz vazifalari (analyze_video_task, Denis'ning versiyasi) job_claim
-# ISHLATMAYDI -- shuning uchun recover_stuck_analyses claim o'rniga
-# `updated_at` eskirganiga qaraydi. Bu chegara: shundan ko'p yangilanmagan
-# aktive-status analiz "qotib qolgan" hisoblanadi (jonli oqim updated_at'ni
-# yangilab turadi, shuning uchun 15 daqiqa xavfsiz).
-RECOVERY_STUCK_MINUTES = 15
 
 
 def recover_stuck_jobs(redis_conn=None):
@@ -179,11 +173,11 @@ def recover_stuck_resolution_variants(redis_conn):
 
 
 
-def recover_stuck_analyses():
-    """recover_stuck_jobs bilan bir xil FILTER — eskirgan VideoAnalysis'lar
-    qayta enqueue qilinadi, jonli ishlab turganlariga tegmaydi."""
-    from datetime import timedelta
-    from datetime import datetime
+
+def recover_stuck_analyses(redis_conn=None):
+    """recover_stuck_jobs() bilan bir xil naqsh -- qarang shu funksiyaning
+    izohi (DB-claim faqat o'qish uchun, navbatga-qo'yish dedup'i Redis
+    SETNX bilan)."""
     from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
     from backend.workers.analysis_tasks import analyze_video_task
     db = SessionLocal()
@@ -196,15 +190,27 @@ def recover_stuck_analyses():
             AnalysisStatus.ANALYZING,
             AnalysisStatus.GENERATING_RESULTS,
         ]
-        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
-        stuck = (
-            db.query(VideoAnalysis)
-            .filter(VideoAnalysis.status.in_(active_statuses))
-            .filter(VideoAnalysis.updated_at < cutoff)
-            .all()
-        )
-        for analysis in stuck:
-            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} (updated_at={analysis.updated_at})")
+        now = datetime.utcnow()
+        candidates = db.query(VideoAnalysis).filter(
+            VideoAnalysis.status.in_(active_statuses),
+            (VideoAnalysis.processing_claim_token.is_(None)) | (VideoAnalysis.processing_lease_expires_at < now),
+        ).all()
+        for analysis in candidates:
+            if analysis.recovery_attempt_count >= RECOVERY_MAX_ATTEMPTS:
+                analysis.status = AnalysisStatus.FAILED
+                analysis.status_message = "Jarayon bir necha marta qayta tiklanishga urinildi, lekin muvaffaqiyatsiz bo'ldi."
+                analysis.error_code = analysis.error_code or "RECOVERY_EXHAUSTED"
+                analysis.updated_at = now
+                db.commit()
+                print(f"[RECOVERY] Analysis {analysis.id} recovery_attempt_count={analysis.recovery_attempt_count} limitga yetdi -- FAILED deb belgilandi.")
+                continue
+
+            if not _redis_recovery_claim(redis_conn, f"recovery_claim:analysis:{analysis.id}"):
+                print(f"[RECOVERY] Skipping analysis {analysis.id} -- another process already claimed it.")
+                continue
+
+            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} with status {analysis.status} (attempt {analysis.recovery_attempt_count + 1}/{RECOVERY_MAX_ATTEMPTS})")
+            analysis.recovery_attempt_count += 1
             analysis.status = AnalysisStatus.PENDING
             analysis.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
@@ -251,7 +257,7 @@ async def lifespan(app: FastAPI):
 
     recover_stuck_jobs(r)
     recover_stuck_resolution_variants(r)
-    recover_stuck_analyses()
+    recover_stuck_analyses(r)
     yield
     # Shutdown (agar kerak bo'lsa)
 
@@ -313,6 +319,7 @@ app.include_router(uzum_router)
 app.include_router(admin_router)
 app.include_router(video_analysis_router)
 app.include_router(plans_router)
+app.include_router(learn_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")

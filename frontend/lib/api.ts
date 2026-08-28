@@ -116,6 +116,11 @@ export interface Job {
   rating?: number
   feedback_comment?: string
   content_flagged?: boolean
+  fallback_available?: boolean
+  fallback_reason?: string
+  // /api/learn bilan yaratilgan job'da to'ldiriladi -- Learning Workspace
+  // (frontend/app/learn/[id]) shu ID orqali tahlilni ham poll qiladi.
+  linked_analysis_id?: string | null
 }
 
 export type JobStatus =
@@ -164,6 +169,47 @@ export async function createJob(
     target_language: 'uz',
     voice_gender,
     audio_mix_mode,
+  })
+  return res.data
+}
+
+// Bosh sahifadagi "O'rganish" oqimi -- bitta so'rovda HAM dublyaj, HAM tahlil
+// (Learning Workspace uchun) boshlaydi. createJob()'dan farqli, dublyaj job'i
+// bilan bog'langan tahlil ID'sini ham qaytaradi (backend/api/learn_routes.py).
+// frontend/app/learn/[id] job'ni poll qiladi, tahlil esa job.linked_analysis_id
+// orqali topiladi.
+export async function learnVideo(youtube_url: string, voice_gender: string = 'auto'): Promise<{
+  dubbing_job_id: string
+  analysis_id: string | null
+  status: string
+  amount: number | null
+}> {
+  const res = await apiClient.post('/api/learn', { youtube_url, voice_gender })
+  return res.data
+}
+
+// backend/api/routes.py'dagi _ALLOWED_UPLOAD_CONTENT_TYPES / MAX_UPLOAD_SIZE_BYTES
+// bilan bir xil -- faqat mijoz-tomon tekshiruvi, backend asosiy darvoza.
+export const UPLOAD_ALLOWED_CONTENT_TYPES = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm']
+export const UPLOAD_ALLOWED_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.webm']
+export const UPLOAD_MAX_SIZE_BYTES = 3 * 1024 * 1024 * 1024 // 3 GB
+
+// YouTube DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan job uchun -- foydalanuvchi
+// videoni to'g'ridan-to'g'ri yuklaydi, xuddi shu job qayta navbatga qo'yiladi.
+export async function uploadVideoFallback(
+  jobId: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
+): Promise<{ success: boolean; message: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await apiClient.post(`/api/jobs/${jobId}/upload-video`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+    signal,
   })
   return res.data
 }
@@ -475,6 +521,23 @@ export interface VideoAnalysisSummary {
   detailed: string
 }
 
+export interface KeyTerm {
+  term: string
+  explanation: string
+}
+
+// "5 daqiqada" -- oddiy VideoAnalysisSummary'dan farqli, o'quv-yo'naltirilgan
+// siqilgan format (frontend/components/analysis/FiveMinuteTab.tsx).
+export interface FiveMinuteSummary {
+  title: string
+  why_it_matters: string
+  core_ideas: string[]
+  examples: string[]
+  takeaways: string[]
+  key_terms: KeyTerm[]
+  remember: string
+}
+
 export interface VideoAnalysis {
   id: string
   status: AnalysisStatus
@@ -489,6 +552,7 @@ export interface VideoAnalysis {
   summary?: VideoAnalysisSummary
   key_points?: KeyPoint[]
   chapters?: Chapter[]
+  five_minute_summary?: FiveMinuteSummary
   notes?: string
   quiz?: QuizQuestion[]
   qa_history: QAEntry[]

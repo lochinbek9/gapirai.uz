@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  useEffect, useRef, useState, useCallback, useMemo
+  useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle
 } from "react";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
@@ -177,14 +177,31 @@ export interface VideoPlayerProps {
   onTheaterToggle?: () => void;
 }
 
+// YouTubePlayerHandle (frontend/components/YouTubePlayer.tsx) bilan bir xil
+// shakl -- frontend/app/learn/[id] Video tabida qaysi pleer ko'rsatilishidan
+// (original YouTube yoki dublyaj videosi) qat'i nazar bitta seek() interfeysi
+// orqali ishlatiladi (transkript/quiz/AI-ustoz timestamp tugmalari).
+export interface VideoPlayerHandle {
+  seekTo: (seconds: number) => void;
+}
+
 /* ── VideoPlayer ──────────────────────────────────── */
-export default function VideoPlayer({
+const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   src, subtitlesContent, audioDownloadUrl,
   className = "", theaterMode = false, onTheaterToggle,
-}: VideoPlayerProps) {
+}, ref) => {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useImperativeHandle(ref, () => ({
+    seekTo: (seconds: number) => {
+      const el = videoRef.current;
+      if (!el) return;
+      el.currentTime = seconds;
+      el.play().catch(() => {});
+    },
+  }));
 
   const [playing,      setPlaying]      = useState(false);
   const [muted,        setMuted]        = useState(false);
@@ -453,4 +470,7 @@ export default function VideoPlayer({
       </div>
     </div>
   );
-}
+});
+
+VideoPlayer.displayName = "VideoPlayer";
+export default VideoPlayer;

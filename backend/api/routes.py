@@ -85,6 +85,10 @@ class JobResponse(BaseModel):
     content_flagged: Optional[bool] = None
     fallback_available: bool = False
     fallback_reason: Optional[str] = None
+    # /api/learn (learn_routes.py) shu job bilan birga yaratgan VideoAnalysis --
+    # frontend/app/learn/[id] shu ID orqali tahlilni ham poll qiladi. Oddiy
+    # dublyaj joblarida NULL.
+    linked_analysis_id: Optional[str] = None
 
 
 # YouTube yuklab olish DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan (video
@@ -148,6 +152,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         # noto'g'ri chetlab qo'ygan edi (2026-08-23 aniqlangan).
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
+        linked_analysis_id=str(getattr(job, "linked_analysis_id", None)) if getattr(job, "linked_analysis_id", None) else None,
     )
 
 

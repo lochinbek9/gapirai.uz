@@ -77,6 +77,11 @@ class DubbingJob(Base):
     youtube_url = Column(String(500), nullable=False)
     youtube_video_id = Column(String(20), nullable=True, index=True)  # kesh qidiruvi uchun (backend/services/job_creation.py)
     source_job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True)  # kesh-hit -- asl job'ga ishora
+    # /api/learn (learn_routes.py) shu job bilan bir vaqtda yaratgan
+    # VideoAnalysis'ga ishora -- Learning Workspace (frontend/app/learn/[id])
+    # shu orqali qaysi tahlilni ham poll qilishni biladi. Oddiy dublyaj
+    # joblarida NULL.
+    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id"), nullable=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -217,6 +222,11 @@ class VideoAnalysis(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     youtube_url = Column(String(500), nullable=False)
+    # DubbingJob.youtube_video_id bilan bir xil naqsh -- boshqa foydalanuvchi
+    # ALLAQACHON shu videoni shu tilda tahlil qilgan bo'lsa, qayta yuklab
+    # olish/transkripsiya/LLM chaqiruvlarini takrorlamaslik uchun (learn_routes.py:
+    # find_cached_analysis).
+    youtube_video_id = Column(String(20), nullable=True, index=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -237,6 +247,9 @@ class VideoAnalysis(Base):
     summary = Column(JSONB, nullable=True)        # {"short": str, "medium": str, "detailed": str}
     key_points = Column(JSONB, nullable=True)      # [{"title","description","timestamp"}]
     chapters = Column(JSONB, nullable=True)        # [{"title","start","end"}]
+    # {"title","why_it_matters","core_ideas","examples","takeaways","key_terms","remember"}
+    # -- "5 daqiqada" formatidagi o'quv-xulosa (Learning Workspace: FiveMinuteTab).
+    five_minute_summary = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)
     quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
     qa_history = Column(JSONB, default=list)       # [{"question","answer","timestamps","asked_at"}]
