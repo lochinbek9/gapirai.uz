@@ -7,6 +7,7 @@ qolish xavfi bor (masalan Safety Gate faqat bittasida bo'lib qolishi mumkin).
 """
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 import asyncio
@@ -23,6 +24,7 @@ from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.downloader import get_video_info
 from backend.services.content_safety import check_safety
 from backend.services.click_service import generate_payment_url, normalize_uzs_amount
+from backend.services.storage import s3_object_exists
 from backend.workers.tasks import process_video
 from backend.config import get_settings
 
@@ -62,6 +64,26 @@ def extract_youtube_video_id(url: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
+    """Kesh-hit nomzodning tayyor video fayli hali haqiqatan mavjudligini
+    tekshiradi -- resolution_variants.py:request_resolution bilan bir xil
+    naqsh (master fayl S3'da bormi). cached_job.storage_id orqali (kesh
+    zanjiridan qat'i nazar ASL ildiz job) tekshiradi, chunki kesh-hit
+    joblarning o'zi hech qachon S3'ga fayl yuklamaydi.
+
+    Buning yo'qligi ilgari tekshirilmagan edi (2026-08-24 aniqlangan bag):
+    create_dubbing_job() COMPLETED holatidagi istalgan mos job'ni keshdan
+    qaytarardi, garchi uning S3 lifecycle (3 kun) bo'yicha allaqachon
+    o'chirilgan bo'lishidan qat'i nazar -- foydalanuvchi "tayyor" job olib,
+    keyin video/audio yuklashda darhol 410 bilan yiqilardi."""
+    settings = get_settings()
+    storage_id = cached_job.storage_id
+    if settings.AWS_BUCKET_NAME:
+        return s3_object_exists(f"dubber/{storage_id}/dubbed_final.mp4")
+    video_path = cached_job.output_video_path
+    return bool(video_path) and Path(video_path).exists()
+
+
 Outcome = Literal["queued", "ready", "awaiting_payment", "blocked", "too_long", "invalid_url", "fetch_error"]
 
 
@@ -96,7 +118,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         if voice_gender in ("male", "female"):
             cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
         cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
-        if cached_job:
+        if cached_job and _cached_job_files_exist(cached_job):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
 
     try:
@@ -165,6 +187,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         id=job_id,
         user_id=user.id,
         youtube_url=youtube_url,
+        youtube_video_id=video_id,
         video_title=title,
         video_duration=duration,
         video_thumbnail=thumbnail,
@@ -208,7 +231,11 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
         user_id=user.id,
         youtube_url=youtube_url,
         youtube_video_id=cached_job.youtube_video_id,
-        source_job_id=cached_job.id,
+        # cached_job.id EMAS -- cached_job o'zi ham kesh-hit bo'lishi mumkin
+        # (2026-08-21 topilgan zanjir bagi). storage_id har doim ASL ildizga
+        # ishora qiladi, shuning uchun yangi job to'g'ridan-to'g'ri o'sha
+        # ildizga bog'lanadi va zanjir uzunligi o'smaydi.
+        source_job_id=cached_job.storage_id,
         video_title=cached_job.video_title,
         video_duration=cached_job.video_duration,
         video_thumbnail=cached_job.video_thumbnail,

@@ -30,20 +30,30 @@ def verify_google_token(credential: str) -> dict:
     if not settings.GOOGLE_CLIENT_ID:
         raise GoogleTokenError("GOOGLE_CLIENT_ID sozlanmagan.")
 
+    # Web (frontend) va Android (mobile/) alohida OAuth mijozlar — ID token'ning
+    # "aud"i qaysi mijozdan kelganiga qarab ikkisidan biri bo'lishi mumkin.
+    # google-auth kutubxonasi audience'ni ro'yxat sifatida qabul qiladi.
+    valid_audiences = [settings.GOOGLE_CLIENT_ID]
+    if settings.GOOGLE_ANDROID_CLIENT_ID:
+        valid_audiences.append(settings.GOOGLE_ANDROID_CLIENT_ID)
+
     try:
-        payload = id_token.verify_oauth2_token(credential, _request, settings.GOOGLE_CLIENT_ID)
+        payload = id_token.verify_oauth2_token(credential, _request, valid_audiences)
     except ValueError as exc:
         # Xom kutubxona xatosini (google-auth) foydalanuvchiga ko'rsatmaymiz.
         logger.warning(f"Google token tekshiruvi muvaffaqiyatsiz: {exc}")
         raise GoogleTokenError("Google token yaroqsiz yoki muddati o'tgan. Qaytadan urinib ko'ring.") from exc
 
-    email = payload.get("email")
-    if not email:
+    email_val = payload.get("email")
+    if not email_val:
         raise GoogleTokenError("Google token'da email topilmadi.")
+
+    raw_verified = payload.get("email_verified")
+    is_verified = raw_verified is True or str(raw_verified).lower() == "true"
 
     return {
         "sub": payload["sub"],
-        "email": email.lower().strip(),
-        "email_verified": bool(payload.get("email_verified", False)),
-        "name": payload.get("name") or email.split("@")[0],
+        "email": str(email_val).lower().strip(),
+        "email_verified": is_verified,
+        "name": payload.get("name") or str(email_val).split("@")[0],
     }

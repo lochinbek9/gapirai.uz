@@ -118,6 +118,23 @@ export default function Footer() {
           </div>
 
         </div>
+
+        <div className="mt-10 pt-8 border-t border-black/5 dark:border-white/10 flex flex-col sm:flex-row sm:items-center gap-4">
+          <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">
+            To'lov turlari
+          </h3>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center justify-center h-11 px-4 rounded-xl bg-gray-100 border border-black/5 dark:border-white/10">
+              <img src="/logos/click.png" alt="Click" className="h-4 w-auto object-contain" />
+            </div>
+            <div className="flex items-center justify-center h-11 px-4 rounded-xl bg-gray-100 border border-black/5 dark:border-white/10">
+              <img src="/logos/payme.png" alt="Payme" className="h-4 w-auto object-contain" />
+            </div>
+            <div className="flex items-center justify-center h-11 px-4 rounded-xl bg-gray-100 border border-black/5 dark:border-white/10">
+              <img src="/logos/uzum.png" alt="Uzum" className="h-6 w-auto object-contain" />
+            </div>
+          </div>
+        </div>
       </div>
     </footer>
   )

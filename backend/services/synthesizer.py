@@ -18,6 +18,54 @@ settings = get_settings()
 
 _FRAME_RATE = 24000
 
+# 2026-08-26 finding (job 83ca2305): Azure TTS occasionally produced a
+# segment file that existed on disk but was not valid audio (observed:
+# all-zero RIFF header, ffmpeg: "invalid start code ... Invalid data
+# found") -- likely a race between the SDK's async write and our own
+# `.exists()` check, though the exact provider-side cause isn't fully
+# confirmed. Whatever the cause, the file previously went straight into
+# AudioSegment.from_wav() with no validation, crashing the whole TTS stage
+# (and, via Celery's outer retry, forcing the whole job to redo work) over
+# ONE bad segment. _validate_wav_file() + the bounded retry below catch
+# this before it reaches pydub/ffmpeg for real.
+_WAV_MAX_VALIDATION_RETRIES = 2  # original attempt + up to 2 retries = 3 total
+_FFMPEG_PROBE_TIMEOUT_S = 30
+
+
+def _validate_wav_file(path: str) -> tuple[bool, str]:
+    """Four independent checks, each catching a different corruption mode:
+    a missing file, a zero-byte file, a file with a plausible size but a
+    broken RIFF/WAVE header (the exact production failure), and a file
+    with a valid-looking header but undecodable audio data (only an actual
+    decode attempt catches this one -- header validation alone would pass
+    it). Returns (is_valid, reason) -- reason is always populated on
+    failure so the caller can log the real cause rather than a bare
+    "invalid" with no context."""
+    p = Path(path)
+    if not p.exists():
+        return False, "fayl mavjud emas"
+    if p.stat().st_size <= 0:
+        return False, "fayl bo'sh (0 bayt)"
+    try:
+        with open(path, "rb") as f:
+            header = f.read(12)
+    except Exception as exc:
+        return False, f"sarlavhani o'qib bo'lmadi: {exc}"
+    if len(header) < 12 or header[0:4] != b"RIFF" or header[8:12] != b"WAVE":
+        return False, f"yaroqsiz RIFF/WAVE sarlavha (bytes={header!r})"
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", path, "-f", "null", "-"],
+            capture_output=True, text=True, timeout=_FFMPEG_PROBE_TIMEOUT_S,
+        )
+        if result.returncode != 0:
+            return False, f"ffmpeg dekodlay olmadi: {result.stderr.strip()[:300]}"
+    except subprocess.TimeoutExpired:
+        return False, "ffmpeg probe vaqti tugadi"
+    except Exception as exc:
+        return False, f"ffmpeg probe xatosi: {exc}"
+    return True, ""
+
 # ─────────────────────────────────────────────────────────────
 # Segmentlarni TABIIY gapga qayta guruhlash
 # ─────────────────────────────────────────────────────────────
@@ -243,17 +291,48 @@ def synthesize_segments(
             engine = get_provider().name
         else:
             engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
-        if seg_file.exists():
-            audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
-            return (idx, {
-                "audio": audio,
-                "start_ms": int(seg["start"] * 1000),
-                "end_ms": int(seg["end"] * 1000),
-                "engine": engine,
-                "text": text,
-                "seg_id": seg["id"],
-            })
-        return None
+
+        # Bounded per-segment validation/retry -- see _validate_wav_file's
+        # docstring. Only THIS segment is ever re-synthesized; the other
+        # (already-valid) segments running in sibling threads are untouched.
+        valid, reason = _validate_wav_file(str(seg_file))
+        attempts = 0
+        while not valid and attempts < _WAV_MAX_VALIDATION_RETRIES:
+            attempts += 1
+            logger.warning(
+                f"Segment {seg['id']}: yaroqsiz TTS audio ({reason}), provider={engine} -- "
+                f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
+            )
+            try:
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+            except Exception as exc:
+                logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
+            valid, reason = _validate_wav_file(str(seg_file))
+
+        if not valid:
+            # Asl provider xatosi/sababi YASHIRILMAYDI -- to'liq diagnostika
+            # serverda log qilinadi; foydalanuvchiga ko'rinadigan xabar esa
+            # backend/workers/tasks.py:_safe_persisted_error orqali alohida,
+            # xavfsiz matn bilan almashtiriladi (raw exception matni hech
+            # qachon API javobiga chiqmaydi).
+            logger.error(
+                f"Segment {seg['id']}: {_WAV_MAX_VALIDATION_RETRIES + 1} urinishdan keyin ham "
+                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}'"
+            )
+            raise RuntimeError(
+                f"TTS_INVALID_AUDIO: segment {seg['id']} {_WAV_MAX_VALIDATION_RETRIES + 1} "
+                f"urinishdan keyin ham yaroqli audio bermadi ({reason})"
+            )
+
+        audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
+        return (idx, {
+            "audio": audio,
+            "start_ms": int(seg["start"] * 1000),
+            "end_ms": int(seg["end"] * 1000),
+            "engine": engine,
+            "text": text,
+            "seg_id": seg["id"],
+        })
 
     # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit) —
     # juda ko'p parallel oqim ba'zi segmentlarni Edge TTS'ga (boshqa ovozga)

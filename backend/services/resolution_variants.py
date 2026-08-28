@@ -23,6 +23,7 @@ from backend.services.storage import (
     upload_file_to_s3,
     download_file_from_s3,
     generate_presigned_download_url,
+    s3_object_exists,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,10 @@ settings = get_settings()
 
 def generate_360p(job) -> str:
     job_id = job.storage_id
-    master_url = generate_presigned_download_url(f"dubber/{job_id}/dubbed_final.mp4")
+    master_key = f"dubber/{job_id}/dubbed_final.mp4"
+    if not s3_object_exists(master_key):
+        raise RuntimeError("Master video S3'da topilmadi (saqlash muddati tugagan bo'lishi mumkin).")
+    master_url = generate_presigned_download_url(master_key)
     if not master_url:
         raise RuntimeError("Master video S3'da topilmadi.")
 
@@ -112,7 +116,7 @@ def generate_variant(job, resolution: str) -> str:
 
 @dataclass
 class ResolutionRequestResult:
-    outcome: str  # "ready" | "processing" | "forbidden" | "invalid"
+    outcome: str  # "ready" | "processing" | "forbidden" | "invalid" | "expired"
     download_url: str | None = None
 
 
@@ -138,10 +142,20 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
         return ResolutionRequestResult(outcome="forbidden")
 
     job_id = job.storage_id
+    master_key = f"dubber/{job_id}/dubbed_final.mp4"
+
+    # Barcha rezolyutsiyalar (720p ham, kesh'dagi tayyor variant ham) shu bitta
+    # master fayl ustida qurilgan -- agar u S3 lifecycle (3 kun) bo'yicha
+    # o'chirilgan bo'lsa, boshqa hech narsa ham ishlamaydi (2026-08-21: avval
+    # bu tekshirilmasdan "ready" qaytarilardi, keyin yuklab olishda jim 404
+    # bo'lardi yoki 360p generatsiyasi tushunarsiz ffmpeg xatosi bilan
+    # yiqilardi).
+    if settings.AWS_BUCKET_NAME and not s3_object_exists(master_key):
+        return ResolutionRequestResult(outcome="expired")
 
     if resolution == "720p":
         if settings.AWS_BUCKET_NAME:
-            presigned_url = generate_presigned_download_url(f"dubber/{job_id}/dubbed_final.mp4")
+            presigned_url = generate_presigned_download_url(master_key)
             if presigned_url:
                 return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
         return ResolutionRequestResult(outcome="ready", download_url=f"/api/outputs/{job_id}/video")
@@ -158,9 +172,14 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
         db.refresh(variant)
 
     if variant.status == "ready" and variant.s3_key:
-        presigned_url = generate_presigned_download_url(variant.s3_key)
-        if presigned_url:
-            return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
+        # Variant masterdan KEYINROQ yuklangan bo'lishi mumkin (foydalanuvchi
+        # uni ancha vaqt o'tib birinchi so'ragan bo'lsa) -- shuning uchun
+        # o'zining alohida, masterdan farqli muddati bo'ladi va u ham
+        # mustaqil ravishda muddati tugagan bo'lishi mumkin.
+        if s3_object_exists(variant.s3_key):
+            presigned_url = generate_presigned_download_url(variant.s3_key)
+            if presigned_url:
+                return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
         variant.status = "pending"  # s3_key ishlamay qoldi -- qayta yaratamiz
 
     if variant.status != "processing":

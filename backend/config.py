@@ -198,6 +198,14 @@ class Settings(BaseSettings):
     # kerak emas). Bo'sh bo'lsa, frontend tugmani ko'rsatmaydi.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Mobil ilova (mobile/) uchun ALOHIDA Android turidagi OAuth mijoz
+    # (2026-08-22) — Google endi "Web application" mijozlar uchun custom-scheme
+    # redirect_uri'ni (gapirai://) rad etadi ("doesn't comply with Google's
+    # OAuth 2.0 policy"), shuning uchun mobil ilova o'zining Android mijozidan
+    # foydalanadi. ID token'ning "aud" maydoni shu ID bo'ladi, GOOGLE_CLIENT_ID
+    # (web) emas — backend/services/google_auth.py ikkalasini ham qabul qiladi.
+    GOOGLE_ANDROID_CLIENT_ID: str = ""
+
     # Eskiz.uz SMS OTP (https://notify.eskiz.uz/api) — email+parol orqali
     # login qilib bearer token oladi (Redis'da keshlanadi, sms_service.py),
     # Resend'ning statik API key'idan farqli. Bo'sh bo'lsa, SMS yuborilmaydi
@@ -251,13 +259,17 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://gapirai.uz"
 
     # yt-dlp orqali YouTube'dan yuklab olishda ishlatiladigan HTTP(S) proxy —
-    # http://user:pass@host:port. AWS/GCP kabi datacenter IP'larni YouTube
-    # ko'pincha bot deb belgilab, PO token/cookie holatidan qat'iy nazar
-    # "Video unavailable" qaytaradi (2026-08-12 productionda tasdiqlangan);
-    # bo'sh bo'lsa proxysiz ishlaydi (lokal/rezident IP uchun kerak emas).
-    # ENABLED alohida flag — provayderda muammo chiqsa, URL'ni o'chirmasdan
-    # tezda proxysiz rejimga qaytarish uchun.
-    YOUTUBE_PROXY_ENABLED: bool = True
+    # http://user:pass@host:port. Butunlay IXTIYORIY — AWS/GCP kabi datacenter
+    # IP'larni YouTube ko'pincha bot deb belgilab, PO token/cookie holatidan
+    # qat'iy nazar "Video unavailable" qaytaradi (2026-08-12 productionda
+    # tasdiqlangan); bo'sh/false bo'lsa to'g'ridan-to'g'ri ulanishga tushadi
+    # (lokal/rezident IP yoki PO token o'zi yetarli bo'lsa kerak emas).
+    # Standart qiymat False — production o'z .env faylida buni aniq "true"
+    # deb belgilaydi, shuning uchun bu yerdagi standart faqat local/dev uchun.
+    # ENABLED alohida flag — provayderda muammo chiqsa (masalan 2026-08-22
+    # Webshare balansi tugagan real hodisa), URL'ni o'chirmasdan tezda
+    # proxysiz rejimga qaytarish uchun.
+    YOUTUBE_PROXY_ENABLED: bool = False
     YOUTUBE_PROXY_URL: str = ""
 
     # Ikkinchi (zaxira) proksi — residential, YOUTUBE_PROXY_URL (datacenter,

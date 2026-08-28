@@ -72,6 +72,12 @@ class DubbingJob(Base):
     youtube_url = Column(String(500), nullable=False)
     youtube_video_id = Column(String(20), nullable=True, index=True)  # kesh qidiruvi uchun (backend/services/job_creation.py)
     source_job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True)  # kesh-hit -- asl job'ga ishora
+    # /api/learn (backend/api/learn_routes.py) shu job bilan bir vaqtda
+    # yaratgan VideoAnalysis'ga ishora -- Learning Workspace (frontend/app/
+    # learn/[id]) shu orqali qaysi tahlilni ham poll qilishni biladi. Eski
+    # oddiy dublyaj joblarida (yoki /api/learn'dan tashqarida yaratilganlarda)
+    # NULL bo'lib qoladi.
+    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id"), nullable=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -127,6 +133,20 @@ class DubbingJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
+    # 2026-08-26: worker lifecycle audit -- bir xil job ikki worker'da bir
+    # vaqtda faol bo'lishining oldini olish uchun DB-darajasidagi atomik
+    # claim/lease (backend/services/job_claim.py). Redis lock emas -- barcha
+    # worker'lar (production-new + worker-1..4) shu BITTA jadvalga ulanadi,
+    # shuning uchun bu haqiqiy umumiy holat manbai.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    # recover_stuck_jobs() shu job'ni necha marta qayta navbatga qo'yganini
+    # sanaydi -- doimiy (transient bo'lmagan) xatoga uchragan job cheksiz
+    # PENDING<->DOWNLOADING aylanishda qolib ketmasligi uchun (2026-08-26
+    # audit: 044530c0 job bir necha kun davomida shu tarzda aylanib yurgan
+    # holati topilgan).
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
+
     user = relationship("User", back_populates="jobs")
 
     @property
@@ -135,8 +155,37 @@ class DubbingJob(Base):
         joblar uchun bu ASL job'ning ID'si (source_job_id), oddiy joblar
         uchun o'zining ID'si. Barcha S3 kalit hisoblovchi kod (routes.py
         download endpointlari, resolution_variants.py) shu propertydan
-        foydalanadi, job.id'dan emas."""
-        return str(self.source_job_id or self.id)
+        foydalanadi, job.id'dan emas.
+
+        job_creation.py'dagi kesh qidiruvi ilgari ENG SO'NGGI tugagan mos
+        job'ni tanlar edi -- bu kesh-hit BOSHQA kesh-hitga ishora qilib,
+        zanjir hosil bo'lishiga olib kelardi (bitta video uchun 13 bosqichgacha
+        kuzatilgan, 2026-08-21). Kesh-hit job'larning o'zi HECH QACHON S3'ga
+        fayl yuklamaydi, shuning uchun zanjirning istalgan oraliq bo'g'ini
+        "storage_id" sifatida ishlatilsa doim mavjud bo'lmagan kalitga olib
+        keladi. Yozish tomoni (job_creation.py) endi to'g'ridan-to'g'ri asl
+        ildizga ishora qiladi, lekin bazadagi eski zanjirlar davolanishi
+        uchun bu yerda ham to'liq zanjir bosib o'tiladi (aylanma himoya
+        bilan)."""
+        from sqlalchemy.orm import object_session
+
+        seen = {str(self.id)}
+        current = self
+        for _ in range(50):
+            if not current.source_job_id:
+                return str(current.id)
+            next_id = str(current.source_job_id)
+            if next_id in seen:
+                return str(current.id)
+            seen.add(next_id)
+            session = object_session(self)
+            if session is None:
+                return next_id
+            nxt = session.get(DubbingJob, current.source_job_id)
+            if nxt is None:
+                return next_id
+            current = nxt
+        return str(current.id)
 
 
 class AnalysisStatus(str, enum.Enum):
@@ -163,6 +212,12 @@ class VideoAnalysis(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     youtube_url = Column(String(500), nullable=False)
+    # DubbingJob.youtube_video_id bilan bir xil naqsh (job_creation.py) --
+    # boshqa foydalanuvchi ALLAQACHON tahlil qilgan videoni qayta yuklab
+    # olish/transkripsiya qilish/LLM chaqirishlarini takrorlamaslik uchun
+    # (2026-08-25 audit: ilgari VideoAnalysis'da bunday kesh umuman yo'q
+    # edi, har so'rov mustaqil ishlardi).
+    youtube_video_id = Column(String(20), nullable=True, index=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -183,6 +238,12 @@ class VideoAnalysis(Base):
     summary = Column(JSONB, nullable=True)        # {"short": str, "medium": str, "detailed": str}
     key_points = Column(JSONB, nullable=True)      # [{"title","description","timestamp"}]
     chapters = Column(JSONB, nullable=True)        # [{"title","start","end"}]
+    # {"title","why_it_matters","core_ideas":[...],"examples":[...],
+    #  "takeaways":[...],"key_terms":[{"term","explanation"}],"remember"} --
+    # o'quv-yo'naltirilgan siqilgan xulosa (oddiy summary'dan farqli, "5
+    # daqiqada" formatida). summary/key_points/chapters bilan bir xil ANALYZE
+    # bosqichida eager generatsiya qilinadi (backend/workers/analysis_tasks.py).
+    five_minute_summary = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)
     quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
     qa_history = Column(JSONB, default=list)       # [{"question","answer","timestamps","asked_at"}]
@@ -193,6 +254,12 @@ class VideoAnalysis(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+    # 2026-08-26: DubbingJob bilan bir xil claim/lease mexanizmi -- qarang
+    # backend/services/job_claim.py va DubbingJob'dagi izoh.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
 
     user = relationship("User")
 

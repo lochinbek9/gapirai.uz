@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Download, Loader2, Lock, RotateCw } from 'lucide-react'
+import { Download, Loader2, Lock, RotateCw, AlertCircle } from 'lucide-react'
 import { getJobResolutions, requestResolution, ResolutionOption } from '@/lib/api'
 import { trackEvent } from '@/lib/analytics'
 
@@ -72,7 +72,11 @@ export default function ResolutionDownloadButtons({ jobId }: ResolutionDownloadB
         refresh()
       }
     } catch {
+      // Masalan 410 (fayl saqlash muddati tugagan) -- GET qayta chaqirilsa
+      // backend haqiqiy "expired" holatini qaytaradi, shu orqali tugma
+      // to'g'ri ko'rinishga o'tadi.
       setBusy((b) => ({ ...b, [opt.resolution]: false }))
+      refresh()
     }
   }
 
@@ -104,6 +108,20 @@ export default function ResolutionDownloadButtons({ jobId }: ResolutionDownloadB
                 <Lock className="w-4 h-4" />
                 {opt.resolution}
               </Link>
+            )
+          }
+
+          if (opt.status === 'expired') {
+            return (
+              <div
+                key={opt.resolution}
+                className="inline-flex items-center gap-2 bg-white/5 text-slate-500 px-5 py-3 rounded-xl font-bold border border-white/10 cursor-default"
+                title="Video fayli saqlash muddati tugagani sababli endi mavjud emas"
+              >
+                <AlertCircle className="w-4 h-4" />
+                {opt.resolution}
+                <span className="text-xs font-normal">muddati tugagan</span>
+              </div>
             )
           }
 

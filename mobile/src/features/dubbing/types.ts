@@ -48,6 +48,11 @@ export interface Job {
   status: JobStatus;
   progress: number;
   status_message?: string;
+  youtube_url?: string;
+  // Set when this job was created via POST /api/learn (Learning Workspace) —
+  // points at the linked VideoAnalysis, null while awaiting_payment (see
+  // backend/api/learn_routes.py).
+  linked_analysis_id?: string | null;
   video_title?: string;
   video_duration?: number;
   video_thumbnail?: string;
@@ -63,6 +68,12 @@ export interface Job {
   expected_end_time?: string;
   rating?: number;
   feedback_comment?: string;
+  // YouTube yuklab olish DOWNLOAD bosqichida (video hech qachon serverga
+  // tushmagan holda) muvaffaqiyatsiz bo'lgan job'lar uchun -- foydalanuvchi
+  // videoni to'g'ridan-to'g'ri yuklashi mumkinligini bildiradi (backend/api/
+  // routes.py:_job_to_response, POST /jobs/{id}/upload-video).
+  fallback_available?: boolean;
+  fallback_reason?: string | null;
 }
 
 export interface InitiatePaymentResponse {
@@ -72,7 +83,31 @@ export interface InitiatePaymentResponse {
   amount: number;
 }
 
+// Uzum has no hosted checkout URL — the user pays via the Uzum app using this
+// "account" number (mirrors frontend/lib/api.ts's initiateUzumPayment).
+export interface InitiateUzumPaymentResponse {
+  success: boolean;
+  account?: number;
+  payment_id?: string;
+  amount: number;
+}
+
 export interface CancelJobResponse {
   success: boolean;
   message: string;
+}
+
+// Mirrors frontend/lib/api.ts's ResolutionOption — status is one of "ready" |
+// "processing" | "not_requested" | "failed" | "expired" (the last added
+// 2026-08-22 when master-file S3 expiry checks were added, see
+// backend/services/resolution_variants.py).
+export interface ResolutionOption {
+  resolution: string;
+  available: boolean;
+  status: string;
+}
+
+export interface RequestResolutionResponse {
+  status: string;
+  download_url?: string;
 }

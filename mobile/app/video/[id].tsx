@@ -5,10 +5,14 @@ import { ActivityIndicator, Linking, ScrollView, StyleSheet } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getErrorMessage } from '../../src/api/errors';
+import { CircularProgress } from '../../src/components/CircularProgress';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ThemedText } from '../../src/components/ThemedText';
 import { ThemedView } from '../../src/components/ThemedView';
 import * as dubbingApi from '../../src/features/dubbing/api';
+import { ProgressSteps } from '../../src/features/dubbing/components/ProgressSteps';
+import { ResolutionDownloadButtons } from '../../src/features/dubbing/components/ResolutionDownloadButtons';
+import { UploadRecoveryPrompt } from '../../src/features/dubbing/components/UploadRecoveryPrompt';
 import { DubbedVideoPlayer } from '../../src/features/dubbing/components/VideoPlayer';
 import { useDubbingJob } from '../../src/features/dubbing/hooks/useDubbingJob';
 import { JOB_STATUS_LABELS } from '../../src/features/dubbing/types';
@@ -39,13 +43,38 @@ export default function VideoJobScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const paymentMutation = useMutation({
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null);
+
+  const clickMutation = useMutation({
     mutationFn: () => dubbingApi.initiateClickPayment(id),
     onSuccess: async (data) => {
       setPaymentError(null);
       if (data.payment_url) await Linking.openURL(data.payment_url);
     },
     onError: (err) => setPaymentError(getErrorMessage(err, "To'lov havolasini yaratishda xatolik yuz berdi.")),
+  });
+
+  const paymeMutation = useMutation({
+    mutationFn: () => dubbingApi.initiatePaymePayment(id),
+    onSuccess: async (data) => {
+      setPaymentError(null);
+      if (data.payment_url) await Linking.openURL(data.payment_url);
+    },
+    onError: (err) => setPaymentError(getErrorMessage(err, "To'lov havolasini yaratishda xatolik yuz berdi.")),
+  });
+
+  // Uzum has no hosted checkout — success just reveals an account number for
+  // the user to enter in the Uzum app themselves (mirrors
+  // frontend/app/video/[id]/page.tsx's handleUzumPayment).
+  const uzumMutation = useMutation({
+    mutationFn: () => dubbingApi.initiateUzumPayment(id),
+    onSuccess: (data) => {
+      setPaymentError(null);
+      if (data.account) {
+        setUzumAccount({ account: data.account, amount: data.amount });
+      }
+    },
+    onError: (err) => setPaymentError(getErrorMessage(err, "To'lov ma'lumotini olishda xatolik yuz berdi.")),
   });
 
   const cancelMutation = useMutation({
@@ -111,37 +140,71 @@ export default function VideoJobScreen() {
                         {paymentError}
                       </ThemedText>
                     )}
-                    <PrimaryButton
-                      label="Click orqali to'lov qilish"
-                      onPress={() => paymentMutation.mutate()}
-                      loading={paymentMutation.isPending}
-                    />
+
+                    {uzumAccount ? (
+                      <ThemedView
+                        style={[styles.uzumBox, { borderColor: colors.accent, backgroundColor: colors.background }]}
+                      >
+                        <ThemedText variant="secondary" style={styles.cardText}>
+                          Uzum ilovasida to&apos;lov uchun quyidagi hisob raqamini kiriting:
+                        </ThemedText>
+                        <ThemedText selectable style={[styles.uzumAccountNumber, { color: colors.accent }]}>
+                          {uzumAccount.account}
+                        </ThemedText>
+                        <ThemedText variant="secondary" style={styles.cardText}>
+                          Summa: {uzumAccount.amount.toLocaleString('uz-UZ')} so&apos;m
+                        </ThemedText>
+                      </ThemedView>
+                    ) : (
+                      <ThemedView style={{ width: '100%', gap: 10 }}>
+                        <PrimaryButton
+                          label="Click orqali to'lov qilish"
+                          onPress={() => clickMutation.mutate()}
+                          loading={clickMutation.isPending}
+                        />
+                        <PrimaryButton
+                          label="Payme orqali to'lov qilish"
+                          variant="secondary"
+                          onPress={() => paymeMutation.mutate()}
+                          loading={paymeMutation.isPending}
+                        />
+                        <PrimaryButton
+                          label="Uzum orqali to'lash"
+                          variant="secondary"
+                          onPress={() => uzumMutation.mutate()}
+                          loading={uzumMutation.isPending}
+                        />
+                      </ThemedView>
+                    )}
                   </ThemedView>
                 )}
 
                 {ACTIVE_STATUSES.includes(job.status) && (
                   <ThemedView style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                    <ActivityIndicator color={colors.accent} style={{ marginBottom: 4 }} />
+                    <CircularProgress progress={job.progress || 0} color={colors.accent} trackColor={colors.border} />
                     <ThemedText style={styles.cardTitle}>{JOB_STATUS_LABELS[job.status]}</ThemedText>
                     {job.status_message && (
                       <ThemedText variant="secondary" style={styles.cardText}>
                         {job.status_message}
                       </ThemedText>
                     )}
-                    <ThemedView style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-                      <ThemedView
-                        style={[styles.progressFill, { backgroundColor: colors.accent, width: `${job.progress || 0}%` }]}
-                      />
-                    </ThemedView>
                     {job.expected_end_time &&
                       (() => {
                         const remaining = Math.ceil((new Date(job.expected_end_time).getTime() - now) / 1000);
+                        // formatRemainingTime already returns "kam qoldi..." for
+                        // remaining <= 0 (a job whose ETA has passed, e.g. one
+                        // stuck for a long time) — appending another " qoldi"
+                        // after it produced "kam qoldi... qoldi". Mirrors
+                        // frontend/app/video/[id]/page.tsx's own <= 0 branch,
+                        // which never appends "qoldi" in that case either.
                         return (
                           <ThemedText variant="secondary" style={styles.eta}>
-                            Taxminan {formatRemainingTime(remaining)} qoldi
+                            {remaining <= 0 ? 'Tez orada yakunlanadi...' : `Taxminan ${formatRemainingTime(remaining)} qoldi`}
                           </ThemedText>
                         );
                       })()}
+                    <ThemedView style={[styles.stepsDivider, { backgroundColor: colors.border }]} />
+                    <ProgressSteps status={job.status} />
                     <PrimaryButton
                       label="Bekor qilish"
                       variant="secondary"
@@ -156,15 +219,22 @@ export default function VideoJobScreen() {
                     <ThemedText variant="secondary" style={styles.cardText}>
                       Davomiylik: {formatDuration(job.video_duration)}
                     </ThemedText>
+                    <ResolutionDownloadButtons jobId={id} />
                   </ThemedView>
                 )}
 
                 {job.status === 'failed' && (
                   <ThemedView style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                    <ThemedText style={[styles.cardTitle, { color: colors.danger }]}>Xatolik yuz berdi</ThemedText>
-                    <ThemedText variant="secondary" style={styles.cardText}>
-                      {job.error_message || "Tizimda noma'lum xatolik yuz berdi."}
-                    </ThemedText>
+                    {job.fallback_available ? (
+                      <UploadRecoveryPrompt jobId={id} />
+                    ) : (
+                      <>
+                        <ThemedText style={[styles.cardTitle, { color: colors.danger }]}>Xatolik yuz berdi</ThemedText>
+                        <ThemedText variant="secondary" style={styles.cardText}>
+                          {job.error_message || "Tizimda noma'lum xatolik yuz berdi."}
+                        </ThemedText>
+                      </>
+                    )}
                     <PrimaryButton label="Yangi urinish" onPress={() => router.replace('/')} />
                   </ThemedView>
                 )}
@@ -188,8 +258,9 @@ const styles = StyleSheet.create({
   rowItem: { flex: 1, gap: 2 },
   label: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   value: { fontSize: 15, fontWeight: '700' },
-  progressTrack: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
   eta: { fontSize: 12, fontWeight: '600' },
   note: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
+  stepsDivider: { height: StyleSheet.hairlineWidth, width: '100%' },
+  uzumBox: { width: '100%', borderWidth: 1.5, borderRadius: 14, padding: 16, gap: 8, alignItems: 'center' },
+  uzumAccountNumber: { fontSize: 26, fontWeight: '800', letterSpacing: 1 },
 });

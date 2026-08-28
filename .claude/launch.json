@@ -27,7 +27,8 @@
       "runtimeExecutable": "/usr/local/bin/docker",
       "runtimeArgs": ["compose", "up", "flower"],
       "cwd": "/Users/user/Desktop/ai-dubber",
-      "port": 5555
+      "port": 5555,
+      "autoPort": true
     },
     {
       "name": "mobile-web",

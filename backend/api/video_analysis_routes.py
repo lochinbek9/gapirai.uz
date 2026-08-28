@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from backend.models.database import get_db, VideoAnalysis, AnalysisStatus, User
 from backend.services.downloader import get_video_info
 from backend.services.auth import get_current_user
-from backend.services.video_analysis import VideoAnalysisService
+from backend.services.video_analysis import VideoAnalysisService, find_cached_analysis, clone_analysis_for_user
+from backend.services.job_creation import extract_youtube_video_id
 from backend.services.rate_limiter import rate_limit
 from backend.workers.analysis_tasks import analyze_video_task
 from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
@@ -61,6 +62,7 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
         "summary": analysis.summary,
         "key_points": analysis.key_points,
         "chapters": analysis.chapters,
+        "five_minute_summary": analysis.five_minute_summary,
         "notes": analysis.notes,
         "quiz": analysis.quiz,
         "qa_history": analysis.qa_history or [],
@@ -99,9 +101,21 @@ async def create_analysis(
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
 
+    # Boshqa foydalanuvchi ALLAQACHON shu videoni shu tilda tahlil qilgan
+    # bo'lsa, qayta yuklab olish/transkripsiya/LLM chaqiruvlari o'rniga
+    # tayyor natijadan nusxa olamiz (2026-08-25, DubbingJob keshi bilan
+    # bir xil naqsh -- find_cached_analysis "original" tilini ataylab
+    # o'tkazib yuboradi, chunki u faqat transkripsiyadan keyin hal bo'ladi).
+    video_id = extract_youtube_video_id(request.youtube_url)
+    cached = find_cached_analysis(db, video_id, request.language)
+    if cached:
+        analysis = clone_analysis_for_user(db, cached, current_user.id)
+        return {"analysis_id": str(analysis.id), "status": "completed"}
+
     analysis = VideoAnalysis(
         user_id=current_user.id,
         youtube_url=request.youtube_url,
+        youtube_video_id=video_id,
         video_title=info.get("title"),
         video_duration=info.get("duration"),
         video_thumbnail=info.get("thumbnail"),

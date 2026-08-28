@@ -78,7 +78,7 @@ export default function UrlInput({
             type="text"
             value={url}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="YouTube havolasini kiriting..."
+            placeholder="Video havolasini joylashtiring..."
             className="flex-1 bg-transparent text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 text-xs sm:text-sm focus:outline-none font-medium"
           />
           <button
@@ -188,7 +188,7 @@ export default function UrlInput({
         {loading ? (
           <><Loader2 size={18} className="animate-spin" /> Vazifa yaratilmoqda...</>
         ) : (
-          <><Sparkles size={18} /> Dublyajni boshlash</>
+          <><Sparkles size={18} /> Videoni o'rganishni boshlash</>
         )}
       </motion.button>
 

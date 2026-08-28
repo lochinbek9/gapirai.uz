@@ -12,6 +12,7 @@ import {
   AnalysisVideoPlayer,
   type AnalysisVideoPlayerHandle,
 } from '../../src/features/analysis/components/AnalysisVideoPlayer';
+import { QuizFlow } from '../../src/features/analysis/components/QuizFlow';
 import { useAnalysisJob } from '../../src/features/analysis/hooks/useAnalysisJob';
 import {
   ANALYSIS_STATUS_LABELS,
@@ -412,80 +413,15 @@ export default function VideoAnalysisScreen() {
               )}
 
               {tab === 'quiz' && (
-                <ScrollView contentContainerStyle={[styles.tabContent, { gap: 14 }]}>
-                  {!quiz ? (
-                    <Pressable
-                      onPress={handleGenerateQuiz}
-                      disabled={quizLoading}
-                      style={[styles.generateButton, { backgroundColor: colors.accentGlow, opacity: quizLoading ? 0.6 : 1 }]}
-                    >
-                      {quizLoading && <ActivityIndicator color={colors.accent} style={{ marginRight: 8 }} />}
-                      <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
-                        {quizLoading ? 'Yaratilmoqda...' : 'Test tuzish'}
-                      </ThemedText>
-                    </Pressable>
-                  ) : (
-                    quiz.map((q, qi) => {
-                      const chosen = quizAnswers[qi];
-                      const showResult = chosen !== undefined;
-                      return (
-                        <ThemedView
-                          key={qi}
-                          style={[styles.quizCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                        >
-                          <ThemedText style={styles.rowTitle}>
-                            {qi + 1}. {q.question}
-                          </ThemedText>
-                          <ThemedView style={{ gap: 6 }}>
-                            {q.options.map((opt, oi) => {
-                              const isChosen = chosen === oi;
-                              const isCorrect = oi === q.correct_answer;
-                              const optionColor =
-                                showResult && isCorrect
-                                  ? colors.success
-                                  : showResult && isChosen
-                                    ? colors.danger
-                                    : colors.textPrimary;
-                              const optionBg =
-                                showResult && isCorrect
-                                  ? `${colors.success}26`
-                                  : showResult && isChosen
-                                    ? `${colors.danger}26`
-                                    : colors.background;
-                              const optionBorder =
-                                showResult && isCorrect
-                                  ? colors.success
-                                  : showResult && isChosen
-                                    ? colors.danger
-                                    : colors.border;
-                              return (
-                                <Pressable
-                                  key={oi}
-                                  disabled={showResult}
-                                  onPress={() => setQuizAnswers((prev) => ({ ...prev, [qi]: oi }))}
-                                  style={[styles.quizOption, { backgroundColor: optionBg, borderColor: optionBorder }]}
-                                >
-                                  <ThemedText style={{ color: optionColor, fontSize: 13, fontWeight: '500' }}>{opt}</ThemedText>
-                                </Pressable>
-                              );
-                            })}
-                          </ThemedView>
-                          {showResult && (
-                            <ThemedView style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-                              <Pressable onPress={() => seek(q.timestamp)}>
-                                <ThemedText style={[styles.timestamp, { color: colors.accent }]}>
-                                  {formatTimestamp(q.timestamp)}
-                                </ThemedText>
-                              </Pressable>
-                              <ThemedText variant="secondary" style={[styles.rowDescription, { flex: 1 }]}>
-                                {q.explanation}
-                              </ThemedText>
-                            </ThemedView>
-                          )}
-                        </ThemedView>
-                      );
-                    })
-                  )}
+                <ScrollView contentContainerStyle={styles.tabContent}>
+                  <QuizFlow
+                    quiz={quiz}
+                    loading={quizLoading}
+                    answers={quizAnswers}
+                    onGenerate={handleGenerateQuiz}
+                    onAnswer={(qidx, oidx) => setQuizAnswers((prev) => ({ ...prev, [qidx]: oidx }))}
+                    onSeek={seek}
+                  />
                 </ScrollView>
               )}
 
@@ -646,6 +582,4 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  quizCard: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
-  quizOption: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
 });

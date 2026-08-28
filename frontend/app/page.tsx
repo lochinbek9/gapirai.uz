@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
+import { learnVideo, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,11 +85,14 @@ function Logo() {
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
         GapirAI<span className="text-violet-600 dark:text-violet-500">.uz</span>
       </h1>
+      <p className="text-base sm:text-xl font-bold text-slate-900 dark:text-white max-w-md leading-snug">
+        Dunyodagi bilimlarni o'zbek tilida.
+      </p>
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
-        YouTube videolarni sun'iy intellekt yordamida <span className="font-bold text-slate-900 dark:text-white">sof, tabiiy o'zbek tiliga</span> avtomatik dublyaj qiling
+        YouTube, kurslar va ta'limiy videolarni o'zbek tilida tomosha qiling, tushuning va o'rganing.
       </p>
       <h2 className="sr-only">
-        YouTube videolarni sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj va tarjima qilish platformasi — GapirAI.uz
+        Dunyodagi bilimlarni o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
       </h2>
     </motion.div>
   );
@@ -315,13 +318,14 @@ export default function Home() {
     startRef.current = null;
     setElapsed(0);
     try {
-      const { job_id, status } = await createJob(url, voiceGender);
-      if (status === "awaiting_payment") {
-        saveJobId(job_id);
-        router.push(`/video/${job_id}`);
-      } else {
-        setJobId(job_id);
-      }
+      // learnVideo() bitta so'rovda HAM dublyaj, HAM o'quv materiallarini
+      // (konspekt/5-daqiqada/test/AI ustoz) boshlaydi -- natija Learning
+      // Workspace'da (frontend/app/learn/[id]) ko'rsatiladi, shu sahifada
+      // inline kutish shart emas (bu sahifadagi eski "processing"/"done"
+      // holatlari faqat oldingi, saqlangan job'larni davom ettirish uchun
+      // qoladi).
+      const { dubbing_job_id } = await learnVideo(url, voiceGender);
+      router.push(`/learn/${dubbing_job_id}`);
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Xatolik yuz berdi. Qayta urinib ko'ring.");
     } finally {
@@ -421,7 +425,7 @@ export default function Home() {
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     }`}
                   >
-                    Dublyaj qilish
+                    O'rganish
                   </button>
                   <button
                     type="button"

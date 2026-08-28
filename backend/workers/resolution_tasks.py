@@ -7,6 +7,7 @@ from backend.models.database import SessionLocal, DubbingJob, ResolutionVariant
 from backend.services import resolution_variants
 from backend.services.storage import generate_presigned_download_url
 from backend.services.telegram_notify import send_telegram_message
+from backend.services.error_classification import scrub_secrets
 
 logger = get_task_logger(__name__)
 
@@ -54,9 +55,11 @@ def generate_resolution_variant_task(self: Task, job_id: str, resolution: str):
                         f"\u2705 {resolution} versiyasi tayyor!\n\n\U0001F3AC {job.video_title or 'Video'}\n\n{url}",
                     )
         except Exception as exc:
-            logger.error(f"Rezolyutsiya generatsiyasida xatolik (job={job_id}, resolution={resolution}): {exc}")
+            logger.error(f"Rezolyutsiya generatsiyasida xatolik (job={job_id}, resolution={resolution}): {scrub_secrets(str(exc))}")
             variant.status = "failed"
-            variant.error_message = str(exc)[:2000]
+            # scrub_secrets -- bu maydon ham job.error_message kabi
+            # credential oshkor qilmasligi kerak (2026-08-26 audit, Priority 1).
+            variant.error_message = scrub_secrets(str(exc))[:2000]
             variant.updated_at = datetime.utcnow()
             db.commit()
     finally:

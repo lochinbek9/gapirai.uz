@@ -18,10 +18,32 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_acks_late=True,          # Xatolik bo'lsa qayta urinish
+    # 2026-08-26 audit: task_acks_late=True O'ZI YETARLI EMAS -- worker
+    # bola-jarayoni to'satdan o'ldirilsa (OOM, deploy paytidagi SIGKILL),
+    # Celery'ning standart xatti-harakati (bu sozlama o'chirilgan holda)
+    # xabarni BARIBIR ACK qiladi va vazifa hech qanday iz qoldirmasdan
+    # yo'qoladi -- productionda 5 marta haqiqiy OOM-kill kuzatilgan
+    # (2026-08-14/15, kernel loglari), shundan keyin job DOWNLOADING
+    # holatida abadiy qotib qolgan. True bilan: o'ldirilgan bola vazifasi
+    # broker'ga QAYTA navbatga qo'yiladi -- boshqa (yoki shu) worker uni
+    # tugatadi. Dublikat-ijro xavfi backend/services/job_claim.py'dagi DB
+    # darajasidagi atomik claim bilan qoplangan (shu audit doirasida
+    # qo'shilgan) -- shu himoyasiz bu sozlamani yoqish xavfli bo'lardi.
+    task_reject_on_worker_lost=True,
     broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=1, # Bir vaqtda bitta vazifa
     task_time_limit=8000,         # Max 8000 seconds execution time limit (8K)
     task_soft_time_limit=7800,    # Soft time limit to clean up gracefully
+    # 2026-08-26 audit: ilgari sozlanmagan edi -- Kombu/Redis'ning
+    # standart qiymati (3600s) process_video'ning o'z time_limit'iga
+    # (3600s) AYNAN teng edi: uzoq video uchun bu ikkalasi bir vaqtda
+    # tugab, vazifaning majburiy SIGKILL qilinishi bilan broker'ning uni
+    # "yo'qolgan" deb hisoblab qayta yetkazib berishi bir zumda to'qnashishi
+    # mumkin edi. 4000s -- eng uzun vazifaning (process_video, 3600s)
+    # o'zidan sezilarli ko'proq, lekin haddan tashqari uzun ham emas (haqiqatan
+    # qotib qolgan vazifa 66 daqiqadan ortiq kutmaydi).
+    broker_transport_options={"visibility_timeout": 4000},
+    result_backend_transport_options={"visibility_timeout": 4000},
     task_routes={
         # process_video'da "queue" ATAYLAB yo'q — chaqiruv joylarida
         # (routes.py/click_routes.py/main.py) get_job_queue() orqali

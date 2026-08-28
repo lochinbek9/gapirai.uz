@@ -3,40 +3,34 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '../src/components/ThemedText';
-import { ThemedView } from '../src/components/ThemedView';
-import { AnalyzeForm } from '../src/features/analysis/components/AnalyzeForm';
-import { DubForm } from '../src/features/dubbing/components/DubForm';
-import { useAuthStore } from '../src/store/useAuthStore';
-import { useTheme } from '../src/theme/ThemeProvider';
+import { ThemedText } from '../../src/components/ThemedText';
+import { ThemedView } from '../../src/components/ThemedView';
+import { AnalyzeForm } from '../../src/features/analysis/components/AnalyzeForm';
+import { DubForm } from '../../src/features/dubbing/components/DubForm';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import { useTheme } from '../../src/theme/ThemeProvider';
 
 type Mode = 'dub' | 'analyze';
 
+// Kutubxona/Videolarim/Chiqish moved out of the header — Library is now its
+// own tab and Profile (also a tab) covers account + sign-out, per the
+// bottom-nav redesign (2026-08-22): keep the home screen to exactly one
+// job — "video yubor -> o'zbekcha tushun" — nothing else competing for it.
 export default function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
   const user = useAuthStore((s) => s.user);
-  const signOut = useAuthStore((s) => s.signOut);
   const [mode, setMode] = useState<Mode>('dub');
 
   return (
     <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex}>
+      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
         <ThemedView style={styles.header}>
           <ThemedText style={styles.headerLogo}>
             GapirAI<ThemedText style={[styles.headerLogo, { color: colors.accent }]}>.uz</ThemedText>
           </ThemedText>
-          {status === 'signedIn' && user ? (
-            <ThemedView style={styles.headerActions}>
-              <Pressable onPress={() => router.push('/dashboard')} hitSlop={8}>
-                <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Videolarim</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => signOut()} hitSlop={8}>
-                <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Chiqish</ThemedText>
-              </Pressable>
-            </ThemedView>
-          ) : (
+          {status !== 'signedIn' && (
             <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={8}>
               <ThemedText style={[styles.headerAction, { color: colors.accent }]}>Kirish</ThemedText>
             </Pressable>
@@ -68,7 +62,7 @@ export default function HomeScreen() {
                 style={[styles.tab, mode === 'dub' && { backgroundColor: colors.background }]}
               >
                 <ThemedText style={[styles.tabLabel, mode === 'dub' && { color: colors.accent }]}>
-                  Dublyaj qilish
+                  O'rganish
                 </ThemedText>
               </Pressable>
               <Pressable
@@ -122,12 +116,6 @@ const styles = StyleSheet.create({
   headerAction: {
     fontSize: 14,
     fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingHorizontal: 20,

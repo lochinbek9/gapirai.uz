@@ -78,6 +78,27 @@ def download_file_from_s3(object_name: str, local_path: str) -> bool:
         return False
 
 
+def s3_object_exists(object_name: str) -> bool:
+    """Obyekt S3'da haqiqatan mavjudligini tekshiradi. Presigned URL
+    generatsiyasi buni tekshirmaydi -- u faqat lokal kriptografik imzolash,
+    tarmoq so'rovi emas -- shuning uchun bucket lifecycle qoidasi (3 kundan
+    keyin avtomatik o'chirish, backend/config.py: AWS_BUCKET_NAME) bo'yicha
+    allaqachon o'chirilgan faylga ham "muvaffaqiyatli" ko'ringan URL
+    qaytarib yuborardi, keyin brauzer uni yuklashga uringanda jim tarzda
+    404 bilan yiqilardi (2026-08-21 aniqlangan bag)."""
+    s3_client, bucket = _get_s3_client()
+    if not s3_client:
+        return False
+    try:
+        s3_client.head_object(Bucket=bucket, Key=object_name)
+        return True
+    except ClientError:
+        return False
+    except Exception as e:
+        logger.error(f"S3 mavjudlikni tekshirishda kutilmagan xatolik ({object_name}): {e}")
+        return False
+
+
 def generate_presigned_download_url(object_name: str, expiration: int = 3600) -> str | None:
     """Generate a presigned URL to share an S3 object."""
     s3_client, bucket = _get_s3_client()
