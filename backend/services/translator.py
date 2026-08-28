@@ -22,6 +22,30 @@ _NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
 # aralashib, JSON kesilib qolishiga sabab bo'ladi (thread-safe emas) —
 # shuning uchun har bir thread o'zining alohida clientiga ega bo'ladi.
 _gemini_local = threading.local()
+# Ротация ключей: бесплатный тариф ~20 запросов/день на ключ. При 429
+# переключаемся на GEMINI_API_KEY_2/_3 (см. _rotate_gemini_key).
+_gemini_key_idx = threading.local()
+
+
+def _next_gemini_key() -> str:
+    keys = [settings.GEMINI_API_KEY, settings.GEMINI_API_KEY_2, settings.GEMINI_API_KEY_3]
+    valid = [k for k in keys if k]
+    if not valid:
+        return ""
+    idx = getattr(_gemini_key_idx, "idx", 0) % len(valid)
+    return valid[idx]
+
+
+def _rotate_gemini_key() -> None:
+    keys = [settings.GEMINI_API_KEY, settings.GEMINI_API_KEY_2, settings.GEMINI_API_KEY_3]
+    valid = [k for k in keys if k]
+    if not valid:
+        return
+    cur = getattr(_gemini_key_idx, "idx", 0)
+    _gemini_key_idx.idx = (cur + 1) % len(valid)
+    if hasattr(_gemini_local, "client"):
+        del _gemini_local.client
+    logger.warning(f"Gemini 429: переключение на ключ #{((cur + 1) % len(valid)) + 1} из {len(valid)}")
 
 
 def _get_gemini_client():
@@ -36,10 +60,11 @@ def _get_gemini_client():
                 project=settings.GCP_PROJECT_ID,
                 location=settings.GCP_LOCATION,
             )
-        elif settings.GEMINI_API_KEY:
-            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         else:
-            raise RuntimeError("GEMINI_API_KEY yoki GEMINI_USE_VERTEX sozlanmagan")
+            key = _next_gemini_key()
+            if not key:
+                raise RuntimeError("GEMINI_API_KEY yoki GEMINI_USE_VERTEX sozlanmagan")
+            _gemini_local.client = genai.Client(api_key=key)
     return _gemini_local.client
 
 
@@ -62,8 +87,21 @@ def translate_free_google(text: str, target_lang: str = "uz") -> str:
             data = response.json()
             parts = [item[0] for item in data[0] if item and item[0]]
             return "".join(parts)
+        else:
+            logger.warning(f"Free Google Translate: HTTP {response.status_code}")
     except Exception as e:
         logger.error(f"Free Google Translate API request failed: {e}")
+    # Fallback: deep-translator (MyMemory — bepul, 5000 kunlik limit)
+    try:
+        from deep_translator import MyMemoryTranslator
+        import html as _html
+        result = MyMemoryTranslator(source="english", target="uzbek").translate(text)
+        if result and result != text:
+            result = _html.unescape(result)  # &#39; → '
+            logger.info("deep-translator (MyMemory) ishlatildi")
+            return result
+    except Exception as e:
+        logger.error(f"deep-translator fallback failed: {e}")
     return text
 
 
@@ -306,33 +344,50 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
             is_bad_json = isinstance(e, json.JSONDecodeError)
             if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
                 raise
+            if is_rate_limit:
+                _rotate_gemini_key()
             backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
             reason = "RateLimit" if is_rate_limit else "noto'g'ri/kesilgan JSON"
             logger.warning(f"Gemini {reason} — qayta urinish {backoff:.2f}s dan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
             time.sleep(backoff)
 
 
+def _translate_chunk_free_fallback(segments: list[dict]) -> list[dict]:
+    """Free Google Translate fallback — cheksiz, API kalit kerak emas.
+    Sifat pastroq (kitobiy tarjima), lekin pipeline to'xtab qolmaydi."""
+    logger.info("Free Google Translate fallback ishlatilmoqda...")
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        return list(executor.map(_translate_segment_free, segments))
+
+
 def _translate_chunk(segments: list[dict]) -> list[dict]:
     """Bir bo'lak segmentlarni tarjima qilish — TRANSLATE_PROVIDER ga qarab.
 
-    TRANSLATE_PROVIDER="openai" bo'lsa ham, OpenAI muvaffaqiyatsiz bo'lsa
-    (masalan krediti tugasa) Gemini'ga avtomatik o'tadi — aks holda butun
-    video navbatda qotib qoladi (2026-08-09 OpenAI krediti tugash hodisasi
-    sabab qo'shildi)."""
+    Fallback zanjiri: OpenAI → Gemini → Free Google Translate.
+    Har qanday xatoda keyingisiga o'tadi — pipeline hech qachon to'xtamaydi.
+    """
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
 
+    # 1. TRANSLATE_PROVIDER bo'yicha primary provider
     if settings.TRANSLATE_PROVIDER == "gemini":
-        return _translate_chunk_gemini(segments, clean_segments)
+        try:
+            return _translate_chunk_gemini(segments, clean_segments)
+        except Exception as e:
+            logger.warning(f"Gemini tarjima muvaffaqiyatsiz ({e}) — Free Google Translate ga o'tilmoqda.")
+            return _translate_chunk_free_fallback(segments)
 
+    # Default: OpenAI
     try:
         return _translate_chunk_openai(segments, clean_segments)
     except Exception as e:
-        if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
-            raise
         logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
-        return _translate_chunk_gemini(segments, clean_segments)
+        try:
+            return _translate_chunk_gemini(segments, clean_segments)
+        except Exception as e2:
+            logger.warning(f"Gemini ham muvaffaqiyatsiz ({e2}) — Free Google Translate ga o'tilmoqda.")
+            return _translate_chunk_free_fallback(segments)
 
 
 _CALIBRATED_RATE_CACHE: dict = {"value": None, "computed_at": 0.0}

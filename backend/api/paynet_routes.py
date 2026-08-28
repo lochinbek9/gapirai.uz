@@ -18,9 +18,10 @@
    услуг", UZPAYNET, v1.0, 2.2-bo'lim).
 
    "fields.order_id" -- bizning Payment.id (Payme'dagi account.payment_id
-   bilan bir xil naqsh) -- bu taxmin, Paynet'ning "test uchun hisob"
-   namunasidagi maydon nomidan kelib chiqqan (order_id/user_id), rasmiy
-   hujjatda umumiy misol "client_id" ishlatgan. Tasdiqlash kerak.
+   bilan bir xil naqsh). Foydalanuvchi tomonidan tasdiqlangan (2026-08-24) --
+   ilgari bu taxmin edi (Paynet'ning "test uchun hisob" namunasidagi maydon
+   nomidan kelib chiqqan, rasmiy hujjatda umumiy misol "client_id"
+   ishlatgan edi), endi qat'iy fakt sifatida ishlatilishi mumkin.
 """
 from datetime import datetime
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -44,6 +45,23 @@ from backend.config import get_settings
 router = APIRouter(prefix="/api/payments/paynet", tags=["paynet"])
 
 ORDER_FIELD = "order_id"  # Payme'dagi ACCOUNT_FIELD bilan bir xil naqsh -- Payment.id
+
+
+def _check_service_id(params: dict, req_id):
+    """Barcha metodlar uchun bitta joyda -- ilgari faqat PerformTransaction
+    o'zi tekshirardi, qolgan metodlar serviceId'ni umuman tekshirmasdi.
+    Paynet texnik jamoasi tasdiqladi (2026-08-24): noto'g'ri serviceId
+    HAR BIR metodda 305 (Xizmat topilmadi) bilan rad etilishi kerak."""
+    service_id = params.get("serviceId")
+    if service_id is None:
+        return rpc_error(PaynetErrors.REQUIRED_PARAMS_MISSING, "serviceId talab qilinadi.", req_id)
+    settings = get_settings()
+    try:
+        if int(service_id) != int(settings.PAYNET_SERVICE_ID):
+            return rpc_error(PaynetErrors.SERVICE_NOT_FOUND, "Xizmat topilmadi.", req_id)
+    except (TypeError, ValueError):
+        return rpc_error(PaynetErrors.SERVICE_NOT_FOUND, "Xizmat topilmadi.", req_id)
+    return None
 
 
 def _amount_tiyin(so_um_amount: float) -> int:
@@ -152,6 +170,10 @@ def _find_by_paynet_txn(db: Session, params: dict) -> Payment | None:
 
 
 def _handle_get_information(db: Session, params: dict, req_id):
+    err = _check_service_id(params, req_id)
+    if err:
+        return err
+
     payment = _find_by_order_id(db, params)
     if not payment or payment.status != PaymentStatus.PENDING:
         return rpc_error(PaynetErrors.CLIENT_NOT_FOUND, "To'lov topilmadi yoki muddati o'tgan.", req_id)
@@ -160,10 +182,17 @@ def _handle_get_information(db: Session, params: dict, req_id):
         f"Tarif: {payment.plan}" if payment.plan else "Video dublyaj"
     )
     return rpc_result({
-        "status": 0,
+        # Paynet texnik jamoasi tasdiqladi (2026-08-24): "status" STRING
+        # bo'lishi kerak (spec jadvalida "Number" deyilgan, lekin bu
+        # noto'g'ri -- ularning o'z misolida ham "0" qo'shtirnoqda).
+        "status": "0",
         "timestamp": now_gmt5_str(),
         "fields": {
-            "amount": _amount_tiyin(payment.amount),
+            # Paynet texnik jamoasi tasdiqladi (2026-08-24): bu yerda summa
+            # SO'MDA qaytarilishi kerak -- tiyinda emas (PerformTransaction
+            # so'rovidagi "amount" tiyinda bo'lishi bilan farqli, xuddi
+            # Uzum'ning /check javobidagi bir xil qoida kabi).
+            "amount": int(payment.amount),
             "name": label,
         },
     }, req_id)
@@ -171,26 +200,22 @@ def _handle_get_information(db: Session, params: dict, req_id):
 
 def _handle_perform_transaction(db: Session, params: dict, req_id):
     amount_tiyin = params.get("amount")
-    service_id = params.get("serviceId")
     txn_id = params.get("transactionId")
 
-    if amount_tiyin is None or service_id is None or txn_id is None:
+    if amount_tiyin is None or txn_id is None:
         return rpc_error(PaynetErrors.REQUIRED_PARAMS_MISSING, "Majburiy parametr(lar) yo'q.", req_id)
 
-    settings = get_settings()
-    if int(service_id) != int(settings.PAYNET_SERVICE_ID):
-        return rpc_error(PaynetErrors.SERVICE_NOT_FOUND, "Xizmat topilmadi.", req_id)
+    err = _check_service_id(params, req_id)
+    if err:
+        return err
 
-    # Idempotentlik: shu Paynet transactionId bilan tranzaksiya allaqachon
-    # yaratilgan bo'lsa, bir xil natijani qaytaramiz (tarmoq qayta urinishi).
+    # Paynet texnik jamoasi tasdiqladi (2026-08-24): bir xil transactionId
+    # bilan takroriy so'rov HAR DOIM 201 (Tranzaksiya allaqachon mavjud) --
+    # holat allaqachon APPROVED bo'lsa ham muvaffaqiyatni qaytadan
+    # qaytarilmaydi (ilgari shunday edi, Payme uslubida idempotent-success --
+    # bu noto'g'ri ekan). Uzum'ning /create'dagi bir xil qat'iy qoidasiga mos.
     existing = _find_by_paynet_txn(db, params)
     if existing:
-        if existing.status == PaymentStatus.APPROVED:
-            return rpc_result({
-                "providerTrnId": provider_trn_id(existing.id),
-                "timestamp": dt_to_gmt5_str(existing.paynet_perform_time or existing.updated_at),
-                "fields": {ORDER_FIELD: str(existing.id)},
-            }, req_id)
         return rpc_error(PaynetErrors.TRANSACTION_ALREADY_EXISTS, "Tranzaksiya allaqachon mavjud.", req_id)
 
     payment = _find_by_order_id(db, params)
@@ -212,11 +237,19 @@ def _handle_perform_transaction(db: Session, params: dict, req_id):
     return rpc_result({
         "providerTrnId": provider_trn_id(payment.id),
         "timestamp": dt_to_gmt5_str(payment.paynet_perform_time),
-        "fields": {ORDER_FIELD: str(payment.id)},
+        # "balance" -- Paynet shartnoma ilovasi (Таблица 4) buni MAJBURIY
+        # deb belgilagan ("Баланс плательщика после проведения транзакции").
+        # Bizda hamyon/balans tushunchasi yo'q (bir martalik to'lov xizmati)
+        # -- foydalanuvchi bilan kelishilgan: doim 0 qaytariladi (2026-08-24).
+        "fields": {ORDER_FIELD: str(payment.id), "balance": 0},
     }, req_id)
 
 
 def _handle_check_transaction(db: Session, params: dict, req_id):
+    err = _check_service_id(params, req_id)
+    if err:
+        return err
+
     payment = _find_by_paynet_txn(db, params)
     if not payment:
         return rpc_result({
@@ -235,6 +268,10 @@ def _handle_check_transaction(db: Session, params: dict, req_id):
 
 
 def _handle_cancel_transaction(db: Session, params: dict, req_id):
+    err = _check_service_id(params, req_id)
+    if err:
+        return err
+
     payment = _find_by_paynet_txn(db, params)
     if not payment:
         return rpc_error(PaynetErrors.TRANSACTION_NOT_FOUND, "Tranzaksiya topilmadi.", req_id)
@@ -268,6 +305,10 @@ def _handle_cancel_transaction(db: Session, params: dict, req_id):
 
 def _handle_get_statement(db: Session, params: dict, req_id):
     from backend.services.paynet_service import parse_gmt5_str
+
+    err = _check_service_id(params, req_id)
+    if err:
+        return err
 
     date_from = params.get("dateFrom")
     date_to = params.get("dateTo")

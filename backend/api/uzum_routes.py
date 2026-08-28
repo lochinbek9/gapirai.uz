@@ -133,6 +133,44 @@ def initiate_job_payment(
     return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": amount}
 
 
+@router.post("/initiate-library")
+def initiate_library_payment(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """payme_routes.py:initiate_library_payment bilan bir xil naqsh --
+    checkout havolasi o'rniga faqat Uzum "account" raqamini qaytaradi
+    (yuqoridagi initiate_job_payment bilan bir xil sabab). Bu metod ilgari
+    umuman yo'q edi -- Uzum faqat video (job) to'lovlari uchun qurilgan,
+    kutubxona kirish huquqi uchun na backend endpoint, na frontend tugma
+    bor edi (2026-08-24, foydalanuvchi kutubxona sahifasida Uzum tugmasi
+    ko'rinmayotganini payqadi)."""
+    from backend.api.routes import LIBRARY_ACCESS_PRICE
+    if current_user.library_access_purchased_at is not None:
+        return {"success": True, "message": "Kirish huquqi allaqachon mavjud.", "amount": 0}
+
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id,
+        Payment.is_library_access.is_(True),
+        Payment.status == PaymentStatus.PENDING,
+        Payment.provider == PaymentProvider.UZUM,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, is_library_access=True, amount=LIBRARY_ACCESS_PRICE,
+            provider=PaymentProvider.UZUM, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+    if not payment.uzum_account_id:
+        payment.uzum_account_id = account_id_from_payment_id(payment.id)
+        db.commit()
+
+    return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": LIBRARY_ACCESS_PRICE}
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # 2. Webhook (Uzum -> bizning backend)
 # ─────────────────────────────────────────────────────────────────────────
@@ -212,10 +250,12 @@ async def uzum_check(request: Request, db: Session = Depends(get_db)):
         return _err(UzumErrors.PAYMENT_CANCELLED)
 
     # Uzum texnik xodimi (Абдухамид Атакулов, 2026-08-20) tasdiqladi: /check
-    # javobida FAQAT "amount" bo'lishi kerak, string ko'rinishida, SO'MDA
-    # (tiyinda emas) -- bizning aniq xizmatimiz uchun ko'rsatma, umumiy
-    # hujjatdagi bo'sh {} namunasidan ustun.
-    return JSONResponse(status_code=200, content=check_success(service_id, {"amount": str(int(payment.amount))}))
+    # javobida "amount" SO'MDA (tiyinda emas) bo'lishi kerak. 2026-08-24:
+    # xuddi shu xodim maydon shaklini TUZATDI -- ilgari tekis satr edi
+    # ("amount": "5000"), aslida {"value": "..."} ichma-ich obyekt bo'lishi
+    # kerak ekan. So'm/tekis-satr qoidasi hali ham amalda, faqat qadoqlash
+    # o'zgardi.
+    return JSONResponse(status_code=200, content=check_success(service_id, {"amount": {"value": str(int(payment.amount))}}))
 
 
 @router.post("/create")
@@ -263,7 +303,7 @@ async def uzum_create(request: Request, db: Session = Depends(get_db)):
     payment.uzum_create_time = datetime.utcnow()
     db.commit()
 
-    return JSONResponse(status_code=200, content=create_success(service_id, str(trans_id), int(amount_in)))
+    return JSONResponse(status_code=200, content=create_success(service_id, str(trans_id), int(amount_in), _dt_to_ms(payment.uzum_create_time)))
 
 
 @router.post("/confirm")
@@ -317,7 +357,7 @@ async def uzum_confirm(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     amount_out = _amount_tiyin(payment.amount)
-    return JSONResponse(status_code=200, content=confirm_success(service_id, str(trans_id), amount_out))
+    return JSONResponse(status_code=200, content=confirm_success(service_id, str(trans_id), amount_out, _dt_to_ms(payment.uzum_confirm_time)))
 
 
 @router.post("/reverse")
@@ -363,7 +403,7 @@ async def uzum_reverse(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     amount_out = _amount_tiyin(payment.amount)
-    return JSONResponse(status_code=200, content=reverse_success(service_id, str(trans_id), amount_out))
+    return JSONResponse(status_code=200, content=reverse_success(service_id, str(trans_id), amount_out, _dt_to_ms(payment.uzum_cancel_time)))
 
 
 @router.post("/status")

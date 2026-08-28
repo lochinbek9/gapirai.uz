@@ -61,7 +61,11 @@ class YoutubeRateLimiter:
     MIN_COOLDOWN = 30       # minimum seconds between download starts
     MAX_COOLDOWN = 300      # cap exponential backoff at 5 minutes
     MAX_CONCURRENT = 1
-    ACQUIRE_TIMEOUT = 8000   # max wait for a slot (10 minutes)
+    # ACQUIRE_TIMEOUT — 8000 c (2s13m) edi; bu worker'ni shu vaqtgacha
+    # ushlab turardi, so'ngra Celery soft_time_limit (55m) uni o'ldirar edi.
+    # Job "qayta ishga tushib" qayta-qayta urinardi. 600 c (10m) — bitta
+    # slot o'ynash uchun yetarli (AUDIT_STABILITY.md §3 P1-3).
+    ACQUIRE_TIMEOUT = 600   # max wait for a slot (10 minutes)
     POLL_INTERVAL = 1.5     # sleep between slot checks
 
     def __init__(self, redis_url: str):

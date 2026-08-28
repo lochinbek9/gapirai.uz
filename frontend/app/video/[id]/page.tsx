@@ -2,15 +2,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, initiateUzumPayment, clearJobId, cancelJob } from '@/lib/api'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2, CreditCard, AlertTriangle
+  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
+import DownloadButton from '@/components/DownloadButton'
+import { detectInAppBrowser, safeFileName } from '@/lib/download'
 import { STEPS as PIPELINE_STEPS, getCurrentStep } from '@/components/StepProgress'
 import { trackEvent, trackOnce } from '@/lib/analytics'
 
@@ -40,10 +42,13 @@ export default function VideoPage() {
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
+  const [uzumCopied, setUzumCopied] = useState(false)
   const [showTranscript, setShowTranscript] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const [inApp, setInApp] = useState<{ inApp: boolean; app: string | null }>({ inApp: false, app: null })
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
@@ -81,6 +86,10 @@ export default function VideoPage() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
+  }, [])
+
+  useEffect(() => {
+    setInApp(detectInAppBrowser())
   }, [])
 
   useEffect(() => {
@@ -188,6 +197,43 @@ export default function VideoPage() {
     }
   }
 
+  // Uzum'da Click/Payme'dagidek checkout havolasi yo'q -- foydalanuvchi
+  // Uzum ilovasida shu "account" raqamini o'zi kiritib to'laydi. Tasdiqlash
+  // Uzum'ning /confirm webhook'i orqali keladi -- shu sahifa allaqachon
+  // useJobPolling bilan job holatini kuzatib turgani uchun (109-qatordagi
+  // "awaiting_payment" o'tishi effekti), qo'shimcha poll shart emas: to'lov
+  // tasdiqlangach sahifa o'zi yangilanadi.
+  const handleUzumPayment = async () => {
+    if (!id) return
+    setPaymentLoading(true)
+    setPaymentError(null)
+    try {
+      const res = await initiateUzumPayment(id)
+      if (res.success && res.account) {
+        trackEvent('payment_started', { provider: 'uzum' })
+        paidAmountRef.current = res.amount
+        paymentIdRef.current = res.payment_id || null
+        setUzumAccount({ account: res.account, amount: res.amount })
+      } else if (res.amount === 0) {
+        window.location.reload()
+      } else {
+        setPaymentError("To'lov ma'lumotlarini yaratishda xatolik yuz berdi.")
+      }
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
+  const handleCopyUzumAccount = () => {
+    if (!uzumAccount) return
+    navigator.clipboard.writeText(String(uzumAccount.account)).then(() => {
+      setUzumCopied(true)
+      setTimeout(() => setUzumCopied(false), 2000)
+    })
+  }
+
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
@@ -210,6 +256,18 @@ export default function VideoPage() {
       </header>
 
       <div className={theaterMode ? 'w-full' : 'max-w-6xl mx-auto px-6 py-8'}>
+        {inApp.inApp && (
+          <div className={theaterMode ? 'max-w-6xl mx-auto px-6 pt-4' : ''}>
+            <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-4 mb-4">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300 leading-relaxed">
+                Siz <strong>{inApp.app || 'ilova ichidagi'}</strong> brauzerdan ochgansiz — unda yuklab olish
+                bloklanishi mumkin. Yaxshisi: videoni <strong>Chrome</strong> yoki <strong>Safari</strong>'da
+                ochib yuklab oling.
+              </p>
+            </div>
+          </div>
+        )}
         <div className={theaterMode
           ? 'flex flex-col gap-0'
           : 'grid grid-cols-1 lg:grid-cols-3 gap-8'
@@ -261,26 +319,64 @@ export default function VideoPage() {
                     Obuna bo'lgandan so'ng, shunga o'xshash videolarni qo'shimcha to'lovsiz dublyaj qila olasiz.
                   </p>
 
-                  <div className="border-t border-white/10 pt-4 space-y-2">
-                    <button
-                      onClick={() => handlePayment('click')}
-                      disabled={paymentLoading}
-                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50 block"
-                    >
-                      {paymentLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin inline" />
-                      ) : (
-                        <>Click orqali bir martalik to'lov qiling ({job.video_duration ? calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ') : '...'} UZS)</>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handlePayment('payme')}
-                      disabled={paymentLoading}
-                      className="text-xs font-semibold text-slate-400 hover:text-white transition disabled:opacity-50 block"
-                    >
-                      Payme orqali to'lash
-                    </button>
-                  </div>
+                  {uzumAccount ? (
+                    <div className="bg-white/5 border border-violet-500/20 rounded-xl p-4 text-left space-y-3">
+                      <p className="text-xs font-semibold text-slate-300">
+                        Uzum ilovasida to'lovlar bo'limidan quyidagi hisob raqamini kiriting va {uzumAccount.amount.toLocaleString('uz-UZ')} so'm to'lang:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 font-mono text-lg font-bold text-white bg-black/30 rounded-lg px-3 py-2 text-center tracking-wider">
+                          {uzumAccount.account}
+                        </span>
+                        <button
+                          onClick={handleCopyUzumAccount}
+                          className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex-shrink-0"
+                          title="Nusxalash"
+                        >
+                          {uzumCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        To'lov tasdiqlangach, bu sahifa avtomatik yangilanadi.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border-t border-white/10 pt-4 space-y-3">
+                      <p className="text-xs text-slate-500">
+                        Yoki ushbu video uchun bir martalik to'lov qiling{job.video_duration ? ` (${calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ')} so'm)` : ''}:
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handlePayment('click')}
+                          disabled={paymentLoading}
+                          title="Click orqali to'lash"
+                          className="flex items-center justify-center h-11 px-3.5 rounded-xl bg-white border border-white/10 hover:shadow-md transition disabled:opacity-50"
+                        >
+                          {paymentLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                          ) : (
+                            <img src="/logos/click.png" alt="Click" className="h-4 w-auto object-contain" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handlePayment('payme')}
+                          disabled={paymentLoading}
+                          title="Payme orqali to'lash"
+                          className="flex items-center justify-center h-11 px-3.5 rounded-xl bg-white border border-white/10 hover:shadow-md transition disabled:opacity-50"
+                        >
+                          <img src="/logos/payme.png" alt="Payme" className="h-4 w-auto object-contain" />
+                        </button>
+                        <button
+                          onClick={handleUzumPayment}
+                          disabled={paymentLoading}
+                          title="Uzum orqali to'lash"
+                          className="flex items-center justify-center h-11 px-3.5 rounded-xl bg-white border border-white/10 hover:shadow-md transition disabled:opacity-50"
+                        >
+                          <img src="/logos/uzum.png" alt="Uzum" className="h-5 w-auto object-contain" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleGoHome}
@@ -415,6 +511,12 @@ export default function VideoPage() {
               {/* Download & Feedback */}
               {job.status === 'completed' && (
                 <div className="space-y-6 pt-1">
+                  <DownloadButton
+                    url={getVideoUrl(id)}
+                    filename={safeFileName(job.video_title, 'video')}
+                    label="Videoni yuklab olish (720p)"
+                    hint="Katta fayl bo'lsa, yuklab olish bir necha daqiqa davom etishi mumkin."
+                  />
                   <div>
                     <ResolutionDownloadButtons jobId={id} />
                   </div>

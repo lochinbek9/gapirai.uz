@@ -2,10 +2,21 @@
 YouTube cookie manager.
 Playwright orqali headless Chrome bilan YouTube ga login qilib,
 cookilarni avtomatik yangilab turadi.
+
+2026-08-25 audit tuzatishi (AUDIT_STABILITY.md §2):
+- `cookies_are_fresh()` endi sun'iy meta-faylga emas, cookie faylning
+  O'ZIDAGI eng kech `expires` qiymatiga qaraydi (meta-fayl eski
+  dizaynda konteynerning effemer qatlamida yashardi va qayta ishga
+  tushishda yo'qolardi).
+- `_save_cookies_netscape()` endi atomik yozadi (tmp + os.replace) —
+  yarim yozilgan fayl hech qachon yt-dlp'ga ko'rinmaydi.
+- Qo'shildi `min_cookie_expiry()` — tashqi monitoring uchun foydali
+  (health-check: "kuки истекут через N дней").
 """
 import asyncio
 import json
 import os
+import time
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,20 +25,42 @@ logger = logging.getLogger(__name__)
 
 COOKIES_FILE = "/app/cookies.txt"
 COOKIES_META_FILE = "/app/cookies_meta.json"
-REFRESH_INTERVAL_HOURS = 12  # Har 12 soatda yangilash
+REFRESH_INTERVAL_HOURS = 12  # Har 12 soatda yangilash (meta-fayl eski dizaynidan qolgan)
+# Freshness kuki: eng erta expires'dan shuncha kun oldin "eski" deb hisoblanadi.
+# YouTube sessiya kukilarining typik qiymati "expires=0" bo'ladi (sessiya) — ular
+# hisobga olinmaydi; faqat aniq sanali kukilar (SAPISID/SSID kabi) hisobga olinadi.
+COOKIE_FRESH_DAYS = 7
+
+
+def min_cookie_expiry() -> float:
+    """Eng erta (minimal) expires qiymatini qaytaradi (epoch seconds).
+    Fayl yo'q yoki sanali kuки yo'q bo'lsa 0 qaytaradi."""
+    if not os.path.exists(COOKIES_FILE):
+        return 0.0
+    expires_vals = []
+    try:
+        with open(COOKIES_FILE) as f:
+            for line in f:
+                if line.startswith("#") or not line.strip():
+                    continue
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) >= 5 and parts[4].isdigit():
+                    val = int(parts[4])
+                    if val > 0:
+                        expires_vals.append(val)
+    except Exception:
+        return 0.0
+    return float(min(expires_vals)) if expires_vals else 0.0
 
 
 def cookies_are_fresh() -> bool:
-    """Cookie fayl yangiligi tekshiruvi."""
-    if not os.path.exists(COOKIES_META_FILE):
+    """Cookie fayl yengilligi: eng erta expires hali ham COOKIE_FRESH_DAYS
+    kelajagida. Bu meta-fayldan emas — fayl o'zida haqiqiy expiry
+    (AUDIT_STABILITY.md §2.1)."""
+    expiry = min_cookie_expiry()
+    if expiry <= 0:
         return False
-    try:
-        with open(COOKIES_META_FILE) as f:
-            meta = json.load(f)
-        updated_at = datetime.fromisoformat(meta["updated_at"])
-        return datetime.utcnow() - updated_at < timedelta(hours=REFRESH_INTERVAL_HOURS)
-    except Exception:
-        return False
+    return expiry > time.time() + COOKIE_FRESH_DAYS * 86400
 
 
 async def refresh_cookies(youtube_email: str, youtube_password: str) -> bool:
@@ -138,8 +171,13 @@ def _save_cookies_netscape(cookies: list, filepath: str) -> None:
         value = c.get("value", "")
         lines.append(f"{domain}\t{include_subdomains}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n")
 
-    with open(filepath, "w") as f:
+    # Atomik yozish: oldin tmp — keyin os.replace(). Agar jarayon ortada
+    # qulasa, eski fay nigina buzilmay qoladi; yt-dlp hech qachon yarim
+    # yozilgan faylni o'qimaydi. (AUDIT_STABILITY.md §2.2)
+    tmp_path = filepath + ".tmp"
+    with open(tmp_path, "w") as f:
         f.writelines(lines)
+    os.replace(tmp_path, filepath)
 
 
 def get_or_refresh_cookies_sync(email: str, password: str) -> str | None:

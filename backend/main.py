@@ -33,8 +33,28 @@ from backend.api.plans_routes import router as plans_router
 
 settings = get_settings()
 
+# RECOVERY_STUCK_MINUTES — "qotib qolgan" job hisoblanadigan chegara:
+# aktive-status job `updated_at`'si shu daqiqadan ko'p eskirgan bo'lsa,
+# crashdan keyin qayta ishga tushiriladi. 15 daqiqadan kam — worker hali
+# ishlab turgan (yangilanayotgan) joblarni re-enqueue qilishdan saqlaydi.
+RECOVERY_STUCK_MINUTES = 15
+
 
 def recover_stuck_jobs():
+    """Crash'dan keyin qotib qolgan (aktive-status, lekin `updated_at`
+    STALE — `RECOVERY_STALE_MINUTES` dan ortiq yangilanmagan) joblarni
+    PENDING ga qaytarib re-enqueue qiladi.
+
+    FILTER (AUDIT_STABILITY.md §3 P0-1): ilgari barcha aktive-status
+    joblar qayta ishga tushirilardi — backend/qayta ishga tushganda
+    worker hali ishlab turgan job ham re-enqueue qilinardi, xuddi shu
+    `task_id` bilan ikkinchi parallellashtirish paydo bo'lib, ikki marta
+    bajarilish (download/LLM xarajat 2x, fayl gonalari) hosil qilar edi.
+    Endi faqat `updated_at` eskirganlar qayta yuboriladi — bu "haqiqiy
+    tiki" (oqim jonli ishlab turgan job updated_at'ni yangilab turadi).
+    """
+    from datetime import timedelta
+    from datetime import datetime
     from backend.models.database import SessionLocal, DubbingJob, JobStatus
     from backend.workers.tasks import process_video
     from backend.services.plans import get_job_queue
@@ -49,10 +69,16 @@ def recover_stuck_jobs():
             JobStatus.SYNCING,
             JobStatus.MERGING
         ]
-        stuck_jobs = db.query(DubbingJob).filter(DubbingJob.status.in_(active_statuses)).all()
+        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
+        stuck_jobs = (
+            db.query(DubbingJob)
+            .filter(DubbingJob.status.in_(active_statuses))
+            .filter(DubbingJob.updated_at < cutoff)   # kluch: faqat haqiqiyan tikiplib qotganlar
+            .all()
+        )
         if stuck_jobs:
             for job in stuck_jobs:
-                print(f"[RECOVERY] Re-enqueueing stuck job {job.id} with status {job.status}")
+                print(f"[RECOVERY] Re-enqueueing stuck job {job.id} (updated_at={job.updated_at})")
                 job.status = JobStatus.PENDING
                 job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
                 db.commit()
@@ -63,7 +89,33 @@ def recover_stuck_jobs():
         db.close()
 
 
+def recover_stuck_resolution_variants():
+    """360p/1080p generatsiyasi ham xuddi shu muammoga duchor bo'lishi
+    mumkin -- vazifa worker qayta ishga tushishi (deploy) yoki servis
+    ishdan chiqishi paytida uzilib qolsa, status "processing"da abadiy
+    qotib qoladi (request_resolution faqat status "processing" BO'LMASA
+    yangi vazifa navbatga qo'yadi, shuning uchun o'zi hech qachon
+    tuzalmaydi). 2026-08-21 aniqlangan -- ikkita haqiqiy job'da kunlar
+    davomida qotib qolgan holat topilgan."""
+    from backend.models.database import SessionLocal, ResolutionVariant
+    from backend.workers.resolution_tasks import generate_resolution_variant_task
+    db = SessionLocal()
+    try:
+        stuck = db.query(ResolutionVariant).filter(ResolutionVariant.status == "processing").all()
+        for variant in stuck:
+            print(f"[RECOVERY] Re-enqueueing stuck resolution variant {variant.job_id}/{variant.resolution}")
+            generate_resolution_variant_task.apply_async(args=[str(variant.job_id), variant.resolution])
+    except Exception as e:
+        print(f"[RECOVERY ERROR] Error during resolution variant recovery: {e}")
+    finally:
+        db.close()
+
+
 def recover_stuck_analyses():
+    """recover_stuck_jobs bilan bir xil FILTER — eskirgan VideoAnalysis'lar
+    qayta enqueue qilinadi, jonli ishlab turganlariga tegmaydi."""
+    from datetime import timedelta
+    from datetime import datetime
     from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
     from backend.workers.analysis_tasks import analyze_video_task
     db = SessionLocal()
@@ -76,9 +128,15 @@ def recover_stuck_analyses():
             AnalysisStatus.ANALYZING,
             AnalysisStatus.GENERATING_RESULTS,
         ]
-        stuck = db.query(VideoAnalysis).filter(VideoAnalysis.status.in_(active_statuses)).all()
+        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
+        stuck = (
+            db.query(VideoAnalysis)
+            .filter(VideoAnalysis.status.in_(active_statuses))
+            .filter(VideoAnalysis.updated_at < cutoff)
+            .all()
+        )
         for analysis in stuck:
-            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} with status {analysis.status}")
+            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} (updated_at={analysis.updated_at})")
             analysis.status = AnalysisStatus.PENDING
             analysis.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
@@ -106,6 +164,7 @@ async def lifespan(app: FastAPI):
         print(f"[STARTUP ERROR] Could not clear Redis locks: {e}")
 
     recover_stuck_jobs()
+    recover_stuck_resolution_variants()
     recover_stuck_analyses()
     yield
     # Shutdown (agar kerak bo'lsa)
@@ -125,6 +184,7 @@ app = FastAPI(
 _allowed_origins = [
     settings.FRONTEND_URL,
     "https://www.gapirai.uz",
+    "https://admin.gapirai.uz",
     "http://localhost:3000",
 ]
 app.add_middleware(

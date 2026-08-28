@@ -16,16 +16,40 @@ export interface AuthState {
   token: string | null
 }
 
+// Cookie domain'siz login qilingan host'ga bog'lanib qoladi (masalan
+// gapirai.uz), shuning uchun admin.gapirai.uz sessiyani ko'rmaydi. Barcha
+// gapirai.uz subdomainlari o'rtasida bo'lishish uchun ".gapirai.uz"
+// ishlatiladi -- localhost'da esa domain berilmaydi (browser rad etadi).
+function cookieDomain(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  const host = window.location.hostname
+  return host.endsWith('gapirai.uz') ? '.gapirai.uz' : undefined
+}
+
 export function getToken(): string | null {
   return Cookies.get('auth_token') || null
 }
 
+// Domain fikslanishidan oldin (shu fayldagi cookieDomain() qo'shilishidan
+// oldin) login qilgan foydalanuvchilarda domainSIZ (host-only) "auth_token"
+// cookie hali ham brauzerda turibdi. Endi faqat domain'li variantni
+// tozalasak, ikkalasi BIR VAQTDA mavjud bo'lib qoladi -- brauzer ikkala
+// qiymatni ham "auth_token=eski; auth_token=yangi" tarzida yuboradi va
+// Cookies.get() qaysi birini qaytarishi noaniq (ba'zan eski, allaqachon
+// yaroqsiz token qaytadi -- qayta login qilingandan keyin ham "Token
+// yaroqsiz" xatosi shu sababdan davom etardi, 2026-08-25). Shuning uchun
+// har doim IKKALA variantni ham (host-only VA domain'li) tozalab/yozib
+// qo'yamiz -- eskisi mavjud bo'lmasa, remove() shunchaki hech narsa
+// qilmaydi.
 export function setToken(token: string) {
-  Cookies.set('auth_token', token, { expires: 7, sameSite: 'lax' })
+  Cookies.remove('auth_token')
+  Cookies.remove('auth_token', { domain: cookieDomain() })
+  Cookies.set('auth_token', token, { expires: 7, sameSite: 'lax', domain: cookieDomain() })
 }
 
 export function removeToken() {
   Cookies.remove('auth_token')
+  Cookies.remove('auth_token', { domain: cookieDomain() })
 }
 
 export function getStoredUser(): User | null {
@@ -57,7 +81,7 @@ export async function apiRegister(name: string, email: string, password: string)
   return res.data
 }
 
-export async function apiLogin(email: string, password: string): Promise<PendingVerification> {
+export async function apiLogin(email: string, password: string): Promise<PendingVerification | AuthResult> {
   const res = await axios.post(`${API_URL}/auth/login`, { email, password })
   return res.data
 }

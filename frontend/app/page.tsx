@@ -200,6 +200,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [voiceGender, setVoiceGender] = useState("auto");
+  const [audioMixMode, setAudioMixMode] = useState<"dubbed_only" | "ducked_mix">("dubbed_only");
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mode, setMode] = useState<"dub" | "analyze">("dub");
@@ -315,7 +316,7 @@ export default function Home() {
     startRef.current = null;
     setElapsed(0);
     try {
-      const { job_id, status } = await createJob(url, voiceGender);
+      const { job_id, status } = await createJob(url, voiceGender, audioMixMode);
       if (status === "awaiting_payment") {
         saveJobId(job_id);
         router.push(`/video/${job_id}`);
@@ -443,8 +444,10 @@ export default function Home() {
                     loading={loading}
                     error={error}
                     voiceGender={voiceGender}
+                    audioMixMode={audioMixMode}
                     onChange={handleUrlChange}
                     onGenderChange={setVoiceGender}
+                    onAudioMixModeChange={setAudioMixMode}
                     onSubmit={handleSubmit}
                   />
                 ) : (
