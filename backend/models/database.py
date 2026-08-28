@@ -141,6 +141,17 @@ class DubbingJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
+    # 2026-08-26 worker-lifecycle audit (GapirAI reliability qatlami) --
+    # bitta job ikki worker'da bir vaqtda faol bo'lishining oldini oluvchi
+    # DB-darajasidagi atomik claim/lease (backend/services/job_claim.py).
+    # Redis lock EMAS -- barcha worker'lar bitta Postgres'ga ulanadi.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    # recover_stuck_jobs() shu job'ni necha marta qayta navbatga qo'yganini
+    # sanaydi -- doimiy xatoli job cheksiz PENDING<->DOWNLOADING aylanishda
+    # qolib ketmasligi uchun.
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
+
     user = relationship("User", back_populates="jobs")
 
     @property
@@ -236,6 +247,12 @@ class VideoAnalysis(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+    # 2026-08-26: DubbingJob bilan bir xil claim/lease mexanizmi --
+    # backend/services/job_claim.py.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
 
     user = relationship("User")
 

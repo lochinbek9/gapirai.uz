@@ -29,8 +29,21 @@ celery_app.conf.update(
     worker_max_tasks_per_child=100,
     task_time_limit=8000,         # Max 8000 seconds execution time limit (8K)
     task_soft_time_limit=7800,    # Soft time limit to clean up gracefully
+    # 2026-08-26 audit (GapirAI reliability): ilgari sozlanmagan edi --
+    # Kombu/Redis'ning standart visibility_timeout'i (3600s) process_video'ning
+    # o'z time_limit'iga (3600s) AYNAN teng edi: uzoq video uchun ikkalasi
+    # bir vaqtda tugab, majburiy SIGKILL bilan broker'ning vazifani "yo'qolgan"
+    # deb qayta yetkazishi bir zumda to'qnashardi. 4000s -- eng uzun vazifadan
+    # (process_video, 3600s) sezilarli ko'proq, haddan tashqari uzun emas.
+    broker_transport_options={"visibility_timeout": 4000},
+    result_backend_transport_options={"visibility_timeout": 4000},
     # ─────────────────────────────────────────────────────────────────────
     # Queues — TTS va Media workers uchun alohida navbatlar.
+    # DIQQAT: media_processing / tts_processing navbatlarini FAQAT Denis'ning
+    # 3-worker docker-compose'i (worker-video / worker-tts / worker-media)
+    # tinglaydi. Bitta worker bilan deploy qilinsa (`-Q video_processing_
+    # priority,video_processing`), resolution + chunk vazifalari osilib qoladi
+    # -- compose bosqichida hal qilinadi.
     # Har bir worker faqat o'z navbatini tinglaydi.
     # ─────────────────────────────────────────────────────────────────────
     task_queues={

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+from datetime import datetime
 import logging
 import os
 import uuid
@@ -33,28 +34,48 @@ from backend.api.plans_routes import router as plans_router
 
 settings = get_settings()
 
-# RECOVERY_STUCK_MINUTES — "qotib qolgan" job hisoblanadigan chegara:
-# aktive-status job `updated_at`'si shu daqiqadan ko'p eskirgan bo'lsa,
-# crashdan keyin qayta ishga tushiriladi. 15 daqiqadan kam — worker hali
-# ishlab turgan (yangilanayotgan) joblarni re-enqueue qilishdan saqlaydi.
-RECOVERY_STUCK_MINUTES = 15
+# 2026-08-26 audit: shu ko'p marta qayta tiklashning yuqori chegarasi --
+# doimiy (transient bo'lmagan) sababdan muvaffaqiyatsiz job (masalan
+# eskirgan cookie/proxy balansi) HAR safar backend qayta ishga tushganda
+# retries=0 bilan qayta navbatga qo'yilaverib, HECH QACHON FAILED holatiga
+# yetmasdi (job 044530c0 productionda kunlar davomida shu tarzda aylanib
+# yurgani kuzatilgan). Endi shu chegaradan keyin to'g'ridan-to'g'ri FAILED
+# deb belgilanadi -- mavjud upload-recovery UI (fallback_available) shu
+# orqali foydalanuvchiga ko'rinadi, cheksiz sukut aylanish o'rniga.
+RECOVERY_MAX_ATTEMPTS = 5
 
 
-def recover_stuck_jobs():
-    """Crash'dan keyin qotib qolgan (aktive-status, lekin `updated_at`
-    STALE — `RECOVERY_STALE_MINUTES` dan ortiq yangilanmagan) joblarni
-    PENDING ga qaytarib re-enqueue qiladi.
+def recover_stuck_jobs(redis_conn=None):
+    """Ishga tushganda (yoki worker yo'qolganda) "osilib qolgan" job'larni
+    qayta tiklaydi -- lekin endi Redis SETNX emas, backend/services/job_claim.py
+    dagi BIR XIL DB-darajasidagi atomik claim orqali (tasks.py:process_video
+    o'zi ishlatadigan mexanizm bilan bir xil manba):
 
-    FILTER (AUDIT_STABILITY.md §3 P0-1): ilgari barcha aktive-status
-    joblar qayta ishga tushirilardi — backend/qayta ishga tushganda
-    worker hali ishlab turgan job ham re-enqueue qilinardi, xuddi shu
-    `task_id` bilan ikkinchi parallellashtirish paydo bo'lib, ikki marta
-    bajarilish (download/LLM xarajat 2x, fayl gonalari) hosil qilar edi.
-    Endi faqat `updated_at` eskirganlar qayta yuboriladi — bu "haqiqiy
-    tiki" (oqim jonli ishlab turgan job updated_at'ni yangilab turadi).
+    1. Faqat HAQIQATAN hech kim faol claim'ga ega bo'lmagan job'lar ko'rib
+       chiqiladi (processing_claim_token bo'sh YOKI lease muddati tugagan)
+       -- hali ishlab turgan job noto'g'ri qayta navbatga qo'yilmaydi. Bu
+       FAQAT o'qish uchun (WHERE filtri) -- recovery bu maydonlarga o'zi
+       yozmaydi (pastdagi 2-bandga qarang, nega).
+    2. Navbatga qo'yishning o'zi Redis SETNX orqali qisqa muddatli
+       dedup qilinadi (job_claim.py'dagi DB-claim EMAS): birinchi jihatdan
+       job_claim.py'ni bu yerda ham ishlatish tabiiy ko'rinardi, lekin bitta
+       haqiqiy poyga sharoiti sinovda tutildi -- agar recovery o'zi
+       claim OLIB, DARHOL BO'SHATSA (vazifa keyinroq o'zi claim qilishi
+       uchun), ikkita bir vaqtdagi recovery chaqiruvi orasidagi shu qisqa
+       "bo'shatilgan" oyna orqali IKKALASI HAM apply_async chaqirishi
+       mumkin ekan (test_concurrent_backend_restarts_only_one_enqueues
+       orqali aniqlangan). Shuning uchun: recovery'ning o'zi hech qachon
+       job_claim.py orqali YOZMAYDI -- faqat o'qiydi (1-band) va alohida,
+       oddiy Redis SETNX bilan o'zining navbatga-qo'yish harakatini
+       ketma-ketlashtiradi (eski _redis_recovery_claim, pastda).
+       Haqiqiy xavfsizlik (dublikat QAYTA ISHLASH'ning oldini olish)
+       process_video/analyze_video_task'ning O'Z ICHIDAGI try_claim
+       chaqiruviga tayanadi -- shu SABABLI recovery tomonidagi dedup
+       "faqat gigiena" (keraksiz Celery xabarlari/recovery_attempt_count
+       shishishini kamaytiradi), yagona xavfsizlik chizig'i emas.
+    3. recovery_attempt_count RECOVERY_MAX_ATTEMPTS'dan oshsa, qayta
+       navbatga qo'yish o'rniga to'g'ridan-to'g'ri FAILED.
     """
-    from datetime import timedelta
-    from datetime import datetime
     from backend.models.database import SessionLocal, DubbingJob, JobStatus
     from backend.workers.tasks import process_video
     from backend.services.plans import get_job_queue
@@ -69,27 +90,54 @@ def recover_stuck_jobs():
             JobStatus.SYNCING,
             JobStatus.MERGING
         ]
-        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
-        stuck_jobs = (
-            db.query(DubbingJob)
-            .filter(DubbingJob.status.in_(active_statuses))
-            .filter(DubbingJob.updated_at < cutoff)   # kluch: faqat haqiqiyan tikiplib qotganlar
-            .all()
-        )
-        if stuck_jobs:
-            for job in stuck_jobs:
-                print(f"[RECOVERY] Re-enqueueing stuck job {job.id} (updated_at={job.updated_at})")
-                job.status = JobStatus.PENDING
-                job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
+        now = datetime.utcnow()
+        candidates = db.query(DubbingJob).filter(
+            DubbingJob.status.in_(active_statuses),
+            (DubbingJob.processing_claim_token.is_(None)) | (DubbingJob.processing_lease_expires_at < now),
+        ).all()
+        for job in candidates:
+            if job.recovery_attempt_count >= RECOVERY_MAX_ATTEMPTS:
+                job.status = JobStatus.FAILED
+                job.status_message = "Jarayon bir necha marta qayta tiklanishga urinildi, lekin muvaffaqiyatsiz bo'ldi."
+                job.error_code = job.error_code or "RECOVERY_EXHAUSTED"
+                job.updated_at = now
                 db.commit()
-                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, job.user_id))
+                print(f"[RECOVERY] Job {job.id} recovery_attempt_count={job.recovery_attempt_count} limitga yetdi -- FAILED deb belgilandi.")
+                continue
+
+            if not _redis_recovery_claim(redis_conn, f"recovery_claim:job:{job.id}"):
+                print(f"[RECOVERY] Skipping job {job.id} -- another process already claimed it.")
+                continue
+
+            print(f"[RECOVERY] Re-enqueueing stuck job {job.id} with status {job.status} (attempt {job.recovery_attempt_count + 1}/{RECOVERY_MAX_ATTEMPTS})")
+            job.recovery_attempt_count += 1
+            job.status = JobStatus.PENDING
+            job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
+            db.commit()
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, job.user_id))
     except Exception as e:
         print(f"[RECOVERY ERROR] Error during job recovery: {e}")
     finally:
         db.close()
 
 
-def recover_stuck_resolution_variants():
+def _redis_recovery_claim(redis_conn, key: str, ttl: int = 300) -> bool:
+    """recover_stuck_jobs/recover_stuck_analyses/recover_stuck_resolution_variants
+    HAR BIRIning o'zining navbatga-qo'yish harakatini (nafaqat qaysi
+    job'lar "kandidat" ekanini aniqlashni -- bu DB-claim orqali o'qiladi,
+    job_claim.py) qisqa muddatli dedup qilish uchun. Nega DB-claim EMAS:
+    recover_stuck_jobs()'ning o'z docstringidagi 2-bandga qarang -- claim'ni
+    olib darhol bo'shatish (vazifaning o'zi keyinroq claim qilishi uchun)
+    ikkita bir vaqtdagi recovery chaqiruvi orasida haqiqiy poyga sharoiti
+    yaratishi sinovda tutildi."""
+    try:
+        return bool(redis_conn.set(key, "1", nx=True, ex=ttl))
+    except Exception as e:
+        print(f"[RECOVERY] Redis claim check failed ({key}): {e} -- xavfsiz tomonga o'tib, baribir navbatga qo'yiladi.")
+        return True
+
+
+def recover_stuck_resolution_variants(redis_conn):
     """360p/1080p generatsiyasi ham xuddi shu muammoga duchor bo'lishi
     mumkin -- vazifa worker qayta ishga tushishi (deploy) yoki servis
     ishdan chiqishi paytida uzilib qolsa, status "processing"da abadiy
@@ -103,19 +151,26 @@ def recover_stuck_resolution_variants():
     try:
         stuck = db.query(ResolutionVariant).filter(ResolutionVariant.status == "processing").all()
         for variant in stuck:
+            if not _redis_recovery_claim(redis_conn, f"recovery_claim:resolution:{variant.id}"):
+                print(f"[RECOVERY] Skipping resolution variant {variant.id} -- another process already claimed it.")
+                continue
             print(f"[RECOVERY] Re-enqueueing stuck resolution variant {variant.job_id}/{variant.resolution}")
-            generate_resolution_variant_task.apply_async(args=[str(variant.job_id), variant.resolution])
+            # task_id endi variant.id'ga bog'langan -- ilgari umuman
+            # berilmagan edi (har chaqiruvda tasodifiy ID), shuning uchun
+            # Celery natija-bazasida bir xil vazifani kuzatib bo'lmasdi.
+            generate_resolution_variant_task.apply_async(
+                args=[str(variant.job_id), variant.resolution], task_id=str(variant.id)
+            )
     except Exception as e:
         print(f"[RECOVERY ERROR] Error during resolution variant recovery: {e}")
     finally:
         db.close()
 
 
-def recover_stuck_analyses():
-    """recover_stuck_jobs bilan bir xil FILTER — eskirgan VideoAnalysis'lar
-    qayta enqueue qilinadi, jonli ishlab turganlariga tegmaydi."""
-    from datetime import timedelta
-    from datetime import datetime
+def recover_stuck_analyses(redis_conn=None):
+    """recover_stuck_jobs() bilan bir xil naqsh -- qarang shu funksiyaning
+    izohi (DB-claim faqat o'qish uchun, navbatga-qo'yish dedup'i Redis
+    SETNX bilan)."""
     from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
     from backend.workers.analysis_tasks import analyze_video_task
     db = SessionLocal()
@@ -128,15 +183,27 @@ def recover_stuck_analyses():
             AnalysisStatus.ANALYZING,
             AnalysisStatus.GENERATING_RESULTS,
         ]
-        cutoff = datetime.utcnow() - timedelta(minutes=RECOVERY_STUCK_MINUTES)
-        stuck = (
-            db.query(VideoAnalysis)
-            .filter(VideoAnalysis.status.in_(active_statuses))
-            .filter(VideoAnalysis.updated_at < cutoff)
-            .all()
-        )
-        for analysis in stuck:
-            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} (updated_at={analysis.updated_at})")
+        now = datetime.utcnow()
+        candidates = db.query(VideoAnalysis).filter(
+            VideoAnalysis.status.in_(active_statuses),
+            (VideoAnalysis.processing_claim_token.is_(None)) | (VideoAnalysis.processing_lease_expires_at < now),
+        ).all()
+        for analysis in candidates:
+            if analysis.recovery_attempt_count >= RECOVERY_MAX_ATTEMPTS:
+                analysis.status = AnalysisStatus.FAILED
+                analysis.status_message = "Jarayon bir necha marta qayta tiklanishga urinildi, lekin muvaffaqiyatsiz bo'ldi."
+                analysis.error_code = analysis.error_code or "RECOVERY_EXHAUSTED"
+                analysis.updated_at = now
+                db.commit()
+                print(f"[RECOVERY] Analysis {analysis.id} recovery_attempt_count={analysis.recovery_attempt_count} limitga yetdi -- FAILED deb belgilandi.")
+                continue
+
+            if not _redis_recovery_claim(redis_conn, f"recovery_claim:analysis:{analysis.id}"):
+                print(f"[RECOVERY] Skipping analysis {analysis.id} -- another process already claimed it.")
+                continue
+
+            print(f"[RECOVERY] Re-enqueueing stuck analysis {analysis.id} with status {analysis.status} (attempt {analysis.recovery_attempt_count + 1}/{RECOVERY_MAX_ATTEMPTS})")
+            analysis.recovery_attempt_count += 1
             analysis.status = AnalysisStatus.PENDING
             analysis.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
@@ -154,18 +221,19 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
     create_tables()
     
+    from redis import Redis
+    r = Redis.from_url(settings.REDIS_URL)
+
     # Clear stale concurrent download locks
     try:
-        from redis import Redis
-        r = Redis.from_url(settings.REDIS_URL)
         r.delete("yt_dl:concurrent")
         print("[STARTUP] Cleared stale yt-dlp concurrency lock from Redis.")
     except Exception as e:
         print(f"[STARTUP ERROR] Could not clear Redis locks: {e}")
 
-    recover_stuck_jobs()
-    recover_stuck_resolution_variants()
-    recover_stuck_analyses()
+    recover_stuck_jobs(r)
+    recover_stuck_resolution_variants(r)
+    recover_stuck_analyses(r)
     yield
     # Shutdown (agar kerak bo'lsa)
 
