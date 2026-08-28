@@ -212,10 +212,17 @@ async def lifespan(app: FastAPI):
     # Denis'ning client docs'i noto'g'ri "JWT_SECRET_KEY" nomini ko'rsatadi --
     # kod SECRET_KEY o'qiydi, shuning uchun docs bo'yicha deploy qilinsa bu
     # BO'SH qoladi. Production'da (DEBUG=False) darhol to'xtatamiz.
-    if not settings.DEBUG and (not settings.SECRET_KEY or len(settings.SECRET_KEY) < 16):
+    _LEAKED_PLACEHOLDER = "ai-dubber-secret-key-2024-uzbek-platform"  # eski .env.example qiymati -- git tarixida
+    if not settings.DEBUG and (
+        not settings.SECRET_KEY
+        or len(settings.SECRET_KEY) < 16
+        or settings.SECRET_KEY == _LEAKED_PLACEHOLDER
+    ):
         raise RuntimeError(
-            "SECRET_KEY .env orqali berilishi SHART (kamida 16 belgi). "
-            "Docs'dagi 'JWT_SECRET_KEY' EMAS -- aynan 'SECRET_KEY'."
+            "SECRET_KEY .env orqali HAQIQIY tasodifiy qiymat bilan berilishi SHART "
+            "(kamida 16 belgi, eski placeholder EMAS). Docs'dagi 'JWT_SECRET_KEY' "
+            "EMAS -- aynan 'SECRET_KEY'. Generatsiya: "
+            "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
         )
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
