@@ -1,10 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Library, Clock, Loader2, Lock, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Library, Clock, Loader2, Lock, CheckCircle2, Copy, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getLibrary, getLibraryAccess, purchaseLibraryAccess, purchaseLibraryAccessPayme, formatDuration, LibraryItem } from '@/lib/api'
+import { getLibrary, getLibraryAccess, purchaseLibraryAccess, purchaseLibraryAccessPayme, purchaseLibraryAccessUzum, formatDuration, LibraryItem } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 
 const LIBRARY_ACCESS_PRICE = 5000
@@ -22,6 +22,9 @@ export default function LibraryPage() {
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
+  const [uzumCopied, setUzumCopied] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const PAGE_SIZE = 24
 
@@ -71,9 +74,71 @@ export default function LibraryPage() {
       }
     } catch (err: any) {
       setError(err?.response?.data?.detail || "To'lovni boshlashda xatolik yuz berdi.")
+    } finally {
+      // window.location.href muvaffaqiyatli bo'lganda sahifa allaqachon
+      // ketayotgan bo'ladi, shuning uchun bu zararsiz -- lekin agar
+      // yo'naltirish sekin ketsa yoki umuman ishlamay qolsa (masalan
+      // checkout provayderning o'zida vaqtinchalik xatolik, 2026-08-25da
+      // Payme'da ko'rilgani kabi), tugmalar abadiy "disabled" holida
+      // qotib qolmasligi uchun har doim qayta yoqiladi.
       setPurchaseLoading(false)
     }
   }
+
+  // Uzum'da Click/Payme'dagidek checkout havolasi yo'q -- "account" raqami
+  // ko'rsatiladi, foydalanuvchi Uzum ilovasida o'zi kiritib to'laydi.
+  // Redirect bo'lmagani uchun (sahifa qayta yuklanmaydi), tasdiqni bu yerda
+  // o'zimiz poll qilishimiz kerak -- video/[id]/page.tsx'da bu allaqachon
+  // job-status pollingga "bepul qo'shilib" ketardi, bu yerda esa bunday poll
+  // umuman yo'q edi (2026-08-24).
+  const handleUzumPurchase = async () => {
+    if (!isLoggedIn) {
+      router.push('/login')
+      return
+    }
+    setPurchaseLoading(true)
+    setError(null)
+    try {
+      const res = await purchaseLibraryAccessUzum()
+      if (res.success && res.account) {
+        setUzumAccount({ account: res.account, amount: res.amount })
+      } else if (res.amount === 0) {
+        setHasAccess(true)
+      } else {
+        setError("To'lov ma'lumotlarini yaratishda xatolik yuz berdi.")
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "To'lovni boshlashda xatolik yuz berdi.")
+    } finally {
+      setPurchaseLoading(false)
+    }
+  }
+
+  const handleCopyUzumAccount = () => {
+    if (!uzumAccount) return
+    navigator.clipboard.writeText(String(uzumAccount.account)).then(() => {
+      setUzumCopied(true)
+      setTimeout(() => setUzumCopied(false), 2000)
+    })
+  }
+
+  useEffect(() => {
+    if (!uzumAccount) return
+    pollRef.current = setInterval(() => {
+      getLibraryAccess()
+        .then((res) => {
+          if (res.has_access) {
+            setHasAccess(true)
+            setUzumAccount(null)
+            if (pollRef.current) clearInterval(pollRef.current)
+          }
+        })
+        .catch(() => {})
+    }, 4000)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [uzumAccount])
 
   const handleOpen = (item: LibraryItem) => {
     if (authLoading) return
@@ -119,24 +184,69 @@ export default function LibraryPage() {
                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Bir martalik to'lov — barcha (hozirgi va kelajakdagi) dublyaj qilingan videolarni cheksiz tomosha qiling</p>
               </div>
               <div className="shrink-0 flex items-center gap-2">
-                <button
-                  onClick={() => handlePurchase('click')}
-                  disabled={purchaseLoading}
-                  className="flex items-center gap-2 px-5 py-3 rounded-2xl btn-premium font-extrabold text-xs uppercase tracking-wide disabled:opacity-60"
-                >
-                  {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                  {isLoggedIn ? "Click orqali to'lash" : "Kirib, huquq olish"}
-                </button>
-                {isLoggedIn && (
+                {isLoggedIn ? (
+                  <>
+                    <button
+                      onClick={() => handlePurchase('click')}
+                      disabled={purchaseLoading}
+                      title="Click orqali to'lash"
+                      className="flex items-center justify-center h-12 px-4 rounded-2xl bg-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/30 hover:shadow-md transition disabled:opacity-50"
+                    >
+                      {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-500" /> : (
+                        <img src="/logos/click.png" alt="Click" className="h-5 w-auto object-contain" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handlePurchase('payme')}
+                      disabled={purchaseLoading}
+                      title="Payme orqali to'lash"
+                      className="flex items-center justify-center h-12 px-4 rounded-2xl bg-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/30 hover:shadow-md transition disabled:opacity-50"
+                    >
+                      <img src="/logos/payme.png" alt="Payme" className="h-5 w-auto object-contain" />
+                    </button>
+                    <button
+                      onClick={handleUzumPurchase}
+                      disabled={purchaseLoading}
+                      title="Uzum orqali to'lash"
+                      className="flex items-center justify-center h-12 px-4 rounded-2xl bg-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/30 hover:shadow-md transition disabled:opacity-50"
+                    >
+                      <img src="/logos/uzum.png" alt="Uzum" className="h-6 w-auto object-contain" />
+                    </button>
+                  </>
+                ) : (
                   <button
-                    onClick={() => handlePurchase('payme')}
+                    onClick={() => handlePurchase('click')}
                     disabled={purchaseLoading}
-                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/[0.03] dark:bg-white/5 hover:bg-black/[0.06] dark:hover:bg-white/10 border border-black/10 dark:border-white/10 font-extrabold text-xs uppercase tracking-wide text-gray-700 dark:text-slate-200 disabled:opacity-60 transition"
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl btn-premium font-extrabold text-xs uppercase tracking-wide disabled:opacity-60"
                   >
-                    Payme orqali to'lash
+                    {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                    Kirib, huquq olish
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {uzumAccount && (
+            <div className="bg-white/5 border border-violet-500/20 rounded-2xl p-5 text-left space-y-3">
+              <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">
+                Uzum ilovasida to'lovlar bo'limidan quyidagi hisob raqamini kiriting va {uzumAccount.amount.toLocaleString('uz-UZ')} so'm to'lang:
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="flex-1 font-mono text-lg font-bold text-gray-900 dark:text-white bg-black/5 dark:bg-black/30 rounded-lg px-3 py-2 text-center tracking-wider">
+                  {uzumAccount.account}
+                </span>
+                <button
+                  onClick={handleCopyUzumAccount}
+                  className="flex items-center justify-center w-10 h-10 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-gray-700 dark:text-white transition flex-shrink-0"
+                  title="Nusxalash"
+                >
+                  {uzumCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-slate-500">
+                To'lov tasdiqlangach, bu sahifa avtomatik yangilanadi.
+              </p>
             </div>
           )}
 

@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     # tasks.py'ning TTS bosqichiga ulangan). Har bir segment uchun qo'shimcha
     # Whisper chaqiruvi kerak bo'lgani uchun (haqiqiy, doimiy xarajat),
     # kerak bo'lsa kodga tegmasdan o'chirish mumkin.
+    # Faster-whisper model: tiny/small/medium/large-v3
+    # tiny=75MB fast worst, small=500MB ok, medium=1.5GB good, large-v3=3GB best
+    WHISPER_MODEL: str = "small"
+
+    # GapirAI integratsiya (2026-08-28): Denis forkida False qilingan edi
+    # ("Azure 429 bottleneck"), biz hozircha True qoldiramiz -- segment QA
+    # sifat kafolati. Azure 429/latency/xarajat integration testlaridan keyin baholanadi.
     ENABLE_SEGMENT_QA: bool = True
     SEGMENT_QA_THRESHOLD: float = 0.75
     # Tarjima tayyor bo'lgach, taxminiy TTS davomiyligi original segment
@@ -77,6 +84,58 @@ class Settings(BaseSettings):
     FINAL_LOUDNORM_TP: float = -1.5
     FINAL_LOUDNORM_LRA: float = 11.0
 
+    # Audio aralashtirish rejimi (merger.py): "dubbed_only" — faqat tarjima/
+    # TTS ovozi saqlanadi (yangi default — foydalanuvchi talabi: "dub haqiqatan
+    # eshitilsin"); "ducked_mix" — original + TTS sidechain ducking bilan
+    # (eski kino-dublyaj rejimi, asl kod mantiqi aynan shu edi). Noto'g'ri
+    # qiymat kelsa xavfsiz tarzda dubbed_only ga tushadi.
+    AUDIO_MIX_MODE: str = "dubbed_only"
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Chunked Pipeline — video va audio ni vaqt bo'yicha qismlarga bo'lib,
+    # TTS va MERGE ni parallel ravishda bajarish (pipeline parallelism).
+    # Natija: ~1.7-2x tezroq ishlash (ba'zan 3x ga yaqin GPU bilan).
+    # ─────────────────────────────────────────────────────────────────────
+    # Har bir chunkning davomiyligi (soniyada). 180 = 3 daqiqa.
+    #kichik qiymat = ko'proq chunklar = ko'proq parallellik, lekin
+    #concat xarajatlari oshadi. Optimal: 120-360 soniya.
+    CHUNK_DURATION_SEC: int = 180
+    # Bir vaqtda qancha chunk parallel qayta ishlanadi.
+    # CPU limitations: 2 chunk = ~4 GB RAM, 3 chunk = ~6 GB RAM.
+    MAX_PARALLEL_CHUNKS: int = 2
+    # Chunklar orasidagi overlap (soniyada) — boundary artifacts
+    # oldini olish uchun. Har bir chunk N секунd OLDINGI chunk bilan
+    # overlap qiladi, keyin裁切 qilinadi.
+    CHUNK_OVERLAP_SEC: float = 1.5
+    # Chunked pipeline ni yoqish/o'chirish. False = eski sequential rejim.
+    # GapirAI integratsiya: productionga OPT-IN. Validatsiya + load-testdan
+    # keyin .env: ENABLE_CHUNKED_PIPELINE=true bilan yoqiladi. Hozircha eski
+    # sequential + to'liq reliability (job_claim/checkpoint) yo'li ishlaydi.
+    ENABLE_CHUNKED_PIPELINE: bool = False
+
+    # ─────────────────────────────────────────────────────────────────────
+    # NVENC GPU Encoding — NVIDIA GPU bilan tezroq video encoding.
+    # Agar serverda NVENC mavjud bo'lsa, avtomatik ishlatiladi.
+    # Yo'q bo'lsa — CPU (libx264) ga fallback.
+    # ─────────────────────────────────────────────────────────────────────
+    # NVENC ni yoqish/o'chirish. False = doimo CPU (libx264).
+    ENABLE_NVENC: bool = True
+    # NVENC preset: p1 (eng tez) → p7 (eng sifatli). p1 = max speed.
+    NVENC_PRESET: str = "p1"
+    # NVENC tune: ull (ultra low latency), ll (low latency),hq (high quality)
+    NVENC_TUNE: str = "ull"
+    # NVENC rate control: vbr (variable bitrate), cbr (constant)
+    NVENC_RC: str = "vbr"
+    # NVENC quality (cq): 0-51, past = yuqori sifat. 23 = libx264 CRF 23 ga teng.
+    NVENC_CQ: int = 23
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Modal GPU — elastic compute (serverless GPU/CPU in cloud).
+    # .env ga MODAL_ENABLED=true va MODAL_API_KEY=modal-xxx qo'shing.
+    # Batafsil: backend/services/modal_integration.py
+    # ─────────────────────────────────────────────────────────────────────
+    MODAL_ENABLED: bool = False
+
     # JWT imzolash kaliti — MAJBURIY .env orqali beriladi. Bo'sh bo'lsa
     # (yoki eski, kodda commit qilingan qiymat ishlatilsa) istalgan kishi
     # o'zi token yasab, istalgan foydalanuvchi (shu jumladan admin) nomidan
@@ -117,10 +176,17 @@ class Settings(BaseSettings):
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
+    # Запасные ключи для ротации (AUDIT_STABILITY §6): бесплатный тариф
+    # ограничивает ~20 запросов/день/ключ на модель. При 429 RESOURCE_EXHAUSTED
+    # transcriber/translator автоматически переключаются на следующий ключ.
+    GEMINI_API_KEY_2: str = ""
+    GEMINI_API_KEY_3: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
 
-    # Tarjima provayderi: "openai" | "gemini"
+    # Tarjima provayderi: "openai" | "gemini" | "claude" | "mistral" | "deepseek" | "groq"
     TRANSLATE_PROVIDER: str = "openai"
+    # Fallback ketma-ketligi (vergul bilan ajratilgan)
+    TRANSLATE_FALLBACK_CHAIN: str = "openai,gemini,claude,mistral,deepseek,groq,cohere"
 
     # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
     GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
@@ -142,6 +208,70 @@ class Settings(BaseSettings):
     # mavjud bo'lmasligi mumkin (masalan "gemini-3.5-flash" Vertex'da 404).
     GEMINI_VERTEX_TEXT_MODEL: str = "gemini-2.5-flash"
 
+    # ─────────────────────────────────────────────────────────────────────
+    # Qo'shimcha LLM provayderlar
+    # ─────────────────────────────────────────────────────────────────────
+    # Anthropic Claude
+    CLAUDE_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-3-5-haiku-20241022"
+
+    # Mistral AI
+    MISTRAL_API_KEY: str = ""
+    MISTRAL_MODEL: str = "mistral-small-latest"
+
+    # DeepSeek (arzon va tez)
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+
+    # Groq (eng tez inference — LPU chip)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # Cohere (arzon va sifatli, RAG qo'llab-quvvatlaydi)
+    COHERE_API_KEY: str = ""
+    COHERE_MODEL: str = "command-r-plus"
+    COHERE_LIGHT_MODEL: str = "command-r"
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Qo'shimcha TTS provayderlar
+    # ─────────────────────────────────────────────────────────────────────
+    # Amazon Polly
+    AWS_POLLY_ACCESS_KEY: str = ""
+    AWS_POLLY_SECRET_KEY: str = ""
+    AWS_POLLY_REGION: str = "us-east-1"
+    AWS_POLLY_VOICE_MALE: str = "Filiz"  # O'zbek erkak ovozi
+    AWS_POLLY_VOICE_FEMALE: str = "Filiz"  # O'zbek ayol ovozi
+
+    # Google Cloud TTS
+    GOOGLE_CLOUD_TTS_CREDENTIALS: str = ""
+    GOOGLE_CLOUD_TTS_VOICE_MALE: str = "uz-UZ-Wavenet-A"
+    GOOGLE_CLOUD_TTS_VOICE_FEMALE: str = "uz-UZ-Wavenet-B"
+
+    # Play.ht
+    PLAYHT_API_KEY: str = ""
+    PLAYHT_USER_ID: str = ""
+    PLAYHT_VOICE_MALE: str = ""  # Voice ID
+    PLAYHT_VOICE_FEMALE: str = ""  # Voice ID
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Qo'shimcha STT provayderlar
+    # ─────────────────────────────────────────────────────────────────────
+    # AssemblyAI (yuqori aniqlik, real-time)
+    ASSEMBLYAI_API_KEY: str = ""
+
+    # Deepgram (juda tez, arzon)
+    DEEPGRAM_API_KEY: str = ""
+
+    # Google Cloud Speech-to-Text
+    GOOGLE_STT_CREDENTIALS: str = ""
+
+    # STT Provider tanlash
+    # Qiymatlar: "openai_whisper" | "assemblyai" | "deepgram" | "google_stt" | "gemini"
+    STT_PROVIDER: str = "openai_whisper"
+    # Fallback ketma-ketligi (vergul bilan ajratilgan)
+    STT_FALLBACK_CHAIN: str = "openai_whisper,assemblyai,deepgram,gemini,google_stt"
+
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
     AZURE_SPEECH_REGION: str = "eastus"
@@ -159,8 +289,10 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "./outputs"
 
     # TTS Provider abstraction
-    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | "uzbekvoice"
+    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | "uzbekvoice" | "polly" | "playht" | "bark"
     TTS_PROVIDER: str = "edge"
+    # Fallback ketma-ketligi (vergul bilan ajratilgan)
+    TTS_FALLBACK_CHAIN: str = "edge,elevenlabs,azure,gemini,openai,polly,playht"
     # Asosiy provider muvaqqat xatolik bilan (timeout/429/5xx) ishlamasa shu
     # providerga o'tiladi. Doimiy xatolikda (noto'g'ri kalit/kirish) fallback
     # ishlatilmaydi — backend/services/tts/base.py: PermanentTTSError.
@@ -198,6 +330,14 @@ class Settings(BaseSettings):
     # kerak emas). Bo'sh bo'lsa, frontend tugmani ko'rsatmaydi.
     GOOGLE_CLIENT_ID: str = ""
 
+    # Mobil ilova (mobile/) uchun ALOHIDA Android turidagi OAuth mijoz
+    # (2026-08-22) — Google endi "Web application" mijozlar uchun custom-scheme
+    # redirect_uri'ni (gapirai://) rad etadi ("doesn't comply with Google's
+    # OAuth 2.0 policy"), shuning uchun mobil ilova o'zining Android mijozidan
+    # foydalanadi. ID token'ning "aud" maydoni shu ID bo'ladi, GOOGLE_CLIENT_ID
+    # (web) emas — backend/services/google_auth.py ikkalasini ham qabul qiladi.
+    GOOGLE_ANDROID_CLIENT_ID: str = ""
+
     # Eskiz.uz SMS OTP (https://notify.eskiz.uz/api) — email+parol orqali
     # login qilib bearer token oladi (Redis'da keshlanadi, sms_service.py),
     # Resend'ning statik API key'idan farqli. Bo'sh bo'lsa, SMS yuborilmaydi
@@ -208,6 +348,8 @@ class Settings(BaseSettings):
 
     # Admin panel — role='admin' bo'lsa ham, faqat shu ro'yxatdagi email
     # kira oladi (vergul bilan ajratilgan). Bo'sh bo'lsa, faqat role tekshiriladi.
+    # 2026-08-28: Denis forkida "den4ikorm@gmail.com" qo'shilgan edi --
+    # privilege grant, olib tashlandi. Kerak bo'lsa .env orqali qo'shiladi.
     ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com"
 
     # Click Payment
@@ -251,13 +393,17 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://gapirai.uz"
 
     # yt-dlp orqali YouTube'dan yuklab olishda ishlatiladigan HTTP(S) proxy —
-    # http://user:pass@host:port. AWS/GCP kabi datacenter IP'larni YouTube
-    # ko'pincha bot deb belgilab, PO token/cookie holatidan qat'iy nazar
-    # "Video unavailable" qaytaradi (2026-08-12 productionda tasdiqlangan);
-    # bo'sh bo'lsa proxysiz ishlaydi (lokal/rezident IP uchun kerak emas).
-    # ENABLED alohida flag — provayderda muammo chiqsa, URL'ni o'chirmasdan
-    # tezda proxysiz rejimga qaytarish uchun.
-    YOUTUBE_PROXY_ENABLED: bool = True
+    # http://user:pass@host:port. Butunlay IXTIYORIY — AWS/GCP kabi datacenter
+    # IP'larni YouTube ko'pincha bot deb belgilab, PO token/cookie holatidan
+    # qat'iy nazar "Video unavailable" qaytaradi (2026-08-12 productionda
+    # tasdiqlangan); bo'sh/false bo'lsa to'g'ridan-to'g'ri ulanishga tushadi
+    # (lokal/rezident IP yoki PO token o'zi yetarli bo'lsa kerak emas).
+    # Standart qiymat False — production o'z .env faylida buni aniq "true"
+    # deb belgilaydi, shuning uchun bu yerdagi standart faqat local/dev uchun.
+    # ENABLED alohida flag — provayderda muammo chiqsa (masalan 2026-08-22
+    # Webshare balansi tugagan real hodisa), URL'ni o'chirmasdan tezda
+    # proxysiz rejimga qaytarish uchun.
+    YOUTUBE_PROXY_ENABLED: bool = False
     YOUTUBE_PROXY_URL: str = ""
 
     # Ikkinchi (zaxira) proksi — residential, YOUTUBE_PROXY_URL (datacenter,

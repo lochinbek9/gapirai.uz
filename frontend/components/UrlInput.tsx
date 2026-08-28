@@ -10,8 +10,10 @@ interface Props {
   loading: boolean;
   error: string | null;
   voiceGender: string;
+  audioMixMode: "dubbed_only" | "ducked_mix";
   onChange: (value: string) => void;
   onGenderChange: (gender: string) => void;
+  onAudioMixModeChange: (mode: "dubbed_only" | "ducked_mix") => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -53,8 +55,8 @@ const GENDER_OPTIONS = [
 ];
 
 export default function UrlInput({
-  url, videoInfo, loading, error, voiceGender,
-  onChange, onGenderChange, onSubmit,
+  url, videoInfo, loading, error, voiceGender, audioMixMode,
+  onChange, onGenderChange, onAudioMixModeChange, onSubmit,
 }: Props) {
 
   const handlePaste = async () => {
@@ -156,6 +158,40 @@ export default function UrlInput({
                   {opt.label}
                 </span>
                 <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-500 font-medium">{opt.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Audio mode selector */}
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
+          Ovoz rejimi
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+          {[
+            { value: "dubbed_only" as const, label: "Faqat tarjima", desc: "Original nutq o'chiriladi" },
+            { value: "ducked_mix" as const, label: "Tarjima + original fon", desc: "Musiqa va original ovoz pasayadi" },
+          ].map((option) => {
+            const selected = audioMixMode === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onAudioMixModeChange(option.value)}
+                aria-pressed={selected}
+                className={`text-left px-3 py-3 rounded-xl border transition-all ${selected
+                  ? "border-blue-500 bg-blue-500/10 shadow-sm"
+                  : "border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] hover:border-blue-400/40"
+                }`}
+              >
+                <span className={`block text-[11px] font-bold ${selected ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}`}>
+                  {option.label}
+                </span>
+                <span className="block mt-1 text-[9px] text-gray-400 dark:text-gray-500">
+                  {option.desc}
+                </span>
               </button>
             );
           })}

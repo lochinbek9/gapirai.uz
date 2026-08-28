@@ -18,6 +18,54 @@ settings = get_settings()
 
 _FRAME_RATE = 24000
 
+# 2026-08-26 finding (job 83ca2305): Azure TTS occasionally produced a
+# segment file that existed on disk but was not valid audio (observed:
+# all-zero RIFF header, ffmpeg: "invalid start code ... Invalid data
+# found") -- likely a race between the SDK's async write and our own
+# `.exists()` check, though the exact provider-side cause isn't fully
+# confirmed. Whatever the cause, the file previously went straight into
+# AudioSegment.from_wav() with no validation, crashing the whole TTS stage
+# (and, via Celery's outer retry, forcing the whole job to redo work) over
+# ONE bad segment. _validate_wav_file() + the bounded retry below catch
+# this before it reaches pydub/ffmpeg for real.
+_WAV_MAX_VALIDATION_RETRIES = 2  # original attempt + up to 2 retries = 3 total
+_FFMPEG_PROBE_TIMEOUT_S = 30
+
+
+def _validate_wav_file(path: str) -> tuple[bool, str]:
+    """Four independent checks, each catching a different corruption mode:
+    a missing file, a zero-byte file, a file with a plausible size but a
+    broken RIFF/WAVE header (the exact production failure), and a file
+    with a valid-looking header but undecodable audio data (only an actual
+    decode attempt catches this one -- header validation alone would pass
+    it). Returns (is_valid, reason) -- reason is always populated on
+    failure so the caller can log the real cause rather than a bare
+    "invalid" with no context."""
+    p = Path(path)
+    if not p.exists():
+        return False, "fayl mavjud emas"
+    if p.stat().st_size <= 0:
+        return False, "fayl bo'sh (0 bayt)"
+    try:
+        with open(path, "rb") as f:
+            header = f.read(12)
+    except Exception as exc:
+        return False, f"sarlavhani o'qib bo'lmadi: {exc}"
+    if len(header) < 12 or header[0:4] != b"RIFF" or header[8:12] != b"WAVE":
+        return False, f"yaroqsiz RIFF/WAVE sarlavha (bytes={header!r})"
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", path, "-f", "null", "-"],
+            capture_output=True, text=True, timeout=_FFMPEG_PROBE_TIMEOUT_S,
+        )
+        if result.returncode != 0:
+            return False, f"ffmpeg dekodlay olmadi: {result.stderr.strip()[:300]}"
+    except subprocess.TimeoutExpired:
+        return False, "ffmpeg probe vaqti tugadi"
+    except Exception as exc:
+        return False, f"ffmpeg probe xatosi: {exc}"
+    return True, ""
+
 # ─────────────────────────────────────────────────────────────
 # Segmentlarni TABIIY gapga qayta guruhlash
 # ─────────────────────────────────────────────────────────────
@@ -233,6 +281,20 @@ def synthesize_segments(
         if pre_synthesized:
             logger.info(f"Batch orqali oldindan tayyorlandi: {len(pre_synthesized)}/{len(segments)} segment")
 
+    # Azure TTS rate-limit: 0.3s interval between requests (prevents 429)
+    import threading as _threading
+    _azure_rate_lock = _threading.Lock()
+    _azure_last_request = [0.0]  # mutable for closure
+
+    def _rate_limit_azure():
+        """Minimal delay between Azure TTS requests to avoid 429 TooManyRequests."""
+        with _azure_rate_lock:
+            now = time.monotonic()
+            elapsed = now - _azure_last_request[0]
+            if elapsed < 0.3:
+                time.sleep(0.3 - elapsed)
+            _azure_last_request[0] = time.monotonic()
+
     def _process_single_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
@@ -242,24 +304,59 @@ def synthesize_segments(
         if seg["id"] in pre_synthesized:
             engine = get_provider().name
         else:
+            _rate_limit_azure()  # Rate-limit before Azure TTS call
             engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
-        if seg_file.exists():
-            audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
-            return (idx, {
-                "audio": audio,
-                "start_ms": int(seg["start"] * 1000),
-                "end_ms": int(seg["end"] * 1000),
-                "engine": engine,
-                "text": text,
-                "seg_id": seg["id"],
-            })
-        return None
+
+        # Bounded per-segment validation/retry -- see _validate_wav_file's
+        # docstring. Only THIS segment is ever re-synthesized; the other
+        # (already-valid) segments running in sibling threads are untouched.
+        # The retry path goes through the same _rate_limit_azure() gate so a
+        # burst of re-syntheses can't itself trip Azure's 429.
+        valid, reason = _validate_wav_file(str(seg_file))
+        attempts = 0
+        while not valid and attempts < _WAV_MAX_VALIDATION_RETRIES:
+            attempts += 1
+            logger.warning(
+                f"Segment {seg['id']}: yaroqsiz TTS audio ({reason}), provider={engine} -- "
+                f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
+            )
+            try:
+                _rate_limit_azure()
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+            except Exception as exc:
+                logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
+            valid, reason = _validate_wav_file(str(seg_file))
+
+        if not valid:
+            # Asl provider xatosi/sababi YASHIRILMAYDI -- to'liq diagnostika
+            # serverda log qilinadi; foydalanuvchiga ko'rinadigan xabar esa
+            # backend/workers/tasks.py:_safe_persisted_error orqali alohida,
+            # xavfsiz matn bilan almashtiriladi (raw exception matni hech
+            # qachon API javobiga chiqmaydi).
+            logger.error(
+                f"Segment {seg['id']}: {_WAV_MAX_VALIDATION_RETRIES + 1} urinishdan keyin ham "
+                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}'"
+            )
+            raise RuntimeError(
+                f"TTS_INVALID_AUDIO: segment {seg['id']} {_WAV_MAX_VALIDATION_RETRIES + 1} "
+                f"urinishdan keyin ham yaroqli audio bermadi ({reason})"
+            )
+
+        audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
+        return (idx, {
+            "audio": audio,
+            "start_ms": int(seg["start"] * 1000),
+            "end_ms": int(seg["end"] * 1000),
+            "engine": engine,
+            "text": text,
+            "seg_id": seg["id"],
+        })
 
     # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit) —
     # juda ko'p parallel oqim ba'zi segmentlarni Edge TTS'ga (boshqa ovozga)
     # "fallback" qilib qo'yishi mumkin edi, natijada bitta dublyajda ikki xil
-    # odam ovozi eshitilardi. 5 oqim boshqa bosqichlar bilan mos va xavfsiz.
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # odam ovozi eshitilardi. 2 oqim — Azure 429 (TooManyRequests) oldini olish.
+    with ThreadPoolExecutor(max_workers=2) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
     # Saralangan segmentlarni yig'ish
@@ -357,7 +454,7 @@ def synthesize_segments(
                         pass
             return item, qa
 
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             qa_pairs = list(executor.map(_qa_and_maybe_retry, seg_data))
         seg_data = [pair[0] for pair in qa_pairs]
         for item, qa in qa_pairs:
@@ -426,17 +523,63 @@ def synthesize_segments(
     original_end_ms = last["end_ms"]
     total_ms = max(natural_end_ms, original_end_ms) + 200
 
-    combined = AudioSegment.silent(duration=total_ms, frame_rate=_FRAME_RATE)
-
-    # 4. Har bir segmentni o'zining ANIQ vaqt koordinatasiga o'rnatish
-    for item in seg_data:
-        combined = combined.overlay(item["audio"], position=item["start_ms"])
-
-    # Final headroom normalization to prevent clipping/crackling
-    combined = combined.normalize(headroom=1.5)
-
+    # 4. Segmentlarni bitta audioda joylashtirish — FFmpeg vositasida, xotirada
+    #    emas (AUDIT_STABILITY.md §3 P0-2 / §4 Shag 3b).
+    #
+    #    Eski usul: AudioSegment.silent(duration=total_ms) + overlay() —
+    #    ular har bir segment uchun BUTUN parcha XOTIRAda saqlanardi: 3 saotlik
+    #    video uchun ~518MB faqat silent-track + har bir overlay yana butun
+    #    buffer nusxasi. 4 workerda parallel — OOM-kill -> worker qayta
+    #    ishga tushib, recover_stuck* -> siklik qayta ishga tushirish.
+    #
+    #    Yangi usul: har bir segment diskda wav sifatida (seg_*.wav) — ffmpeg
+    #    stream deflyatsiyada: har biri adelay orqali o'z start_ms ga suyiladi
+    #    (adelay=delay|delay, stereo), keyin amix normalize=0 bilan aralashtiriladi
+    #    va alimiter=0.95 clippingni oldini oladi. Xotira — O(1) by segment,
+    #    disk — O(N). Fallback (ffmpeg xato qilsa) — eski pydub usuli.
     merged_path = str(output_path / "dubbed_audio.wav")
-    combined.set_frame_rate(_FRAME_RATE).export(merged_path, format="wav")
+
+    def _fallback_pydub_combine(seg_data, total_ms, merged_path):
+        """Xotira usulida birlashtirish — faqat ffmpeg skleyka muvaffaqiyatsiz
+        bo'lsa fallback (qisqa video / xato)."""
+        combined = AudioSegment.silent(duration=total_ms, frame_rate=_FRAME_RATE)
+        for item in seg_data:
+            combined = combined.overlay(item["audio"], position=item["start_ms"])
+        combined = combined.normalize(headroom=1.5)
+        combined.set_frame_rate(_FRAME_RATE).export(merged_path, format="wav")
+        return seg_data
+
+    seg_files = sorted(output_path.glob("seg_*.wav"))
+    if seg_files:
+        seg_id_to_start = {item["seg_id"]: item["start_ms"] for item in seg_data}
+        inputs: list[str] = []
+        filter_parts: list[str] = []
+        amix_inputs: list[str] = []
+        idx = 0
+        for seg_file in seg_files:
+            m = re.search(r"seg_(\d+)\.wav$", seg_file.name)
+            if not m:
+                continue
+            seg_id = int(m.group(1))
+            delay_ms = seg_id_to_start.get(seg_id, 0)
+            inputs += ["-i", str(seg_file)]
+            filter_parts.append(f"[{idx}:a]adelay={delay_ms}|{delay_ms}[d{idx}]")
+            amix_inputs.append(f"[d{idx}]")
+            idx += 1
+        if idx > 0:
+            amix = "".join(amix_inputs) + f"amix=inputs={idx}:normalize=0,alimiter=limit=0.95[a]"
+            filter_complex = ";".join(filter_parts) + ";" + amix
+            cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", filter_complex,
+                   "-map", "[a]", "-ar", str(_FRAME_RATE), "-ac", "1",
+                   "-c:a", "pcm_s16le", merged_path]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            if proc.returncode != 0:
+                logger.warning(f"FFmpeg skleika failed ({proc.stderr[-300:]}). Fallback pydub.")
+                _fallback_pydub_combine(seg_data, total_ms, merged_path)
+        else:
+            _fallback_pydub_combine(seg_data, total_ms, merged_path)
+    else:
+        _fallback_pydub_combine(seg_data, total_ms, merged_path)
 
     # Alohida segment fayllari (seg_XXXX.wav) birlashtirilgan audioga
     # kirgandan so'ng boshqa hech qachon kerak bo'lmaydi — ular diskda

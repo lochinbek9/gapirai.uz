@@ -1,10 +1,12 @@
 "use client";
 
-import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert } from "lucide-react";
+import { RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
 import { useState, useEffect } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
+import DownloadButton from "@/components/DownloadButton";
+import { safeFileName } from "@/lib/download";
 import { trackEvent } from "@/lib/analytics";
 
 interface Props {
@@ -139,19 +141,12 @@ export default function VideoResult({ job, onReset }: Props) {
           </div>
         </div>
 
-        <motion.a
-          href={downloadUrl}
-          download
-          onClick={() => trackEvent("video_downloaded", { format: "video" })}
-          whileHover={{ y: -2 }}
-          whileTap={{ y: 0 }}
-          className="btn-premium w-full flex items-center justify-center gap-3
-                     py-5 rounded-[24px]
-                     transition-all duration-300 text-sm shadow-xl font-extrabold"
-        >
-          <Download size={18} />
-          Videoni yuklab olish
-        </motion.a>
+        <DownloadButton
+          url={downloadUrl}
+          filename={safeFileName(job.video_title, "video")}
+          label="Videoni yuklab olish"
+          hint="Katta fayl bo'lsa, yuklab olish bir necha daqiqa davom etishi mumkin."
+        />
       </div>
 
       {/* ── Translation Text Accordion ────────────── */}

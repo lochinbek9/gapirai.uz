@@ -110,6 +110,7 @@ export interface Job {
   created_at?: string
   speaker_gender?: string
   voice_gender_setting?: string
+  audio_mix_mode?: 'dubbed_only' | 'ducked_mix'
   uzbek_srt_content?: string
   expected_end_time?: string
   rating?: number
@@ -156,8 +157,14 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 export async function createJob(
   youtube_url: string,
   voice_gender: string = 'auto',
+  audio_mix_mode: 'dubbed_only' | 'ducked_mix' = 'dubbed_only',
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender })
+  const res = await apiClient.post('/api/jobs', {
+    youtube_url,
+    target_language: 'uz',
+    voice_gender,
+    audio_mix_mode,
+  })
   return res.data
 }
 
@@ -210,6 +217,14 @@ export async function purchaseLibraryAccessPayme(): Promise<{ success: boolean; 
   return res.data
 }
 
+// Uzum'da checkout havolasi yo'q -- initiateUzumPayment bilan bir xil sabab
+// (backend/api/uzum_routes.py:initiate_library_payment). "account" raqami
+// qaytadi, payment_url emas.
+export async function purchaseLibraryAccessUzum(): Promise<{ success: boolean; account?: number; payment_id?: string; amount: number; message?: string }> {
+  const res = await apiClient.post('/api/payments/uzum/initiate-library')
+  return res.data
+}
+
 export async function initiateClickPayment(jobId: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/click/initiate', { job_id: jobId })
   return res.data
@@ -220,8 +235,17 @@ export async function initiatePaymePayment(jobId: string): Promise<{ success: bo
   return res.data
 }
 
+// Uzum'da checkout havolasi yo'q -- foydalanuvchi Uzum ilovasida shu "account"
+// raqamini o'zi kiritib to'laydi (backend/api/uzum_routes.py). amount===0
+// bo'lsa video allaqachon bepul/kvota bilan qoplangan (payment_url'siz holat
+// bilan bir xil semantik).
+export async function initiateUzumPayment(jobId: string): Promise<{ success: boolean; account?: number; payment_id?: string; amount: number }> {
+  const res = await apiClient.post('/api/payments/uzum/initiate', { job_id: jobId })
+  return res.data
+}
+
 export function getDownloadUrl(jobId: string): string {
-  return `${API_URL}/api/outputs/${jobId}/video`
+  return `${API_URL}/api/outputs/${jobId}/video?download=1`
 }
 
 export interface ResolutionOption {
@@ -235,8 +259,12 @@ export async function getJobResolutions(jobId: string): Promise<{ resolutions: R
   return res.data
 }
 
-export async function requestResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
-  const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`)
+export async function requestResolution(
+  jobId: string,
+  resolution: string,
+  download: boolean = true,
+): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`, null, { params: { download } })
   return res.data
 }
 
@@ -248,8 +276,12 @@ export async function getLibraryJobResolutions(jobId: string): Promise<{ resolut
   return res.data
 }
 
-export async function requestLibraryResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
-  const res = await apiClient.post(`/api/library/${jobId}/resolutions/${resolution}`)
+export async function requestLibraryResolution(
+  jobId: string,
+  resolution: string,
+  download: boolean = true,
+): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/library/${jobId}/resolutions/${resolution}`, null, { params: { download } })
   return res.data
 }
 

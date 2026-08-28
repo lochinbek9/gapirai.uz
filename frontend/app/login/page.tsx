@@ -39,8 +39,15 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
-      setStep('code')
+      const result = await login(email, password)
+      if (result && 'id' in result) {
+        // Verified user — login() qaytardi User object (id, name, email, role)
+        trackEvent('login')
+        router.push('/dashboard')
+      } else {
+        // Unverified — PendingVerification qaytadi (pending_verification, email, message)
+        setStep('code')
+      }
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Xatolik yuz berdi.')
     } finally {

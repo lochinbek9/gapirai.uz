@@ -11,14 +11,58 @@ from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
 from backend.services.errors import PermanentError
+from backend.services import error_classification
 from backend.services.content_safety import check_safety
 from backend.models.database import ContentViolation
 from backend.services.email_service import send_dubbing_complete_email
 from backend.services.telegram_notify import send_telegram_message
+from backend.services.job_claim import try_claim, release_claim
+from backend.services.job_checkpoint import save_checkpoint, restore_checkpoint
 from backend.config import get_settings
+# Chunked pipeline (opt-in, ENABLE_CHUNKED_PIPELINE). Import-safe: the module
+# singletons below are lazy and open no Redis connection at import time.
+from backend.services.chunked_pipeline import (
+    split_video_into_chunks,
+    split_segments_into_chunks,
+    concat_video_chunks,
+    cleanup_chunk_files,
+)
+from backend.services.sliding_window import ChunkWindow
+from backend.services.metrics import get_metrics
+from backend.services.backpressure import get_backpressure
 
 logger = get_task_logger(__name__)
 settings = get_settings()
+
+# Observability for the chunked path only. Per-user gating
+# (scheduler.can_accept_job) is deliberately NOT wired -- it is a no-op in
+# Denis's fork and real per-user limits belong at the enqueue layer.
+_metrics = get_metrics()
+_backpressure = get_backpressure()
+
+# time_limit (3600s) dan sal ko'proq -- 2026-08-26 audit: task_time_limit
+# aynan Redis visibility_timeout defaultiga (3600s) teng edi, bu ikkalasi
+# bir vaqtda tugab qolish xavfini yaratardi. Lease shu ikkalasidan ham
+# ko'proq bo'lishi kerak, aks holda hali ishlayotgan vazifaning claim'i
+# lease muddati tugagani sababli "bo'sh" ko'rinib, boshqa worker tomonidan
+# noto'g'ri qayta claim qilinishi mumkin.
+CLAIM_LEASE_SECONDS = 3900
+
+
+def _release_claim_safe(job_id: str, claim_token: str) -> None:
+    """Claim'ni bo'shatadi -- doim BUTUNLAY YANGI DB sessiyasi bilan, `db`
+    o'zgaruvchisi shu payt yopilgan/buzilgan bo'lishidan qat'i nazar (xuddi
+    _mark_job_failed kabi, pastda). Muvaffaqiyatsiz bo'lsa ham asl xatoni
+    yashirmaydi -- faqat log qoldiradi; claim baribir lease muddati
+    tugagach o'z-o'zidan bo'shaydi, shuning uchun bu xato job'ni abadiy
+    bloklab qo'ymaydi."""
+    session = SessionLocal()
+    try:
+        release_claim(session, DubbingJob, job_id, claim_token)
+    except Exception as exc:
+        logger.warning(f"[JOB {job_id}] Claim bo'shatilmadi (lease muddati bilan o'zi tugaydi): {exc}")
+    finally:
+        session.close()
 
 
 def _sec_to_vtt_time(seconds: float) -> str:
@@ -129,14 +173,208 @@ def _detect_gender(transcript_text: str) -> str:
         return "male"
 
 
+def _scrub_secrets(text: str) -> str:
+    """Log qatoridan credential'larni olib tashlaydi (proxy URL, auth
+    header, cookie, API kalit/token) — backend/services/error_classification.py
+    ning yagona manbasiga delegatsiya qiladi, shu bilan log qatorlari VA
+    persist qilinadigan job.error_message bir xil qoidalar bilan tozalanadi."""
+    return error_classification.scrub_secrets(text)
+
+
+def _classify_download_error(exc: Exception) -> str:
+    """DOWNLOAD bosqichidagi xatoni aniq toifaga ajratadi —
+    backend/services/error_classification.py ga delegatsiya (yagona
+    klassifikatsiya manbasi — downloader.py'ning proksi-eskalatsiya
+    qarori ham xuddi shu funksiyadan foydalanadi, ular hech qachon
+    bir-biridan farq qilmasligi uchun)."""
+    return error_classification.classify_error(exc)
+
+
 def _error_code_for(exc: Exception, current_stage: str) -> str:
     """Xatolikni qisqa toifaga ajratadi (admin panel/monitoring uchun)."""
     code = getattr(exc, "code", None)
     if code:
         return code
     if isinstance(exc, SoftTimeLimitExceeded):
-        return "TIMEOUT"
+        return error_classification.TIMEOUT
+    if current_stage == "DOWNLOAD":
+        return _classify_download_error(exc)
     return f"{current_stage}_FAILED"
+
+
+def _safe_persisted_error(exc: Exception, current_stage: str) -> tuple[str, str]:
+    """Returns (error_code, error_message) SAFE to persist to the DB and
+    return via the (intentionally unauthenticated, shareable-link) job
+    detail endpoint. Two cases:
+
+    - PermanentError: its message was authored BY US as user-facing text
+      (e.g. "Bu videoda nutq topilmadi.") — never derived from a raw
+      yt-dlp/network exception, so it is kept verbatim (scrubbed anyway,
+      as cheap defense in depth in case a future PermanentError ever
+      interpolates raw data).
+    - Any other exception: message may be raw yt-dlp/urllib3/requests
+      text, which can embed proxy credentials (2026-08-26 audit finding)
+      and is never useful to an end user regardless. Classified centrally
+      and replaced with the matching safe Uzbek message — the raw,
+      scrubbed text is only ever written to the server log, never to a
+      persisted/API-visible field.
+    """
+    code = _error_code_for(exc, current_stage)
+    if isinstance(exc, PermanentError):
+        return code, error_classification.scrub_secrets(str(exc))
+    return code, error_classification.safe_user_message(code)
+
+
+def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
+    """Job'ni FAILED holatiga o'tkazadi — doim BUTUNLAY YANGI DB sessiyasi
+    bilan, chaqiruvchining `db` sessiyasidan mustaqil ravishda.
+
+    Sabab: 2026-08-21/22 productionda haqiqiy job (cdc1f75e) topildi — u
+    yuklab olishda muvaffaqiyatsiz bo'lgach, xuddi shu `except` bloki FAILED
+    deb belgilashga urinayotganda DB ulanishi vaqtinchalik uzilgan edi
+    (`OperationalError: server closed the connection unexpectedly`) — bu
+    IKKINCHI xato hech qayerda ushlanmagani uchun, job hech qachon FAILED
+    bo'lmay, oxirgi muvaffaqiyatli holatida (DOWNLOADING) ABADIY qotib
+    qolgan edi. Bu funksiya shu holatni oldini oladi: eski `db` qanday
+    holatda bo'lishidan qat'i nazar, 2 marta yangi sessiya bilan urinadi;
+    ikkalasi ham muvaffaqiyatsiz bo'lsa, kamida CRITICAL log qoldiradi —
+    "hech narsa" o'rniga."""
+    # error_message HECH QACHON xom exception matni bo'lmasligi kerak --
+    # GET /jobs/{id} ataylab autentifikatsiyasiz (ulashiladigan havola
+    # naqshi), shuning uchun bu maydon proxy credential yoki boshqa
+    # sirlarni oshkor qilmasligi kerak (2026-08-26 audit, Priority 1).
+    error_code, safe_message = _safe_persisted_error(exc, current_stage)
+    fields = {
+        "status": JobStatus.FAILED,
+        "error_message": safe_message,
+        "error_code": error_code,
+        "updated_at": datetime.utcnow(),
+    }
+    for attempt in range(2):
+        session = SessionLocal()
+        try:
+            session.query(DubbingJob).filter(DubbingJob.id == job_id).update(fields)
+            session.commit()
+            return
+        except Exception as mark_exc:
+            logger.error(f"[JOB {job_id}] FAILED holatiga o'tkazishda xatolik (urinish {attempt + 1}/2): {mark_exc}")
+            try:
+                session.rollback()
+            except Exception:
+                pass
+        finally:
+            session.close()
+    logger.critical(f"[JOB {job_id}] FAILED holatiga HECH QANDAY usulda o'tkazib bo'lmadi — job eski holatida abadiy qotib qolishi mumkin!")
+
+
+def _run_chunked_pipeline(job_id: str, job, video_path: str, speech_segments: list, voice: str, output_dir) -> str:
+    """Chunked pipeline (OPT-IN — settings.ENABLE_CHUNKED_PIPELINE). Video ni
+    vaqt bo'yicha qismlarga bo'lib, har chunk uchun TTS + MERGE ni parallel
+    bajaradi (~1.7-2x tezroq), keyin concat qiladi. dubbed_final.mp4 yo'lini
+    qaytaradi.
+
+    Q1 (coarse recovery): chunk-darajasidagi checkpoint YO'Q. Worker o'rtada
+    qulasa, process_video shu butun TTS bosqichini qaytadan ishlatadi (chunklar
+    tez). Chunk-ichi xato -> window.fail_chunk() + butun bosqich raise qiladi,
+    process_video'ning oddiy error_classification/retry mexanizmi hal qiladi.
+    Kod Denis-kaa/ai-dubbet feature/chunked-pipeline-gpu dan olingan; faqat
+    ishlaydigan holatga keltirildi (__import__("concurrent.futures") -> _cf).
+    """
+    import concurrent.futures as _cf
+    import threading
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"[JOB {job_id}] Chunked pipeline YONIQ (chunk={settings.CHUNK_DURATION_SEC}s, parallel={settings.MAX_PARALLEL_CHUNKS})")
+
+    video_chunks = split_video_into_chunks(
+        video_path, str(output_dir),
+        chunk_duration_sec=settings.CHUNK_DURATION_SEC,
+        overlap_sec=settings.CHUNK_OVERLAP_SEC,
+    )
+    segment_chunks = split_segments_into_chunks(speech_segments, video_chunks)
+
+    chunk_ids = [f"{job_id}_c{i}" for i in range(len(video_chunks))]
+    window = ChunkWindow(job_id=job_id, window_size=settings.MAX_PARALLEL_CHUNKS)
+    window.init_chunks(chunk_ids)
+    _metrics.set_chunks_total(job_id, len(video_chunks))
+    logger.info(f"[JOB {job_id}] Sliding window: {len(video_chunks)} chunks, window={settings.MAX_PARALLEL_CHUNKS}")
+
+    _bp_lock = threading.Lock()
+
+    def _process_chunk(chunk_idx: int) -> dict:
+        chunk_id = f"{job_id}_c{chunk_idx}"
+        chunk_output_dir = str(output_dir / f"chunk_{chunk_idx}_tts")
+        os.makedirs(chunk_output_dir, exist_ok=True)
+        chunk_segments = segment_chunks[chunk_idx]
+        if not chunk_segments:
+            return {"chunk_idx": chunk_idx, "merged_path": None}
+        with _bp_lock:
+            while not _backpressure.can_produce_tts(job_id):
+                backoff = _backpressure.get_backoff_seconds(job_id)
+                logger.info(f"[JOB {job_id}] Backpressure: chunk {chunk_idx} throttled {backoff}s")
+                time.sleep(backoff)
+            _backpressure.register_tts_produced(job_id, chunk_id)
+        window.start_chunk(chunk_id)
+        chunk_t0 = time.monotonic()
+        chunk_audio, chunk_timings, chunk_qa = synthesizer.synthesize_segments(
+            chunk_segments, chunk_output_dir, voice_name=voice,
+            video_id=f"{job_id}_c{chunk_idx}",
+            user_id=(str(job.user_id) if job.user_id else None),
+            existing_qa=job.segment_qa,
+        )
+        _metrics.record_tts_latency(job_id, chunk_id, time.monotonic() - chunk_t0)
+        with _bp_lock:
+            _backpressure.register_media_started(job_id, chunk_id)
+        media_t0 = time.monotonic()
+        merged_chunk_path = str(output_dir / f"merged_chunk_{chunk_idx:02d}.mp4")
+        merger.merge_video_audio_chunk(
+            video_chunk_path=video_chunks[chunk_idx].video_path,
+            dubbed_audio_path=chunk_audio,
+            output_path=merged_chunk_path,
+            audio_mix_mode=job.audio_mix_mode,
+            chunk_index=chunk_idx,
+        )
+        _metrics.record_media_latency(job_id, chunk_id, time.monotonic() - media_t0)
+        with _bp_lock:
+            _backpressure.register_media_consumed(job_id, chunk_id)
+            _backpressure.register_media_finished(job_id, chunk_id)
+        window.complete_chunk(chunk_id)
+        _metrics.record_chunk_completed(job_id)
+        _metrics.record_ttfp(job_id, chunk_id)
+        logger.info(f"[JOB {job_id}] Chunk {chunk_idx}/{len(video_chunks) - 1} tayyor")
+        return {"chunk_idx": chunk_idx, "merged_path": merged_chunk_path, "timings": chunk_timings, "qa": chunk_qa}
+
+    chunk_results = [None] * len(video_chunks)
+    try:
+        with _cf.ThreadPoolExecutor(max_workers=settings.MAX_PARALLEL_CHUNKS) as executor:
+            future_to_chunk = {}
+            submitted = set()
+            while not window.is_complete():
+                for cid in window.get_next_window():
+                    ci = int(cid.split("_c")[-1])
+                    if ci not in submitted:
+                        future_to_chunk[executor.submit(_process_chunk, ci)] = ci
+                        submitted.add(ci)
+                if not future_to_chunk:
+                    break
+                done, _ = _cf.wait(future_to_chunk.keys(), timeout=1.0, return_when=_cf.FIRST_COMPLETED)
+                for future in done:
+                    ci = future_to_chunk.pop(future)
+                    try:
+                        chunk_results[ci] = future.result()
+                    except Exception as exc:
+                        window.fail_chunk(f"{job_id}_c{ci}", str(exc))
+                        _metrics.record_chunk_failed(job_id)
+                        logger.error(f"[JOB {job_id}] Chunk {ci} xatosi: {exc}")
+                        raise
+    finally:
+        _backpressure.cleanup_job(job_id)
+
+    merged_paths = [r["merged_path"] for r in chunk_results if r and r["merged_path"]]
+    final_output = str(output_dir / "dubbed_final.mp4")
+    concat_video_chunks(merged_paths, final_output)
+    cleanup_chunk_files(video_chunks, str(output_dir))
+    return final_output
 
 
 @celery_app.task(
@@ -152,11 +390,34 @@ def process_video(self: Task, job_id: str) -> dict:
     stage_timings: dict = {}
     pipeline_start = time.monotonic()
     current_stage = "INIT"
+    claim_token = None
 
     try:
         job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
         if not job:
             raise ValueError(f"Job topilmadi: {job_id}")
+
+        # 2026-08-26 audit: bir xil task_id ikki worker'da bir vaqtda faol
+        # bo'lishi productionda LIVE kuzatilgan (Celery/Redis qayta
+        # yetkazib berishi VA recover_stuck_jobs() bir xil job'ni mustaqil
+        # qayta navbatga qo'yishi tufayli). Bu yerda DB darajasidagi atomik
+        # claim -- ikkinchi (dublikat) yetkazib berish xato/qayta urinishsiz,
+        # xavfsiz chiqib ketadi.
+        # redelivered=True -- Celery/Kombu bu vazifani QAYTA yetkazayotgani
+        # tasdiqlangan (task_reject_on_worker_lost yoki visibility_timeout
+        # orqali) -- eski egasi ALLAQACHON o'lgan bo'lishi kafolatlangan
+        # (job_claim.py:try_claim docstringidagi xavfsizlik dalili), shuning
+        # uchun muddati tugamagan eski claim'ni ham qayta claim qilishga
+        # ruxsat beriladi (2026-08-26 worker-loss audit -- ilgari bunday
+        # holatda job lease muddati tugagunча, soatlab, qotib qolardi).
+        is_redelivered = bool((self.request.delivery_info or {}).get("redelivered"))
+        claim_token = try_claim(db, DubbingJob, job_id, CLAIM_LEASE_SECONDS, allow_reclaim=is_redelivered)
+        if claim_token is None:
+            logger.info(
+                f"[JOB {job_id}] Boshqa worker allaqachon faol claim'ga ega -- "
+                f"bu dublikat yetkazib berish, xavfsiz chiqilmoqda."
+            )
+            return {"job_id": job_id, "status": "skipped_duplicate_claim"}
 
         job_dir = Path(settings.UPLOAD_DIR) / job_id
         output_dir = Path(settings.OUTPUT_DIR) / job_id
@@ -165,10 +426,22 @@ def process_video(self: Task, job_id: str) -> dict:
         # Checkpoint: agar video+audio disk'da hali ham mavjud bo'lsa (masalan
         # oldingi urinish shu yerdan keyin qulagan bo'lsa), qayta yuklab
         # olinmaydi — YouTube'ga behuda so'rov yuborilmaydi.
+        #
+        # 2026-08-26 finding (job 83ca2305): "diskda mavjud" ilgari FAQAT shu
+        # HOST'ning o'z diskini tekshirar edi -- Celery qayta urinishni
+        # BOSHQA worker host'iga yuborsa (5 host'li flot, umumiy disk yo'q),
+        # oldingi hostning muvaffaqiyatli yuklab olingan fayli butunlay
+        # ko'rinmas edi, majburiy qayta yuklashga (va qayta YouTube xatosiga
+        # duch kelishga) olib kelardi. restore_checkpoint() avval xuddi shu
+        # lokal tekshiruvni qiladi (bir xil host'da hech narsa o'zgarmaydi,
+        # S3'ga murojaat yo'q) -- faqat lokal fayl YO'Q bo'lsa S3'dan
+        # tiklashga urinadi (backend/services/job_checkpoint.py).
         current_stage = "DOWNLOAD"
         stage_t0 = time.monotonic()
         audio_path = str(job_dir / "audio.wav")
-        if job.original_video_path and Path(job.original_video_path).exists() and Path(audio_path).exists():
+        video_restored = bool(job.original_video_path) and restore_checkpoint(job_id, "video.mp4", job.original_video_path)
+        audio_restored = bool(job.original_video_path) and restore_checkpoint(job_id, "audio.wav", audio_path)
+        if video_restored and audio_restored and Path(job.original_video_path).exists() and Path(audio_path).exists():
             _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
             video_path = job.original_video_path
         else:
@@ -180,6 +453,8 @@ def process_video(self: Task, job_id: str) -> dict:
             db.commit()
             video_path = download_result["video_path"]
             audio_path = download_result["audio_path"]
+            save_checkpoint(job_id, "video.mp4", video_path)
+            save_checkpoint(job_id, "audio.wav", audio_path)
             _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "ok")
 
         # BOSQICH 2: Transkripsiya
@@ -324,9 +599,13 @@ def process_video(self: Task, job_id: str) -> dict:
         # BOSQICH 5: TTS (jinsga mos ovoz)
         # Checkpoint: agar birlashtirilgan dublyaj audiosi allaqachon
         # diskda bo'lsa, ElevenLabs'ga qayta pul to'lab sintez qilinmaydi.
+        # DOWNLOAD'dagi bilan bir xil sabab bilan restore_checkpoint()
+        # orqali -- boshqa host'dagi qayta urinish ham S3'dan tiklay oladi.
         current_stage = "TTS"
         stage_t0 = time.monotonic()
-        if job.dubbed_audio_path and Path(job.dubbed_audio_path).exists():
+        _chunked_final = None   # chunked pipeline TTS+MERGE'ni birga bajarsa shu yerga yoziladi
+        tts_restored = bool(job.dubbed_audio_path) and restore_checkpoint(job_id, "dubbed_audio.wav", job.dubbed_audio_path)
+        if tts_restored and Path(job.dubbed_audio_path).exists():
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "skipped")
             dubbed_audio_path = job.dubbed_audio_path
             # Checkpoint orqali qayta tiklangan job uchun aniq segment
@@ -335,6 +614,24 @@ def process_video(self: Task, job_id: str) -> dict:
             # clipping/balandlik tekshiruvlarini bajaradi, faqat dub/fon
             # balansi tekshiruvi o'tkazib yuboriladi.
             actual_timings = None
+        elif settings.ENABLE_CHUNKED_PIPELINE:
+            # OPT-IN chunked pipeline: TTS + MERGE ni chunk'lar bo'yicha parallel
+            # bajaradi va to'g'ridan-to'g'ri dubbed_final.mp4 yaratadi. Bu bosqich
+            # bizning claim/lease ICHIDA ishlaydi (claim yuqorida olingan).
+            # Q1 (coarse recovery): chunk-checkpoint yo'q -> crash bo'lsa butun
+            # shu bosqich qaytadan (chunklar tez, qabul qilinadi).
+            voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+            _update_job(db, job, JobStatus.PROCESSING_CHUNKS, 60.0,
+                        "Video qismlarga bo'lib parallel qayta ishlanmoqda...")
+            _chunked_final = _run_chunked_pipeline(job_id, job, video_path, speech_segments, voice, output_dir)
+            dubbed_audio_path = _chunked_final   # yakuniy QA video fayldan signal-darajali tekshiradi
+            actual_timings = None
+            job.dubbed_audio_path = dubbed_audio_path
+            job.output_video_path = _chunked_final
+            job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
+            db.commit()
+            save_checkpoint(job_id, "dubbed_final.mp4", _chunked_final)
+            _record_stage(stage_timings, job_id, "TTS", stage_t0, "ok")
         else:
             voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
@@ -356,14 +653,21 @@ def process_video(self: Task, job_id: str) -> dict:
             # tushmay qoladi.
             job.uzbek_srt_content = _segments_to_vtt(actual_timings)
             db.commit()
+            save_checkpoint(job_id, "dubbed_audio.wav", dubbed_audio_path)
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "ok")
 
         # BOSQICH 6: Birlashtirish
         # Checkpoint: yakuniy video allaqachon tayyor bo'lsa, ffmpeg qayta
-        # ishlamaydi.
+        # ishlamaydi. Xuddi DOWNLOAD/TTS kabi -- boshqa host'dagi qayta
+        # urinish uchun S3'dan tiklash imkoniyati bilan.
         current_stage = "MERGE"
         stage_t0 = time.monotonic()
-        if job.output_video_path and Path(job.output_video_path).exists():
+        merge_restored = bool(job.output_video_path) and restore_checkpoint(job_id, "dubbed_final.mp4", job.output_video_path)
+        if _chunked_final is not None:
+            # Chunked pipeline MERGE'ni allaqachon chunk'lar ichida bajardi.
+            _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
+            final_output = _chunked_final
+        elif merge_restored and Path(job.output_video_path).exists():
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
             final_output = job.output_video_path
         else:
@@ -375,11 +679,13 @@ def process_video(self: Task, job_id: str) -> dict:
                 video_path=video_path,
                 dubbed_audio_path=dubbed_audio_path,
                 output_path=final_output,
+                audio_mix_mode=job.audio_mix_mode,
             )
 
             job.output_video_path = final_output
             job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
             db.commit()
+            save_checkpoint(job_id, "dubbed_final.mp4", final_output)
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "ok")
 
         # Yakuniy aralashma QA — merger.py'ning ducking/mixing natijasini
@@ -467,24 +773,31 @@ def process_video(self: Task, job_id: str) -> dict:
 
     except PermanentError as exc:
         # Qayta urinish ma'nosiz — har safar bir xil natija chiqadi.
-        db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
-            "status": JobStatus.FAILED,
-            "error_message": str(exc),
-            "error_code": _error_code_for(exc, current_stage),
-            "updated_at": datetime.utcnow(),
-        })
-        db.commit()
-        if job.user_id and job.user and job.user.telegram_chat_id:
-            send_telegram_message(
-                job.user.telegram_chat_id,
-                f"\u274c Dublyaj bajarilmadi: {job.video_title or 'Video'}\n\n{str(exc)}",
-            )
+        # Status-o'tkazish endi mustaqil, yangi sessiya bilan (_mark_job_failed) —
+        # eski `db` sessiyasi shu paytda qanday holatda bo'lishidan qat'i nazar.
+        _mark_job_failed(job_id, exc, current_stage)
+        try:
+            if job.user_id and job.user and job.user.telegram_chat_id:
+                send_telegram_message(
+                    job.user.telegram_chat_id,
+                    f"\u274c Dublyaj bajarilmadi: {job.video_title or 'Video'}\n\n{str(exc)}",
+                )
+        except Exception as notify_exc:
+            logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
 
     except Exception as exc:
-        if self.request.retries < self.max_retries:
+        error_code = _error_code_for(exc, current_stage)
+        # AUTH_ERROR (va boshqa should_retry()=False toifalar) uchun BLIND
+        # RETRY yo'q (2026-08-26 audit, Priority 5) -- eskirgan/bloklangan
+        # sessiya soniyalar/daqiqalar o'tishi bilan o'zi tuzalmaydi, shuning
+        # uchun bunday xato birinchi marta chiqishi bilanoq to'g'ridan-
+        # to'g'ri quyidagi "yakuniy muvaffaqiyatsizlik" bo'limiga o'tadi --
+        # xuddi max_retries tugagandagidek, faqat qayta urinishlarni
+        # sarflamasdan.
+        if self.request.retries < self.max_retries and error_classification.should_retry(error_code):
             # 600s'gacha (10 daq) chegaralangan — bugun kuzatilgan naqsh
             # bo'yicha YouTube'ning vaqtinchalik bot-bloklanishi odatda
             # ~10-15 daqiqada tozalanadi (2026-08-14); qayta urinishlar
@@ -495,48 +808,97 @@ def process_video(self: Task, job_id: str) -> dict:
             # (transcript_segments, translated_segments, ...) ATAYLAB
             # tozalanmaydi/o'chirilmaydi — keyingi urinish shu checkpoint
             # nuqtalaridan davom etadi, boshidan boshlamaydi.
-            job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-            if job:
-                job.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
-                job.error_message = str(exc)
-                job.error_code = _error_code_for(exc, current_stage)
-                job.updated_at = datetime.utcnow()
-                db.commit()
-            db.close()
+            #
+            # 2026-08-26 audit (orphan-job topilmasi, job 9ffc3336): asl `db`
+            # sessiyasi aynan shu `except` blokiga olib kelgan
+            # OperationalError sababli ALLAQACHON buzilgan bo'lishi mumkin
+            # (masalan Postgres idle-in-transaction timeout tufayli) — shu
+            # buzilgan sessiyani qayta ishlatib so'rov yuborilsa, IKKINCHI,
+            # ushlanmagan OperationalError chiqadi va bu self.retry()/
+            # _mark_job_failed()/xabarnoma/kvota-qaytarishning HAMMASINI
+            # chetlab o'tadi — job hech qanday error_code'siz DOWNLOADING
+            # holatida abadiy qotib qoladi. Yechim: _mark_job_failed bilan
+            # bir xil naqsh — eski `db`dan mustaqil, har doim YANGI
+            # SessionLocal() ochiladi. Bu yangi sessiya bilan ham
+            # muvaffaqiyatsiz bo'lsa (DB butunlay ishlamay qolgan bo'lsa),
+            # xato shu yerning o'zida ushlanadi va faqat log qoldiriladi —
+            # lekin self.retry() BARIBIR pastda chaqiriladi, chunki qayta
+            # urinishning o'zi status-xabari yozilishiga bog'liq emas.
+            retry_session = SessionLocal()
+            try:
+                job = retry_session.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+                if job:
+                    job.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
+                    _, job.error_message = _safe_persisted_error(exc, current_stage)
+                    job.error_code = error_code
+                    job.updated_at = datetime.utcnow()
+                    retry_session.commit()
+            except Exception as status_exc:
+                logger.warning(f"[JOB {job_id}] Qayta urinish oldidan status yangilanmadi: {status_exc}")
+            finally:
+                retry_session.close()
+            try:
+                db.close()
+            except Exception:
+                pass
             _log_pipeline_summary(job_id, stage_timings, pipeline_start, f"RETRY {self.request.retries + 1}/{self.max_retries}")
             raise self.retry(exc=exc, countdown=countdown)
 
-        db.query(DubbingJob).filter(DubbingJob.id == job_id).update({
-            "status": JobStatus.FAILED,
-            "error_message": str(exc),
-            "error_code": _error_code_for(exc, current_stage),
-            "updated_at": datetime.utcnow(),
-        })
+        if current_stage == "DOWNLOAD":
+            # Foydalanuvchi so'ragan aniq log formati — monitoring/grep uchun
+            # (masalan `docker compose logs worker | grep PROXY_BILLING_ERROR`
+            # orqali Webshare balansi tugagan holatlarni tezda topish uchun).
+            # Xabar matni credential'lardan tozalangan (_scrub_secrets).
+            not_retried = not error_classification.should_retry(error_code)
+            logger.error(f"[DOWNLOAD] attempt {self.request.retries + 1}/{self.max_retries}")
+            logger.error(f"[DOWNLOAD] error_type={error_code}")
+            logger.error(f"[DOWNLOAD] job_id={job_id}")
+            logger.error(f"[DOWNLOAD] {_scrub_secrets(str(exc))}")
+            logger.error("[DOWNLOAD] not retried (non-retryable error type)" if not_retried else "[DOWNLOAD] max retries reached")
+            logger.error("[JOB] status=FAILED")
+
+        # Status-o'tkazish endi mustaqil, yangi sessiya bilan (_mark_job_failed) —
+        # eski `db` sessiyasi shu paytda qanday holatda bo'lishidan qat'i nazar
+        # (2026-08-21/22 productionda haqiqiy job shu sabab bilan abadiy qotib
+        # qolgan edi — batafsili izoh _mark_job_failed'ning o'zida).
+        _mark_job_failed(job_id, exc, current_stage)
 
         # Kvota qaytarish -- bepul/kvota bilan boshlangan job 5 marta
         # urinib ham muvaffaqiyatsiz tugasa, sarflangan kvota userga qaytadi
         # (2026-08-19, foydalanuvchi so'rovi). Pullik (Click) job'lar uchun
         # avtomatik pul qaytarish integratsiyasi yo'q -- Payment.needs_refund
         # true qilinadi, admin panelda qo'lda qaytarish uchun ko'rsatiladi.
-        if job.quota_consumed and job.user_id:
-            from backend.services.plans import refund_quota
-            refund_quota(db, job.user_id)
-            job.quota_consumed = False
-        else:
-            from backend.models.payment import Payment, PaymentStatus
-            paid = db.query(Payment).filter(
-                Payment.job_id == job_id, Payment.status == PaymentStatus.APPROVED
-            ).first()
-            if paid:
-                paid.needs_refund = True
+        # O'z alohida sessiyasi va try/except bilan — bu yerdagi xato endi
+        # yuqoridagi status-o'tkazishga ta'sir qilmaydi.
+        refund_db = None
+        try:
+            refund_db = SessionLocal()
+            if job.quota_consumed and job.user_id:
+                from backend.services.plans import refund_quota
+                refund_quota(refund_db, job.user_id)
+                refund_db.query(DubbingJob).filter(DubbingJob.id == job_id).update({"quota_consumed": False})
+            else:
+                from backend.models.payment import Payment, PaymentStatus
+                paid = refund_db.query(Payment).filter(
+                    Payment.job_id == job_id, Payment.status == PaymentStatus.APPROVED
+                ).first()
+                if paid:
+                    paid.needs_refund = True
+            refund_db.commit()
+        except Exception as refund_exc:
+            logger.error(f"[JOB {job_id}] Kvota/to'lov qaytarish belgisini qo'yishda xatolik: {refund_exc}")
+        finally:
+            if refund_db is not None:
+                refund_db.close()
 
-        db.commit()
-
-        if job.user_id and job.user and job.user.telegram_chat_id:
-            send_telegram_message(
-                job.user.telegram_chat_id,
-                f"\u274c Dublyaj bajarilmadi (bir necha marta urinildi): {job.video_title or 'Video'}\n\n{str(exc)}",
-            )
+        try:
+            if job.user_id and job.user and job.user.telegram_chat_id:
+                send_telegram_message(
+                    job.user.telegram_chat_id,
+                    f"\u274c Dublyaj bajarilmadi (bir necha marta urinildi): {job.video_title or 'Video'}\n\n{str(exc)}",
+                )
+        except Exception as notify_exc:
+            logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
 
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (max retries)")
@@ -544,4 +906,6 @@ def process_video(self: Task, job_id: str) -> dict:
         raise exc
 
     finally:
+        if claim_token is not None:
+            _release_claim_safe(job_id, claim_token)
         db.close()

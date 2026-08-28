@@ -239,7 +239,11 @@ export default function DashboardPage() {
     if (!job.youtube_url) return
     setRetryingId(job.job_id)
     try {
-      const { job_id, status } = await createJob(job.youtube_url, job.voice_gender_setting || 'auto')
+      const { job_id, status } = await createJob(
+        job.youtube_url,
+        job.voice_gender_setting || 'auto',
+        job.audio_mix_mode || 'dubbed_only',
+      )
       if (status === 'awaiting_payment') {
         router.push(`/video/${job_id}`)
       } else {

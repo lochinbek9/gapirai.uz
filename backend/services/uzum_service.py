@@ -104,34 +104,42 @@ def check_success(service_id, data: dict | None = None) -> dict:
     }
 
 
-def create_success(service_id, trans_id: str, amount, data: dict | None = None) -> dict:
+def create_success(service_id, trans_id: str, amount, trans_time_ms: int, data: dict | None = None) -> dict:
+    """trans_time_ms -- DB'da saqlangan payment.uzum_create_time'dan hisoblanadi
+    (endi now_ms() emas), aks holda /status keyinroq BOSHQA (bir necha
+    millisekund farqli) qiymat qaytarardi -- 2026-08-21, foydalanuvchi
+    Postman orqali /status va /create javoblarini solishtirib topgan bag."""
     return {
         "serviceId": service_id,
         "transId": trans_id,
         "status": "CREATED",
-        "transTime": now_ms(),
+        "transTime": trans_time_ms,
         "data": data or {},
         "amount": amount,
     }
 
 
-def confirm_success(service_id, trans_id: str, amount, data: dict | None = None) -> dict:
+def confirm_success(service_id, trans_id: str, amount, confirm_time_ms: int, data: dict | None = None) -> dict:
+    """confirm_time_ms -- DB'dagi payment.uzum_confirm_time'dan (create_success
+    bilan bir xil sabab)."""
     return {
         "serviceId": service_id,
         "transId": trans_id,
         "status": "CONFIRMED",
-        "confirmTime": now_ms(),
+        "confirmTime": confirm_time_ms,
         "data": data or {},
         "amount": amount,
     }
 
 
-def reverse_success(service_id, trans_id: str, amount, data: dict | None = None) -> dict:
+def reverse_success(service_id, trans_id: str, amount, reverse_time_ms: int, data: dict | None = None) -> dict:
+    """reverse_time_ms -- DB'dagi payment.uzum_cancel_time'dan (create_success
+    bilan bir xil sabab)."""
     return {
         "serviceId": service_id,
         "transId": trans_id,
         "status": "REVERSED",
-        "reverseTime": now_ms(),
+        "reverseTime": reverse_time_ms,
         "data": data or {},
         "amount": amount,
     }

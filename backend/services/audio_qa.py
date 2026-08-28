@@ -22,6 +22,8 @@ import subprocess
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 
+from backend.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 _SILENCE_THRESH_DB = -40
@@ -125,7 +127,11 @@ def _measure_loudness_range(video_path: str) -> float | None:
         return None
 
 
-def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None = None) -> dict:
+def check_final_mix_quality(
+    video_path: str,
+    actual_timings: list[dict] | None = None,
+    audio_mix_mode: str | None = None,
+) -> dict:
     """
     Yakuniy aralashtirilgan videoni (merger.py'ning natijasi) signal
     darajasida tekshiradi — STT'siz, xuddi check_audio_quality() kabi.
@@ -137,9 +143,10 @@ def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None =
     - dub eshitiladimi: actual_timings bo'yicha dub gapirayotgan oynalarning
       mutlaq darajasi juda past emasmi (aks holda dub mikslashda yo'qolib
       qolgan yoki umuman qo'shilmagan degani).
-    - fon saqlanganmi: dub orasidagi bo'sh joylar butunlay jim emasmi
-      (aks holda original audio tasodifan to'liq o'chirilgan bo'lishi mumkin
-      — bu funksiyaning butun maqsadi shuni oldini olish edi).
+    - fon saqlanganmi: faqat ``AUDIO_MIX_MODE=ducked_mix`` rejimida dub
+      orasidagi bo'sh joylar butunlay jim emasmi. ``dubbed_only`` rejimida
+      original fon ataylab chiqariladi, shuning uchun bu tekshiruv o'tkazib
+      yuboriladi.
 
     Ma'lum cheklov: bu funksiya faqat YAKUNIY (aralashtirilgan) audioni
     ko'radi, dub va original alohida-alohida emas — shuning uchun "dub juda
@@ -206,8 +213,14 @@ def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None =
 
     if dub_rms is not None and dub_rms < _MIN_DUB_ABSOLUTE_DBFS:
         flags.append("dub_not_audible")
-    if bg_rms is not None and bg_rms < _BACKGROUND_SILENCE_FLOOR_DBFS:
-        flags.append("background_missing")
+    # In dubbed_only mode the original track is intentionally absent; treating
+    # silent gaps as a failure would create a false warning for every job.
+    mode = audio_mix_mode or get_settings().AUDIO_MIX_MODE
+    if mode == "ducked_mix":
+        if bg_rms is not None and bg_rms < _BACKGROUND_SILENCE_FLOOR_DBFS:
+            flags.append("background_missing")
+    else:
+        bg_rms = None
 
     score = 1.0
     if "clipping" in flags:

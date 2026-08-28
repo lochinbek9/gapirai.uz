@@ -25,6 +25,11 @@ class JobStatus(str, enum.Enum):
     MERGING = "MERGING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    # Progressive playback uchun yangi holatlar
+    SPLITTING = "SPLITTING"           # Video chunk'larga bo'linmoqda
+    PROCESSING_CHUNKS = "PROCESSING_CHUNKS"  # Chunk'lar parallel qayta ishlanmoqda
+    PARTIALLY_READY = "PARTIALLY_READY"  # Birinchi chunk tayyor, playback mumkin
+    PUBLISHING = "PUBLISHING"         # HLS segmentlar publish qilinmoqda
 
 
 class User(Base):
@@ -77,6 +82,9 @@ class DubbingJob(Base):
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
+    # Per-job audio mode: dubbed_only or ducked_mix. Nullable for old jobs;
+    # new requests always persist an explicit value.
+    audio_mix_mode = Column(String(20), nullable=True)
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -107,6 +115,12 @@ class DubbingJob(Base):
     output_video_path = Column(String(500))
     output_video_url = Column(String(500))
 
+    # Progressive playback uchun qo'shimcha maydonlar
+    hls_playlist_url = Column(String(500), nullable=True)  # HLS playlist URL
+    chunks_ready = Column(Integer, default=0)  # Tayyor chunk'lar soni
+    chunks_total = Column(Integer, default=0)  # Jami chunk'lar soni
+    first_playable_at = Column(DateTime, nullable=True)  # Birinchi chunk tayyor bo'lgan vaqt
+
     error_message = Column(Text)
     error_code = Column(String(50), nullable=True)  # masalan: VIDEO_UNAVAILABLE, TRANSCRIBE_FAILED, TIMEOUT
     # 2026-08-19: shu job uchun tarif kvotasi sarflanganmi (consume_quota
@@ -127,6 +141,17 @@ class DubbingJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
+    # 2026-08-26 worker-lifecycle audit (GapirAI reliability qatlami) --
+    # bitta job ikki worker'da bir vaqtda faol bo'lishining oldini oluvchi
+    # DB-darajasidagi atomik claim/lease (backend/services/job_claim.py).
+    # Redis lock EMAS -- barcha worker'lar bitta Postgres'ga ulanadi.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    # recover_stuck_jobs() shu job'ni necha marta qayta navbatga qo'yganini
+    # sanaydi -- doimiy xatoli job cheksiz PENDING<->DOWNLOADING aylanishda
+    # qolib ketmasligi uchun.
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
+
     user = relationship("User", back_populates="jobs")
 
     @property
@@ -135,8 +160,37 @@ class DubbingJob(Base):
         joblar uchun bu ASL job'ning ID'si (source_job_id), oddiy joblar
         uchun o'zining ID'si. Barcha S3 kalit hisoblovchi kod (routes.py
         download endpointlari, resolution_variants.py) shu propertydan
-        foydalanadi, job.id'dan emas."""
-        return str(self.source_job_id or self.id)
+        foydalanadi, job.id'dan emas.
+
+        job_creation.py'dagi kesh qidiruvi ilgari ENG SO'NGGI tugagan mos
+        job'ni tanlar edi -- bu kesh-hit BOSHQA kesh-hitga ishora qilib,
+        zanjir hosil bo'lishiga olib kelardi (bitta video uchun 13 bosqichgacha
+        kuzatilgan, 2026-08-21). Kesh-hit job'larning o'zi HECH QACHON S3'ga
+        fayl yuklamaydi, shuning uchun zanjirning istalgan oraliq bo'g'ini
+        "storage_id" sifatida ishlatilsa doim mavjud bo'lmagan kalitga olib
+        keladi. Yozish tomoni (job_creation.py) endi to'g'ridan-to'g'ri asl
+        ildizga ishora qiladi, lekin bazadagi eski zanjirlar davolanishi
+        uchun bu yerda ham to'liq zanjir bosib o'tiladi (aylanma himoya
+        bilan)."""
+        from sqlalchemy.orm import object_session
+
+        seen = {str(self.id)}
+        current = self
+        for _ in range(50):
+            if not current.source_job_id:
+                return str(current.id)
+            next_id = str(current.source_job_id)
+            if next_id in seen:
+                return str(current.id)
+            seen.add(next_id)
+            session = object_session(self)
+            if session is None:
+                return next_id
+            nxt = session.get(DubbingJob, current.source_job_id)
+            if nxt is None:
+                return next_id
+            current = nxt
+        return str(current.id)
 
 
 class AnalysisStatus(str, enum.Enum):
@@ -193,6 +247,12 @@ class VideoAnalysis(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+    # 2026-08-26: DubbingJob bilan bir xil claim/lease mexanizmi --
+    # backend/services/job_claim.py.
+    processing_claim_token = Column(String(64), nullable=True)
+    processing_lease_expires_at = Column(DateTime, nullable=True)
+    recovery_attempt_count = Column(Integer, nullable=False, default=0)
 
     user = relationship("User")
 
