@@ -1,7 +1,14 @@
+import logging
+
 from celery import Celery
 from backend.config import get_settings
 
 settings = get_settings()
+
+# httpx INFO logi job yakunlanganda (telegram_notify.py) bot tokenini
+# to'liq URL ichida oshkor qiladi -- worker'da ham WARNING'ga ko'taramiz.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 celery_app = Celery(
     "ai_dubber",

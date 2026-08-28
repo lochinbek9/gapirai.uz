@@ -39,6 +39,14 @@ from backend.services.job_creation import (
 from backend.services.resolution_variants import request_resolution
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+# python-telegram-bot ichida httpx ishlatadi; uning INFO-darajali "HTTP Request:
+# POST https://api.telegram.org/bot<TOKEN>/getUpdates" logi HAR long-poll
+# so'rovida BOT TOKENINI to'liq oshkor qiladi. WARNING'ga ko'tarib, bu
+# oqimni to'xtatamiz (xatoliklar baribir ko'rinadi). httpcore ham shovqinli.
+for _noisy in ("httpx", "httpcore", "telegram.ext.Application"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 logger = logging.getLogger("telegram_bot")
 
 settings = get_settings()

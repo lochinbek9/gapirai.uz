@@ -18,6 +18,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx'ning INFO "HTTP Request: POST https://api.telegram.org/bot<TOKEN>/..."
+# logi job yakunlanganda (telegram_notify.py) bot tokenini oshkor qiladi.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 from backend.config import get_settings
