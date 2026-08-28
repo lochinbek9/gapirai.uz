@@ -16,6 +16,7 @@ import { useTheme } from '../../../theme/ThemeProvider';
 import { formatDuration } from '../../../utils/format';
 import { isValidYoutubeUrl } from '../../../utils/youtube';
 import * as dubbingApi from '../api';
+import * as learnApi from '../../learn/api';
 import { dubFormSchema, type DubFormValues } from '../schemas';
 
 const VOICE_OPTIONS = [
@@ -49,9 +50,9 @@ export function DubForm() {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: DubFormValues) => dubbingApi.createJob(values.youtubeUrl.trim(), values.voiceGender),
+    mutationFn: (values: DubFormValues) => learnApi.learnVideo(values.youtubeUrl.trim(), values.voiceGender),
     onSuccess: (data) => {
-      router.push(`/video/${data.job_id}`);
+      router.push(`/learn/${data.dubbing_job_id}`);
     },
   });
 
@@ -104,11 +105,11 @@ export function DubForm() {
 
       {mutation.isError && (
         <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(mutation.error, 'Dublyaj yaratishda xatolik yuz berdi.')}
+          {getErrorMessage(mutation.error, "O'rganishni boshlashda xatolik yuz berdi.")}
         </ThemedText>
       )}
 
-      <PrimaryButton label="Dublyaj qilish" onPress={onSubmit} loading={mutation.isPending} />
+      <PrimaryButton label="O'rganish" onPress={onSubmit} loading={mutation.isPending} />
     </ThemedView>
   );
 }

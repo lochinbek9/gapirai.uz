@@ -89,6 +89,23 @@ export interface AnalysisSummary {
   detailed: string;
 }
 
+export interface KeyTerm {
+  term: string;
+  explanation: string;
+}
+
+// "5 daqiqada" -- oddiy AnalysisSummary'dan farqli, o'quv-yo'naltirilgan
+// siqilgan format (mirrors frontend/lib/api.ts's FiveMinuteSummary).
+export interface FiveMinuteSummary {
+  title: string;
+  why_it_matters: string;
+  core_ideas: string[];
+  examples: string[];
+  takeaways: string[];
+  key_terms: KeyTerm[];
+  remember: string;
+}
+
 export interface QuizQuestion {
   question: string;
   options: string[];
@@ -126,6 +143,7 @@ export interface VideoAnalysis {
   summary?: AnalysisSummary;
   key_points?: KeyPoint[];
   chapters?: Chapter[];
+  five_minute_summary?: FiveMinuteSummary;
   notes?: string;
   quiz?: QuizQuestion[];
   qa_history: QAEntry[];
