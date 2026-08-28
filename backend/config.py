@@ -16,7 +16,10 @@ class Settings(BaseSettings):
     # tiny=75MB fast worst, small=500MB ok, medium=1.5GB good, large-v3=3GB best
     WHISPER_MODEL: str = "small"
 
-    ENABLE_SEGMENT_QA: bool = False  # DISABLED: Azure 429 bottleneck, +30% overhead
+    # GapirAI integratsiya (2026-08-28): Denis forkida False qilingan edi
+    # ("Azure 429 bottleneck"), biz hozircha True qoldiramiz -- segment QA
+    # sifat kafolati. Azure 429/latency/xarajat integration testlaridan keyin baholanadi.
+    ENABLE_SEGMENT_QA: bool = True
     SEGMENT_QA_THRESHOLD: float = 0.75
     # Tarjima tayyor bo'lgach, taxminiy TTS davomiyligi original segment
     # uzunligidan shu nisbatdan ko'p oshsa, bitta cheklangan qisqartirish
@@ -105,7 +108,10 @@ class Settings(BaseSettings):
     # overlap qiladi, keyin裁切 qilinadi.
     CHUNK_OVERLAP_SEC: float = 1.5
     # Chunked pipeline ni yoqish/o'chirish. False = eski sequential rejim.
-    ENABLE_CHUNKED_PIPELINE: bool = True
+    # GapirAI integratsiya: productionga OPT-IN. Validatsiya + load-testdan
+    # keyin .env: ENABLE_CHUNKED_PIPELINE=true bilan yoqiladi. Hozircha eski
+    # sequential + to'liq reliability (job_claim/checkpoint) yo'li ishlaydi.
+    ENABLE_CHUNKED_PIPELINE: bool = False
 
     # ─────────────────────────────────────────────────────────────────────
     # NVENC GPU Encoding — NVIDIA GPU bilan tezroq video encoding.
@@ -342,7 +348,9 @@ class Settings(BaseSettings):
 
     # Admin panel — role='admin' bo'lsa ham, faqat shu ro'yxatdagi email
     # kira oladi (vergul bilan ajratilgan). Bo'sh bo'lsa, faqat role tekshiriladi.
-    ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com,den4ikorm@gmail.com"
+    # 2026-08-28: Denis forkida "den4ikorm@gmail.com" qo'shilgan edi --
+    # privilege grant, olib tashlandi. Kerak bo'lsa .env orqali qo'shiladi.
+    ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com"
 
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"

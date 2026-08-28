@@ -217,6 +217,16 @@ def recover_stuck_analyses(redis_conn=None):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # 2026-08-28 (GapirAI integratsiya): SECRET_KEY bo'sh bo'lsa istalgan kishi
+    # o'zi JWT yasab, istalgan foydalanuvchi (admin ham) nomidan kira oladi.
+    # Denis'ning client docs'i noto'g'ri "JWT_SECRET_KEY" nomini ko'rsatadi --
+    # kod SECRET_KEY o'qiydi, shuning uchun docs bo'yicha deploy qilinsa bu
+    # BO'SH qoladi. Production'da (DEBUG=False) darhol to'xtatamiz.
+    if not settings.DEBUG and (not settings.SECRET_KEY or len(settings.SECRET_KEY) < 16):
+        raise RuntimeError(
+            "SECRET_KEY .env orqali berilishi SHART (kamida 16 belgi). "
+            "Docs'dagi 'JWT_SECRET_KEY' EMAS -- aynan 'SECRET_KEY'."
+        )
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
     create_tables()
