@@ -44,6 +44,13 @@ settings = get_settings()
 # orqali foydalanuvchiga ko'rinadi, cheksiz sukut aylanish o'rniga.
 RECOVERY_MAX_ATTEMPTS = 5
 
+# Analiz vazifalari (analyze_video_task, Denis'ning versiyasi) job_claim
+# ISHLATMAYDI -- shuning uchun recover_stuck_analyses claim o'rniga
+# `updated_at` eskirganiga qaraydi. Bu chegara: shundan ko'p yangilanmagan
+# aktive-status analiz "qotib qolgan" hisoblanadi (jonli oqim updated_at'ni
+# yangilab turadi, shuning uchun 15 daqiqa xavfsiz).
+RECOVERY_STUCK_MINUTES = 15
+
 
 def recover_stuck_jobs(redis_conn=None):
     """Ishga tushganda (yoki worker yo'qolganda) "osilib qolgan" job'larni
