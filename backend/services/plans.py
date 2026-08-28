@@ -52,7 +52,7 @@ class PlanDef:
 
 
 PLANS: dict[str, PlanDef] = {
-    "free": PlanDef(id="free", name="Bepul", price=0, videos_per_period=1, free_minutes=5.0, priority=False, tts_tier="edge", tier=PlanTier.FREE, max_resolution="360p"),
+    "free": PlanDef(id="free", name="Bepul", price=0, videos_per_period=1, free_minutes=45.0, priority=False, tts_tier="edge", tier=PlanTier.FREE, max_resolution="360p"),
     "standard": PlanDef(id="standard", name="Standart", price=49_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p"),
     "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p", period_days=365),
     "pro": PlanDef(id="pro", name="Pro", price=149_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, max_resolution="1080p"),
