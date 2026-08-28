@@ -25,6 +25,11 @@ class JobStatus(str, enum.Enum):
     MERGING = "MERGING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    # Progressive playback uchun yangi holatlar
+    SPLITTING = "SPLITTING"           # Video chunk'larga bo'linmoqda
+    PROCESSING_CHUNKS = "PROCESSING_CHUNKS"  # Chunk'lar parallel qayta ishlanmoqda
+    PARTIALLY_READY = "PARTIALLY_READY"  # Birinchi chunk tayyor, playback mumkin
+    PUBLISHING = "PUBLISHING"         # HLS segmentlar publish qilinmoqda
 
 
 class User(Base):
@@ -83,6 +88,12 @@ class DubbingJob(Base):
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
+    # Per-job audio mode: "dubbed_only" (default) yoki "ducked_mix". Eski
+    # joblarda NULL -- shu holatda backend/config.py:AUDIO_MIX_MODE global
+    # qiymatiga tushadi (merger.py:_build_audio_filtergraph). 2026-08-28
+    # GapirAI integratsiya: ai-dubbet lineage'idan qaytarildi -- merger.py,
+    # job_creation.py kesh filtri va routes.py shu ustunga tayanadi.
+    audio_mix_mode = Column(String(20), nullable=True)
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -112,6 +123,12 @@ class DubbingJob(Base):
     dubbed_audio_path = Column(String(500))
     output_video_path = Column(String(500))
     output_video_url = Column(String(500))
+
+    # Progressive playback uchun qo'shimcha maydonlar
+    hls_playlist_url = Column(String(500), nullable=True)  # HLS playlist URL
+    chunks_ready = Column(Integer, default=0)  # Tayyor chunk'lar soni
+    chunks_total = Column(Integer, default=0)  # Jami chunk'lar soni
+    first_playable_at = Column(DateTime, nullable=True)  # Birinchi chunk tayyor bo'lgan vaqt
 
     error_message = Column(Text)
     error_code = Column(String(50), nullable=True)  # masalan: VIDEO_UNAVAILABLE, TRANSCRIBE_FAILED, TIMEOUT
