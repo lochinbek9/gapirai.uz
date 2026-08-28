@@ -95,7 +95,11 @@ class JobResponse(BaseModel):
 # job uchun video allaqachon bor, qayta yuklash befoyda).
 
 
-def _job_to_response(job: DubbingJob) -> JobResponse:
+def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
+    # redact=True -- job egasi BO'LMAGAN (anonim) so'rovchi uchun. Faqat
+    # tugallangan job'ning ulashsa bo'ladigan qismi qaytariladi: video,
+    # subtitr, sarlavha. Egasining shaxsiy ma'lumoti (ichki xato matni,
+    # transkript, baho/fikr) YASHIRILADI -- get_job() shu bayroqni beradi.
     raw_status = job.status.value if hasattr(job.status, "value") else job.status
     status_str = str(raw_status).lower() if raw_status else "pending"
     
@@ -119,21 +123,21 @@ def _job_to_response(job: DubbingJob) -> JobResponse:
         video_duration=job.video_duration,
         video_thumbnail=job.video_thumbnail,
         output_video_url=job.output_video_url,
-        transcript_text=job.transcript_text,
+        transcript_text=None if redact else job.transcript_text,
         translated_text=job.translated_text,
-        error_message=job.error_message,
-        error_code=job.error_code,
+        error_message=None if redact else job.error_message,
+        error_code=None if redact else job.error_code,
         created_at=job.created_at.isoformat() if job.created_at else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         audio_mix_mode=job.audio_mix_mode or settings.AUDIO_MIX_MODE,
         uzbek_srt_content=job.uzbek_srt_content,
         expected_end_time=expected_end_time,
-        rating=job.rating,
-        feedback_comment=job.feedback_comment,
-        feedback_voice_ok=job.feedback_voice_ok,
-        feedback_translation_ok=job.feedback_translation_ok,
-        feedback_speed_ok=job.feedback_speed_ok,
+        rating=None if redact else job.rating,
+        feedback_comment=None if redact else job.feedback_comment,
+        feedback_voice_ok=None if redact else job.feedback_voice_ok,
+        feedback_translation_ok=None if redact else job.feedback_translation_ok,
+        feedback_speed_ok=None if redact else job.feedback_speed_ok,
         content_flagged=job.content_flagged,
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
@@ -211,14 +215,26 @@ def get_job(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> JobResponse:
-    """Job ma'lumotlarini olish. Authenticated foydalanuvchi faqat o'zini,
-    anonymous — har qanday tugallangan jobni ko'ra oladi (share link uchun)."""
+    """Job ma'lumotlarini olish.
+    - Egasi (authenticated) -> to'liq javob.
+    - Authenticated, lekin egasi emas -> 404 (IDOR/enumeratsiyani yashiradi).
+    - Anonim -> FAQAT tugallangan job, va faqat ulashsa bo'ladigan maydonlar
+      (transkript / xato matni / baho-fikr yashiriladi). Jarayondagi / xato
+      bo'lgan job anonimga umuman ko'rinmaydi."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
-    # Agar foydalanuvchi tizimga kirgan bo'lsa — faqat o'zini tekshir
-    if current_user and job.user_id != current_user.id:
+
+    is_owner = current_user is not None and job.user_id == current_user.id
+    if current_user is not None and not is_owner:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
+
+    if not is_owner:
+        raw_status = job.status.value if hasattr(job.status, "value") else job.status
+        if str(raw_status).upper() != "COMPLETED":
+            raise HTTPException(status_code=404, detail="Job topilmadi.")
+        return _job_to_response(job, redact=True)
+
     return _job_to_response(job)
 
 
