@@ -18,6 +18,11 @@ from backend.services.email_service import send_dubbing_complete_email
 from backend.services.telegram_notify import send_telegram_message
 from backend.services.job_claim import try_claim, release_claim
 from backend.services.job_checkpoint import save_checkpoint, restore_checkpoint
+# Processing boundary (Phase 2) -- TRANSCRIBE va MERGE chaqiruvlari shu qatlam
+# orqali. Hozircha default = LocalTranscriber / LocalEncoder (transcriber.py /
+# merger.py ustidagi yupqa wrapper), xatti-harakat o'zgarmaydi. Modal keyinroq
+# shu Protocol ortida qo'shiladi.
+from backend.services.processing import get_encoder, get_transcriber
 from backend.config import get_settings
 # Chunked pipeline (opt-in, ENABLE_CHUNKED_PIPELINE). Import-safe: the module
 # singletons below are lazy and open no Redis connection at import time.
@@ -468,7 +473,7 @@ def process_video(self: Task, job_id: str) -> dict:
             transcript_text = job.transcript_text or ""
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(audio_path)
+            transcript = get_transcriber().transcribe(audio_path)
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
@@ -675,11 +680,11 @@ def process_video(self: Task, job_id: str) -> dict:
             final_output = str(output_dir / "dubbed_final.mp4")
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            merger.merge_video_audio(
+            get_encoder().encode_merge(
                 video_path=video_path,
-                dubbed_audio_path=dubbed_audio_path,
-                output_path=final_output,
-                audio_mix_mode=job.audio_mix_mode,
+                audio_path=dubbed_audio_path,
+                out_path=final_output,
+                mix_mode=job.audio_mix_mode,
             )
 
             job.output_video_path = final_output
