@@ -46,6 +46,16 @@ def generate_payment_url(
     return f"{CLICK_BASE_URL}?{urlencode(params)}"
 
 def validate_signature(params: dict, secret_key: str) -> bool:
+    # Fail-closed: bo'sh/yo'q secret_key bilan imzo tekshiruvi FAQAT ommaviy
+    # maydonlarning MD5'iga aylanadi -- so'rovchi (Click emas, hujjum qiluvchi)
+    # o'sha qiymatlarni o'zi yuborayotgani uchun to'g'ri "imzo"ni o'zi hisoblab
+    # qo'yishi mumkin edi, ya'ni har qanday /prepare va /complete webhook
+    # qabul qilinardi (E-2, 2026-08-28 audit). Hech qanday holatda bo'sh kalit
+    # bilan imzo qabul qilinmaydi -- .env'da CLICK_SECRET_KEY sozlanmagan bo'lsa
+    # to'lov webhook'lari butunlay rad etiladi (fail-closed).
+    if not secret_key:
+        return False
+
     click_trans_id = params.get('click_trans_id')
     service_id = params.get('service_id')
     merchant_trans_id = params.get('merchant_trans_id')
