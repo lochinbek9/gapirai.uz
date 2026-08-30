@@ -278,10 +278,16 @@ class Settings(BaseSettings):
     AZURE_VOICE_NAME: str = "uz-UZ-SardorNeural"  # O'zbek erkak ovozi
 
     # AWS S3
+    # Source of truth: `.env` (prod) / Modal Secret `gapirai-s3`. Defaultlar
+    # AWS kalitlari bilan bir xil konvensiyada bo'sh -- sozlanmagan muhitda
+    # storage._get_s3_client() (None, None) qaytaradi (S3 o'chirilgan, lokal
+    # fayl fallback). Ilgari bu yerda boshqa loyihaning bucket nomi hardcoded
+    # turardi -- kalitlar mavjud-u bucket sozlanmagan holatda begona bucketga
+    # jim yozib yuborish xavfi bor edi.
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_BUCKET_NAME: str = "hr-lodex-recordings"
-    AWS_REGION: str = "eu-north-1"
+    AWS_BUCKET_NAME: str = ""
+    AWS_REGION: str = ""
 
 
     # Paths
