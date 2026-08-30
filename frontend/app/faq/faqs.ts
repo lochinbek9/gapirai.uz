@@ -1,7 +1,7 @@
 export const FAQS = [
   {
     q: "GapirAI.uz qanday ishlaydi?",
-    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi hamda zamonaviy nutq sintezi texnologiyasi yordamida o'zbek tilida tabiiy ovoz beradi."
+    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
   },
   {
     q: "Platformadan foydalanish bepulmi?",

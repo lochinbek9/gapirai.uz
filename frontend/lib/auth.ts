@@ -81,7 +81,7 @@ export async function apiRegister(name: string, email: string, password: string)
   return res.data
 }
 
-export async function apiLogin(email: string, password: string): Promise<PendingVerification | AuthResult> {
+export async function apiLogin(email: string, password: string): Promise<PendingVerification> {
   const res = await axios.post(`${API_URL}/auth/login`, { email, password })
   return res.data
 }

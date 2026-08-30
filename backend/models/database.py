@@ -25,11 +25,6 @@ class JobStatus(str, enum.Enum):
     MERGING = "MERGING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    # Progressive playback uchun yangi holatlar
-    SPLITTING = "SPLITTING"           # Video chunk'larga bo'linmoqda
-    PROCESSING_CHUNKS = "PROCESSING_CHUNKS"  # Chunk'lar parallel qayta ishlanmoqda
-    PARTIALLY_READY = "PARTIALLY_READY"  # Birinchi chunk tayyor, playback mumkin
-    PUBLISHING = "PUBLISHING"         # HLS segmentlar publish qilinmoqda
 
 
 class User(Base):
@@ -77,19 +72,17 @@ class DubbingJob(Base):
     youtube_url = Column(String(500), nullable=False)
     youtube_video_id = Column(String(20), nullable=True, index=True)  # kesh qidiruvi uchun (backend/services/job_creation.py)
     source_job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True)  # kesh-hit -- asl job'ga ishora
-    # /api/learn (learn_routes.py) shu job bilan bir vaqtda yaratgan
-    # VideoAnalysis'ga ishora -- Learning Workspace (frontend/app/learn/[id])
-    # shu orqali qaysi tahlilni ham poll qilishni biladi. Oddiy dublyaj
-    # joblarida NULL.
+    # /api/learn (backend/api/learn_routes.py) shu job bilan bir vaqtda
+    # yaratgan VideoAnalysis'ga ishora -- Learning Workspace (frontend/app/
+    # learn/[id]) shu orqali qaysi tahlilni ham poll qilishni biladi. Eski
+    # oddiy dublyaj joblarida (yoki /api/learn'dan tashqarida yaratilganlarda)
+    # NULL bo'lib qoladi.
     linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id"), nullable=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
-    # Per-job audio mode: dubbed_only or ducked_mix. Nullable for old jobs;
-    # new requests always persist an explicit value.
-    audio_mix_mode = Column(String(20), nullable=True)
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -120,12 +113,6 @@ class DubbingJob(Base):
     output_video_path = Column(String(500))
     output_video_url = Column(String(500))
 
-    # Progressive playback uchun qo'shimcha maydonlar
-    hls_playlist_url = Column(String(500), nullable=True)  # HLS playlist URL
-    chunks_ready = Column(Integer, default=0)  # Tayyor chunk'lar soni
-    chunks_total = Column(Integer, default=0)  # Jami chunk'lar soni
-    first_playable_at = Column(DateTime, nullable=True)  # Birinchi chunk tayyor bo'lgan vaqt
-
     error_message = Column(Text)
     error_code = Column(String(50), nullable=True)  # masalan: VIDEO_UNAVAILABLE, TRANSCRIBE_FAILED, TIMEOUT
     # 2026-08-19: shu job uchun tarif kvotasi sarflanganmi (consume_quota
@@ -146,15 +133,18 @@ class DubbingJob(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
 
-    # 2026-08-26 worker-lifecycle audit (GapirAI reliability qatlami) --
-    # bitta job ikki worker'da bir vaqtda faol bo'lishining oldini oluvchi
-    # DB-darajasidagi atomik claim/lease (backend/services/job_claim.py).
-    # Redis lock EMAS -- barcha worker'lar bitta Postgres'ga ulanadi.
+    # 2026-08-26: worker lifecycle audit -- bir xil job ikki worker'da bir
+    # vaqtda faol bo'lishining oldini olish uchun DB-darajasidagi atomik
+    # claim/lease (backend/services/job_claim.py). Redis lock emas -- barcha
+    # worker'lar (production-new + worker-1..4) shu BITTA jadvalga ulanadi,
+    # shuning uchun bu haqiqiy umumiy holat manbai.
     processing_claim_token = Column(String(64), nullable=True)
     processing_lease_expires_at = Column(DateTime, nullable=True)
     # recover_stuck_jobs() shu job'ni necha marta qayta navbatga qo'yganini
-    # sanaydi -- doimiy xatoli job cheksiz PENDING<->DOWNLOADING aylanishda
-    # qolib ketmasligi uchun.
+    # sanaydi -- doimiy (transient bo'lmagan) xatoga uchragan job cheksiz
+    # PENDING<->DOWNLOADING aylanishda qolib ketmasligi uchun (2026-08-26
+    # audit: 044530c0 job bir necha kun davomida shu tarzda aylanib yurgan
+    # holati topilgan).
     recovery_attempt_count = Column(Integer, nullable=False, default=0)
 
     user = relationship("User", back_populates="jobs")
@@ -222,10 +212,11 @@ class VideoAnalysis(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     youtube_url = Column(String(500), nullable=False)
-    # DubbingJob.youtube_video_id bilan bir xil naqsh -- boshqa foydalanuvchi
-    # ALLAQACHON shu videoni shu tilda tahlil qilgan bo'lsa, qayta yuklab
-    # olish/transkripsiya/LLM chaqiruvlarini takrorlamaslik uchun (learn_routes.py:
-    # find_cached_analysis).
+    # DubbingJob.youtube_video_id bilan bir xil naqsh (job_creation.py) --
+    # boshqa foydalanuvchi ALLAQACHON tahlil qilgan videoni qayta yuklab
+    # olish/transkripsiya qilish/LLM chaqirishlarini takrorlamaslik uchun
+    # (2026-08-25 audit: ilgari VideoAnalysis'da bunday kesh umuman yo'q
+    # edi, har so'rov mustaqil ishlardi).
     youtube_video_id = Column(String(20), nullable=True, index=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
@@ -247,8 +238,11 @@ class VideoAnalysis(Base):
     summary = Column(JSONB, nullable=True)        # {"short": str, "medium": str, "detailed": str}
     key_points = Column(JSONB, nullable=True)      # [{"title","description","timestamp"}]
     chapters = Column(JSONB, nullable=True)        # [{"title","start","end"}]
-    # {"title","why_it_matters","core_ideas","examples","takeaways","key_terms","remember"}
-    # -- "5 daqiqada" formatidagi o'quv-xulosa (Learning Workspace: FiveMinuteTab).
+    # {"title","why_it_matters","core_ideas":[...],"examples":[...],
+    #  "takeaways":[...],"key_terms":[{"term","explanation"}],"remember"} --
+    # o'quv-yo'naltirilgan siqilgan xulosa (oddiy summary'dan farqli, "5
+    # daqiqada" formatida). summary/key_points/chapters bilan bir xil ANALYZE
+    # bosqichida eager generatsiya qilinadi (backend/workers/analysis_tasks.py).
     five_minute_summary = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)
     quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
@@ -261,8 +255,8 @@ class VideoAnalysis(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
-    # 2026-08-26: DubbingJob bilan bir xil claim/lease mexanizmi --
-    # backend/services/job_claim.py.
+    # 2026-08-26: DubbingJob bilan bir xil claim/lease mexanizmi -- qarang
+    # backend/services/job_claim.py va DubbingJob'dagi izoh.
     processing_claim_token = Column(String(64), nullable=True)
     processing_lease_expires_at = Column(DateTime, nullable=True)
     recovery_attempt_count = Column(Integer, nullable=False, default=0)

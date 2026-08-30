@@ -12,12 +12,13 @@ import {
 import { useJobPolling } from '@/hooks/useJobPolling'
 import { useAnalysisPolling } from '@/hooks/useAnalysisPolling'
 import VideoPlayer, { VideoPlayerHandle } from '@/components/VideoPlayer'
+import YouTubePlayer, { YouTubePlayerHandle } from '@/components/YouTubePlayer'
 import NotesTab from '@/components/analysis/NotesTab'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import QuizTab from '@/components/analysis/QuizTab'
 import QATab from '@/components/analysis/QATab'
 import FiveMinuteTab from '@/components/analysis/FiveMinuteTab'
-import { STEPS as PIPELINE_STEPS, getCurrentStep } from '@/components/StepProgress'
+import { extractYouTubeId } from '@/lib/youtube'
 import { trackEvent, trackOnce } from '@/lib/analytics'
 
 // video/[id]/page.tsx bilan bir xil narx qoidasi (45 daqiqadan uzun videolar
@@ -26,14 +27,6 @@ import { trackEvent, trackOnce } from '@/lib/analytics'
 function calculateClientPrice(durationMinutes: number): number {
   if (durationMinutes < 45.0) return 0
   return Math.ceil(durationMinutes) * 500
-}
-
-// /video/[id]/page.tsx bilan bir xil -- "taxminan N daqiqa qoldi" ko'rinishi.
-function formatRemainingTime(seconds: number): string {
-  if (seconds <= 0) return 'kam qoldi...'
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return m > 0 ? `${m} daqiqa ${s} soniya` : `${s} soniya`
 }
 
 // Backend'ning job.status_message'i (masalan "Nutq matnga aylantirilmoqda...")
@@ -69,10 +62,10 @@ export default function LearnPage() {
   const { job, is404 } = useJobPolling(id)
   const { analysis } = useAnalysisPolling(job?.linked_analysis_id ?? null)
 
+  const youtubePlayerRef = useRef<YouTubePlayerHandle>(null)
   const dubbedPlayerRef = useRef<VideoPlayerHandle>(null)
 
   const [tab, setTab] = useState<Tab>('video')
-  const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
@@ -93,16 +86,6 @@ export default function LearnPage() {
   useEffect(() => {
     if (is404) router.push('/')
   }, [is404, router])
-
-  // "Taxminiy yakunlanish vaqti" hisoblagichini har soniyada yangilab turadi
-  // (job hali qayta ishlanayotgan bo'lsagina) -- /video/[id] bilan bir xil.
-  const isProcessing =
-    job != null && job.status !== 'completed' && job.status !== 'failed' && job.status !== 'awaiting_payment'
-  useEffect(() => {
-    if (!isProcessing) return
-    const t = setInterval(() => setCurrentTime(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [isProcessing])
 
   // Agar sahifa ochilganda video HAM, tahlil HAM allaqachon tayyor bo'lsa
   // (masalan avval tugagan darsni qayta ochish) -- "5 daqiqada"dan
@@ -148,11 +131,16 @@ export default function LearnPage() {
     if (next === 'notes') trackOnce(id, 'notes_opened')
   }
 
-  // Transkript/quiz/AI-ustoz timestamp tugmalari dublyaj videosini o'sha
-  // lahzaga o'tkazadi. Dublyaj hali tayyor bo'lmasa (video tab progress
-  // ko'rsatib turadi) -- seek shunchaki e'tiborsiz qoldiriladi.
+  // Video tab qaysi pleerni ko'rsatishidan (original YouTube dub tugagunga
+  // qadar, keyin dublyaj videosi) qat'i nazar bitta seek() -- VideoPlayer
+  // endi YouTubePlayer bilan bir xil seekTo() interfeysini beradi
+  // (frontend/components/VideoPlayer.tsx).
   const seek = (seconds: number) => {
-    dubbedPlayerRef.current?.seekTo(seconds)
+    if (job?.status === 'completed') {
+      dubbedPlayerRef.current?.seekTo(seconds)
+    } else {
+      youtubePlayerRef.current?.seekTo(seconds)
+    }
   }
 
   const handleAsk = async (e: React.FormEvent) => {
@@ -284,6 +272,7 @@ export default function LearnPage() {
 
   const videoSrc = getVideoUrl(id)
   const audioUrl = job.status === 'completed' ? getAudioUrl(id) : undefined
+  const youtubeVideoId = job.youtube_url ? extractYouTubeId(job.youtube_url) : null
   const analysisReady = analysis?.status === 'completed'
 
   return (
@@ -459,74 +448,32 @@ export default function LearnPage() {
                 </div>
               </div>
             ) : (
-              // Dublyaj qilinayotganda: videosiz progress ko'rinishi
-              // (/video/[id]/page.tsx bilan bir xil) -- spinner, pipeline
-              // bosqichlari, taxminiy yakunlanish vaqti, bekor qilish.
-              <div className="min-h-[22rem] sm:min-h-0 sm:aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-
-                <div className="text-center space-y-4 max-w-sm z-10">
-                  <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto" />
-                  <div className="space-y-1">
-                    <p className="text-white font-semibold text-lg">
-                      {PROCESSING_LABELS[job.status] || job.status_message || 'Darsingiz tayyorlanmoqda...'}
-                    </p>
+              <>
+                {youtubeVideoId ? (
+                  <YouTubePlayer ref={youtubePlayerRef} videoId={youtubeVideoId} />
+                ) : (
+                  <div className="aspect-video bg-black rounded-2xl flex items-center justify-center text-gray-500 text-sm">
+                    Video ko'rsatib bo'lmadi
                   </div>
-
-                  {/* Bosqichlar -- foiz o'rniga (backend haqiqiy % bermaydi) */}
-                  <div className="flex items-center justify-center gap-2">
-                    {PIPELINE_STEPS.map((step, i) => {
-                      const current = getCurrentStep(job.status)
-                      const isDone = current > i
-                      const isActive = current === i
-                      return (
-                        <div key={step.key} className="flex flex-col items-center gap-1">
-                          <div
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs transition-all duration-300 ${
-                              isDone
-                                ? 'bg-emerald-500 text-white'
-                                : isActive
-                                ? 'bg-blue-500 text-white animate-pulse'
-                                : 'bg-white/5 text-slate-600'
-                            }`}
-                          >
-                            {isDone ? '✓' : step.icon}
-                          </div>
-                          <span className={`text-[9px] font-semibold ${isActive ? 'text-blue-400' : isDone ? 'text-emerald-500' : 'text-slate-600'}`}>
-                            {step.label}
-                          </span>
-                        </div>
-                      )
-                    })}
+                )}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+                  <p className="text-xs text-slate-400">
+                    O'zbekcha dublyaj tayyorlanmoqda — hozircha original videoni tomosha qilib turing.
+                  </p>
+                  <div className="flex items-center gap-2.5">
+                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                    <span className="text-xs text-slate-500">{PROCESSING_LABELS[job.status] || job.status_message || 'Darsingiz tayyorlanmoqda...'}</span>
                   </div>
-
-                  {job.expected_end_time && (
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-slate-400 space-y-1">
-                      <p className="font-semibold text-slate-300">Taxminiy yakunlanish vaqti:</p>
-                      <p className="text-white font-mono text-sm">
-                        {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </p>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
-                          ? '(tez orada yakunlanadi...)'
-                          : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <button
-                      onClick={handleCancel}
-                      disabled={cancelLoading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-violet-400 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-lg transition duration-200 disabled:opacity-50"
-                    >
-                      {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                      Jarayonni bekor qilish
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-white transition disabled:opacity-50"
+                  >
+                    {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    Jarayonni bekor qilish
+                  </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}

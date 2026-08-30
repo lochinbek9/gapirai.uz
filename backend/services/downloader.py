@@ -19,6 +19,7 @@ from redis import Redis
 
 from backend.config import get_settings
 from backend.services.errors import PermanentError
+from backend.services import error_classification as errcls
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -29,30 +30,9 @@ COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
 # oshib ketmasligi uchun (disk to'lib qolishining oldini olish).
 MAX_DOWNLOAD_SIZE_BYTES = 3 * 1024 * 1024 * 1024  # 3 GB
 
-# yt-dlp/YouTube'dan qaytadigan, qayta urinish bilan hal bo'lmaydigan
-# xatolik matnlari — bunday holatlarda job darhol FAILED bo'lishi kerak,
-# 3 marta behuda qayta urinilmasligi kerak.
-_PERMANENT_ERROR_PATTERNS = [
-    "private video",
-    "video unavailable",
-    "video is unavailable",
-    "no longer available",
-    "has been removed",
-    "account associated with this video has been terminated",
-    "this video is not available",
-    "copyright",
-    "members-only",
-    "premieres in",
-    "live event will begin",
-    "this live stream recording is not available",
-    "video has been removed",
-    "unable to extract",
-]
-
 
 def _is_permanent_download_error(err_str: str) -> bool:
-    low = err_str.lower()
-    return any(pattern in low for pattern in _PERMANENT_ERROR_PATTERNS)
+    return errcls.classify_text(err_str) == errcls.VIDEO_UNAVAILABLE
 
 
 class YoutubeRateLimiter:
@@ -61,11 +41,7 @@ class YoutubeRateLimiter:
     MIN_COOLDOWN = 30       # minimum seconds between download starts
     MAX_COOLDOWN = 300      # cap exponential backoff at 5 minutes
     MAX_CONCURRENT = 1
-    # ACQUIRE_TIMEOUT — 8000 c (2s13m) edi; bu worker'ni shu vaqtgacha
-    # ushlab turardi, so'ngra Celery soft_time_limit (55m) uni o'ldirar edi.
-    # Job "qayta ishga tushib" qayta-qayta urinardi. 600 c (10m) — bitta
-    # slot o'ynash uchun yetarli (AUDIT_STABILITY.md §3 P1-3).
-    ACQUIRE_TIMEOUT = 600   # max wait for a slot (10 minutes)
+    ACQUIRE_TIMEOUT = 8000   # max wait for a slot (10 minutes)
     POLL_INTERVAL = 1.5     # sleep between slot checks
 
     def __init__(self, redis_url: str):
@@ -127,6 +103,87 @@ class YoutubeRateLimiter:
 _rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
 
 
+# Cookie freshness -- makes cookie availability EXPLICIT rather than
+# blindly trusting whatever file happens to be mounted at COOKIES_PATH.
+# cookies.txt here is a manually-maintained, manually-refreshed export
+# (see backend/services/README or the ingestion audit) -- there is no
+# automated refresh, and there must not be one (no personal-account login
+# automation in this codebase). A file older than the threshold is more
+# likely to trigger a wasted, bot-check-flavored request than to succeed,
+# so it is treated as absent: the existing cookie-less fallback path runs
+# instead, and this is logged (server-side only) as a clear diagnostic
+# rather than failing silently or blindly attempting stale credentials.
+YOUTUBE_COOKIES_MAX_AGE_HOURS = float(os.getenv("YOUTUBE_COOKIES_MAX_AGE_HOURS", "96"))
+
+
+def _cookies_are_stale(path: str) -> bool:
+    try:
+        age_hours = (time.time() - os.path.getmtime(path)) / 3600
+    except OSError:
+        return True
+    if age_hours > YOUTUBE_COOKIES_MAX_AGE_HOURS:
+        logger.warning(
+            f"YouTube cookies file is {age_hours:.0f}h old (max {YOUTUBE_COOKIES_MAX_AGE_HOURS:.0f}h) "
+            "-- treating as absent and proceeding without cookies. No cookie contents logged."
+        )
+        return True
+    return False
+
+
+def cookie_status() -> dict:
+    """Explicit, inspectable cookie state -- present/absent, fresh/stale,
+    age in hours. No cookie contents, ever. Intended for operator-facing
+    diagnostics (e.g. an admin/health endpoint), not end-user output."""
+    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
+    if not os.path.isfile(cookies_target):
+        return {"present": False, "fresh": False, "age_hours": None}
+    age_hours = (time.time() - os.path.getmtime(cookies_target)) / 3600
+    return {
+        "present": True,
+        "fresh": age_hours <= YOUTUBE_COOKIES_MAX_AGE_HOURS,
+        "age_hours": round(age_hours, 1),
+    }
+
+
+class _CookieSessionLogger:
+    """Routes yt-dlp's own internal warnings through this project's logger
+    instead of letting them vanish into quiet/no_warnings suppression --
+    specifically to surface ONE distinct, previously-invisible signal:
+    yt-dlp's own detection that the loaded cookie SESSION is server-side
+    invalid. This is NOT the same thing as file-age staleness (that's
+    _cookies_are_stale(), checked entirely separately) -- a cookie file can
+    be fresh by age and still session-invalid, exactly as confirmed live in
+    the 2026-08-27 isolated-path reliability experiment (this warning fired
+    on effectively every attempt, success or failure alike).
+
+    2026-08-27 audit: logged as its own distinct, greppable marker
+    (COOKIE_SESSION_INVALID) rather than folded into the existing AUTH_ERROR
+    classification -- the experiment showed this signal does NOT reliably
+    predict failure (mweb succeeds via PO-token regardless of it), so it
+    must not change retry/success decisions, only add visibility for
+    diagnosing WHY a failure happened when one does. Everything else is
+    silently dropped, matching the prior quiet/no_warnings behavior exactly
+    -- and this never logs cookie contents, only yt-dlp's own fixed
+    warning text (scrubbed defensively anyway)."""
+
+    def debug(self, msg):
+        pass
+
+    def info(self, msg):
+        pass
+
+    def warning(self, msg):
+        if "cookies are no longer valid" in msg or "have likely been rotated" in msg:
+            logger.warning(
+                f"[COOKIE_SESSION_INVALID] yt-dlp cookie sessiyasini tekshirishda: "
+                f"sessiya haqiqiy emas deb aniqlandi (fayl yangi bo'lsa ham -- bu "
+                f"fayl yoshi emas, sessiya haqiqiyligi muammosi): {errcls.scrub_secrets(msg)}"
+            )
+
+    def error(self, msg):
+        pass
+
+
 def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_url: str | None = None) -> tuple[dict, str | None]:
     """yt-dlp options tuned for single-IP anti-blocking.
 
@@ -137,6 +194,7 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
     opts: dict = {
         "quiet": True,
         "no_warnings": True,
+        "logger": _CookieSessionLogger(),
         "force_ipv4": True,
         "socket_timeout": 30,
         "retries": 5,
@@ -152,10 +210,21 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
                 # available" xatosiga olib kelardi (2026-08-13, real
                 # foydalanuvchi joblarida tasdiqlangan: xuddi shu video "web"
                 # bilan muvaffaqiyatsiz, faqat ios/android/mweb bilan
-                # muvaffaqiyatli bo'ldi). ios/android/mweb PO token bilan
-                # birga ishonchli ishlaydi, cookies bo'lsa ham ular orqali
-                # qo'llanadi.
-                "player_client": ["ios", "android", "mweb"],
+                # muvaffaqiyatli bo'ldi).
+                #
+                # 2026-08-27 audit: mweb ENDI BIRINCHI — YouTube'ning "GVS PO
+                # Token'ni video ID'ga bog'lash" tajribasi (yt-dlp o'zi
+                # aniqlagan, o'zgartirib bo'lmaydi) haqiqiy, ishlaydigan PO
+                # token'ni FAQAT mweb mijoziga beradi. Ilgari ios birinchi
+                # bo'lgani uchun yt-dlp har safar avval ios formatlarini
+                # so'rar, PO token yo'qligini aniqlab ularni tashlab yuborar
+                # ("...may yield HTTP Error 403", productionda tasdiqlangan),
+                # va faqat SHUNDAN KEYIN mweb'ga o'tardi — bekorchi so'rov va
+                # kechikish, hech qanday foyda bermasdan. mweb birinchi bo'lsa,
+                # ishlaydigan PO token'li javob DARHOL kelib, ios/android'ga
+                # umuman ehtiyoj qolmaydi (ular hali ham zaxira sifatida
+                # qoladi -- agar mweb muvaffaqiyatsiz bo'lsa).
+                "player_client": ["mweb", "ios", "android"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
             # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
@@ -172,6 +241,28 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
             # aniq beriladi.
             "youtubepot-bgutilhttp": {"base_url": ["http://pot-provider:4416"]},
         },
+        # Deno-backed JS interpreter + the EJS remote component, for
+        # decoding YouTube's obfuscated signature/n-parameter scheme --
+        # the same thing a real browser's own JS engine does natively.
+        # This is required extraction machinery, not an anti-bot bypass:
+        # yt-dlp cannot resolve some signed media URLs at all without it,
+        # independent of any bot-check. The backend Docker image already
+        # installs Deno specifically for this (see Dockerfile) and wrote
+        # it into a yt-dlp CLI config file that this Python API path never
+        # reads -- the same class of dead-config bug the PO-token base_url
+        # above already fixed once (2026-08-13). Wiring it in here closes
+        # that gap for the js_runtimes/remote_components half too
+        # (2026-08-26 ingestion audit).
+        # NOTE: js_runtimes takes a {runtime: config} dict in the Python
+        # API, NOT the list the --js-runtimes CLI flag accepts -- verified
+        # directly against yt-dlp's own option-parsing source. The value
+        # must be an actual dict, not None: yt-dlp's own live production
+        # verification (2026-08-26) caught `config.get('path')` being
+        # called unconditionally on this value inside YoutubeDL._js_runtimes
+        # -- None crashes with AttributeError, even though the validator
+        # that runs at YoutubeDL() construction time accepts None.
+        "js_runtimes": {"deno": {}},
+        "remote_components": ["ejs:github"],
     }
 
     if proxy_url is not None:
@@ -182,7 +273,7 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
 
     temp_cookie_path = None
     cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
-    if use_cookies and os.path.isfile(cookies_target):
+    if use_cookies and os.path.isfile(cookies_target) and not _cookies_are_stale(cookies_target):
         try:
             tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
             shutil.copyfile(cookies_target, tmp.name)
@@ -212,17 +303,53 @@ def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True, proxy_url: s
                 logger.warning(f"Could not remove temp cookie file {temp_cookie_path}: {e}")
 
 
-_BOT_CHECK_MARKERS = ("cookies are no longer valid", "Sign in to confirm you")
-# 2026-08-19: "Requested format is not available" (cookies bilan autentifikatsiyalangan
-# sessiyada ba'zan boshqacha format ro'yxati qaytadi) va "HTTP Error 403" (signed
-# URL/IP vaqtincha bloklangan) ham amalda xuddi bot-check kabi -- residential
-# proksiga o'tish ular uchun ham hal qiluvchi bo'lgani real ishlab chiqarish
-# job'ida tasdiqlangan. Shuning uchun bular ESKALATSIYA (residential proksiga
-# o'tish) qarorlarida _BOT_CHECK_MARKERS o'rniga shu kengroq to'plam
-# ishlatiladi -- lekin foydalanuvchiga ko'rsatiladigan yakuniy "cookielar
-# eskirgan" xabari FAQAT haqiqiy bot-check uchun qoladi (_BOT_CHECK_MARKERS),
-# aks holda noto'g'ri tashxis bo'lib qoladi.
-_PROXY_ESCALATION_MARKERS = _BOT_CHECK_MARKERS + ("Requested format is not available", "HTTP Error 403")
+# 2026-08-27 audit: replaced the old datacenter -> residential -> no-cookies
+# -> no-cookies-residential escalation chain entirely. A controlled,
+# isolated 12-video experiment (4 videos per path, no cross-path
+# escalation) measured:
+#   cookies+mweb, no proxy:     0/4 first-attempt, 0/4 eventual
+#   datacenter+mweb:            0/4 first-attempt, 0/4 eventual
+#   residential+mweb:           2/4 first-attempt, 3/4 eventual
+# Datacenter provided no measurable benefit over no proxy at all (both
+# dominated by LOGIN_REQUIRED at the info stage) -- sending every attempt
+# through it first was pure wasted latency before ever reaching the one
+# path that actually works. Residential is now the ONLY production path,
+# with exactly one bounded retry on that SAME path (proven to recover
+# genuinely retryable failures in the experiment) -- never a different
+# proxy tier, never more than one retry. Cookie-loading support is kept
+# intact (use_cookies=True) as an available-but-not-primary input; see
+# _CookieSessionLogger above for why cookie validity is tracked separately
+# from this retry decision rather than folded into it.
+_RESIDENTIAL_RETRY_SLEEP_BASE = 2.0
+_RESIDENTIAL_RETRY_SLEEP_JITTER = 2.0
+
+
+def _residential_attempt(action, extra: dict | None = None, use_cookies: bool = True):
+    """Runs `action(ydl)` via the residential proxy -- the sole production
+    ingestion path. On a RETRYABLE failure (error_classification.should_retry),
+    makes exactly one bounded retry on this SAME path; on a non-retryable
+    failure (AUTH_ERROR/VIDEO_UNAVAILABLE/PROXY_BILLING_ERROR), fails
+    immediately with no retry, matching the existing no-blind-retry rule
+    used everywhere else in this pipeline. Never escalates to a different
+    proxy tier -- datacenter is no longer attempted at all in the normal
+    path (see the module-level comment above for why)."""
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        try:
+            with get_yt_dlp(extra, use_cookies=use_cookies, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
+                return action(ydl)
+        except Exception as e:
+            last_exc = e
+            error_code = errcls.classify_text(str(e))
+            if attempt == 0 and errcls.should_retry(error_code):
+                logger.warning(
+                    f"Residential urinish muvaffaqiyatsiz [{error_code}] "
+                    f"({errcls.scrub_secrets(str(e))}), xuddi shu yo'lda bir marta qayta urinilmoqda..."
+                )
+                time.sleep(_RESIDENTIAL_RETRY_SLEEP_BASE + random.random() * _RESIDENTIAL_RETRY_SLEEP_JITTER)
+                continue
+            break
+    raise last_exc
 
 
 def _extract_info_dict(ydl, youtube_url: str) -> dict:
@@ -306,63 +433,19 @@ def get_video_info(youtube_url: str) -> dict:
     if api_result is not None:
         return api_result
 
-    # "Sign in to confirm you're not a bot" tekshirilganda PROKSI ROTATSIYA
-    # QILUVCHI IP SIFATIGA BOG'LIQ — cookies yoki PO token doimiy buzuq emas
-    # (2026-08-13 haqiqiy testda tasdiqlangan: xuddi shu so'rov 3 urinishdan
-    # 2 tasida muvaffaqiyatli bo'ldi). Shuning uchun bu xato uchun bir necha
-    # marta (yangi proksi IP bilan) qayta urinish ma'noli — darhol "cookielar
-    # eskirgan" deb xabar berish o'rniga.
-    last_exc: Exception | None = None
-    for attempt in range(3):
-        try:
-            with get_yt_dlp(use_cookies=True) as ydl:
-                return _extract_info_dict(ydl, youtube_url)
-        except Exception as e:
-            last_exc = e
-            if not any(marker in str(e) for marker in _PROXY_ESCALATION_MARKERS):
-                break  # boshqa turdagi xato — qayta urinish foydasiz
-            if attempt < 2:
-                logger.warning(f"Bot-check xatosi (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
-                time.sleep(2 + random.random() * 2)
-
-    # Datacenter proksi (tezkor) bot-check bilan tugadi — residential proksiga
-    # (sekinroq, lekin YouTube uni oddiy foydalanuvchi deb hisoblaydi) o'tamiz,
-    # faqat SHU holatda, cheklangan trafik hajmini tejash uchun (2026-08-14).
-    if (
-        settings.YOUTUBE_RESIDENTIAL_PROXY_URL
-        and last_exc is not None
-        and any(marker in str(last_exc) for marker in _PROXY_ESCALATION_MARKERS)
-    ):
-        logger.warning("Datacenter proksi bot-check bilan tugadi — residential proksiga o'tilmoqda.")
-        try:
-            with get_yt_dlp(use_cookies=True, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
-                return _extract_info_dict(ydl, youtube_url)
-        except Exception as e_res:
-            last_exc = e_res
-
-    logger.warning(f"Extract info with cookies failed ({last_exc}). Retrying without cookies...")
     try:
-        with get_yt_dlp(use_cookies=False) as ydl:
-            return _extract_info_dict(ydl, youtube_url)
+        return _residential_attempt(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
     except Exception as e2:
-        err_str = f"{last_exc} | {e2}"
-        if any(marker in err_str for marker in _PROXY_ESCALATION_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
-            try:
-                with get_yt_dlp(use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
-                    return _extract_info_dict(ydl, youtube_url)
-            except Exception as e3:
-                err_str = f"{err_str} | {e3}"
-                e2 = e3
-        if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
-            raise RuntimeError(
-                "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-            ) from e2
-        if _is_permanent_download_error(err_str):
+        code = errcls.classify_text(str(e2))
+        if code == errcls.VIDEO_UNAVAILABLE:
             raise PermanentError(
                 "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                code="VIDEO_UNAVAILABLE",
+                code=errcls.VIDEO_UNAVAILABLE,
             ) from e2
-        raise RuntimeError(f"Video ma'lumot olishda xatolik: {e2}") from e2
+        # Texnik xabar -- faqat server logi uchun (bu funksiya to'g'ridan-to'g'ri
+        # job_creation.py'dan chaqiriladi, u o'zining xavfsiz umumiy xabarini
+        # qaytaradi va bu matnni foydalanuvchiga hech qachon ko'rsatmaydi).
+        raise RuntimeError(f"Video ma'lumot olishda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
 
 
 def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
@@ -389,70 +472,23 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
         "merge_output_format": "mp4",
     }
 
-    last_exc: Exception | None = None
-    info = None
-    for attempt in range(3):
-        try:
-            with get_yt_dlp(extra_opts, use_cookies=True) as ydl:
-                info = ydl.extract_info(youtube_url, download=True)
-                title = info.get("title", "Unknown")
-                duration = float(info.get("duration", 0) or 0)
-            last_exc = None
-            break
-        except Exception as e:
-            last_exc = e
-            if not any(marker in str(e) for marker in _PROXY_ESCALATION_MARKERS):
-                break
-            if attempt < 2:
-                logger.warning(f"Bot-check xatosi yuklab olishda (urinish {attempt + 1}/3), qayta urinilmoqda: {e}")
-                time.sleep(2 + random.random() * 2)
+    def _do_extract(ydl):
+        info = ydl.extract_info(youtube_url, download=True)
+        return info.get("title", "Unknown"), float(info.get("duration", 0) or 0)
 
-    if (
-        settings.YOUTUBE_RESIDENTIAL_PROXY_URL
-        and last_exc is not None
-        and any(marker in str(last_exc) for marker in _PROXY_ESCALATION_MARKERS)
-    ):
-        logger.warning("Datacenter proksi yuklab olishda bot-check bilan tugadi — residential proksiga o'tilmoqda.")
-        try:
-            with get_yt_dlp(extra_opts, use_cookies=True, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
-                info = ydl.extract_info(youtube_url, download=True)
-                title = info.get("title", "Unknown")
-                duration = float(info.get("duration", 0) or 0)
-            last_exc = None
-        except Exception as e_res:
-            last_exc = e_res
-
-    if last_exc is not None:
-        e = last_exc
-        logger.warning(f"Download with cookies failed ({e}). Retrying without cookies...")
-        try:
-            with get_yt_dlp(extra_opts, use_cookies=False) as ydl:
-                info = ydl.extract_info(youtube_url, download=True)
-                title = info.get("title", "Unknown")
-                duration = float(info.get("duration", 0) or 0)
-        except Exception as e2:
-            err_str = f"{e} | {e2}"
-            if any(marker in err_str for marker in _PROXY_ESCALATION_MARKERS) and settings.YOUTUBE_RESIDENTIAL_PROXY_URL:
-                try:
-                    with get_yt_dlp(extra_opts, use_cookies=False, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
-                        info = ydl.extract_info(youtube_url, download=True)
-                        title = info.get("title", "Unknown")
-                        duration = float(info.get("duration", 0) or 0)
-                        err_str = None
-                except Exception as e3:
-                    err_str = f"{err_str} | {e3}"
-                    e2 = e3
-            if err_str is not None:
-                if any(marker in err_str for marker in _BOT_CHECK_MARKERS):
-                    raise RuntimeError(
-                        "YouTube session cookielari eskirgan. Iltimos, cookies.txt faylini Incognito rejimida YouTube ga kirib qayta eksport qiling va serverga yuklang."
-                    ) from e2
-                if _is_permanent_download_error(err_str):
-                    raise PermanentError(
-                        "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                        code="VIDEO_UNAVAILABLE",
-                    ) from e2
-                raise RuntimeError(f"Video yuklashda xatolik: {e2}") from e2
+    try:
+        title, duration = _residential_attempt(_do_extract, extra=extra_opts, use_cookies=True)
+    except Exception as e2:
+        code = errcls.classify_text(str(e2))
+        if code == errcls.VIDEO_UNAVAILABLE:
+            raise PermanentError(
+                "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                code=errcls.VIDEO_UNAVAILABLE,
+            ) from e2
+        # Texnik xabar -- job.error_message'ga yozilmasdan oldin
+        # backend/workers/tasks.py markazlashgan klassifikatsiya +
+        # xavfsiz foydalanuvchi xabariga aylantiradi (Priority 1/6).
+        raise RuntimeError(f"Video yuklashda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
 
     video_file = None
     for f in job_dir.iterdir():

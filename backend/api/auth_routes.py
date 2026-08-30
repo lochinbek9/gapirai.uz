@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.models.database import User, get_db
 from backend.services.auth import hash_password, verify_password, create_access_token, get_current_user
-from fastapi.responses import JSONResponse
 from backend.services.email_service import (
     generate_verification_code,
     send_verification_email,
@@ -148,25 +147,12 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVeri
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", 10, 600))])
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
-    try:
-        if not verify_password(req.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="Parol noto'g'ri.")
-    except ValueError:
-        # bcrypt hash buzilgan — foydalanuvchiga tushunarli xabar
+    if not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Parol noto'g'ri.")
-
-    # Agar foydalanuvchi allaqachon tasdiqlangan bo'lsa — JWT to'g'ridan-to'g'ri,
-    # qayta email-kod yuborilmaydi. Yangi akkauntlar uchun eski oqim saqlanadi.
-    if user.is_verified:
-        token = create_access_token(str(user.id), user.email)
-        return AuthResponse(
-            access_token=token,
-            user={"id": str(user.id), "name": user.name, "email": user.email, "role": user.role},
-        )
 
     code = _issue_code(user, db)
     if not send_verification_email(user.email, code, user.name):

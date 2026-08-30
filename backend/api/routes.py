@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -43,11 +42,6 @@ class CreateJobRequest(BaseModel):
     youtube_url: str
     target_language: str = "uz"
     voice_gender: str = "auto"   # auto / male / female
-    audio_mix_mode: str = "dubbed_only"  # dubbed_only / ducked_mix
-
-
-def _normalize_audio_mix_mode(value: str | None) -> str:
-    return value if value in {"dubbed_only", "ducked_mix"} else "dubbed_only"
 
 
 class VideoInfoResponse(BaseModel):
@@ -74,7 +68,6 @@ class JobResponse(BaseModel):
     created_at: Optional[str] = None
     speaker_gender: Optional[str] = None
     voice_gender_setting: Optional[str] = None
-    audio_mix_mode: Optional[str] = None
     uzbek_srt_content: Optional[str] = None
     expected_end_time: Optional[str] = None
     rating: Optional[int] = None
@@ -85,9 +78,6 @@ class JobResponse(BaseModel):
     content_flagged: Optional[bool] = None
     fallback_available: bool = False
     fallback_reason: Optional[str] = None
-    # /api/learn (learn_routes.py) shu job bilan birga yaratgan VideoAnalysis --
-    # frontend/app/learn/[id] shu ID orqali tahlilni ham poll qiladi. Oddiy
-    # dublyaj joblarida NULL.
     linked_analysis_id: Optional[str] = None
 
 
@@ -134,7 +124,6 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         created_at=job.created_at.isoformat() if job.created_at else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
-        audio_mix_mode=job.audio_mix_mode or settings.AUDIO_MIX_MODE,
         uzbek_srt_content=job.uzbek_srt_content,
         expected_end_time=expected_end_time,
         rating=None if redact else job.rating,
@@ -143,6 +132,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         feedback_translation_ok=None if redact else job.feedback_translation_ok,
         feedback_speed_ok=None if redact else job.feedback_speed_ok,
         content_flagged=job.content_flagged,
+        linked_analysis_id=str(job.linked_analysis_id) if job.linked_analysis_id else None,
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
         # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
@@ -152,7 +142,6 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         # noto'g'ri chetlab qo'ygan edi (2026-08-23 aniqlangan).
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
-        linked_analysis_id=str(getattr(job, "linked_analysis_id", None)) if getattr(job, "linked_analysis_id", None) else None,
     )
 
 
@@ -181,13 +170,7 @@ async def create_job(
 ) -> dict:
     # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
     # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
-    result = await create_dubbing_job(
-        db,
-        current_user,
-        request.youtube_url,
-        request.voice_gender,
-        _normalize_audio_mix_mode(request.audio_mix_mode),
-    )
+    result = await create_dubbing_job(db, current_user, request.youtube_url, request.voice_gender)
 
     if result.outcome == "invalid_url":
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
@@ -266,28 +249,17 @@ def list_jobs(
 # fallback -- backend/services/downloader.py'ning MAX_DOWNLOAD_SIZE_BYTES bilan
 # bir xil chegara.
 MAX_UPLOAD_SIZE_BYTES = 3 * 1024 * 1024 * 1024  # 3 GB
-
-
-def _existing_local_media_path(path: str | None) -> Path | None:
-    """Локальный media-файл, если он доступен как резерв S3.
-
-    Пути в PostgreSQL могут быть относительными (например,
-    ``outputs/<job>/dubbed_final.mp4``), поэтому разрешаем их относительно
-    текущего каталога сервиса. Это позволяет пережить удаление S3-объекта
-    lifecycle-политикой, пока локальная копия ещё существует.
-    """
-    if not path:
-        return None
-    candidate = Path(path)
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    try:
-        if candidate.is_file() and os.access(candidate, os.R_OK):
-            return candidate
-    except OSError:
-        pass
-    return None
 _ALLOWED_UPLOAD_CONTENT_TYPES = {"video/mp4", "video/quicktime", "video/x-matroska", "video/webm"}
+# Saqlanadigan fayl kengaytmasi shu FIXED xaritadan olinadi -- foydalanuvchi
+# yuborgan `file.filename`'dan HECH QACHON emas (2026-08-26, upload-recovery
+# xavfsizlik ko'rib chiqilishi: filename ixtiyoriy/ishonchsiz, faqat allaqachon
+# tekshirilgan content_type'ga bog'liq bo'lishi kerak).
+_CONTENT_TYPE_TO_EXT = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-matroska": ".mkv",
+    "video/webm": ".webm",
+}
 
 
 def _get_media_duration_seconds(path: str) -> float | None:
@@ -338,8 +310,10 @@ async def upload_video_fallback(
 
     job_dir = Path(settings.UPLOAD_DIR) / str(job_id)
     job_dir.mkdir(parents=True, exist_ok=True)
-    ext = Path(file.filename or "video.mp4").suffix or ".mp4"
-    video_path = job_dir / f"video{ext}"
+    # job_dir "video" bazaviy nomi va job_id (UUID, FastAPI tomonidan
+    # tekshirilgan) qat'iy belgilangan -- fayl nomi umuman ishlatilmaydi,
+    # shuning uchun path traversal imkonsiz.
+    video_path = job_dir / f"video{_CONTENT_TYPE_TO_EXT[file.content_type]}"
 
     size = 0
     try:
@@ -352,7 +326,11 @@ async def upload_video_fallback(
                         detail=f"Fayl hajmi {MAX_UPLOAD_SIZE_BYTES // (1024 ** 3)} GB dan katta bo'lmasligi kerak.",
                     )
                 f.write(chunk)
-    except HTTPException:
+    except Exception:
+        # HTTPException (413) VA tarmoq uzilishi/mijoz bekor qilishi kabi
+        # boshqa har qanday xato -- ikkalasida ham yarim yozilgan fayl
+        # qolib ketmasligi kerak (2026-08-26, keyingi "qayta urinish"
+        # buzuq qisman faylni topib qolmasligi uchun).
         video_path.unlink(missing_ok=True)
         raise
 
@@ -493,10 +471,7 @@ def list_library_resolutions(
     master_missing = False
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import s3_object_exists
-        master_missing = (
-            not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
-            and _existing_local_media_path(job.output_video_path) is None
-        )
+        master_missing = not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
 
     resolutions = []
     for i, res in enumerate(RESOLUTION_ORDER):
@@ -513,7 +488,6 @@ def list_library_resolutions(
 def request_library_resolution(
     job_id: uuid.UUID,
     resolution: str,
-    download: bool = Query(True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -530,13 +504,7 @@ def request_library_resolution(
     from backend.services.resolution_variants import request_resolution as _request_resolution
     # 2026-08-19: yuqoridagi list_library_resolutions bilan bir xil sabab --
     # kutubxonada 1080p vaqtincha barcha tomoshabinlar uchun bepul.
-    result = _request_resolution(
-        db,
-        job,
-        resolution,
-        max_resolution_override="1080p",
-        download=download,
-    )
+    result = _request_resolution(db, job, resolution, max_resolution_override="1080p")
 
     if result.outcome == "invalid":
         raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
@@ -636,17 +604,10 @@ def delete_job(
 
 
 @router.get("/jobs/{job_id}/subtitles.vtt")
-def get_subtitles(
-    job_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
-):
-    """O'zbekcha subtitrlarni WebVTT formatida qaytarish.
-    Authenticated foydalanuvchi faqat o'zini, anonymous — har qandayni."""
+def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """O'zbekcha subtitrlarni WebVTT formatida qaytarish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.uzbek_srt_content:
-        raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
-    if current_user and job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
     return Response(
         content=job.uzbek_srt_content,
@@ -656,84 +617,60 @@ def get_subtitles(
 
 
 @router.get("/outputs/{job_id}/audio")
-def download_audio(
-    job_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
-):
-    """Dublyaj qilingan audioni WAV formatida yuklab olish.
-    Authenticated foydalanuvchi faqat o'zini, anonymous — har qandayni."""
+def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Dublyaj qilingan audioni WAV formatida yuklab olish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Audio hali tayyor emas.")
-    if current_user and job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Audio hali tayyor emas.")
 
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import generate_presigned_download_url, s3_object_exists
         s3_key = f"dubber/{job.storage_id}/dubbed_audio.wav"
-        if s3_object_exists(s3_key):
-            presigned_url = generate_presigned_download_url(s3_key)
-            if presigned_url:
-                return Response(status_code=307, headers={"Location": presigned_url})
+        if not s3_object_exists(s3_key):
+            raise HTTPException(status_code=410, detail="Audio fayl endi mavjud emas — saqlash muddati tugagan.")
+        presigned_url = generate_presigned_download_url(s3_key)
+        if presigned_url:
+            return Response(status_code=307, headers={"Location": presigned_url})
 
-    audio_path = _existing_local_media_path(job.dubbed_audio_path)
-    if audio_path is None:
-        raise HTTPException(status_code=410, detail="Audio fayl endi mavjud emas — saqlash muddati tugagan.")
+    audio_path = job.dubbed_audio_path
+    if not audio_path or not Path(audio_path).exists():
+        raise HTTPException(status_code=404, detail="Audio fayl topilmadi.")
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"{safe_title or job_id}_audio.wav"
     return FileResponse(path=audio_path, media_type="audio/wav", filename=filename)
 
 
 @router.get("/outputs/{job_id}/video")
-def download_video(
-    job_id: uuid.UUID,
-    download: bool = Query(False),
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
-):
-    """Video yuklab olish. Authenticated foydalanuvchi faqat o'zini, anonymous — har qandayni."""
+def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
-    if current_user and job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
 
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import generate_presigned_download_url, s3_object_exists
         s3_key = f"dubber/{job.storage_id}/dubbed_final.mp4"
-        if s3_object_exists(s3_key):
-            presigned_url = generate_presigned_download_url(s3_key, download=download)
-            if presigned_url:
-                return Response(status_code=307, headers={"Location": presigned_url})
+        if not s3_object_exists(s3_key):
+            raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
+        presigned_url = generate_presigned_download_url(s3_key)
+        if presigned_url:
+            return Response(status_code=307, headers={"Location": presigned_url})
 
-    video_path = _existing_local_media_path(job.output_video_path)
-    if video_path is None:
-        raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
+    video_path = job.output_video_path
+    if not video_path or not Path(video_path).exists():
+        raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"dubbed_{safe_title or job_id}.mp4"
-    return FileResponse(
-        path=video_path,
-        media_type="video/mp4",
-        filename=filename,
-        content_disposition_type="attachment" if download else "inline",
-    )
+    return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
 
 
 @router.get("/jobs/{job_id}/resolutions")
-def list_resolutions(
-    job_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
-):
+def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Tarif bo'yicha ruxsat etilgan va tayyor rezolyutsiyalar ro'yxati.
     720p har doim "ready" -- u master fayl, alohida generatsiya kerak emas."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
-    if current_user and job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
 
     from backend.services.plans import get_max_resolution_for_job, RESOLUTION_ORDER
@@ -750,10 +687,7 @@ def list_resolutions(
     master_missing = False
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import s3_object_exists
-        master_missing = (
-            not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
-            and _existing_local_media_path(job.output_video_path) is None
-        )
+        master_missing = not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
 
     resolutions = []
     for i, res in enumerate(RESOLUTION_ORDER):
@@ -767,13 +701,7 @@ def list_resolutions(
 
 
 @router.post("/jobs/{job_id}/resolutions/{resolution}")
-def request_resolution(
-    job_id: uuid.UUID,
-    resolution: str,
-    download: bool = Query(True),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def request_resolution(job_id: uuid.UUID, resolution: str, db: Session = Depends(get_db)):
     """Berilgan rezolyutsiyani so'raydi -- 720p darhol qaytadi (master fayl),
     360p/1080p mavjud bo'lmasa Celery task navbatga qo'yiladi va "processing"
     qaytariladi (frontend buni pollaydi). Mantiq resolution_variants.py'da --
@@ -781,11 +709,9 @@ def request_resolution(
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or job.status != JobStatus.COMPLETED:
         raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
-    if job.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
 
     from backend.services.resolution_variants import request_resolution as _request_resolution
-    result = _request_resolution(db, job, resolution, download=download)
+    result = _request_resolution(db, job, resolution)
 
     if result.outcome == "invalid":
         raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
@@ -804,12 +730,15 @@ def cancel_job(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Jobni bekor qilish — faqat job egasi. shutil.rmtree ishlatiladi,
-    shuning uchun broken access control juda xavfli."""
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    # 2026-08-25: ilgari current_user tekshiruvi umuman yo'q edi -- job_id'ni
+    # bilgan ISTALGAN kishi (havola ulashish, log, referrer orqali) boshqa
+    # birovning ishlayotgan job'ini bekor qila olardi. DELETE /jobs/{job_id}
+    # (yuqorida) bilan bir xil naqsh -- so'rovning o'ziga user_id filtri.
+    job = db.query(DubbingJob).filter(
+        DubbingJob.id == job_id,
+        DubbingJob.user_id == current_user.id,
+    ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Job topilmadi.")
-    if job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
     
     active_statuses = [
@@ -898,10 +827,14 @@ def submit_feedback(
     if req.rating < 1 or req.rating > 5:
         raise HTTPException(status_code=400, detail="Baho 1 va 5 orasida bo'lishi kerak.")
 
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    # 2026-08-25: cancel_job bilan bir xil bag -- current_user tekshiruvi
+    # yo'q edi, job_id'ni bilgan istalgan kishi boshqa birovning
+    # baho/feedback'ini ustidan yozib qo'yishi mumkin edi.
+    job = db.query(DubbingJob).filter(
+        DubbingJob.id == job_id,
+        DubbingJob.user_id == current_user.id,
+    ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Job topilmadi.")
-    if job.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
     job.rating = req.rating

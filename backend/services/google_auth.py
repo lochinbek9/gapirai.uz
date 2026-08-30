@@ -44,16 +44,13 @@ def verify_google_token(credential: str) -> dict:
         logger.warning(f"Google token tekshiruvi muvaffaqiyatsiz: {exc}")
         raise GoogleTokenError("Google token yaroqsiz yoki muddati o'tgan. Qaytadan urinib ko'ring.") from exc
 
-    email_val = payload.get("email")
-    if not email_val:
+    email = payload.get("email")
+    if not email:
         raise GoogleTokenError("Google token'da email topilmadi.")
-
-    raw_verified = payload.get("email_verified")
-    is_verified = raw_verified is True or str(raw_verified).lower() == "true"
 
     return {
         "sub": payload["sub"],
-        "email": str(email_val).lower().strip(),
-        "email_verified": is_verified,
-        "name": payload.get("name") or str(email_val).split("@")[0],
+        "email": email.lower().strip(),
+        "email_verified": bool(payload.get("email_verified", False)),
+        "name": payload.get("name") or email.split("@")[0],
     }

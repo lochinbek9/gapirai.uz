@@ -22,7 +22,7 @@ export default function PrivacyPage() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Maxfiylik siyosati</h1>
-              <p className="text-xs text-gray-500 dark:text-slate-500">Oxirgi yangilanish: 2026-yil 20-avgust</p>
+              <p className="text-xs text-gray-500 dark:text-slate-500">Oxirgi yangilanish: 2026-yil 4-avgust</p>
             </div>
           </div>
 
@@ -34,8 +34,8 @@ export default function PrivacyPage() {
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Siz kiritgan YouTube video manzillari va davomiyligi;</li>
-                <li>Tizimga kirish uchun foydalanadigan login, elektron pochta manzili yoki telefon raqami;</li>
-                <li>To'lov tafsilotlari (to'lovlar bevosita Click yoki Payme to'lov tizimlari orqali amalga oshiriladi va biz kartangiz ma'lumotlarini saqlamaymiz).</li>
+                <li>Tizimga kirish uchun foydalanadigan login va elektron pochta manzili;</li>
+                <li>To'lov tafsilotlari (to'lovlar bevosita Click to'lov shlyuzi orqali amalga oshiriladi va biz kartangiz ma'lumotlarini saqlamaymiz).</li>
               </ul>
             </section>
 
@@ -59,18 +59,8 @@ export default function PrivacyPage() {
             <section className="space-y-2">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">4. Uchinchi shaxslarga ma'lumot uzatish</h2>
               <p>
-                Xizmat ko'rsatish jarayonida matnlarni tarjima qilish uchun OpenAI va nutq sintezi uchun Microsoft Azure xizmatlariga faqatgina videodagi matnli ma'lumotlar uzatiladi. Pullik videolar uchun to'lov ma'lumotlari Click yoki Payme to'lov tizimlariga (siz tanlagan usulga qarab) uzatiladi. Sizning shaxsiy ma'lumotlaringiz uchinchi shaxslarga sotilmaydi.
+                Xizmat ko'rsatish jarayonida matnlarni tarjima qilish uchun OpenAI va nutq sintezi uchun Microsoft Azure xizmatlariga faqatgina videodagi matnli ma'lumotlar uzatiladi. Sizning shaxsiy ma'lumotlaringiz uchinchi shaxslarga sotilmaydi.
               </p>
-            </section>
-
-            <section className="space-y-2">
-              <h2 className="text-base font-bold text-gray-900 dark:text-white">5. Ma'lumotlarni saqlash va o'chirish muddati</h2>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Asl yuklab olingan YouTube video va oraliq audio fayllar faqat dublyaj jarayoni davomida serverimizda vaqtincha saqlanadi va jarayon tugashi bilan (muvaffaqiyatli yoki xatolik bilan) darhol o'chiriladi;</li>
-                <li>Tayyor dublyaj qilingan video va audio fayllar bulutli xotirada (AWS S3) saqlanadi va yaratilgan kundan boshlab <strong>3 kun</strong> o'tgach avtomatik ravishda butunlay o'chiriladi — shu muddat ichida video/audioni yuklab olishingizni tavsiya qilamiz;</li>
-                <li>Subtitr matni va job haqidagi ma'lumotlar (video nomi, holati, sana) hisobingiz tarixi sifatida saqlanadi; ularni "Dashboard" bo'limidan istalgan vaqtda o'chirishingiz mumkin;</li>
-                <li>Hisob ma'lumotlaringiz (ism, email, telefon) hisobingiz faol bo'lgan davomida saqlanadi.</li>
-              </ul>
             </section>
           </div>
         </div>

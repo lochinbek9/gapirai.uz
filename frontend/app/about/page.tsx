@@ -24,13 +24,11 @@ export const metadata: Metadata = {
     siteName: "GapirAI.uz",
     locale: "uz_UZ",
     type: "website",
-    images: [{ url: "https://gapirai.uz/logo.webp", width: 256, height: 256, alt: "GapirAI.uz logotipi" }],
   },
   twitter: {
     card: "summary",
     title: "Loyiha haqida | GapirAI.uz",
     description: "Videolarni AI yordamida o'zbek tiliga dublyaj qiluvchi platforma haqida.",
-    images: ["https://gapirai.uz/logo.webp"],
   },
 }
 

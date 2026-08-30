@@ -11,8 +11,6 @@ services:
       POSTGRES_USER: dubber
       POSTGRES_PASSWORD: dubber123
     ports:
-      # Host IP to bind on. Override per host: COMPOSE_HOST_IP=127.0.0.1 (local)
-      # or the server's private IP (prod). Default kept for the current AWS box.
       - "${COMPOSE_HOST_IP:-172.31.27.238}:5439:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -84,23 +82,7 @@ services:
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 
   # ──────────────────────────────
-  # Celery Worker (single, all queues).
-  #
-  # 2026-08-28 (ai-dubbet integratsiya): celery_app.py'da endi 4 navbat bor
-  # (video_processing[_priority], tts_processing, media_processing).
-  # generate_resolution_variant_task -> media_processing, chunk vazifalari ->
-  # tts/media. Bitta worker HAMMASINI tinglaydi -- shu hozirgi production
-  # miqyosiga mos (chunked pipeline default OFF, tts/media navbatlar deyarli
-  # bo'sh: faqat resolution generatsiyasi media'da).
-  #
-  # MIQYOSGA BO'LISH (chunked pipeline yoqilganda / yuk oshganda):
-  # bu servisni o'chirib, uch alohida worker qo'ying --
-  #   worker-video:  -Q video_processing_priority,video_processing -c 2 --hostname=video@%%h
-  #   worker-tts:    -Q tts_processing   -c 4 --hostname=tts@%%h
-  #   worker-media:  -Q media_processing -c 4 --hostname=media@%%h
-  # (Denis'ning feature/chunked-pipeline-gpu compose'ida tayyor namuna bor.)
-  # DIQQAT: 3 worker × concurrency = 2+4+4 = 10 bola-jarayon -- RAM tekshiruvi
-  # SHART (har biri ~1.5-2GB tepasida).
+  # Celery Worker
   # ──────────────────────────────
   worker:
     build:
@@ -108,6 +90,30 @@ services:
       dockerfile: backend/Dockerfile
     container_name: dubber_worker
     restart: unless-stopped
+    # 2026-08-26 audit: har bir worker host o'zining RAM hajmiga mos
+    # WORKER_CONCURRENCY/WORKER_MEM_LIMIT'ni o'z .env faylida belgilaydi
+    # (masalan worker-1, 3.7GB, oldindan -c 2 bilan sozlangan edi -- bu
+    # o'zgarish uni tasodifan qayta 4'ga qaytarib qo'ymasligi uchun ataylab
+    # ${...:-4} standart qiymat bilan, docker-compose.yml BARCHA host'larda
+    # bir xil git fayli sifatida saqlanadi). mem_limit -- production'da 7
+    # marta haqiqiy kernel OOM-kill kuzatilgan (2026-08-14/15/24, task=celery,
+    # ayrim jarayonlar ~5.5GB'gacha ko'tarilgan) -- limitsiz holda bitta
+    # qochib ketgan vazifa BUTUN host'ni (shu jumladan boshqa konteynerlar,
+    # SSH) OOM-killer orqali qulatishi mumkin edi. Endi konteyner o'z cgroup
+    # chegarasi ichida qoladi -- chegaradan oshsa faqat SHU konteyner
+    # ichidagi bitta jarayon o'ldiriladi, task_reject_on_worker_lost=True
+    # (celery_app.py) uni xavfsiz qayta navbatga qo'yadi.
+    mem_limit: ${WORKER_MEM_LIMIT:-6.5g}
+    # Docker standart to'xtash muddati (10s) process_video'ning soat
+    # davomida ishlashi mumkinligidan (time_limit=3600s) ancha qisqa --
+    # har qanday `docker restart`/deploy vazifani SIGTERM'ga javob berish
+    # imkoniyatisiz majburan SIGKILL qilardi. Celery SIGTERM'da "iliq"
+    # to'xtaydi (joriy vazifalar tugashini kutadi, yangilarini qabul
+    # qilmaydi) -- shu muddat ichida buni bajarishga ulguradi; agar
+    # ulgurmasa (juda uzun vazifa), SIGKILL baribir keladi, lekin endi
+    # task_reject_on_worker_lost tufayli vazifa yo'qolmaydi, qayta
+    # navbatga qo'yiladi.
+    stop_grace_period: 120s
     environment:
       - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
       - REDIS_URL=redis://:0061f8931184fe1276650305600d5409df1a3af2692094d5@redis:6379/0
@@ -129,7 +135,7 @@ services:
         condition: service_healthy
       pot-provider:
         condition: service_started
-    command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing,media_processing,tts_processing -c 4
+    command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing -c ${WORKER_CONCURRENCY:-4}
 
   # ──────────────────────────────
   # Telegram bot -- to'liq dublyaj xizmati Telegram ichida (backend/telegram_bot.py).
@@ -175,7 +181,7 @@ services:
     container_name: dubber_flower
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5555:5555"
+      - "127.0.0.1:${PORT:-5555}:5555"
     env_file:
       - .env
     environment:

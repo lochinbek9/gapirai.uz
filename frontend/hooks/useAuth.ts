@@ -24,19 +24,10 @@ export function useAuth() {
     }
   }, [])
 
-  // Agar foydalanuvchi allaqachon verified bo'lsa, backend JWT qaytaradi
-  // (pending_verification qaytmaydi). Verified bo'lmasa — email-kodi oqimi.
+  // login/register endi to'g'ridan-to'g'ri token bermaydi — email'ga
+  // tasdiqlash kodi yuboriladi, kirish faqat verifyCode orqali yakunlanadi.
   const login = useCallback(async (email: string, password: string) => {
-    const data = await apiLogin(email, password)
-    if ('access_token' in data) {
-      // Verified user — darhol kirish
-      setToken(data.access_token)
-      setStoredUser(data.user)
-      setUser(data.user)
-      return data.user
-    }
-    // Unverified — email-kodi kerak
-    return data
+    return apiLogin(email, password)
   }, [])
 
   const register = useCallback(async (name: string, email: string, password: string) => {

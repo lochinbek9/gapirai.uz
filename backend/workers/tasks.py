@@ -19,26 +19,9 @@ from backend.services.telegram_notify import send_telegram_message
 from backend.services.job_claim import try_claim, release_claim
 from backend.services.job_checkpoint import save_checkpoint, restore_checkpoint
 from backend.config import get_settings
-# Chunked pipeline (opt-in, ENABLE_CHUNKED_PIPELINE). Import-safe: the module
-# singletons below are lazy and open no Redis connection at import time.
-from backend.services.chunked_pipeline import (
-    split_video_into_chunks,
-    split_segments_into_chunks,
-    concat_video_chunks,
-    cleanup_chunk_files,
-)
-from backend.services.sliding_window import ChunkWindow
-from backend.services.metrics import get_metrics
-from backend.services.backpressure import get_backpressure
 
 logger = get_task_logger(__name__)
 settings = get_settings()
-
-# Observability for the chunked path only. Per-user gating
-# (scheduler.can_accept_job) is deliberately NOT wired -- it is a no-op in
-# Denis's fork and real per-user limits belong at the enqueue layer.
-_metrics = get_metrics()
-_backpressure = get_backpressure()
 
 # time_limit (3600s) dan sal ko'proq -- 2026-08-26 audit: task_time_limit
 # aynan Redis visibility_timeout defaultiga (3600s) teng edi, bu ikkalasi
@@ -267,116 +250,6 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
     logger.critical(f"[JOB {job_id}] FAILED holatiga HECH QANDAY usulda o'tkazib bo'lmadi — job eski holatida abadiy qotib qolishi mumkin!")
 
 
-def _run_chunked_pipeline(job_id: str, job, video_path: str, speech_segments: list, voice: str, output_dir) -> str:
-    """Chunked pipeline (OPT-IN — settings.ENABLE_CHUNKED_PIPELINE). Video ni
-    vaqt bo'yicha qismlarga bo'lib, har chunk uchun TTS + MERGE ni parallel
-    bajaradi (~1.7-2x tezroq), keyin concat qiladi. dubbed_final.mp4 yo'lini
-    qaytaradi.
-
-    Q1 (coarse recovery): chunk-darajasidagi checkpoint YO'Q. Worker o'rtada
-    qulasa, process_video shu butun TTS bosqichini qaytadan ishlatadi (chunklar
-    tez). Chunk-ichi xato -> window.fail_chunk() + butun bosqich raise qiladi,
-    process_video'ning oddiy error_classification/retry mexanizmi hal qiladi.
-    Kod Denis-kaa/ai-dubbet feature/chunked-pipeline-gpu dan olingan; faqat
-    ishlaydigan holatga keltirildi (__import__("concurrent.futures") -> _cf).
-    """
-    import concurrent.futures as _cf
-    import threading
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"[JOB {job_id}] Chunked pipeline YONIQ (chunk={settings.CHUNK_DURATION_SEC}s, parallel={settings.MAX_PARALLEL_CHUNKS})")
-
-    video_chunks = split_video_into_chunks(
-        video_path, str(output_dir),
-        chunk_duration_sec=settings.CHUNK_DURATION_SEC,
-        overlap_sec=settings.CHUNK_OVERLAP_SEC,
-    )
-    segment_chunks = split_segments_into_chunks(speech_segments, video_chunks)
-
-    chunk_ids = [f"{job_id}_c{i}" for i in range(len(video_chunks))]
-    window = ChunkWindow(job_id=job_id, window_size=settings.MAX_PARALLEL_CHUNKS)
-    window.init_chunks(chunk_ids)
-    _metrics.set_chunks_total(job_id, len(video_chunks))
-    logger.info(f"[JOB {job_id}] Sliding window: {len(video_chunks)} chunks, window={settings.MAX_PARALLEL_CHUNKS}")
-
-    _bp_lock = threading.Lock()
-
-    def _process_chunk(chunk_idx: int) -> dict:
-        chunk_id = f"{job_id}_c{chunk_idx}"
-        chunk_output_dir = str(output_dir / f"chunk_{chunk_idx}_tts")
-        os.makedirs(chunk_output_dir, exist_ok=True)
-        chunk_segments = segment_chunks[chunk_idx]
-        if not chunk_segments:
-            return {"chunk_idx": chunk_idx, "merged_path": None}
-        with _bp_lock:
-            while not _backpressure.can_produce_tts(job_id):
-                backoff = _backpressure.get_backoff_seconds(job_id)
-                logger.info(f"[JOB {job_id}] Backpressure: chunk {chunk_idx} throttled {backoff}s")
-                time.sleep(backoff)
-            _backpressure.register_tts_produced(job_id, chunk_id)
-        window.start_chunk(chunk_id)
-        chunk_t0 = time.monotonic()
-        chunk_audio, chunk_timings, chunk_qa = synthesizer.synthesize_segments(
-            chunk_segments, chunk_output_dir, voice_name=voice,
-            video_id=f"{job_id}_c{chunk_idx}",
-            user_id=(str(job.user_id) if job.user_id else None),
-            existing_qa=job.segment_qa,
-        )
-        _metrics.record_tts_latency(job_id, chunk_id, time.monotonic() - chunk_t0)
-        with _bp_lock:
-            _backpressure.register_media_started(job_id, chunk_id)
-        media_t0 = time.monotonic()
-        merged_chunk_path = str(output_dir / f"merged_chunk_{chunk_idx:02d}.mp4")
-        merger.merge_video_audio_chunk(
-            video_chunk_path=video_chunks[chunk_idx].video_path,
-            dubbed_audio_path=chunk_audio,
-            output_path=merged_chunk_path,
-            audio_mix_mode=job.audio_mix_mode,
-            chunk_index=chunk_idx,
-        )
-        _metrics.record_media_latency(job_id, chunk_id, time.monotonic() - media_t0)
-        with _bp_lock:
-            _backpressure.register_media_consumed(job_id, chunk_id)
-            _backpressure.register_media_finished(job_id, chunk_id)
-        window.complete_chunk(chunk_id)
-        _metrics.record_chunk_completed(job_id)
-        _metrics.record_ttfp(job_id, chunk_id)
-        logger.info(f"[JOB {job_id}] Chunk {chunk_idx}/{len(video_chunks) - 1} tayyor")
-        return {"chunk_idx": chunk_idx, "merged_path": merged_chunk_path, "timings": chunk_timings, "qa": chunk_qa}
-
-    chunk_results = [None] * len(video_chunks)
-    try:
-        with _cf.ThreadPoolExecutor(max_workers=settings.MAX_PARALLEL_CHUNKS) as executor:
-            future_to_chunk = {}
-            submitted = set()
-            while not window.is_complete():
-                for cid in window.get_next_window():
-                    ci = int(cid.split("_c")[-1])
-                    if ci not in submitted:
-                        future_to_chunk[executor.submit(_process_chunk, ci)] = ci
-                        submitted.add(ci)
-                if not future_to_chunk:
-                    break
-                done, _ = _cf.wait(future_to_chunk.keys(), timeout=1.0, return_when=_cf.FIRST_COMPLETED)
-                for future in done:
-                    ci = future_to_chunk.pop(future)
-                    try:
-                        chunk_results[ci] = future.result()
-                    except Exception as exc:
-                        window.fail_chunk(f"{job_id}_c{ci}", str(exc))
-                        _metrics.record_chunk_failed(job_id)
-                        logger.error(f"[JOB {job_id}] Chunk {ci} xatosi: {exc}")
-                        raise
-    finally:
-        _backpressure.cleanup_job(job_id)
-
-    merged_paths = [r["merged_path"] for r in chunk_results if r and r["merged_path"]]
-    final_output = str(output_dir / "dubbed_final.mp4")
-    concat_video_chunks(merged_paths, final_output)
-    cleanup_chunk_files(video_chunks, str(output_dir))
-    return final_output
-
-
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
@@ -603,7 +476,6 @@ def process_video(self: Task, job_id: str) -> dict:
         # orqali -- boshqa host'dagi qayta urinish ham S3'dan tiklay oladi.
         current_stage = "TTS"
         stage_t0 = time.monotonic()
-        _chunked_final = None   # chunked pipeline TTS+MERGE'ni birga bajarsa shu yerga yoziladi
         tts_restored = bool(job.dubbed_audio_path) and restore_checkpoint(job_id, "dubbed_audio.wav", job.dubbed_audio_path)
         if tts_restored and Path(job.dubbed_audio_path).exists():
             _record_stage(stage_timings, job_id, "TTS", stage_t0, "skipped")
@@ -614,24 +486,6 @@ def process_video(self: Task, job_id: str) -> dict:
             # clipping/balandlik tekshiruvlarini bajaradi, faqat dub/fon
             # balansi tekshiruvi o'tkazib yuboriladi.
             actual_timings = None
-        elif settings.ENABLE_CHUNKED_PIPELINE:
-            # OPT-IN chunked pipeline: TTS + MERGE ni chunk'lar bo'yicha parallel
-            # bajaradi va to'g'ridan-to'g'ri dubbed_final.mp4 yaratadi. Bu bosqich
-            # bizning claim/lease ICHIDA ishlaydi (claim yuqorida olingan).
-            # Q1 (coarse recovery): chunk-checkpoint yo'q -> crash bo'lsa butun
-            # shu bosqich qaytadan (chunklar tez, qabul qilinadi).
-            voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
-            _update_job(db, job, JobStatus.PROCESSING_CHUNKS, 60.0,
-                        "Video qismlarga bo'lib parallel qayta ishlanmoqda...")
-            _chunked_final = _run_chunked_pipeline(job_id, job, video_path, speech_segments, voice, output_dir)
-            dubbed_audio_path = _chunked_final   # yakuniy QA video fayldan signal-darajali tekshiradi
-            actual_timings = None
-            job.dubbed_audio_path = dubbed_audio_path
-            job.output_video_path = _chunked_final
-            job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
-            db.commit()
-            save_checkpoint(job_id, "dubbed_final.mp4", _chunked_final)
-            _record_stage(stage_timings, job_id, "TTS", stage_t0, "ok")
         else:
             voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
@@ -663,11 +517,7 @@ def process_video(self: Task, job_id: str) -> dict:
         current_stage = "MERGE"
         stage_t0 = time.monotonic()
         merge_restored = bool(job.output_video_path) and restore_checkpoint(job_id, "dubbed_final.mp4", job.output_video_path)
-        if _chunked_final is not None:
-            # Chunked pipeline MERGE'ni allaqachon chunk'lar ichida bajardi.
-            _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
-            final_output = _chunked_final
-        elif merge_restored and Path(job.output_video_path).exists():
+        if merge_restored and Path(job.output_video_path).exists():
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
             final_output = job.output_video_path
         else:
@@ -679,7 +529,6 @@ def process_video(self: Task, job_id: str) -> dict:
                 video_path=video_path,
                 dubbed_audio_path=dubbed_audio_path,
                 output_path=final_output,
-                audio_mix_mode=job.audio_mix_mode,
             )
 
             job.output_video_path = final_output

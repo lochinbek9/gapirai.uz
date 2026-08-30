@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getToken, clearAuth } from './auth'
+import { getToken } from './auth'
 import { getApiUrl } from './runtime-config'
 
 const API_URL = getApiUrl()
@@ -12,80 +12,6 @@ apiClient.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
-
-// Token yaroqsiz bo'lib qolsa (masalan server tomonda imzolash kaliti
-// almashtirilsa) useAuth ilgari cache'langan foydalanuvchini ko'rsatishda
-// davom etardi -- "kirgan" ko'rinib, har bir so'rov jimgina 401 bilan
-// muvaffaqiyatsiz tugardi. Endi shu yerda bir joyda tozalanadi va foydalanuvchi
-// qayta kirish sahifasiga yo'naltiriladi.
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (
-      error?.response?.status === 401 &&
-      typeof window !== 'undefined' &&
-      !window.location.pathname.startsWith('/login')
-    ) {
-      clearAuth()
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
-
-/**
- * Har qanday API xatosini (axios error) foydalanuvchiga xavfsiz ko'rsatish
- * mumkin bo'lgan shaklga keltiradi -- "nima bo'ldi" (message), "qayta
- * urinish mumkinmi" (retryable) va tarmoq xatosimi (isNetworkError).
- *
- * Backend'ning `detail` matnlari allaqachon o'zbek tilida va xavfsiz
- * (backend/api/*.py) -- bu funksiya ularni o'zgartirmaydi, faqat:
- *   1. Javob umuman kelmagan holatni (tarmoq/timeout) alohida aniqlaydi
- *      -- avval bu ham xuddi 5xx bilan bir xil umumiy xabar olardi
- *      (frontend/hooks/useJobPolling.ts'dagi eski xatti-harakat).
- *   2. `detail` maydoni yo'q/matn bo'lmagan holatlar uchun xavfsiz
- *      standart xabar beradi (hech qachon xom axios/tarmoq ichki
- *      xabarini ko'rsatmaydi).
- */
-export interface ApiErrorInfo {
-  message: string
-  retryable: boolean
-  isNetworkError: boolean
-  status?: number
-}
-
-export function parseApiError(err: unknown): ApiErrorInfo {
-  const anyErr = err as any
-
-  if (!anyErr?.response) {
-    // Javob umuman kelmadi -- tarmoq uzilgan, so'rov muddati tugagan yoki
-    // server butunlay ishlamayapti.
-    return {
-      message: "Server bilan aloqa o'rnatib bo'lmadi. Internet aloqangizni tekshiring va qaytadan urinib ko'ring.",
-      retryable: true,
-      isNetworkError: true,
-    }
-  }
-
-  const status: number = anyErr.response.status
-  const detail = anyErr.response.data?.detail
-
-  if (status >= 500) {
-    return {
-      message: typeof detail === 'string' && detail ? detail : "Serverda kutilmagan xatolik yuz berdi. Birozdan so'ng qaytadan urinib ko'ring.",
-      retryable: true,
-      isNetworkError: false,
-      status,
-    }
-  }
-
-  return {
-    message: typeof detail === 'string' && detail ? detail : "So'rovda xatolik yuz berdi.",
-    retryable: status === 429, // faqat "juda ko'p so'rov" holatida qayta urinish mantiqiy
-    isNetworkError: false,
-    status,
-  }
-}
 
 export interface VideoInfo {
   title: string
@@ -109,18 +35,18 @@ export interface Job {
   error_message?: string
   created_at?: string
   speaker_gender?: string
-  voice_gender_setting?: string
-  audio_mix_mode?: 'dubbed_only' | 'ducked_mix'
   uzbek_srt_content?: string
   expected_end_time?: string
   rating?: number
   feedback_comment?: string
   content_flagged?: boolean
-  fallback_available?: boolean
-  fallback_reason?: string
-  // /api/learn bilan yaratilgan job'da to'ldiriladi -- Learning Workspace
-  // (frontend/app/learn/[id]) shu ID orqali tahlilni ham poll qiladi.
   linked_analysis_id?: string | null
+  // YouTube yuklab olish DOWNLOAD bosqichida (video hech qachon serverga
+  // tushmagan holda) muvaffaqiyatsiz bo'lgan job'lar uchun -- foydalanuvchi
+  // videoni to'g'ridan-to'g'ri yuklashi mumkinligini bildiradi (backend/api/
+  // routes.py:_job_to_response, POST /jobs/{id}/upload-video).
+  fallback_available?: boolean
+  fallback_reason?: string | null
 }
 
 export type JobStatus =
@@ -162,22 +88,15 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 export async function createJob(
   youtube_url: string,
   voice_gender: string = 'auto',
-  audio_mix_mode: 'dubbed_only' | 'ducked_mix' = 'dubbed_only',
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', {
-    youtube_url,
-    target_language: 'uz',
-    voice_gender,
-    audio_mix_mode,
-  })
+  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender })
   return res.data
 }
 
-// Bosh sahifadagi "O'rganish" oqimi -- bitta so'rovda HAM dublyaj, HAM tahlil
-// (Learning Workspace uchun) boshlaydi. createJob()'dan farqli, dublyaj job'i
-// bilan bog'langan tahlil ID'sini ham qaytaradi (backend/api/learn_routes.py).
-// frontend/app/learn/[id] job'ni poll qiladi, tahlil esa job.linked_analysis_id
-// orqali topiladi.
+// Bosh sahifadagi asosiy oqim -- bitta so'rovda HAM dublyaj, HAM tahlil
+// (Learning Workspace uchun) boshlaydi. createJob()'dan farqli, ikkita ID
+// qaytaradi -- frontend/app/learn/[id] shu ikkalasini birga poll qiladi
+// (backend/api/learn_routes.py).
 export async function learnVideo(youtube_url: string, voice_gender: string = 'auto'): Promise<{
   dubbing_job_id: string
   analysis_id: string | null
@@ -188,14 +107,24 @@ export async function learnVideo(youtube_url: string, voice_gender: string = 'au
   return res.data
 }
 
-// backend/api/routes.py'dagi _ALLOWED_UPLOAD_CONTENT_TYPES / MAX_UPLOAD_SIZE_BYTES
-// bilan bir xil -- faqat mijoz-tomon tekshiruvi, backend asosiy darvoza.
+export async function getJob(jobId: string): Promise<Job> {
+  const res = await apiClient.get(`/api/jobs/${jobId}`)
+  return res.data
+}
+
+// Mirrors backend/api/routes.py's _ALLOWED_UPLOAD_CONTENT_TYPES /
+// MAX_UPLOAD_SIZE_BYTES exactly -- client-side check only, the backend is
+// the real gate. Kept here (not fetched at runtime) to match this
+// codebase's established convention of mirroring backend constants with a
+// comment rather than adding a config-exposure endpoint for values that
+// rarely change.
 export const UPLOAD_ALLOWED_CONTENT_TYPES = ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm']
 export const UPLOAD_ALLOWED_EXTENSIONS = ['.mp4', '.mov', '.mkv', '.webm']
 export const UPLOAD_MAX_SIZE_BYTES = 3 * 1024 * 1024 * 1024 // 3 GB
 
 // YouTube DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan job uchun -- foydalanuvchi
-// videoni to'g'ridan-to'g'ri yuklaydi, xuddi shu job qayta navbatga qo'yiladi.
+// videoni to'g'ridan-to'g'ri yuklaydi, xuddi shu job qayta navbatga qo'yiladi
+// (mavjud pipeline, ikkinchi yo'l yaratilmaydi).
 export async function uploadVideoFallback(
   jobId: string,
   file: File,
@@ -211,11 +140,6 @@ export async function uploadVideoFallback(
     },
     signal,
   })
-  return res.data
-}
-
-export async function getJob(jobId: string): Promise<Job> {
-  const res = await apiClient.get(`/api/jobs/${jobId}`)
   return res.data
 }
 
@@ -291,7 +215,7 @@ export async function initiateUzumPayment(jobId: string): Promise<{ success: boo
 }
 
 export function getDownloadUrl(jobId: string): string {
-  return `${API_URL}/api/outputs/${jobId}/video?download=1`
+  return `${API_URL}/api/outputs/${jobId}/video`
 }
 
 export interface ResolutionOption {
@@ -305,12 +229,8 @@ export async function getJobResolutions(jobId: string): Promise<{ resolutions: R
   return res.data
 }
 
-export async function requestResolution(
-  jobId: string,
-  resolution: string,
-  download: boolean = true,
-): Promise<{ status: string; download_url?: string }> {
-  const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`, null, { params: { download } })
+export async function requestResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/resolutions/${resolution}`)
   return res.data
 }
 
@@ -322,12 +242,8 @@ export async function getLibraryJobResolutions(jobId: string): Promise<{ resolut
   return res.data
 }
 
-export async function requestLibraryResolution(
-  jobId: string,
-  resolution: string,
-  download: boolean = true,
-): Promise<{ status: string; download_url?: string }> {
-  const res = await apiClient.post(`/api/library/${jobId}/resolutions/${resolution}`, null, { params: { download } })
+export async function requestLibraryResolution(jobId: string, resolution: string): Promise<{ status: string; download_url?: string }> {
+  const res = await apiClient.post(`/api/library/${jobId}/resolutions/${resolution}`)
   return res.data
 }
 

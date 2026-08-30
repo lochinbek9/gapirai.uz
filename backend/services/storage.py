@@ -99,12 +99,8 @@ def s3_object_exists(object_name: str) -> bool:
         return False
 
 
-def generate_presigned_download_url(
-    object_name: str,
-    expiration: int = 3600,
-    download: bool = True,
-) -> str | None:
-    """Generate a presigned URL with an explicit browser disposition."""
+def generate_presigned_download_url(object_name: str, expiration: int = 3600) -> str | None:
+    """Generate a presigned URL to share an S3 object."""
     s3_client, bucket = _get_s3_client()
     if not s3_client:
         return None
@@ -120,7 +116,6 @@ def generate_presigned_download_url(
         content_type, _ = mimetypes.guess_type(object_name)
         if content_type:
             params["ResponseContentType"] = content_type
-        params["ResponseContentDisposition"] = "attachment" if download else "inline"
         response = s3_client.generate_presigned_url(
             "get_object",
             Params=params,

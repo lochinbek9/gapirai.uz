@@ -65,7 +65,7 @@ export default function LibraryWatchPage() {
     if (!job || !opt.available || switching) return
     setSwitching(opt.resolution)
     try {
-      const res = await requestLibraryResolution(job.job_id, opt.resolution, false)
+      const res = await requestLibraryResolution(job.job_id, opt.resolution)
       if (res.status === 'ready' && res.download_url) {
         setVideoSrc(res.download_url)
         setActiveResolution(opt.resolution)
@@ -77,7 +77,7 @@ export default function LibraryWatchPage() {
             setResolutions(updated.resolutions)
             const found = updated.resolutions.find((r) => r.resolution === opt.resolution)
             if (found && found.status === 'ready') {
-              const again = await requestLibraryResolution(job.job_id, opt.resolution, false)
+              const again = await requestLibraryResolution(job.job_id, opt.resolution)
               if (again.download_url) {
                 setVideoSrc(again.download_url)
                 setActiveResolution(opt.resolution)
@@ -201,7 +201,7 @@ export default function LibraryWatchPage() {
                     <div className="relative w-32 sm:w-40 aspect-video shrink-0 rounded-lg overflow-hidden bg-black/10 dark:bg-black/30">
                       {item.video_thumbnail && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={item.video_thumbnail} alt={item.video_title || ''} loading="lazy" className="w-full h-full object-cover" />
+                        <img src={item.video_thumbnail} alt={item.video_title || ''} className="w-full h-full object-cover" />
                       )}
                       {item.video_duration != null && (
                         <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[9px] font-bold">

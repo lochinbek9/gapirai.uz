@@ -60,7 +60,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">4. To'lovlar va qaytarish shartlari</h2>
               <p>
-                Davomiyligi 45 daqiqadan kam bo'lgan videolar bepul taqdim etiladi. 45 daqiqadan ortiq davom etadigan videolarni qayta ishlash uchun Click yoki Payme to'lov tizimlaridan biri orqali to'lov amalga oshirilishi lozim (daqiqasiga 500 so'm). Xizmat ko'rsatilgandan so'ng, to'langan mablag'lar qaytarilmaydi.
+                Davomiyligi 45 daqiqadan kam bo'lgan videolar bepul taqdim etiladi. 45 daqiqadan ortiq davom etadigan videolarni qayta ishlash uchun Click to'lov tizimi orqali to'lov amalga oshirilishi lozim (daqiqasiga 500 so'm). Xizmat ko'rsatilgandan so'ng, to'langan mablag'lar qaytarilmaydi.
               </p>
             </section>
 

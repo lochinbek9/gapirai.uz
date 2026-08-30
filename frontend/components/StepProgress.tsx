@@ -1,32 +1,19 @@
 import { useState, useEffect } from "react";
-import { Check, X, Loader2, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job } from "@/lib/api";
 
-export const STEPS = [
-  { key: "video", icon: "⬇", label: "Video", statuses: ["downloading"] },
-  { key: "transcription", icon: "🎙", label: "Transkripsiya", statuses: ["transcribing"] },
-  { key: "translation", icon: "🌐", label: "Tarjima", statuses: ["translating"] },
-  { key: "voice", icon: "🔊", label: "Ovoz", statuses: ["syncing", "synthesizing"] },
-  { key: "rendering", icon: "🎬", label: "Render", statuses: ["merging"] },
+const STEPS = [
+  { key: "downloading",  icon: "⬇", label: "Yuklab olish" },
+  { key: "transcribing", icon: "🎙", label: "Transkripsiya" },
+  { key: "translating",  icon: "🌐", label: "Tarjima" },
+  { key: "syncing",      icon: "🗣", label: "Talaffuz" },
+  { key: "synthesizing", icon: "🔊", label: "Ovoz berish" },
+  { key: "merging",      icon: "🎬", label: "Birlashtirish" },
 ] as const;
 
-export function getCurrentStep(status: Job["status"]): number {
-  return STEPS.findIndex((s) => (s.statuses as readonly string[]).includes(status));
-}
-
-// job.progress backendda faqat bosqich almashganda o'rnatiladi (haqiqiy
-// ichki-bosqich % emas) -- xato yuz berganda oxirgi o'rnatilgan qiymatda
-// "muzlab qoladi", shuning uchun buni FOYDALANUVCHIGA foiz sifatida emas,
-// balki xatolik QAYSI bosqichda yuz berganini aniqlash uchun ichki
-// signal sifatida ishlatamiz (backend/workers/tasks.py: _update_job
-// chaqiruvlaridagi haqiqiy checkpoint qiymatlari: 5/20/35/40/50/60/85/100).
-function stageIndexFromProgress(progress: number): number {
-  if (progress < 20) return 0;
-  if (progress < 35) return 1;
-  if (progress < 50) return 2;
-  if (progress < 85) return 3;
-  return 4;
+function getCurrentStep(status: Job["status"]): number {
+  return STEPS.findIndex((s) => s.key === status);
 }
 
 interface Props {
@@ -53,9 +40,8 @@ function formatElapsed(sec: number) {
 }
 
 export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: Props) {
+  const current = getCurrentStep(job.status);
   const isFailed = job.status === "failed";
-  const current = isFailed ? -1 : getCurrentStep(job.status);
-  const failedStageIndex = isFailed ? stageIndexFromProgress(job.progress) : -1;
   const [currentTime, setCurrentTime] = useState(Date.now());
 
   useEffect(() => {
@@ -67,33 +53,29 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
 
   return (
     <div className="space-y-8 py-2">
-      {/* ── Bosqichlar (pending / processing / completed / failed) ──── */}
+      {/* ── Progress Circle Visual ─────────────────── */}
       <div className="relative flex justify-between px-2">
         {STEPS.map((step, i) => {
-          const isFailedHere = isFailed && i === failedStageIndex;
-          const isCompleted = isFailed ? i < failedStageIndex : current > i;
-          const isActive = !isFailed && current === i;
+          const isCompleted = current > i;
+          const isActive = current === i && !isFailed;
+          const isPending = current < i;
 
           return (
             <div key={step.key} className="flex flex-col items-center gap-3 relative z-10 flex-1">
               <motion.div
                 initial={false}
                 animate={{
-                  scale: isActive || isFailedHere ? 1.15 : 1,
-                  backgroundColor: isFailedHere ? "rgb(59, 130, 246)" : isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgb(59, 130, 246)" : "rgba(255, 255, 255, 0.02)",
-                  borderColor: isFailedHere ? "rgba(59, 130, 246, 0.8)" : isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.05)",
+                  scale: isActive ? 1.15 : 1,
+                  backgroundColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgb(59, 130, 246)" : "rgba(255, 255, 255, 0.02)",
+                  borderColor: isCompleted ? "rgb(16, 185, 129)" : isActive ? "rgba(59, 130, 246, 0.8)" : "rgba(255, 255, 255, 0.05)",
                 }}
                 className={`
                   w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500
-                  ${isCompleted || isActive || isFailedHere ? "shadow-lg text-white" : "text-gray-500"}
+                  ${isCompleted ? "shadow-lg shadow-emerald-500/20 text-white" : isActive ? "shadow-xl shadow-blue-500/30 text-white" : "text-gray-500"}
                 `}
               >
                 <AnimatePresence mode="wait">
-                  {isFailedHere ? (
-                    <motion.div key="failed" initial={{ scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }}>
-                      <X className="w-5 h-5 text-white" strokeWidth={3} />
-                    </motion.div>
-                  ) : isCompleted ? (
+                  {isCompleted ? (
                     <motion.div
                       key="check"
                       initial={{ scale: 0, rotate: -45 }}
@@ -117,15 +99,11 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                   )}
                 </AnimatePresence>
               </motion.div>
-
+              
               <div className="text-center">
                  <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors duration-300
-                    ${isFailedHere ? "text-blue-500" : isCompleted ? "text-emerald-500" : isActive ? "text-blue-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
+                    ${isCompleted ? "text-emerald-500" : isActive ? "text-blue-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
                    {step.label}
-                 </p>
-                 <p className={`text-[8px] font-semibold mt-0.5 transition-colors duration-300
-                    ${isFailedHere ? "text-blue-500/70" : isCompleted ? "text-emerald-500/70" : isActive ? "text-blue-500/70" : "text-gray-300 dark:text-gray-700"}`}>
-                   {isFailedHere ? "Xatolik" : isCompleted ? "Tayyor" : isActive ? "Jarayonda" : "Kutilmoqda"}
                  </p>
               </div>
             </div>
@@ -134,16 +112,16 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
 
         {/* Connector Line Background */}
         <div className="absolute top-5 left-8 right-8 h-[2px] bg-black/5 dark:bg-white/[0.03] -z-0 transition-colors"></div>
-        {/* Active Connector Line -- bosqichlar soniga asoslangan (foiz emas) */}
-        <motion.div
+        {/* Active Connector Line */}
+        <motion.div 
           className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 shadow-[0_0_10px_rgba(59,130,246,0.5)] -z-0"
           initial={{ width: 0 }}
-          animate={{ width: `${((isFailed ? failedStageIndex : current) / (STEPS.length - 1)) * 88}%` }}
+          animate={{ width: `${(current / (STEPS.length - 1)) * 88}%` }}
           transition={{ duration: 1, ease: "easeInOut" }}
         />
       </div>
 
-      {/* ── Holat matni (foiz raqami YO'Q -- backend haqiqiy % bermaydi) ── */}
+      {/* ── Main Progress Bar & Status Text ────────── */}
       <div className="space-y-4 pt-4">
         <div className="flex justify-between items-end">
            <div className="space-y-1">
@@ -152,12 +130,27 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                  <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
+                 <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
+                   {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
+                 </p>
                  <div className="py-1 px-3 rounded-full bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex items-center gap-2 transition-colors">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse transition-colors"></div>
                     <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 transition-colors">{formatElapsed(elapsed)}</span>
                  </div>
               </div>
            </div>
+        </div>
+
+        <div className="relative h-3.5 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1.5px] transition-colors">
+          <motion.div
+            className="h-full bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${job.progress}%` }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5"></div>
+            <div className="absolute inset-0 shimmer-anim"></div>
+          </motion.div>
         </div>
       </div>
 

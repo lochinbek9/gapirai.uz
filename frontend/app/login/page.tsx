@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import { Eye, EyeOff, Loader2, Youtube, ArrowLeft, Phone } from 'lucide-react'
-import { trackEvent } from '@/lib/analytics'
 
 const PHONE_RE = /^\+998\d{9}$/
 
@@ -39,15 +38,8 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const result = await login(email, password)
-      if (result && 'id' in result) {
-        // Verified user — login() qaytardi User object (id, name, email, role)
-        trackEvent('login')
-        router.push('/dashboard')
-      } else {
-        // Unverified — PendingVerification qaytadi (pending_verification, email, message)
-        setStep('code')
-      }
+      await login(email, password)
+      setStep('code')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Xatolik yuz berdi.')
     } finally {
@@ -61,7 +53,6 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyCode(email, code)
-      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
@@ -89,7 +80,6 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await googleAuth(credential)
-      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
@@ -122,7 +112,6 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyPhoneCode(phone, phoneCode)
-      trackEvent('login')
       router.push('/dashboard')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')

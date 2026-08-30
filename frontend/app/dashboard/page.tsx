@@ -3,24 +3,22 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { listJobs, deleteJob, createJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getDownloadUrl, getPlans, subscribeToPlan, CurrentSubscription, PlanDef } from '@/lib/api'
-import { trackEvent } from '@/lib/analytics'
+import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
-  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCcw, Download
+  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown
 } from 'lucide-react'
 
 const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
 
-function PlanCard({ sub, plan, onRenew, renewing }: { sub: CurrentSubscription | null; plan: PlanDef | null; onRenew: () => void; renewing: boolean }) {
+function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null; onRenew: () => void; renewing: boolean }) {
   if (!sub) return null
   const planName = PLAN_NAMES[sub.plan] || sub.plan
   const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
-  const remaining = plan ? Math.max(0, plan.videos_per_period - sub.videos_used_this_period) : null
 
   return (
     <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner flex items-center justify-between gap-4 mb-6 flex-wrap">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
           <Crown className="w-5 h-5" />
         </div>
@@ -28,14 +26,16 @@ function PlanCard({ sub, plan, onRenew, renewing }: { sub: CurrentSubscription |
           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
           <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
         </div>
-        <div className="ml-3 text-xs text-gray-500 dark:text-gray-400">
-          <p>{sub.videos_used_this_period} video ishlatilgan{remaining !== null && ` · ${remaining} ta qoldi`}</p>
-          {sub.expires_at && (
-            <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
-              {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
-            </p>
-          )}
-        </div>
+        {sub.plan !== 'free' && (
+          <div className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+            <p>{sub.videos_used_this_period} video ishlatilgan</p>
+            {sub.expires_at && (
+              <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
+                {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
+              </p>
+            )}
+          </div>
+        )}
       </div>
       <Link
         href="/pricing"
@@ -65,18 +65,17 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function VideoCard({ job, onDelete, onRetry, retrying }: { job: Job; onDelete: (id: string) => void; onRetry: (job: Job) => void; retrying: boolean }) {
+function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void }) {
   const thumbnail = job.video_thumbnail || `https://img.youtube.com/vi/${job.job_id}/mqdefault.jpg`
   const duration = job.video_duration ? formatDuration(job.video_duration) : '--:--'
   const isReady = job.status === 'completed'
-  const isFailed = job.status === 'failed'
 
   return (
     <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
       {/* Thumbnail */}
       <div className="relative aspect-video bg-black/10 dark:bg-slate-900/60 overflow-hidden">
         {job.video_thumbnail ? (
-          <img src={thumbnail} alt={job.video_title || ''} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={thumbnail} alt={job.video_title || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/[0.02]">
             <Youtube className="w-12 h-12 text-slate-400 dark:text-slate-700" />
@@ -108,44 +107,19 @@ function VideoCard({ job, onDelete, onRetry, retrying }: { job: Job; onDelete: (
         <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
           {job.video_title || 'Yuklanmoqda...'}
         </h3>
-        {job.status === 'failed' && job.error_message && (
-          <p className="text-[11px] text-blue-500/70 dark:text-blue-400/70 mb-3 line-clamp-2">{job.error_message}</p>
-        )}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between">
           <StatusBadge status={job.status} />
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {isReady && (
-              <>
-                <Link
-                  href={`/video/${job.job_id}`}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-bold px-1"
-                >
-                  Ko'rish →
-                </Link>
-                <a
-                  href={getDownloadUrl(job.job_id)}
-                  download
-                  onClick={() => trackEvent('video_downloaded', { format: 'video', source: 'dashboard' })}
-                  title="Yuklab olish"
-                  className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl"
-                >
-                  <Download className="w-4 h-4" />
-                </a>
-              </>
-            )}
-            {isFailed && (
-              <button
-                onClick={() => onRetry(job)}
-                disabled={retrying || !job.youtube_url}
-                title={job.youtube_url ? "Qayta urinish" : "Video havolasi topilmadi"}
-                className="text-gray-400 hover:text-indigo-500 hover:bg-indigo-500/10 transition p-1.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+              <Link
+                href={`/video/${job.job_id}`}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-bold"
               >
-                {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-              </button>
+                Ko'rish →
+              </Link>
             )}
             <button
               onClick={() => onDelete(job.job_id)}
-              title="O'chirish"
               className="text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl"
             >
               <Trash2 className="w-4 h-4" />
@@ -173,9 +147,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
-  const [currentPlan, setCurrentPlan] = useState<PlanDef | null>(null)
   const [renewing, setRenewing] = useState(false)
-  const [retryingId, setRetryingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -188,20 +160,7 @@ export default function DashboardPage() {
         .catch(console.error)
         .finally(() => setJobsLoading(false))
 
-      getPlans().then((res) => {
-        setSubscription(res.current)
-        setCurrentPlan(res.plans.find((p) => p.id === res.current.plan) || null)
-        // Tarif to'lovi tugagach backend webhook orqali tasdiqlanadi va
-        // foydalanuvchi shu sahifaga qaytariladi -- faol poll yo'q, shuning
-        // uchun /pricing'da qo'yilgan belgi bilan bir martagina solishtiramiz.
-        try {
-          const pendingPlan = sessionStorage.getItem('pending_subscription_payment')
-          if (pendingPlan && res.current.plan === pendingPlan) {
-            sessionStorage.removeItem('pending_subscription_payment')
-            trackEvent('payment_completed', { plan: pendingPlan })
-          }
-        } catch {}
-      }).catch(console.error)
+      getPlans().then((res) => setSubscription(res.current)).catch(console.error)
 
       const interval = setInterval(() => {
         listJobs().then(setJobs).catch(console.error)
@@ -235,27 +194,6 @@ export default function DashboardPage() {
     setJobs((prev) => prev.filter((j) => j.job_id !== id))
   }
 
-  async function handleRetry(job: Job) {
-    if (!job.youtube_url) return
-    setRetryingId(job.job_id)
-    try {
-      const { job_id, status } = await createJob(
-        job.youtube_url,
-        job.voice_gender_setting || 'auto',
-        job.audio_mix_mode || 'dubbed_only',
-      )
-      if (status === 'awaiting_payment') {
-        router.push(`/video/${job_id}`)
-      } else {
-        listJobs().then(setJobs).catch(console.error)
-      }
-    } catch (err: any) {
-      alert(err?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.")
-    } finally {
-      setRetryingId(null)
-    }
-  }
-
   function handleLogout() {
     logout()
     router.push('/')
@@ -285,8 +223,8 @@ export default function DashboardPage() {
           </Link>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
-              <User2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
-              <span className="text-xs font-bold truncate max-w-[90px] sm:max-w-[160px]">{user.name}</span>
+              <User2 className="w-4 h-4 text-blue-500" />
+              <span className="text-xs font-bold">{user.name}</span>
             </div>
             <Link
               href="/"
@@ -323,7 +261,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <PlanCard sub={subscription} plan={currentPlan} onRenew={handleRenew} renewing={renewing} />
+        <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
 
         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
 
@@ -335,16 +273,15 @@ export default function DashboardPage() {
         ) : jobs.length === 0 ? (
           <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
             <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
-            <p className="text-gray-500 dark:text-gray-400 font-bold mb-5">Hali hech qanday video yo'q</p>
-            <Link href="/" className="inline-flex items-center gap-2 btn-premium text-xs font-bold px-5 py-3 rounded-xl shadow-md">
-              <Plus className="w-4 h-4" />
-              Birinchi videoni dublyaj qilish
+            <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
+            <Link href="/" className="text-blue-500 hover:underline text-xs font-bold uppercase tracking-wider">
+              Birinchi videoni dublyaj qiling →
             </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {jobs.map((job) => (
-              <VideoCard key={job.job_id} job={job} onDelete={handleDelete} onRetry={handleRetry} retrying={retryingId === job.job_id} />
+              <VideoCard key={job.job_id} job={job} onDelete={handleDelete} />
             ))}
           </div>
         )}

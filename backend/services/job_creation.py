@@ -97,20 +97,12 @@ class JobCreationResult:
     error_detail: str | None = None
 
 
-async def create_dubbing_job(
-    db: Session,
-    user: User,
-    youtube_url: str,
-    voice_gender: str = "auto",
-    audio_mix_mode: str = "dubbed_only",
-) -> JobCreationResult:
+async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_gender: str = "auto") -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
     yoki Telegram xabari) ko'rinishini tanlaydi."""
     if not is_valid_youtube_url(youtube_url):
         return JobCreationResult(outcome="invalid_url")
-
-    audio_mix_mode = audio_mix_mode if audio_mix_mode in {"dubbed_only", "ducked_mix"} else "dubbed_only"
 
     # Kesh: agar shu video ALLAQACHON (istalgan foydalanuvchi tomonidan)
     # dublyaj qilingan bo'lsa, YouTube'ga so'rov yubormasdan (video ID
@@ -119,25 +111,15 @@ async def create_dubbing_job(
     # so'rovi -- YouTube bot-check va OpenAI xarajatini ham kamaytiradi).
     video_id = extract_youtube_video_id(youtube_url)
     if video_id:
-        # Rows created before per-job mode support have NULL here and may
-        # contain the legacy mixed audio, so they are never reused for a new
-        # request. Only an explicit mode match is safe.
-        mode_condition = DubbingJob.audio_mix_mode == audio_mix_mode
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
-            mode_condition,
         )
-        # A clean dub and a background mix are different products; never
-        # return one as the other from the cache. Legacy rows without this
-        # field remain available, but are intentionally not cache candidates.
         if voice_gender in ("male", "female"):
             cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
         cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
         if cached_job and _cached_job_files_exist(cached_job):
-            return await _create_job_from_cache(
-                db, user, youtube_url, cached_job, voice_gender, audio_mix_mode
-            )
+            return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
 
     try:
         info = await asyncio.to_thread(get_video_info, youtube_url)
@@ -210,7 +192,6 @@ async def create_dubbing_job(
         video_duration=duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=voice_gender,
-        audio_mix_mode=audio_mix_mode,
         status=status,
         progress=0.0,
         status_message=status_message,
@@ -230,14 +211,7 @@ async def create_dubbing_job(
     return JobCreationResult(outcome="awaiting_payment", job_id=job_id, video_title=title, duration_minutes=duration_minutes, amount=amount)
 
 
-async def _create_job_from_cache(
-    db: Session,
-    user: User,
-    youtube_url: str,
-    cached_job: DubbingJob,
-    voice_gender: str,
-    audio_mix_mode: str = "dubbed_only",
-) -> JobCreationResult:
+async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cached_job: DubbingJob, voice_gender: str) -> JobCreationResult:
     """Kesh-hit uchun job yaratadi -- matn maydonlarini (transkript/tarjima/
     subtitr) nusxalaydi, lekin video/audio S3 fayllarini NUSXALAMAYDI --
     source_job_id orqali asl job'ga ishora qiladi (DubbingJob.storage_id
@@ -267,7 +241,6 @@ async def _create_job_from_cache(
         video_thumbnail=cached_job.video_thumbnail,
         speaker_gender=cached_job.speaker_gender,
         voice_gender_setting=voice_gender,
-        audio_mix_mode=audio_mix_mode,
         transcript_text=cached_job.transcript_text,
         translated_text=cached_job.translated_text,
         srt_content=cached_job.srt_content,
