@@ -42,8 +42,27 @@ celery_app.conf.update(
     # mumkin edi. 4000s -- eng uzun vazifaning (process_video, 3600s)
     # o'zidan sezilarli ko'proq, lekin haddan tashqari uzun ham emas (haqiqatan
     # qotib qolgan vazifa 66 daqiqadan ortiq kutmaydi).
-    broker_transport_options={"visibility_timeout": 4000},
-    result_backend_transport_options={"visibility_timeout": 4000},
+    # 2026-08-30: worker'lar bir necha marta xuddi shu naqsh bilan jim qotib
+    # qoldi -- tarmoqda bir lahzalik uzilish -> kombu'ning ulanish-xatolik
+    # tozalash yo'lida (connection.collect() -> maybe_close_channel() ->
+    # channel.close() -> _brpop_read()) socket.recv() CHEKSIZ bloklanadi,
+    # chunki bu socket'ga hech qanday o'qish muddati (timeout) berilmagan
+    # edi. SIGUSR1 stack dump orqali 4 ta serverda mustaqil ravishda
+    # tasdiqlangan (kombu/celery/redis-py'ning rasmiy hujjatlashtirilgan
+    # muammosi -- socket_timeout aynan shu holat uchun mo'ljallangan).
+    broker_transport_options={
+        "visibility_timeout": 4000,
+        "socket_timeout": 30,          # hech qanday o'qish 30s dan uzoq bloklanmasin
+        "socket_connect_timeout": 10,
+        "socket_keepalive": True,      # OS darajasida "o'lik" ulanishni aniqlaydi
+        "health_check_interval": 25,   # uzoq turgan ulanishni ishlatishdan oldin tekshiradi
+        "retry_on_timeout": True,      # vaqtinchalik uzilishda avtomatik qayta urinadi
+    },
+    result_backend_transport_options={
+        "visibility_timeout": 4000,
+        "socket_timeout": 30,
+        "socket_connect_timeout": 10,
+    },
     task_routes={
         # process_video'da "queue" ATAYLAB yo'q — chaqiruv joylarida
         # (routes.py/click_routes.py/main.py) get_job_queue() orqali
