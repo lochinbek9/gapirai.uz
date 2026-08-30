@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import re
@@ -47,6 +48,22 @@ def _gemini_text_model() -> str:
     return settings.GEMINI_VERTEX_TEXT_MODEL if settings.GEMINI_USE_VERTEX else settings.GEMINI_MODEL
 
 
+def _translate_mymemory(text: str, source_lang: str = "en", target_lang: str = "uz") -> str:
+    """MyMemory — free 500K chars/month, no rate-limit issues."""
+    url = "https://api.mymemory.translated.net/get"
+    params = {"q": text, "langpair": f"{source_lang}|{target_lang}"}
+    try:
+        response = httpx.get(url, params=params, timeout=10.0)
+        if response.status_code == 200:
+            data = response.json()
+            result = data.get("responseData", {}).get("translatedText", "")
+            if result and result != text:
+                return html.unescape(result)
+    except Exception as e:
+        logger.error(f"MyMemory translate failed: {e}")
+    return text
+
+
 def translate_free_google(text: str, target_lang: str = "uz") -> str:
     url = "https://translate.googleapis.com/translate_a/single"
     params = {
@@ -62,9 +79,13 @@ def translate_free_google(text: str, target_lang: str = "uz") -> str:
             data = response.json()
             parts = [item[0] for item in data[0] if item and item[0]]
             return "".join(parts)
+        elif response.status_code == 429:
+            logger.warning("Free Google Translate 429 — falling back to MyMemory")
+            return _translate_mymemory(text, "en", target_lang)
     except Exception as e:
         logger.error(f"Free Google Translate API request failed: {e}")
-    return text
+    # Fallback: MyMemory (free, no rate-limit)
+    return _translate_mymemory(text, "en", target_lang)
 
 
 def _translate_segment_free(segment: dict) -> dict:
