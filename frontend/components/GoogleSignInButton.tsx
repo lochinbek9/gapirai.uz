@@ -26,20 +26,29 @@ interface GoogleSignInButtonProps {
 // yashirin" tamoyili.
 export default function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const callbackRef = useRef(onCredential)
+  callbackRef.current = onCredential
 
   useEffect(() => {
     if (!CLIENT_ID) return
 
     function render() {
       if (!window.google || !containerRef.current) return
-      window.google.accounts.id.initialize({
-        client_id: CLIENT_ID!,
-        callback: (resp) => onCredential(resp.credential),
-      })
+      // initialize idempotente: guarda na instância evita o aviso
+      // "initialize() is called multiple times" do GSI.
+      const gsi = window.google.accounts.id as typeof window.google.accounts.id & { __gapiraiInitialized?: boolean }
+      if (!gsi.__gapiraiInitialized) {
+        window.google.accounts.id.initialize({
+          client_id: CLIENT_ID!,
+          callback: (resp) => callbackRef.current(resp.credential),
+        })
+        gsi.__gapiraiInitialized = true
+      }
+      // width numérico (px) — o GSI rejeita "100%".
       window.google.accounts.id.renderButton(containerRef.current, {
         theme: 'outline',
         size: 'large',
-        width: '100%',
+        width: 360,
         text: 'continue_with',
         locale: 'uz',
       })
@@ -56,7 +65,7 @@ export default function GoogleSignInButton({ onCredential }: GoogleSignInButtonP
       }, 100)
       return () => clearInterval(interval)
     }
-  }, [onCredential])
+  }, [])
 
   if (!CLIENT_ID) return null
 
