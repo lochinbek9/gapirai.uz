@@ -109,6 +109,10 @@ class Settings(BaseSettings):
     # chiqdi (real taqqoslashda tasdiqlangan), narxi esa ~17x arzon.
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
+    # faster-whisper model (CPU): "tiny" | "small" | "medium" | "large-v3"
+    # small = 500MB RAM, 100% accuracy, ~4s per 8s audio on CPU
+    # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
+    WHISPER_MODEL: str = "small"
     # Nutq optimallashtirish (raqam/ohang moslashtirish) va jins aniqlash kabi
     # mexanik, sifatga unchalik sezgir bo'lmagan vazifalar uchun — OPENAI_MODEL
     # dan alohida saqlanadi, shunda kerak bo'lsa tarjima sifatini mustaqil
@@ -214,9 +218,14 @@ class Settings(BaseSettings):
     ESKIZ_PASSWORD: str = ""
     ESKIZ_FROM: str = "4546"  # Eskiz sandbox/test sender nickname — productionda tasdiqlangan nom kerak
 
+    # Modal (https://modal.com) — cloud GPU for heavy tasks (TTS, merge)
+    # OFF by default. Enable after: pip install modal && modal token new
+    MODAL_ENABLED: bool = False
+    MODAL_API_KEY: str = ""
+
     # Admin panel — role='admin' bo'lsa ham, faqat shu ro'yxatdagi email
     # kira oladi (vergul bilan ajratilgan). Bo'sh bo'lsa, faqat role tekshiriladi.
-    ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com"
+    ADMIN_ALLOWED_EMAILS: str = "lochinbeksetor@gmail.com,den4ikorm@gmail.com"
 
     # Click Payment
     CLICK_MERCHANT_ID: str = "56653"
