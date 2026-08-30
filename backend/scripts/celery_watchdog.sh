@@ -18,6 +18,21 @@ if ! docker inspect "$CONTAINER" --format '{{.State.Running}}' 2>/dev/null | gre
     exit 0
 fi
 
+# Yaqinda ishga tushgan bo'lsa (masalan qo'lda deploy/restart qilingandan
+# keyin), worker hali broker bilan to'liq mingle/ulanish jarayonida bo'lishi
+# mumkin -- shu daqiqada o'ziga ping'ga javob bermasligi haqiqiy qotib
+# qolish emas. 90 soniyalik imtiyoz muddati beriladi, aks holda har bir
+# restart'dan keyin keraksiz qayta-restart tsikliga tushib qolishi mumkin
+# (2026-08-30, deploy'dan keyingi darhol tekshiruvda amalda aniqlangan).
+STARTED_AT=$(docker inspect "$CONTAINER" --format '{{.State.StartedAt}}' 2>/dev/null || echo "")
+if [ -n "$STARTED_AT" ]; then
+    STARTED_EPOCH=$(date -d "$STARTED_AT" +%s 2>/dev/null || echo 0)
+    NOW_EPOCH=$(date -u +%s)
+    if [ "$STARTED_EPOCH" -gt 0 ] && [ $((NOW_EPOCH - STARTED_EPOCH)) -lt 90 ]; then
+        exit 0  # yaqinda ishga tushgan -- hali tekshirilmaydi
+    fi
+fi
+
 HOSTNAME_IN_CONTAINER=$(docker exec "$CONTAINER" hostname 2>/dev/null || echo "")
 if [ -z "$HOSTNAME_IN_CONTAINER" ]; then
     log "konteyner hostname'ini o'qib bo'lmadi, o'tkazib yuborilmoqda"
