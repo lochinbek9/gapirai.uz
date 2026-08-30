@@ -31,10 +31,32 @@ def _get_redis() -> Redis:
 
 
 def _client_ip(request: Request) -> str:
-    """Nginx orqasida ishlaganda haqiqiy IP'ni X-Forwarded-For'dan olamiz."""
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    """Haqiqiy client IP'ni aniqlaydi.
+
+    Topologiya: client -> nginx (yagona ishonchli reverse proxy; Cloudflare
+    YO'Q, backend :8000 tashqaridan yopiq). Client yuboradigan
+    X-Forwarded-For ning ENG CHAP qiymati SOXTALASHTIRILISHI mumkin --
+    hujjum qiluvchi uni to'liq boshqaradi, shuning uchun har so'rovda yangi
+    "IP" yuborib rate-limit bucket'ini aylanib o'tardi (P1: XFF bypass).
+    Unga HECH QACHON ishonilmaydi.
+
+    Tartib:
+      1. X-Real-IP (nginx uni `$remote_addr` = haqiqiy TCP peer bilan o'rnatadi).
+      2. yo'q bo'lsa -> X-Forwarded-For ro'yxatining ENG O'NG qiymati
+         (nginx `$proxy_add_x_forwarded_for` bilan haqiqiy peer'ni OXIRIGA
+         qo'shadi; chapdagilar client da'volari).
+      3. yo'q bo'lsa -> request.client.host.
+    Bo'sh / faqat-whitespace header invalid deb hisoblanadi -> keyingi fallback.
+    """
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip
+
+    fwd = request.headers.get("x-forwarded-for") or ""
+    parts = [p.strip() for p in fwd.split(",") if p.strip()]
+    if parts:
+        return parts[-1]
+
     return request.client.host if request.client else "unknown"
 
 
