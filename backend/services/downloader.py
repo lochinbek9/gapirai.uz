@@ -325,14 +325,26 @@ _RESIDENTIAL_RETRY_SLEEP_JITTER = 2.0
 
 
 def _residential_attempt(action, extra: dict | None = None, use_cookies: bool = True):
-    """Runs `action(ydl)` via the residential proxy -- the sole production
+    """Runs `action(ydl)` via the residential proxy -- the primary production
     ingestion path. On a RETRYABLE failure (error_classification.should_retry),
     makes exactly one bounded retry on this SAME path; on a non-retryable
-    failure (AUTH_ERROR/VIDEO_UNAVAILABLE/PROXY_BILLING_ERROR), fails
-    immediately with no retry, matching the existing no-blind-retry rule
-    used everywhere else in this pipeline. Never escalates to a different
-    proxy tier -- datacenter is no longer attempted at all in the normal
-    path (see the module-level comment above for why)."""
+    failure (AUTH_ERROR/VIDEO_UNAVAILABLE), fails immediately with no retry,
+    matching the existing no-blind-retry rule used everywhere else in this
+    pipeline. Never escalates to a different proxy tier -- datacenter is not
+    attempted (see the module-level comment above for why).
+
+    2026-08-30: PROXY_BILLING_ERROR is the one exception. It means the
+    residential proxy ACCOUNT is out of bandwidth/balance -- retrying the
+    same path, bounded or not, can never succeed until someone tops up the
+    account (a human, billing action, not something a retry loop can fix).
+    Verified live on production-new the same day: a direct (no-proxy) mweb +
+    PO-token request succeeded end-to-end (full video download, 15s) with
+    zero proxy involved, even with stale/absent cookies. So when the proxy
+    specifically reports billing exhaustion, ONE bounded no-proxy attempt is
+    tried before giving up -- turns a guaranteed-fail into a real chance of
+    success at zero extra proxy cost. This is the ONLY case that ever skips
+    the residential proxy; every other failure mode still stays on
+    residential-or-fail, per the original evidence-based design."""
     last_exc: Exception | None = None
     for attempt in range(2):
         try:
@@ -341,6 +353,17 @@ def _residential_attempt(action, extra: dict | None = None, use_cookies: bool = 
         except Exception as e:
             last_exc = e
             error_code = errcls.classify_text(str(e))
+            if error_code == errcls.PROXY_BILLING_ERROR:
+                logger.warning(
+                    "Residential proksi hisobida balans tugagan "
+                    f"[{error_code}] -- proksisiz bir marta zaxira urinish qilinmoqda..."
+                )
+                try:
+                    with get_yt_dlp(extra, use_cookies=use_cookies, proxy_url=None) as ydl:
+                        return action(ydl)
+                except Exception as e2:
+                    last_exc = e2
+                break
             if attempt == 0 and errcls.should_retry(error_code):
                 logger.warning(
                     f"Residential urinish muvaffaqiyatsiz [{error_code}] "
