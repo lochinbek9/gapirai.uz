@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import PlatformFeedbackWidget from "@/components/PlatformFeedbackWidget";
+import PwaProvider from "@/components/PwaProvider";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -90,6 +91,22 @@ export const metadata: Metadata = {
   verification: {
     google: "srZlb7Q_Zziyn-5bWCG4Kc5NLwyyALavPhPL9MaU_iU",
   },
+  applicationName: "GapirAI",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "GapirAI",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#7c3aed" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1120" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -149,6 +166,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <PwaProvider />
         <PlatformFeedbackWidget />
         <Script id="yandex-metrika" strategy="afterInteractive">
           {`

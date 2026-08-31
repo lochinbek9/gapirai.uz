@@ -289,6 +289,18 @@ export default function Home() {
     } catch { /* Fail silently */ }
   };
 
+  // PWA share-target (app/share/page.tsx -> /?shared=<url>): YouTube ilovasidan
+  // "Share -> GapirAI" qilinganda havolani oldindan to'ldiramiz.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const shared = new URLSearchParams(window.location.search).get("shared");
+    if (shared && (shared.includes("youtube.com") || shared.includes("youtu.be"))) {
+      handleUrlChange(shared);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
