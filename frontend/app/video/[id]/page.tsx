@@ -327,9 +327,20 @@ export default function VideoPage() {
                 
                 <div className="text-center space-y-4 max-w-sm z-10">
                   <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto" />
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <p className="text-white font-semibold text-lg">{job.status_message || 'Qayta ishlanmoqda...'}</p>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Progress: {job.progress}%</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-slate-500 uppercase tracking-wider">
+                        <span>Progress</span>
+                        <span className="text-slate-200 font-semibold tabular-nums">{Math.round(job.progress || 0)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-[width] duration-700 ease-out"
+                          style={{ width: `${Math.max(3, Math.min(100, job.progress || 0))}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {job.expected_end_time && (
