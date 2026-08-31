@@ -17,9 +17,9 @@ import { useTheme } from '../src/theme/ThemeProvider';
 // instead of an in-app WebView — same pattern already used for dubbing job
 // payments in app/video/[id].tsx's initiateClickPayment flow.
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge' },
-  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge' },
-  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium' },
+  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 25, priority: false, tts_tier: 'edge' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium' },
 ];
 
 function PlanCard({ plan, isCurrent, onSubscribe, subscribing }: {
@@ -56,7 +56,7 @@ function PlanCard({ plan, isCurrent, onSubscribe, subscribing }: {
 
       <ThemedView style={styles.features}>
         <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} Oyiga {plan.videos_per_period} ta video{plan.price === 0 ? `, ${plan.free_minutes} daqiqagacha` : ', cheklovsiz davomiylik'}
+          {'✓'} Oyiga {plan.monthly_minutes} daqiqa dublyaj (1 video — maks. 120 daqiqa)
         </ThemedText>
         <ThemedText variant="secondary" style={styles.featureRow}>
           {'✓'} {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}
@@ -145,8 +145,8 @@ export default function PricingScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedText style={styles.title}>Tarif rejalari</ThemedText>
           <ThemedText variant="secondary" style={styles.subtitle}>
-            45 daqiqadan qisqa videolar har doim bepul. Uzunroq videolarni tez-tez dublyaj qilsangiz, oylik
-            tarif arzonroq bo&apos;ladi.
+            Har tarif oyiga ma&apos;lum daqiqa dublyaj beradi (haqiqiy video davomiyligi bo&apos;yicha).
+            Byudjet tugasa, saytdan qo&apos;shimcha daqiqa paketi sotib olasiz — ular tugamaydi.
           </ThemedText>
 
           {!isLoggedIn && (

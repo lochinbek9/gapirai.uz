@@ -5,7 +5,7 @@ export const FAQS = [
   },
   {
     q: "Platformadan foydalanish bepulmi?",
-    a: "Ha, davomiyligi 45 daqiqagacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. 45 daqiqadan uzun videolarni dublyaj qilish uchun esa Click yoki Payme orqali to'lov amalga oshirilishi talab qilinadi."
+    a: "Bepul tarifda oyiga 25 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 300 daqiqa, 49 000 so'm; Pro — oyiga 400 daqiqa, premium ovoz va 1080p, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling (+30 daqiqa — 15 000 so'm, +60 — 25 000, +120 — 45 000, +300 — 100 000). Sarf haqiqiy video davomiyligi bo'yicha hisoblanadi. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi. Bitta video — maksimal 120 daqiqa."
   },
   {
     q: "Dublyaj qilish qancha vaqt oladi?",
@@ -13,7 +13,7 @@ export const FAQS = [
   },
   {
     q: "Dublyaj jarayonini bekor qilsa bo'ladimi?",
-    a: "Ha, jarayon davomida xohlagan vaqtingizda 'Jarayonni bekor qilish' tugmasini bosib, ishni to'xtatishingiz mumkin. Agar video bepul bo'lsa, hech qanday to'lov yo'qolmaydi."
+    a: "Ha, jarayon davomida xohlagan vaqtingizda 'Jarayonni bekor qilish' tugmasini bosib, ishni to'xtatishingiz mumkin. Agar dublyaj bir necha marta urinishdan keyin ham muvaffaqiyatsiz tugasa, sarflangan daqiqalar hisobingizga qaytariladi."
   },
   {
     q: "Agar dublyaj jarayonida xatolik yuz bersa nima bo'ladi?",

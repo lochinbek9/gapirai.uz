@@ -36,7 +36,7 @@ export default function PricingPreviewSection() {
             </p>
             <ul className="space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
               <li className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Oyiga {plan.videos_per_period} ta video
+                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Oyiga {plan.monthly_minutes} daqiqa dublyaj
               </li>
               <li className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> {plan.max_resolution} gacha sifat

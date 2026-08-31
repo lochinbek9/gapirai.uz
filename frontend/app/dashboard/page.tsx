@@ -26,16 +26,26 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
           <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
         </div>
-        {sub.plan !== 'free' && (
-          <div className="ml-3 text-xs text-gray-500 dark:text-gray-400">
-            <p>{sub.videos_used_this_period} video ishlatilgan</p>
-            {sub.expires_at && (
-              <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
-                {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
+        <div className="ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+          {sub.minutes && (
+            <>
+              <p>
+                <span className="font-bold text-gray-800 dark:text-gray-200">{sub.minutes.monthly_remaining}</span>
+                {' / '}{sub.minutes.monthly_cap} daqiqa qoldi (oylik)
               </p>
-            )}
-          </div>
-        )}
+              {sub.minutes.purchased > 0 && (
+                <p className="text-violet-500 dark:text-violet-400 font-semibold">
+                  + {sub.minutes.purchased} sotib olingan daqiqa
+                </p>
+              )}
+            </>
+          )}
+          {sub.plan !== 'free' && sub.expires_at && (
+            <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
+              {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
+            </p>
+          )}
+        </div>
       </div>
       <Link
         href="/pricing"
