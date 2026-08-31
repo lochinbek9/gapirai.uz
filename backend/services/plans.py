@@ -73,6 +73,23 @@ def get_max_resolution_for_job(db, job) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
+def get_tts_provider_for_job(db, job) -> str | None:
+    """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini
+    aniqlaydi (PlanDef.tts_tier). "premium" (Pro) -> None qaytaradi, ya'ni
+    global settings.TTS_PROVIDER (Azure/ElevenLabs) ishlatiladi. "edge"
+    (Free/Standard) -> "edge" qaytaradi (bepul, xarajatsiz).
+
+    Sabab: 1-2 soatlik videolar Azure S0'da ~$2/dona turadi -- buni faqat
+    Pro obunachilar uchun ajratamiz; Free/Standard bepul edge-tts oladi
+    (bir xil uz-UZ-SardorNeural/MadinaNeural ovozlari, sifat biroz pastroq).
+    Login qilmagan / egasiz job -> "edge"."""
+    if job.user_id is None:
+        return "edge"
+    sub = get_or_create_subscription(db, job.user_id)
+    tier = PLANS[sub.plan.value].tts_tier
+    return None if tier == "premium" else "edge"
+
+
 def get_max_resolution_for_user(db, user_id) -> str:
     """get_max_resolution_for_job'ning tomoshabin-versiyasi -- Ommaviy
     videolar kutubxonasida (2026-08-19) sifat cheklovi VIDEO EGASI emas,

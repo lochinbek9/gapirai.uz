@@ -495,11 +495,17 @@ def process_video(self: Task, job_id: str) -> dict:
             # har segment tugagach SYNTHESIZING oynasi (60..82) ichida
             # progress bar siljiydi (backend/services/job_progress.py).
             from backend.services.job_progress import set_subprogress
+            from backend.services.plans import get_tts_provider_for_job
+            # Tarifga qarab TTS provayderi: Pro -> premium (Azure/ElevenLabs),
+            # Free/Standard -> edge-tts (bepul). Uzun videolarni faqat Pro
+            # uchun pullik provayderga yuboradi (backend/services/plans.py).
+            tts_provider = get_tts_provider_for_job(db, job)
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
                 existing_qa=job.segment_qa,
                 progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
+                provider_name=tts_provider,
             )
             job.dubbed_audio_path = dubbed_audio_path
             # Segment darajasidagi QA checkpoint — Celery qayta urinishida

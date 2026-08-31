@@ -129,6 +129,7 @@ def _synthesize_text(
     voice_name: str | None = None,
     video_id: str | None = None,
     user_id: str | None = None,
+    provider_name: str | None = None,
 ) -> str:
     """
     Matnni audioga aylantiradi.
@@ -159,7 +160,9 @@ def _synthesize_text(
         raise RuntimeError("FREE_MODE: Edge TTS muvaffaqiyatsiz.")
 
     # --- Asosiy provider ---
-    primary = get_provider()
+    # provider_name berilgan bo'lsa (tarifga qarab, plans.get_tts_provider_for_job)
+    # o'sha ishlatiladi; aks holda global settings.TTS_PROVIDER.
+    primary = get_provider(provider_name)
 
     # Kesh: bir xil matn+ovoz+provider oldin sintez qilingan bo'lsa, qayta
     # pul to'lamasdan S3'dan qaytariladi (backend/services/tts_cache.py).
@@ -225,6 +228,7 @@ def synthesize_segments(
     user_id: str | None = None,
     existing_qa: dict | None = None,
     progress_cb=None,
+    provider_name: str | None = None,
 ) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
@@ -275,7 +279,7 @@ def synthesize_segments(
     # segmentlar pastdagi oddiy bir-bir yo'lga avtomatik qaytadi.
     pre_synthesized: dict[int, str] = {}
     if not settings.FREE_MODE:
-        primary_provider = get_provider()
+        primary_provider = get_provider(provider_name)
         try:
             pre_synthesized = primary_provider.synthesize_batch(segments, str(output_path), voice_name=voice_name)
         except Exception as exc:
@@ -314,9 +318,9 @@ def synthesize_segments(
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         if seg["id"] in pre_synthesized:
-            engine = get_provider().name
+            engine = get_provider(provider_name).name
         else:
-            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
 
         # Bounded per-segment validation/retry -- see _validate_wav_file's
         # docstring. Only THIS segment is ever re-synthesized; the other
@@ -330,7 +334,7 @@ def synthesize_segments(
                 f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
             )
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))
@@ -407,7 +411,7 @@ def synthesize_segments(
         for item in seg_data:
             engine_counts[item["engine"]] = engine_counts.get(item["engine"], 0) + 1
         majority_engine = max(engine_counts, key=engine_counts.get)
-        primary = get_provider()
+        primary = get_provider(provider_name)
         if majority_engine == primary.name:
             for item in seg_data:
                 if item["engine"] == majority_engine:
@@ -457,7 +461,7 @@ def synthesize_segments(
                     logger.warning(f"Segment {seg_id} QA'dan o'tmadi (score={qa['score']}, flags={qa['flags']}) — qayta sintez qilinmoqda.")
                     retry_file = output_path / f"seg_qaretry_{seg_id:04d}.wav"
                     try:
-                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
                         if retry_file.exists():
                             item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
                             item["engine"] = engine
