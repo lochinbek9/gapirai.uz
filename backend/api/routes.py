@@ -198,15 +198,25 @@ async def create_job(
             status_code=400,
             detail=f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
+    if result.outcome == "insufficient_minutes":
+        # Daqiqa yetmadi -- frontend "Buy additional minutes" CTA'sini ko'rsatadi.
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "insufficient_minutes",
+                "message": f"Bu video uchun {result.minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa sotib oling.",
+                "minutes_short": result.minutes_short,
+                "video_minutes": round(result.duration_minutes or 0, 1),
+            },
+        )
     if result.outcome == "queued":
         return {"job_id": result.job_id, "status": "pending"}
     if result.outcome == "ready":
-        # Kesh-hit, bepul/kvota bilan qoplangan -- darhol tayyor (job DB'da
+        # Kesh-hit, kvota bilan qoplangan -- darhol tayyor (job DB'da
         # allaqachon COMPLETED, backend/services/job_creation.py).
         return {"job_id": result.job_id, "status": "completed"}
 
-    # "awaiting_payment"
-    return {"job_id": result.job_id, "status": "awaiting_payment", "amount": result.amount}
+    raise HTTPException(status_code=500, detail="Kutilmagan holat.")
 
 
 @router.get("/jobs/{job_id}")

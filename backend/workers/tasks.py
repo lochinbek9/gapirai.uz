@@ -735,7 +735,7 @@ def process_video(self: Task, job_id: str) -> dict:
             refund_db = SessionLocal()
             if job.quota_consumed and job.user_id:
                 from backend.services.plans import refund_quota
-                refund_quota(refund_db, job.user_id)
+                refund_quota(refund_db, job.user_id, (job.video_duration or 0.0) / 60.0)
                 refund_db.query(DubbingJob).filter(DubbingJob.id == job_id).update({"quota_consumed": False})
             else:
                 from backend.models.payment import Payment, PaymentStatus

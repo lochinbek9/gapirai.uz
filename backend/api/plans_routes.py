@@ -8,18 +8,10 @@ from backend.models.database import get_db, User
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user, get_optional_user
 from backend.services.click_service import generate_payment_url
-from backend.services.plans import PLANS, get_or_create_subscription
+from backend.services.plans import PLANS, MINUTE_PACKS, get_or_create_subscription, get_minute_balance
 from backend.config import get_settings
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
-
-
-def _subscription_to_dict(sub) -> dict:
-    return {
-        "plan": sub.plan.value,
-        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
-        "videos_used_this_period": sub.videos_used_this_period,
-    }
 
 
 @router.get("")
@@ -29,18 +21,27 @@ def list_plans(
 ) -> dict:
     # Narxlarni har kim ko'ra oladi (marketing/pricing sahifasi) — faqat
     # obuna bo'lish (subscribe) uchun login talab qilinadi.
-    current = _subscription_to_dict(get_or_create_subscription(db, current_user.id)) if current_user else None
+    current = None
+    if current_user:
+        sub = get_or_create_subscription(db, current_user.id)
+        bal = get_minute_balance(db, current_user.id)
+        current = {
+            "plan": sub.plan.value,
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "minutes": bal,  # {monthly_cap, monthly_used, monthly_remaining, purchased, total_available}
+        }
     return {
         "plans": [
             {
                 "id": p.id, "name": p.name, "price": p.price,
-                "videos_per_period": p.videos_per_period, "free_minutes": p.free_minutes,
+                "monthly_minutes": p.monthly_minutes,
                 "priority": p.priority, "tts_tier": p.tts_tier,
                 "tier": p.tier.value, "period_days": p.period_days,
                 "max_resolution": p.max_resolution,
             }
             for p in PLANS.values()
         ],
+        "minute_packs": [{"minutes": m, "price": price} for m, price in sorted(MINUTE_PACKS.items())],
         "current": current,
     }
 
