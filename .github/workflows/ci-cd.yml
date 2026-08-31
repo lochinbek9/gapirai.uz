@@ -200,18 +200,20 @@ jobs:
             fi
             chmod 600 .env
             
-            # Force update Click credentials and environment variables in server .env
+            # Non-secret Click identifiers + FRONTEND_URL. The secret
+            # (CLICK_SECRET_KEY) is NEVER written here — it must already be
+            # present in the server's own .env (chmod 600), managed out of
+            # band. A committed secret here can forge payment webhooks.
             sed -i '/^CLICK_MERCHANT_ID=/d' .env 2>/dev/null || true
             sed -i '/^CLICK_SERVICE_ID=/d' .env 2>/dev/null || true
-            sed -i '/^CLICK_SECRET_KEY=/d' .env 2>/dev/null || true
             sed -i '/^CLICK_MERCHANT_USER_ID=/d' .env 2>/dev/null || true
             sed -i '/^FRONTEND_URL=/d' .env 2>/dev/null || true
 
             echo 'CLICK_MERCHANT_ID="56653"' >> .env
             echo 'CLICK_SERVICE_ID="108780"' >> .env
-            echo 'CLICK_SECRET_KEY="Pbxfw7SaMso"' >> .env
             echo 'CLICK_MERCHANT_USER_ID="89102"' >> .env
-            echo 'FRONTEND_URL="https://xadichai.uz"' >> .env
+            echo 'FRONTEND_URL="https://gapirai.uz"' >> .env
+            grep -q '^CLICK_SECRET_KEY=' .env || { echo "ERROR: CLICK_SECRET_KEY missing from server .env"; exit 1; }
 
             grep -q "DATABASE_URL=" .env || echo 'DATABASE_URL="postgresql://dubber:dubber123@localhost:5432/dubber_db"' >> .env
             grep -q "ASYNC_DATABASE_URL=" .env || echo 'ASYNC_DATABASE_URL="postgresql+asyncpg://dubber:dubber123@localhost:5432/dubber_db"' >> .env
