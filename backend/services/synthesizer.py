@@ -310,19 +310,20 @@ def synthesize_segments(
             valid, reason = _validate_wav_file(str(seg_file))
 
         if not valid:
-            # Asl provider xatosi/sababi YASHIRILMAYDI -- to'liq diagnostika
-            # serverda log qilinadi; foydalanuvchiga ko'rinadigan xabar esa
-            # backend/workers/tasks.py:_safe_persisted_error orqali alohida,
-            # xavfsiz matn bilan almashtiriladi (raw exception matni hech
-            # qachon API javobiga chiqmaydi).
+            # 2026-08-31: bitta tuzatib bo'lmaydigan segment BUTUN jobни
+            # o'ldirmaydi. Ilgari bu yerda `raise` bo'lib, uzun videolarda
+            # (150+ segment) bitta vaqtinchalik Azure 429 -> Edge-fallback
+            # bo'sh-audio zanjiri butun dublyajni FAILED qilardi va Celery
+            # uni 5 marta qayta urinib ~23 daqiqa sarflardi (job 5c4f986d).
+            # Endi: shu segment o'tkazib yuboriladi -- yakuniy aralashmada
+            # o'sha 2-3 soniyalik oraliqda original audio eshitiladi. Faqat
+            # segmentlarning katta qismi yiqilsa (pastda) job to'xtaydi.
             logger.error(
                 f"Segment {seg['id']}: {_WAV_MAX_VALIDATION_RETRIES + 1} urinishdan keyin ham "
-                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}'"
+                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}' "
+                f"-- bu segment o'tkazib yuborildi (original audio qoladi)."
             )
-            raise RuntimeError(
-                f"TTS_INVALID_AUDIO: segment {seg['id']} {_WAV_MAX_VALIDATION_RETRIES + 1} "
-                f"urinishdan keyin ham yaroqli audio bermadi ({reason})"
-            )
+            return ("__failed__", seg["id"])
 
         audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
         return (idx, {
@@ -341,8 +342,30 @@ def synthesize_segments(
     with ThreadPoolExecutor(max_workers=5) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
+    # Tuzatib bo'lmagan segmentlar (yuqoridagi "__failed__" sentinel) --
+    # ular yakuniy aralashmada original audio bilan qoplanadi. Lekin agar
+    # KO'P segment yiqilsa (masalan Azure krediti butunlay tugagan yoki
+    # kalit yaroqsiz), yarim-jim dublyaj o'rniga aniq xato bilan to'xtaymiz.
+    failed_ids = [r[1] for r in raw_results if isinstance(r, tuple) and len(r) == 2 and r[0] == "__failed__"]
+    non_empty = sum(1 for s in segments if s.get("text", "").strip())
+    if failed_ids:
+        allowed = max(3, int(0.15 * non_empty))
+        if len(failed_ids) > allowed or len(failed_ids) == non_empty:
+            raise RuntimeError(
+                f"TTS_INVALID_AUDIO: {len(failed_ids)}/{non_empty} segment yaroqli audio bermadi "
+                f"(ruxsat: {allowed}) -- TTS provayderi (kalit/kredit/rate-limit) tekshirilsin. "
+                f"Yiqilgan segmentlar: {failed_ids[:10]}"
+            )
+        logger.warning(
+            f"{len(failed_ids)}/{non_empty} segment TTS bermadi -- o'sha oraliqlarда original "
+            f"audio qoladi, dublyaj davom etadi. Segmentlar: {failed_ids}"
+        )
+
     # Saralangan segmentlarni yig'ish
-    valid_results = [r for r in raw_results if r is not None]
+    valid_results = [
+        r for r in raw_results
+        if r is not None and not (isinstance(r, tuple) and len(r) == 2 and r[0] == "__failed__")
+    ]
     valid_results.sort(key=lambda x: x[0])
     seg_data = [item for _, item in valid_results]
 

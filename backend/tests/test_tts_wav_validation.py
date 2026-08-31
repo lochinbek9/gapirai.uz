@@ -137,12 +137,11 @@ class TestPerSegmentRetry(unittest.TestCase):
         self.assertTrue(Path(merged_path).exists())
         self.assertEqual(len(timings), 1)
 
-    # 12. retry exhaustion produces TTS_FAILED (the caller in tasks.py maps
-    # any uncaught TTS-stage exception to error_code=TTS_FAILED via
-    # _error_code_for's f"{current_stage}_FAILED" fallback -- this test
-    # covers synthesizer.py's own half: it must raise clearly, not hang or
-    # silently drop the segment)
-    def test_retry_exhaustion_raises_clear_error_not_silent_drop(self):
+    # 12. when EVERY segment fails TTS (bad key / no credit / provider down),
+    # synthesize_segments must raise clearly -- not hang, and not return a
+    # dub that is entirely original audio. (A MINORITY of failed segments is
+    # tolerated instead -- see test_minority_failed_segments_are_dropped.)
+    def test_all_segments_failing_raises_clear_error(self):
         def always_corrupt(text, output_path, voice_name=None, video_id=None, user_id=None):
             Path(output_path).write_bytes(b"\x00" * 44)
             return "azure"
@@ -160,7 +159,41 @@ class TestPerSegmentRetry(unittest.TestCase):
                         self._segments(), self.tmpdir, voice_name="uz-UZ-SardorNeural",
                     )
         self.assertIn("TTS_INVALID_AUDIO", str(ctx.exception))
-        self.assertIn("segment 0", str(ctx.exception))
+
+    # 12b. a SINGLE unrecoverable segment among several valid ones must NOT
+    # kill the job (production finding: job 5c4f986d -- one transient
+    # Azure-429 -> empty-Edge-fallback on segment 154 of a 150+ segment
+    # video failed the whole dub, then Celery retried it 5x over ~23min).
+    # The bad slot keeps the original audio; the dub still completes.
+    def test_minority_failed_segments_are_dropped_not_fatal(self):
+        segments = [
+            {"id": 0, "start": 0.0, "end": 1.0, "text": "birinchi"},
+            {"id": 1, "start": 2.0, "end": 3.0, "text": "ikkinchi"},
+            {"id": 2, "start": 4.0, "end": 5.0, "text": "uchinchi"},
+            {"id": 3, "start": 6.0, "end": 7.0, "text": "tortinchi"},
+        ]
+
+        def one_bad(text, output_path, voice_name=None, video_id=None, user_id=None):
+            if text == "uchinchi":
+                Path(output_path).write_bytes(b"\x00" * 44)  # always corrupt
+            else:
+                _write_valid_wav(output_path)
+            return "azure"
+
+        with patch("backend.services.synthesizer._synthesize_text", side_effect=one_bad), \
+             patch("backend.services.synthesizer.settings") as mock_settings:
+            mock_settings.FREE_MODE = False
+            mock_settings.ENABLE_SEGMENT_QA = False
+            with patch("backend.services.synthesizer.get_provider") as mock_get_provider:
+                mock_provider = mock_get_provider.return_value
+                mock_provider.name = "azure"
+                mock_provider.synthesize_batch.side_effect = Exception("no batch support in this test")
+                merged_path, timings, qa = synthesizer.synthesize_segments(
+                    segments, self.tmpdir, voice_name="uz-UZ-SardorNeural",
+                )
+
+        self.assertTrue(Path(merged_path).exists())
+        self.assertEqual(len(timings), 3, "the 3 good segments survive; the corrupt one is dropped")
 
     # 13. other segments are not regenerated unnecessarily
     def test_other_segments_not_regenerated_when_one_segment_is_corrupt(self):
