@@ -16,6 +16,13 @@ def apply_successful_payment(db, payment) -> None:
         user = db.query(User).filter(User.id == payment.user_id).first()
         if user and user.library_access_purchased_at is None:
             user.library_access_purchased_at = datetime.utcnow()
+    elif payment.minutes_purchased:
+        # 2026-08-31: daqiqa paketi xaridi -> Subscription.purchased_minutes'ga
+        # qo'shiladi (hech qachon tugamaydi). Provayder webhooklari (click_complete,
+        # payme PerformTransaction, uzum confirm, paynet perform) hammasi shu
+        # yerga keladi -- alohida fulfillment kodi kerak emas.
+        from backend.services.plans import add_purchased_minutes
+        add_purchased_minutes(db, payment.user_id, int(payment.minutes_purchased))
     elif payment.plan:
         from backend.services.plans import activate_subscription
         activate_subscription(db, payment.user_id, payment.plan)
