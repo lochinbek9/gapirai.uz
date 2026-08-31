@@ -208,6 +208,26 @@ def _safe_persisted_error(exc: Exception, current_stage: str) -> tuple[str, str]
     return code, error_classification.safe_user_message(code)
 
 
+def _notify_job_failed_push(job_id: str, job, exc_text: str) -> None:
+    """FAILED bo'lganda PWA push -- doim yangi sessiya bilan (chaqiruvchining
+    `db`si bu paytda buzilgan bo'lishi mumkin, _mark_job_failed kabi).
+    VAPID sozlanmagan / obuna yo'q bo'lsa jimgina o'tadi."""
+    try:
+        user_id = getattr(job, "user_id", None)
+        if not user_id:
+            return
+        from backend.services.push_service import notify_user
+        session = SessionLocal()
+        try:
+            notify_user(session, user_id, "Dublyaj bajarilmadi ❌",
+                        (getattr(job, "video_title", None) or "Video") + " — qaytadan urinib ko'ring.",
+                        f"/video/{job_id}")
+        finally:
+            session.close()
+    except Exception as push_err:
+        logger.warning(f"[JOB {job_id}] Push (failed) yuborilmadi: {push_err}")
+
+
 def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
     """Job'ni FAILED holatiga o'tkazadi — doim BUTUNLAY YANGI DB sessiyasi
     bilan, chaqiruvchining `db` sessiyasidan mustaqil ravishda.
@@ -605,6 +625,17 @@ def process_video(self: Task, job_id: str) -> dict:
             except Exception as email_err:
                 logger.warning(f"Dublyaj tayyor email yuborilmadi (job {job_id}): {email_err}")
 
+        # PWA push (backend/services/push_service.py) -- VAPID sozlanmagan
+        # bo'lsa jimgina o'tkazib yuboriladi.
+        if job.user_id:
+            try:
+                from backend.services.push_service import notify_user
+                notify_user(db, job.user_id, "Dublyaj tayyor! 🎬",
+                            job.video_title or "Videongiz o'zbek tilida tayyor.",
+                            f"/video/{job_id}")
+            except Exception as push_err:
+                logger.warning(f"Push yuborilmadi (job {job_id}): {push_err}")
+
         # Telegram bot orqali bog'langan bo'lsa (backend/telegram_bot.py) --
         # web orqali yaratilgan job bo'lsa ham, foydalanuvchi telefon
         # raqami botga ham ulangan bo'lsa xabar boradi. Rezolyutsiya
@@ -644,6 +675,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 )
         except Exception as notify_exc:
             logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
+        _notify_job_failed_push(job_id, job, str(exc))
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
@@ -759,6 +791,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 )
         except Exception as notify_exc:
             logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
+        _notify_job_failed_push(job_id, job, str(exc))
 
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (max retries)")

@@ -196,6 +196,16 @@ class Settings(BaseSettings):
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
 
+    # Web Push (PWA bildirishnomalari) — VAPID kalitlari. Bo'sh bo'lsa push
+    # butunlay o'chiq (frontend tugmani ko'rsatmaydi, backend jimgina
+    # o'tkazib yuboradi). Server'da generatsiya:
+    #   python3 -c "from py_vapid import Vapid01; v=Vapid01(); v.generate_keys(); import base64; \
+    #   print('PUB', base64.urlsafe_b64encode(v.public_key.public_bytes(...)))"
+    # (aniq buyruq backend/services/push_service.py izohida)
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:contact@gapirai.uz"
+
     # Google bilan kirish — faqat CLIENT_ID kerak (frontend'dagi Google
     # Identity Services token beradi, backend uni shu ID orqali tekshiradi;
     # server-side auth-code almashinuvi ishlatilmagani uchun CLIENT_SECRET

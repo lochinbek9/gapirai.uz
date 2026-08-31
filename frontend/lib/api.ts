@@ -296,6 +296,25 @@ export async function purchaseMinutes(
   return res.data
 }
 
+/* ── Web Push (PWA bildirishnomalar) ───────────────────────── */
+
+export async function getVapidKey(): Promise<string> {
+  const res = await apiClient.get('/api/push/vapid-public-key')
+  return res.data?.key || ''
+}
+
+export async function savePushSubscription(sub: PushSubscriptionJSON, userAgent?: string): Promise<void> {
+  await apiClient.post('/api/push/subscribe', {
+    endpoint: sub.endpoint,
+    keys: sub.keys,
+    user_agent: userAgent,
+  })
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await apiClient.post('/api/push/unsubscribe', { endpoint })
+}
+
 export async function subscribeToPlan(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/plans/subscribe', { plan })
   return res.data
