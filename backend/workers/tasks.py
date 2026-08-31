@@ -491,10 +491,15 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
             tts_dir = str(output_dir / "tts_segments")
+            # Jonli progress: TTS eng uzun bosqich (uzun videoda daqiqalab) --
+            # har segment tugagach SYNTHESIZING oynasi (60..82) ichida
+            # progress bar siljiydi (backend/services/job_progress.py).
+            from backend.services.job_progress import set_subprogress
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
                 existing_qa=job.segment_qa,
+                progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
             )
             job.dubbed_audio_path = dubbed_audio_path
             # Segment darajasidagi QA checkpoint — Celery qayta urinishida
@@ -757,4 +762,9 @@ def process_video(self: Task, job_id: str) -> dict:
     finally:
         if claim_token is not None:
             _release_claim_safe(job_id, claim_token)
+        try:
+            from backend.services.job_progress import clear_subprogress
+            clear_subprogress(job_id)
+        except Exception:
+            pass
         db.close()

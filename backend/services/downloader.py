@@ -489,10 +489,30 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
     job_dir.mkdir(parents=True, exist_ok=True)
 
     video_tpl = str(job_dir / "video.%(ext)s")
+
+    # Jonli yuklab olish foizi -- DOWNLOADING bosqichi progress oynasiga
+    # (5..18) moslanadi; set_subprogress o'zi vaqt/qiymat bo'yicha cheklaydi,
+    # shuning uchun yt-dlp hook'ini sekundiga bir necha marta chaqirsa ham
+    # xavfsiz (backend/services/job_progress.py).
+    from backend.services.job_progress import set_subprogress
+
+    def _dl_progress_hook(d: dict) -> None:
+        try:
+            if d.get("status") == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                if total:
+                    frac = min(1.0, (d.get("downloaded_bytes") or 0) / total)
+                    set_subprogress(job_id, 5.0 + frac * 13.0)
+            elif d.get("status") == "finished":
+                set_subprogress(job_id, 18.0)
+        except Exception:
+            pass
+
     extra_opts = {
         "outtmpl": video_tpl,
         "format": f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
+        "progress_hooks": [_dl_progress_hook],
     }
 
     def _do_extract(ydl):

@@ -195,6 +195,35 @@ class TestPerSegmentRetry(unittest.TestCase):
         self.assertTrue(Path(merged_path).exists())
         self.assertEqual(len(timings), 3, "the 3 good segments survive; the corrupt one is dropped")
 
+    # 12c. progress_cb fires once per segment (live SYNTHESIZING progress)
+    def test_progress_cb_called_once_per_segment(self):
+        segments = [
+            {"id": 0, "start": 0.0, "end": 1.0, "text": "bir"},
+            {"id": 1, "start": 2.0, "end": 3.0, "text": "ikki"},
+            {"id": 2, "start": 4.0, "end": 5.0, "text": "uch"},
+        ]
+        seen: list[tuple[int, int]] = []
+
+        def fake_tts(text, output_path, voice_name=None, video_id=None, user_id=None):
+            _write_valid_wav(output_path)
+            return "azure"
+
+        with patch("backend.services.synthesizer._synthesize_text", side_effect=fake_tts), \
+             patch("backend.services.synthesizer.settings") as mock_settings:
+            mock_settings.FREE_MODE = False
+            mock_settings.ENABLE_SEGMENT_QA = False
+            with patch("backend.services.synthesizer.get_provider") as mock_get_provider:
+                mock_get_provider.return_value.name = "azure"
+                mock_get_provider.return_value.synthesize_batch.side_effect = Exception("no batch")
+                synthesizer.synthesize_segments(
+                    segments, self.tmpdir, voice_name="uz-UZ-SardorNeural",
+                    progress_cb=lambda done, total: seen.append((done, total)),
+                )
+
+        self.assertEqual(len(seen), 3)
+        self.assertEqual({t for _, t in seen}, {3})
+        self.assertEqual(sorted(d for d, _ in seen), [1, 2, 3])
+
     # 13. other segments are not regenerated unnecessarily
     def test_other_segments_not_regenerated_when_one_segment_is_corrupt(self):
         # Gap > 0.6s so group_segments_into_sentences() does NOT merge these

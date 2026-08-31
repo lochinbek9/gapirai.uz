@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 import logging
 import asyncio
@@ -223,6 +224,7 @@ def synthesize_segments(
     video_id: str | None = None,
     user_id: str | None = None,
     existing_qa: dict | None = None,
+    progress_cb=None,
 ) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
@@ -281,7 +283,31 @@ def synthesize_segments(
         if pre_synthesized:
             logger.info(f"Batch orqali oldindan tayyorlandi: {len(pre_synthesized)}/{len(segments)} segment")
 
+    # Jonli TTS progress -- har segment tugagach (muvaffaqiyatli, o'tkazib
+    # yuborilgan yoki bo'sh) sanoqchi oshadi va progress_cb(done, total)
+    # chaqiriladi. tasks.py buni SYNTHESIZING oynasiga (60..82) moslaydi.
+    _prog_lock = threading.Lock()
+    _prog_done = [0]
+    _prog_total = max(1, len(segments))
+
+    def _bump_progress():
+        if progress_cb is None:
+            return
+        with _prog_lock:
+            _prog_done[0] += 1
+            n = _prog_done[0]
+        try:
+            progress_cb(n, _prog_total)
+        except Exception:
+            pass
+
     def _process_single_segment(idx_seg):
+        try:
+            return _do_one_segment(idx_seg)
+        finally:
+            _bump_progress()
+
+    def _do_one_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
         if not text:
