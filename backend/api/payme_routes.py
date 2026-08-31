@@ -96,10 +96,15 @@ def initiate_job_payment(
 
     duration_minutes = job.video_duration / 60.0
     from backend.services.plans import check_quota, consume_quota, get_job_queue
-    covered_by_quota, amount = check_quota(db, current_user.id, duration_minutes)
-    if job.source_job_id and not covered_by_quota:
-        from backend.services.job_creation import CACHE_HIT_PRICE
-        amount = CACHE_HIT_PRICE
+    covered_by_quota, minutes_short = check_quota(db, current_user.id, duration_minutes)
+    if not covered_by_quota:
+        # 2026-08-31: per-job to'lov o'chirildi -- kvota daqiqa bo'yicha.
+        # Yetmasa foydalanuvchi daqiqa paketi sotib oladi (minutes_routes.py).
+        raise HTTPException(
+            status_code=402,
+            detail=f"Bu video uchun {minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa paketini sotib oling.",
+        )
+    amount = 0
 
     if amount == 0:
         if covered_by_quota:

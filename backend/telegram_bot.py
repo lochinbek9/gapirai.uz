@@ -195,16 +195,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await update.message.reply_text(
                 f"✅ \"{result.video_title}\" allaqachon tayyor!\n\n{frontend_url}/video/{result.job_id}"
             )
-        elif result.outcome == "awaiting_payment":
-            job = db.query(DubbingJob).filter(DubbingJob.id == result.job_id).first()
-            payment_url = create_click_payment(
-                db, job, result.amount,
-                return_url=f"{(settings.FRONTEND_URL or 'https://gapirai.uz').rstrip('/')}/dashboard",
-            )
+        elif result.outcome == "insufficient_minutes":
+            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
             await update.message.reply_text(
-                f"\"{result.video_title}\" uchun to'lov kerak: {result.amount:,} so'm.\n\n"
-                f"To'lov havolasi: {payment_url}\n\n"
-                "To'lovni yakunlagach, dublyaj avtomatik boshlanadi va tayyor bo'lganda shu yerga xabar yuboraman."
+                f"\"{result.video_title}\" ({result.duration_minutes:.0f} daqiqa) uchun "
+                f"{result.minutes_short} daqiqa yetishmayapti.\n\n"
+                f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
             )
     finally:
         db.close()

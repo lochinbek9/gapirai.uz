@@ -42,10 +42,11 @@ function PlanCard() {
           Joriy tarif
         </ThemedText>
         <ThemedText style={styles.planName}>{planName}</ThemedText>
-        {current.plan !== 'free' && (
+        {current.minutes && (
           <ThemedText variant="secondary" style={styles.planMeta}>
-            {current.videos_used_this_period} video ishlatilgan
-            {current.expires_at
+            {current.minutes.monthly_remaining} / {current.minutes.monthly_cap} daqiqa qoldi
+            {current.minutes.purchased > 0 ? ` (+${current.minutes.purchased} sotib olingan)` : ''}
+            {current.plan !== 'free' && current.expires_at
               ? ` · ${new Date(current.expires_at).toLocaleDateString('uz-UZ')} gacha`
               : ''}
           </ThemedText>

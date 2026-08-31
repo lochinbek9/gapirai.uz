@@ -27,6 +27,10 @@ class Payment(Base):
     job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True) # Linked to a video dubbing job
     plan = Column(String(20), nullable=True)  # "standard" | "pro" — set instead of job_id for a subscription renewal payment
     is_library_access = Column(Boolean, default=False, nullable=False)  # 2026-08-19: Ommaviy videolar kutubxonasiga bir martalik kirish to'lovi -- job_id/plan ikkalasi ham bo'sh
+    # 2026-08-31: minute-pack xaridi -- paket hajmi (daqiqa: 30/60/120/300).
+    # job_id / plan / is_library_access o'rniga o'rnatiladi. To'lov tasdiqlangach
+    # backend/services/payment_fulfillment.py Subscription.purchased_minutes'ga qo'shadi.
+    minutes_purchased = Column(Integer, nullable=True)
     amount = Column(Float, nullable=False)
     provider = Column(Enum(PaymentProvider), default=PaymentProvider.CLICK)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)

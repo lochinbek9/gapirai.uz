@@ -117,17 +117,25 @@ async def learn_video(
             status_code=400,
             detail=f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
+    if result.outcome == "insufficient_minutes":
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "insufficient_minutes",
+                "message": f"Bu video uchun {result.minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa sotib oling.",
+                "minutes_short": result.minutes_short,
+                "video_minutes": round(result.duration_minutes or 0, 1),
+            },
+        )
 
     dubbing_job = db.query(DubbingJob).filter(DubbingJob.id == result.job_id).first()
     if not dubbing_job:
         raise HTTPException(status_code=500, detail="Job yaratishda kutilmagan xatolik.")
 
-    analysis_id = None
-    if result.outcome != "awaiting_payment":
-        analysis = _create_linked_analysis(db, current_user, request.youtube_url, dubbing_job)
-        analysis_id = str(analysis.id)
+    analysis = _create_linked_analysis(db, current_user, request.youtube_url, dubbing_job)
+    analysis_id = str(analysis.id)
 
-    status = {"queued": "pending", "ready": "completed"}.get(result.outcome, "awaiting_payment")
+    status = {"queued": "pending", "ready": "completed"}.get(result.outcome, "pending")
 
     return {
         "dubbing_job_id": str(dubbing_job.id),

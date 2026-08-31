@@ -251,8 +251,7 @@ export interface PlanDef {
   id: string
   name: string
   price: number
-  videos_per_period: number
-  free_minutes: number
+  monthly_minutes: number
   priority: boolean
   tts_tier: string
   tier: string
@@ -260,14 +259,40 @@ export interface PlanDef {
   max_resolution: string
 }
 
+export interface MinuteBalance {
+  monthly_cap: number
+  monthly_used: number
+  monthly_remaining: number
+  purchased: number
+  total_available: number
+}
+
+export interface MinutePack {
+  minutes: number
+  price: number
+}
+
 export interface CurrentSubscription {
   plan: string
   expires_at: string | null
-  videos_used_this_period: number
+  minutes: MinuteBalance
 }
 
-export async function getPlans(): Promise<{ plans: PlanDef[]; current: CurrentSubscription }> {
+export async function getPlans(): Promise<{ plans: PlanDef[]; minute_packs: MinutePack[]; current: CurrentSubscription | null }> {
   const res = await apiClient.get('/api/plans')
+  return res.data
+}
+
+export async function getMinuteBalance(): Promise<{ balance: MinuteBalance; packs: MinutePack[] }> {
+  const res = await apiClient.get('/api/minutes')
+  return res.data
+}
+
+export async function purchaseMinutes(
+  pack: number,
+  provider: 'click' | 'payme' = 'click',
+): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number; minutes: number }> {
+  const res = await apiClient.post('/api/minutes/purchase', { pack, provider })
   return res.data
 }
 

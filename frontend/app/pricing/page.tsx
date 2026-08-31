@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
-import { getPlans, subscribeToPlan, subscribeToPlanPayme, PlanDef, CurrentSubscription } from '@/lib/api'
+import { getPlans, subscribeToPlan, subscribeToPlanPayme, purchaseMinutes, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
@@ -12,9 +12,11 @@ export default function PricingPage() {
   const router = useRouter()
   const { isLoggedIn, loading: authLoading } = useAuth()
   const [plans, setPlans] = useState<PlanDef[]>([])
+  const [packs, setPacks] = useState<MinutePack[]>(DEFAULT_PACKS)
   const [current, setCurrent] = useState<CurrentSubscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState<string | null>(null)
+  const [buyingPack, setBuyingPack] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
@@ -23,11 +25,34 @@ export default function PricingPage() {
     getPlans()
       .then((res) => {
         setPlans(res.plans)
+        if (res.minute_packs?.length) setPacks(res.minute_packs)
         setCurrent(res.current)
       })
       .catch(() => setError("Tariflarni yuklashda xatolik yuz berdi."))
       .finally(() => setLoading(false))
   }, [authLoading])
+
+  const handleBuyPack = async (pack: number, provider: 'click' | 'payme' = 'click') => {
+    if (!isLoggedIn) { router.push('/login'); return }
+    setBuyingPack(pack)
+    setError(null)
+    const w = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    try {
+      const res = await purchaseMinutes(pack, provider)
+      if (res.success && res.payment_url) {
+        if (w) w.location.href = res.payment_url
+        else window.location.href = res.payment_url
+      } else {
+        if (w) w.close()
+        setError("To'lov havolasini yaratishda xatolik yuz berdi.")
+      }
+    } catch {
+      if (w) w.close()
+      setError("To'lov havolasini yaratishda xatolik yuz berdi.")
+    } finally {
+      setBuyingPack(null)
+    }
+  }
 
   const handleSubscribe = async (planId: string, provider: 'click' | 'payme' = 'click') => {
     if (!isLoggedIn) {
@@ -66,7 +91,8 @@ export default function PricingPage() {
         <div className="text-center space-y-3">
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">Tarif rejalari</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xl mx-auto">
-            45 daqiqadan qisqa videolar har doim bepul. Uzunroq videolarni tez-tez dublyaj qilsangiz, oylik tarif arzonroq bo'ladi.
+            Har tarif oyiga ma'lum daqiqa dublyaj beradi (haqiqiy video davomiyligi bo'yicha hisoblanadi).
+            Byudjet tugasa — pastdan qo'shimcha daqiqa sotib olasiz. Sotib olingan daqiqalar tugamaydi.
           </p>
         </div>
 
@@ -148,7 +174,8 @@ export default function PricingPage() {
                   </div>
 
                   <ul className="space-y-2.5 text-sm text-gray-600 dark:text-slate-300 flex-1">
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Oyiga {plan.videos_per_period} ta video{plan.price === 0 ? `, ${plan.free_minutes} daqiqagacha` : ', cheklovsiz davomiylik'}</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> dublyaj</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> 1 video — maksimal 120 daqiqa</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Yuklab olish sifati: {plan.max_resolution} gacha</li>
@@ -182,10 +209,50 @@ export default function PricingPage() {
             })}
           </div>
         )}
+
+        {/* Qo'shimcha daqiqa paketlari */}
+        <div className="space-y-4 pt-4">
+          <div className="text-center space-y-1.5">
+            <h2 className="text-xl font-black text-gray-900 dark:text-white">Qo'shimcha daqiqalar</h2>
+            <p className="text-xs text-gray-500 dark:text-slate-400 max-w-lg mx-auto">
+              Oylik byudjetingiz tugasa sotib oling. Bir martalik to'lov — tugamaydi, keyingi oyga o'tadi.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {packs.map((p) => (
+              <div key={p.minutes} className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-4 flex flex-col items-center gap-2 text-center">
+                <span className="text-2xl font-black text-gray-900 dark:text-white">+{p.minutes}</span>
+                <span className="text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500">daqiqa</span>
+                <span className="text-sm font-bold text-violet-600 dark:text-violet-400">{p.price.toLocaleString('uz-UZ')} so'm</span>
+                <button
+                  onClick={() => handleBuyPack(p.minutes, 'click')}
+                  disabled={buyingPack === p.minutes}
+                  className="mt-1 w-full py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {buyingPack === p.minutes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Sotib olish'}
+                </button>
+                <button
+                  onClick={() => handleBuyPack(p.minutes, 'payme')}
+                  disabled={buyingPack === p.minutes}
+                  className="w-full py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                >
+                  Payme
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
+const DEFAULT_PACKS: MinutePack[] = [
+  { minutes: 30, price: 15000 },
+  { minutes: 60, price: 25000 },
+  { minutes: 120, price: 45000 },
+  { minutes: 300, price: 100000 },
+]
 
 function MeshBackground() {
   return (
@@ -201,9 +268,9 @@ function MeshBackground() {
 // (backend /api/plans login talab qiladi) — narxlar backend/services/plans.py
 // bilan bir xil, faqat ko'rsatish uchun.
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, videos_per_period: 1, free_minutes: 45, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
-  { id: 'standard', name: 'Standart', price: 49000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
-  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, videos_per_period: 8, free_minutes: 60, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
-  { id: 'pro', name: 'Pro', price: 149000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
-  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1490000, videos_per_period: 30, free_minutes: 90, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365, max_resolution: '1080p' },
+  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 25, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
+  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1990000, monthly_minutes: 400, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365, max_resolution: '1080p' },
 ]

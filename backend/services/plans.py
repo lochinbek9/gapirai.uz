@@ -1,33 +1,42 @@
-"""Tarif rejalar — narx, kvota, ustuvorlik va TTS sifat darajasi.
+"""Tarif rejalar — DAQIQA kvotasi, narx, ustuvorlik va TTS sifat darajasi.
 
-Reja ta'riflari kod konstantasi (bazada emas) — MAX_VIDEO_DURATION_MINUTES bilan
-bir xil pattern: narx o'zgarsa, bitta qator tahrirlanadi, bazaviy migratsiya kerak
-emas. Bu yerda faqat "kim qaysi tarifda va qachongacha" holati (Subscription
-jadvali) saqlanadi.
+2026-08-31: model "oyiga N video, cheksiz davomiylik"dan "oyiga N DAQIQA"ga
+o'zgartirildi. Har tarif oylik daqiqa byudjeti beradi (Free 25 / Standard 300
+/ Pro 400). Sarf haqiqiy video davomiyligi bo'yicha o'lchanadi. Byudjet
+tugaganda foydalanuvchi daqiqa paketi sotib oladi (+30/+60/+120/+300) —
+sotib olingan daqiqalar HECH QACHON tugamaydi, keyingi oyga o'tadi.
 
-Muhim moslik qoidasi: 45 daqiqadan qisqa videolar HAR DOIM bepul — bu
-click_service.calculate_price()'ning bugungi (tarif tizimigacha bo'lgan)
-xatti-harakati, va shu holicha saqlanadi. Tarif kvotasi (videos_per_period,
-free_minutes) faqat 45+ daqiqali (pullik bo'lishi mumkin) videolarga tegishli —
-"free_minutes" past kvotani emas, balki kvota ichida QAYSI davomiylikdagi
-video "bepul hisoblanadi"ni bildiradi.
+Reja ta'riflari kod konstantasi (bazada emas). Subscription jadvali faqat
+"kim qaysi tarifda, qachongacha, qancha daqiqa sarflagan" holatini saqlaydi.
 
-Yillik tariflar (standard_yearly/pro_yearly) alohida PLANS yozuvlari — xuddi
-shu tier xususiyatlari (videos_per_period/free_minutes/priority/tts_tier) bilan,
-faqat narxi va to'lov davri (period_days=365) boshqacha. `Subscription.plan`
-ustuni faqat TIER'ni saqlaydi (standard/pro) — oylik/yillik farqi yo'q, chunki
-xususiyatlar bir xil. Kvota oynasi (videos_used_this_period) har doim 30 kunda
-qayta boshlanadi, to'lov davridan (period_days) MUSTAQIL — aks holda yillik
-foydalanuvchi butun yil uchun faqat bir martalik kvota olardi.
+Yillik tariflar (standard_yearly/pro_yearly) — xuddi shu tier xususiyatlari,
+faqat narxi va to'lov davri (period_days=365) boshqacha. Oylik daqiqa oynasi
+(monthly_minutes_used) har doim 30 kunda qayta boshlanadi, to'lov davridan
+MUSTAQIL — aks holda yillik foydalanuvchi butun yil uchun bir martalik
+kvota olardi.
 """
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from backend.models.database import Subscription, PlanTier
-from backend.services.click_service import calculate_price
 
-QUOTA_RESET_DAYS = 30  # video-soni kvotasi har doim shuncha kunda qayta boshlanadi
-_FREE_THRESHOLD_MINUTES = 45.0  # click_service.calculate_price bilan bir xil chegara
+QUOTA_RESET_DAYS = 30  # oylik daqiqa kvotasi har doim shuncha kunda qayta boshlanadi
+
+# Bitta job uchun maksimal video davomiyligi (daqiqa) — barcha tariflar uchun
+# qat'iy. job_creation.py shu chegaradan uzun videoni qabul qilmaydi.
+MAX_JOB_MINUTES = 120
+
+# Sotib olinadigan daqiqa paketlari: {daqiqa: narx_som}. Foydalanuvchi oylik
+# byudjeti tugaganda shulardan birini sotib oladi (backend/api/minutes_routes.py).
+# Sotib olingan daqiqalar Subscription.purchased_minutes'ga qo'shiladi va
+# hech qachon tugamaydi.
+MINUTE_PACKS: dict[int, int] = {
+    30: 15_000,
+    60: 25_000,
+    120: 45_000,
+    300: 100_000,
+}
 
 # Celery navbat nomlari — worker ikkalasini ham tinglaydi (docker-compose.yml,
 # "-Q video_processing_priority,video_processing"), lekin ustuvor navbat
@@ -42,21 +51,20 @@ class PlanDef:
     id: str
     name: str
     price: int  # UZS / to'lov davri
-    videos_per_period: int  # oyiga nechta 45+ daqiqali video BEPUL kiritilgan
-    free_minutes: float  # kiritilgan videoning maksimal davomiyligi (undan uzuni odatdagidek to'lanadi)
+    monthly_minutes: float  # oyiga beriladigan dublyaj daqiqasi byudjeti
     priority: bool
-    tts_tier: str  # "edge" | "premium"
+    tts_tier: str  # "edge" (bepul) | "premium" (Azure/ElevenLabs)
     tier: PlanTier  # Subscription.plan ustuniga yoziladigan haqiqiy tier
     max_resolution: str  # "360p" | "720p" | "1080p" -- yuklab olish uchun maksimal ruxsat etilgan sifat
     period_days: int = 30  # to'lov davri: 30 = oylik, 365 = yillik
 
 
 PLANS: dict[str, PlanDef] = {
-    "free": PlanDef(id="free", name="Bepul", price=0, videos_per_period=1, free_minutes=45.0, priority=False, tts_tier="edge", tier=PlanTier.FREE, max_resolution="360p"),
-    "standard": PlanDef(id="standard", name="Standart", price=49_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p"),
-    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000, videos_per_period=8, free_minutes=60.0, priority=False, tts_tier="edge", tier=PlanTier.STANDARD, max_resolution="720p", period_days=365),
-    "pro": PlanDef(id="pro", name="Pro", price=149_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, max_resolution="1080p"),
-    "pro_yearly": PlanDef(id="pro_yearly", name="Pro (yillik)", price=1_490_000, videos_per_period=30, free_minutes=90.0, priority=True, tts_tier="premium", tier=PlanTier.PRO, max_resolution="1080p", period_days=365),
+    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=25,  priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="360p"),
+    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p"),
+    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p",  period_days=365),
+    "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p"),
+    "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
 }
 
 RESOLUTION_ORDER = ["360p", "720p", "1080p"]
@@ -71,6 +79,23 @@ def get_max_resolution_for_job(db, job) -> str:
         return "360p"
     sub = get_or_create_subscription(db, job.user_id)
     return PLANS[sub.plan.value].max_resolution
+
+
+def get_tts_provider_for_job(db, job) -> str | None:
+    """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini
+    aniqlaydi (PlanDef.tts_tier). "premium" (Pro) -> None qaytaradi, ya'ni
+    global settings.TTS_PROVIDER (Azure/ElevenLabs) ishlatiladi. "edge"
+    (Free/Standard) -> "edge" qaytaradi (bepul, xarajatsiz).
+
+    Sabab: 1-2 soatlik videolar Azure S0'da ~$2/dona turadi -- buni faqat
+    Pro obunachilar uchun ajratamiz; Free/Standard bepul edge-tts oladi
+    (bir xil uz-UZ-SardorNeural/MadinaNeural ovozlari, sifat biroz pastroq).
+    Login qilmagan / egasiz job -> "edge"."""
+    if job.user_id is None:
+        return "edge"
+    sub = get_or_create_subscription(db, job.user_id)
+    tier = PLANS[sub.plan.value].tts_tier
+    return None if tier == "premium" else "edge"
 
 
 def get_max_resolution_for_user(db, user_id) -> str:
@@ -92,82 +117,118 @@ def get_or_create_subscription(db, user_id) -> Subscription:
         return sub
 
     # Muddati o'tgan pullik obuna -> FREE'ga qaytadi, davr qayta boshlanadi.
+    # DIQQAT: purchased_minutes TEGILMAYDI -- sotib olingan daqiqalar hech
+    # qachon tugamaydi, obuna bekor bo'lsa ham.
     if sub.plan != PlanTier.FREE and sub.expires_at and sub.expires_at < datetime.utcnow():
         sub.plan = PlanTier.FREE
         sub.expires_at = None
         sub.period_started_at = datetime.utcnow()
-        sub.videos_used_this_period = 0
+        sub.monthly_minutes_used = 0.0
         db.commit()
         db.refresh(sub)
         return sub
 
-    # "Oyiga N video" kvotasi har doim 30 kunda qayta boshlanadi — to'lov
-    # davridan mustaqil, shu jumladan yillik obunalarda ham (aks holda
-    # yillik foydalanuvchi butun yil uchun faqat bir martalik kvota olardi).
+    # Oylik daqiqa byudjeti har doim 30 kunda qayta boshlanadi — to'lov
+    # davridan mustaqil (yillik obunada ham). purchased_minutes TEGILMAYDI.
     if sub.period_started_at and (datetime.utcnow() - sub.period_started_at) > timedelta(days=QUOTA_RESET_DAYS):
         sub.period_started_at = datetime.utcnow()
-        sub.videos_used_this_period = 0
+        sub.monthly_minutes_used = 0.0
         db.commit()
         db.refresh(sub)
 
     return sub
 
 
-def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
-    """Berilgan video uchun to'lov kerakmi tekshiradi.
+def get_minute_balance(db, user_id) -> dict:
+    """Foydalanuvchining daqiqa holati -- dashboard va enforcement uchun.
 
-    Returns: (covered_without_payment, price_uzs)
-    - 45 daqiqadan qisqa video: har doim (True, 0) — bugungi xatti-harakat, tarifdan mustaqil.
-    - 45+ daqiqa, BEPUL tarif: faqat free_minutes ichiga sig'sa va oylik video-soni
-      kvotasidan oshmasa (True, 0) — free_minutes shu yerda haqiqiy chegara.
-    - 45+ daqiqa, PULLIK tarif (standard/pro): video davomiyligi CHEKLANMAYDI —
-      faqat oylik video-soni kvotasi (videos_per_period) tekshiriladi. Foydalanuvchi
-      tarifga pul to'lagandan keyin uzun video uchun yana to'lov so'ralishi kutilmagan
-      va noto'g'ri edi (aniq foydalanuvchi talabi, 2026-08-13) — free_minutes bu yerda
-      faqat pricing sahifasidagi ko'rsatkich, haqiqiy cheklov emas.
+    Returns: {
+      "monthly_cap": float,        # tarif oylik byudjeti
+      "monthly_used": float,       # joriy davrda sarflangan
+      "monthly_remaining": float,  # max(0, cap - used)
+      "purchased": float,          # sotib olingan, tugamaydigan qoldiq
+      "total_available": float,    # monthly_remaining + purchased
+    }
     """
-    if duration_minutes < _FREE_THRESHOLD_MINUTES:
-        return True, 0
-
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
+    used = sub.monthly_minutes_used or 0.0
+    purchased = sub.purchased_minutes or 0.0
+    monthly_remaining = max(0.0, plan.monthly_minutes - used)
+    return {
+        "monthly_cap": float(plan.monthly_minutes),
+        "monthly_used": round(used, 1),
+        "monthly_remaining": round(monthly_remaining, 1),
+        "purchased": round(purchased, 1),
+        "total_available": round(monthly_remaining + purchased, 1),
+    }
 
-    if sub.plan == PlanTier.FREE:
-        covered = duration_minutes <= plan.free_minutes and sub.videos_used_this_period < plan.videos_per_period
-    else:
-        covered = sub.videos_used_this_period < plan.videos_per_period
 
-    if covered:
+def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
+    """Video foydalanuvchining mavjud daqiqalariga (oylik qoldiq + sotib
+    olingan) sig'adimi tekshiradi.
+
+    Returns: (covered, shortfall_minutes)
+    - covered=True  -> video sig'adi, consume_quota() bilan sarflash mumkin
+    - covered=False -> shortfall_minutes = yetishmayotgan daqiqa (butun songa
+      yaxlitlangan) -- frontend "Buy additional minutes" CTA'sida ko'rsatiladi
+    """
+    bal = get_minute_balance(db, user_id)
+    if duration_minutes <= bal["total_available"] + 1e-6:
         return True, 0
-
-    price = calculate_price(duration_minutes, is_first_video=False)
-    return False, price
+    return False, math.ceil(duration_minutes - bal["total_available"])
 
 
 def consume_quota(db, user_id, duration_minutes: float) -> None:
-    """45+ daqiqali video kvota ichida (pullik bo'lmasdan) qoplanganda chaqiriladi."""
-    if duration_minutes < _FREE_THRESHOLD_MINUTES:
-        return  # qisqa videolar kvotaga kirmaydi
+    """Video navbatga qo'yilganda chaqiriladi -- avval oylik byudjetdan,
+    yetmasa sotib olingan daqiqalardan yechadi."""
     sub = get_or_create_subscription(db, user_id)
-    sub.videos_used_this_period += 1
+    plan = PLANS[sub.plan.value]
+    used = sub.monthly_minutes_used or 0.0
+    monthly_remaining = max(0.0, plan.monthly_minutes - used)
+
+    from_monthly = min(duration_minutes, monthly_remaining)
+    from_purchased = max(0.0, duration_minutes - from_monthly)
+
+    sub.monthly_minutes_used = used + from_monthly
+    if from_purchased > 0:
+        sub.purchased_minutes = max(0.0, (sub.purchased_minutes or 0.0) - from_purchased)
     db.commit()
 
 
-def refund_quota(db, user_id) -> None:
-    """consume_quota() bilan sarflangan kvotani qaytaradi -- job pipeline
-    5 marta urinib ham muvaffaqiyatsiz tugasa chaqiriladi
-    (backend/workers/tasks.py). DubbingJob.quota_consumed=True bo'lgandagina
-    chaqiriladi, shuning uchun qisqa (kvotasiz) videolar bu yerga kelmaydi."""
+def refund_quota(db, user_id, duration_minutes: float) -> None:
+    """consume_quota() bilan sarflangan daqiqalarni qaytaradi -- job pipeline
+    5 marta urinib ham muvaffaqiyatsiz tugasa (backend/workers/tasks.py).
+    consume'ning teskarisi: avval sotib olingan daqiqalarga (agar shu jobda
+    ishlatilган bo'lsa), keyin oylikка qaytaradi -- soddaroq qilib, hammasini
+    oylik hisoblagichdan ayiramiz, purchased qoldig'i esa faqat oylik 0'ga
+    yetganда oshadi."""
     sub = get_or_create_subscription(db, user_id)
-    if sub.videos_used_this_period > 0:
-        sub.videos_used_this_period -= 1
-        db.commit()
+    used = sub.monthly_minutes_used or 0.0
+    give_back_to_monthly = min(duration_minutes, used)
+    remainder = duration_minutes - give_back_to_monthly
+    sub.monthly_minutes_used = max(0.0, used - give_back_to_monthly)
+    if remainder > 0:
+        sub.purchased_minutes = (sub.purchased_minutes or 0.0) + remainder
+    db.commit()
+
+
+def add_purchased_minutes(db, user_id, minutes: int) -> Subscription:
+    """Daqiqa paketi to'lovi tasdiqlangach chaqiriladi
+    (backend/services/payment_fulfillment.py). purchased_minutes'ga qo'shadi --
+    bu qoldiq hech qachon reset bo'lmaydi."""
+    sub = get_or_create_subscription(db, user_id)
+    sub.purchased_minutes = (sub.purchased_minutes or 0.0) + float(minutes)
+    db.commit()
+    db.refresh(sub)
+    return sub
 
 
 def activate_subscription(db, user_id, plan_id: str) -> Subscription:
     """To'lov muvaffaqiyatli bo'lgandan keyin chaqiriladi — obunani tanlangan
     tarifning to'lov davriga (plan.period_days: oylik=30, yillik=365) ko'ra
-    faollashtiradi/uzaytiradi va kvota hisoblagichini nolga tushiradi."""
+    faollashtiradi/uzaytiradi va OYLIK daqiqa hisoblagichini nolga tushiradi
+    (purchased_minutes tegilmaydi)."""
     if plan_id not in PLANS or plan_id == "free":
         raise ValueError(f"Noto'g'ri tarif: {plan_id}")
 
@@ -182,7 +243,7 @@ def activate_subscription(db, user_id, plan_id: str) -> Subscription:
     sub.plan = plan.tier
     sub.expires_at = base + timedelta(days=plan.period_days)
     sub.period_started_at = now
-    sub.videos_used_this_period = 0
+    sub.monthly_minutes_used = 0.0
     db.commit()
     db.refresh(sub)
     return sub

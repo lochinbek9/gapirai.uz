@@ -460,9 +460,28 @@ export default function LearnPage() {
                   <p className="text-xs text-slate-400">
                     O'zbekcha dublyaj tayyorlanmoqda — hozircha original videoni tomosha qilib turing.
                   </p>
-                  <div className="flex items-center gap-2.5">
-                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
-                    <span className="text-xs text-slate-500">{PROCESSING_LABELS[job.status] || job.status_message || 'Darsingiz tayyorlanmoqda...'}</span>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <span className="flex items-center gap-2 text-xs text-slate-400 min-w-0">
+                        <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+                        <span className="truncate">{PROCESSING_LABELS[job.status] || job.status_message || 'Darsingiz tayyorlanmoqda...'}</span>
+                      </span>
+                      <span className="text-xs font-semibold text-slate-200 tabular-nums shrink-0">
+                        {Math.round(job.progress || 0)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-[width] duration-700 ease-out"
+                        style={{ width: `${Math.max(3, Math.min(100, job.progress || 0))}%` }}
+                      />
+                    </div>
+                    {job.expected_end_time && (
+                      <p className="text-[11px] text-slate-500">
+                        Taxminan tugash vaqti:{' '}
+                        {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={handleCancel}

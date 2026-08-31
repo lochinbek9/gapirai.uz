@@ -310,7 +310,12 @@ export default function Home() {
       const { dubbing_job_id } = await learnVideo(url, voiceGender);
       router.push(`/learn/${dubbing_job_id}`);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Xatolik yuz berdi. Qayta urinib ko'ring.");
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 402 && detail && typeof detail === "object" && detail.error === "insufficient_minutes") {
+        setError(`${detail.message} → gapirai.uz/pricing`);
+      } else {
+        setError((typeof detail === "string" ? detail : detail?.message) || "Xatolik yuz berdi. Qayta urinib ko'ring.");
+      }
     } finally {
       setLoading(false);
     }

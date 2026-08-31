@@ -96,13 +96,25 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     # transkript, baho/fikr) YASHIRILADI -- get_job() shu bayroqni beradi.
     raw_status = job.status.value if hasattr(job.status, "value") else job.status
     status_str = str(raw_status).lower() if raw_status else "pending"
-    
+
+    # Jonli (bosqich ichidagi) progress -- DubbingJob.progress qo'pol sakraydi
+    # (5/20/40/60/85), shuning uchun uzun videoda bar daqiqalab qotib turadi.
+    # DOWNLOADING / SYNTHESIZING bosqichlarida worker Redis'ga oraliq foizni
+    # yozib boradi (backend/services/job_progress.py) -- shuni aralashtiramiz,
+    # keyingi bosqich chegarasidan oshirmasdan.
+    live_progress = job.progress or 0.0
+    if status_str in ("downloading", "synthesizing"):
+        from backend.services.job_progress import get_subprogress
+        sub = get_subprogress(str(job.id))
+        if sub is not None:
+            ceiling = 19.0 if status_str == "downloading" else 83.0
+            live_progress = max(live_progress, min(sub, ceiling))
+
     expected_end_time = None
     if status_str not in ("completed", "failed", "awaiting_payment"):
         duration = job.video_duration or 300.0
         baseline_dt = job.updated_at or job.created_at
-        progress = job.progress or 0.0
-        remaining_factor = max(0.1, (100.0 - progress) / 100.0)
+        remaining_factor = max(0.1, (100.0 - live_progress) / 100.0)
         est_seconds = (30 + 0.3 * duration) * remaining_factor
         expected_dt = baseline_dt + timedelta(seconds=est_seconds)
         expected_end_time = expected_dt.isoformat() + "Z"
@@ -110,7 +122,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     return JobResponse(
         job_id=str(job.id),
         status=status_str,
-        progress=job.progress or 0.0,
+        progress=round(live_progress, 1),
         status_message=job.status_message,
         youtube_url=job.youtube_url,
         video_title=job.video_title,
@@ -186,15 +198,25 @@ async def create_job(
             status_code=400,
             detail=f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
+    if result.outcome == "insufficient_minutes":
+        # Daqiqa yetmadi -- frontend "Buy additional minutes" CTA'sini ko'rsatadi.
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "insufficient_minutes",
+                "message": f"Bu video uchun {result.minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa sotib oling.",
+                "minutes_short": result.minutes_short,
+                "video_minutes": round(result.duration_minutes or 0, 1),
+            },
+        )
     if result.outcome == "queued":
         return {"job_id": result.job_id, "status": "pending"}
     if result.outcome == "ready":
-        # Kesh-hit, bepul/kvota bilan qoplangan -- darhol tayyor (job DB'da
+        # Kesh-hit, kvota bilan qoplangan -- darhol tayyor (job DB'da
         # allaqachon COMPLETED, backend/services/job_creation.py).
         return {"job_id": result.job_id, "status": "completed"}
 
-    # "awaiting_payment"
-    return {"job_id": result.job_id, "status": "awaiting_payment", "amount": result.amount}
+    raise HTTPException(status_code=500, detail="Kutilmagan holat.")
 
 
 @router.get("/jobs/{job_id}")

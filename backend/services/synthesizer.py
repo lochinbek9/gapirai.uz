@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 import logging
 import asyncio
@@ -128,6 +129,7 @@ def _synthesize_text(
     voice_name: str | None = None,
     video_id: str | None = None,
     user_id: str | None = None,
+    provider_name: str | None = None,
 ) -> str:
     """
     Matnni audioga aylantiradi.
@@ -158,7 +160,9 @@ def _synthesize_text(
         raise RuntimeError("FREE_MODE: Edge TTS muvaffaqiyatsiz.")
 
     # --- Asosiy provider ---
-    primary = get_provider()
+    # provider_name berilgan bo'lsa (tarifga qarab, plans.get_tts_provider_for_job)
+    # o'sha ishlatiladi; aks holda global settings.TTS_PROVIDER.
+    primary = get_provider(provider_name)
 
     # Kesh: bir xil matn+ovoz+provider oldin sintez qilingan bo'lsa, qayta
     # pul to'lamasdan S3'dan qaytariladi (backend/services/tts_cache.py).
@@ -223,6 +227,8 @@ def synthesize_segments(
     video_id: str | None = None,
     user_id: str | None = None,
     existing_qa: dict | None = None,
+    progress_cb=None,
+    provider_name: str | None = None,
 ) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
@@ -273,7 +279,7 @@ def synthesize_segments(
     # segmentlar pastdagi oddiy bir-bir yo'lga avtomatik qaytadi.
     pre_synthesized: dict[int, str] = {}
     if not settings.FREE_MODE:
-        primary_provider = get_provider()
+        primary_provider = get_provider(provider_name)
         try:
             pre_synthesized = primary_provider.synthesize_batch(segments, str(output_path), voice_name=voice_name)
         except Exception as exc:
@@ -281,16 +287,40 @@ def synthesize_segments(
         if pre_synthesized:
             logger.info(f"Batch orqali oldindan tayyorlandi: {len(pre_synthesized)}/{len(segments)} segment")
 
+    # Jonli TTS progress -- har segment tugagach (muvaffaqiyatli, o'tkazib
+    # yuborilgan yoki bo'sh) sanoqchi oshadi va progress_cb(done, total)
+    # chaqiriladi. tasks.py buni SYNTHESIZING oynasiga (60..82) moslaydi.
+    _prog_lock = threading.Lock()
+    _prog_done = [0]
+    _prog_total = max(1, len(segments))
+
+    def _bump_progress():
+        if progress_cb is None:
+            return
+        with _prog_lock:
+            _prog_done[0] += 1
+            n = _prog_done[0]
+        try:
+            progress_cb(n, _prog_total)
+        except Exception:
+            pass
+
     def _process_single_segment(idx_seg):
+        try:
+            return _do_one_segment(idx_seg)
+        finally:
+            _bump_progress()
+
+    def _do_one_segment(idx_seg):
         idx, seg = idx_seg
         text = seg.get("text", "").strip()
         if not text:
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         if seg["id"] in pre_synthesized:
-            engine = get_provider().name
+            engine = get_provider(provider_name).name
         else:
-            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
 
         # Bounded per-segment validation/retry -- see _validate_wav_file's
         # docstring. Only THIS segment is ever re-synthesized; the other
@@ -304,25 +334,26 @@ def synthesize_segments(
                 f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
             )
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))
 
         if not valid:
-            # Asl provider xatosi/sababi YASHIRILMAYDI -- to'liq diagnostika
-            # serverda log qilinadi; foydalanuvchiga ko'rinadigan xabar esa
-            # backend/workers/tasks.py:_safe_persisted_error orqali alohida,
-            # xavfsiz matn bilan almashtiriladi (raw exception matni hech
-            # qachon API javobiga chiqmaydi).
+            # 2026-08-31: bitta tuzatib bo'lmaydigan segment BUTUN jobни
+            # o'ldirmaydi. Ilgari bu yerda `raise` bo'lib, uzun videolarda
+            # (150+ segment) bitta vaqtinchalik Azure 429 -> Edge-fallback
+            # bo'sh-audio zanjiri butun dublyajni FAILED qilardi va Celery
+            # uni 5 marta qayta urinib ~23 daqiqa sarflardi (job 5c4f986d).
+            # Endi: shu segment o'tkazib yuboriladi -- yakuniy aralashmada
+            # o'sha 2-3 soniyalik oraliqda original audio eshitiladi. Faqat
+            # segmentlarning katta qismi yiqilsa (pastda) job to'xtaydi.
             logger.error(
                 f"Segment {seg['id']}: {_WAV_MAX_VALIDATION_RETRIES + 1} urinishdan keyin ham "
-                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}'"
+                f"yaroqsiz TTS audio -- provider={engine}, sabab={reason}, matn='{text[:80]}' "
+                f"-- bu segment o'tkazib yuborildi (original audio qoladi)."
             )
-            raise RuntimeError(
-                f"TTS_INVALID_AUDIO: segment {seg['id']} {_WAV_MAX_VALIDATION_RETRIES + 1} "
-                f"urinishdan keyin ham yaroqli audio bermadi ({reason})"
-            )
+            return ("__failed__", seg["id"])
 
         audio = _clean_audio(AudioSegment.from_wav(str(seg_file)))
         return (idx, {
@@ -341,8 +372,30 @@ def synthesize_segments(
     with ThreadPoolExecutor(max_workers=5) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
+    # Tuzatib bo'lmagan segmentlar (yuqoridagi "__failed__" sentinel) --
+    # ular yakuniy aralashmada original audio bilan qoplanadi. Lekin agar
+    # KO'P segment yiqilsa (masalan Azure krediti butunlay tugagan yoki
+    # kalit yaroqsiz), yarim-jim dublyaj o'rniga aniq xato bilan to'xtaymiz.
+    failed_ids = [r[1] for r in raw_results if isinstance(r, tuple) and len(r) == 2 and r[0] == "__failed__"]
+    non_empty = sum(1 for s in segments if s.get("text", "").strip())
+    if failed_ids:
+        allowed = max(3, int(0.15 * non_empty))
+        if len(failed_ids) > allowed or len(failed_ids) == non_empty:
+            raise RuntimeError(
+                f"TTS_INVALID_AUDIO: {len(failed_ids)}/{non_empty} segment yaroqli audio bermadi "
+                f"(ruxsat: {allowed}) -- TTS provayderi (kalit/kredit/rate-limit) tekshirilsin. "
+                f"Yiqilgan segmentlar: {failed_ids[:10]}"
+            )
+        logger.warning(
+            f"{len(failed_ids)}/{non_empty} segment TTS bermadi -- o'sha oraliqlarда original "
+            f"audio qoladi, dublyaj davom etadi. Segmentlar: {failed_ids}"
+        )
+
     # Saralangan segmentlarni yig'ish
-    valid_results = [r for r in raw_results if r is not None]
+    valid_results = [
+        r for r in raw_results
+        if r is not None and not (isinstance(r, tuple) and len(r) == 2 and r[0] == "__failed__")
+    ]
     valid_results.sort(key=lambda x: x[0])
     seg_data = [item for _, item in valid_results]
 
@@ -358,7 +411,7 @@ def synthesize_segments(
         for item in seg_data:
             engine_counts[item["engine"]] = engine_counts.get(item["engine"], 0) + 1
         majority_engine = max(engine_counts, key=engine_counts.get)
-        primary = get_provider()
+        primary = get_provider(provider_name)
         if majority_engine == primary.name:
             for item in seg_data:
                 if item["engine"] == majority_engine:
@@ -408,7 +461,7 @@ def synthesize_segments(
                     logger.warning(f"Segment {seg_id} QA'dan o'tmadi (score={qa['score']}, flags={qa['flags']}) — qayta sintez qilinmoqda.")
                     retry_file = output_path / f"seg_qaretry_{seg_id:04d}.wav"
                     try:
-                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id)
+                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
                         if retry_file.exists():
                             item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
                             item["engine"] = engine

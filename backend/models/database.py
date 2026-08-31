@@ -346,7 +346,16 @@ class Subscription(Base):
     plan = Column(Enum(PlanTier, values_callable=lambda obj: [e.value for e in obj]), default=PlanTier.FREE, nullable=False)
     expires_at = Column(DateTime, nullable=True)  # FREE uchun null (muddatsiz)
     period_started_at = Column(DateTime, default=datetime.utcnow)  # joriy davr kvotasi shu vaqtdan hisoblanadi
+    # LEGACY (2026-08-31 gacha): "oyiga N video" hisoblagichi. Endi kvota
+    # DAQIQA bo'yicha (pastdagi ikki ustun). Ustun DB'da qoladi, lekin hech
+    # qanday kod uni o'qimaydi/yozmaydi.
     videos_used_this_period = Column(Integer, default=0)
+    # 2026-08-31: daqiqa-asosidagi kvota. monthly_minutes_used har billing
+    # davri boshida 0'ga tushadi (get_or_create_subscription). purchased_minutes
+    # -- alohida sotib olingan paketlar, HECH QACHON reset bo'lmaydi, keyingi
+    # oyga o'tadi (backend/services/plans.py).
+    monthly_minutes_used = Column(Float, nullable=False, default=0.0)
+    purchased_minutes = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { getJob, Job, JobStatus } from "@/lib/api";
 
 const TERMINAL_STATUSES: JobStatus[] = ["completed", "failed"];
-const POLL_INTERVAL = 2000; // 2 soniya
+// 1.5s — backend endi DOWNLOADING/SYNTHESIZING bosqichlarida bosqich ichidagi
+// jonli foizni qaytaradi (job_progress.py), shuning uchun tez-tez so'rov
+// progress barni silliq harakatlantiradi.
+const POLL_INTERVAL = 1500;
 
 export function useJobPolling(jobId: string | null) {
   const [job, setJob] = useState<Job | null>(null);

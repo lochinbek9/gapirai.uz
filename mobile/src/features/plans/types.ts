@@ -4,16 +4,28 @@ export interface PlanDef {
   id: string;
   name: string;
   price: number;
-  videos_per_period: number;
-  free_minutes: number;
+  monthly_minutes: number;
   priority: boolean;
   tts_tier: string;
+}
+
+export interface MinuteBalance {
+  monthly_cap: number;
+  monthly_used: number;
+  monthly_remaining: number;
+  purchased: number;
+  total_available: number;
+}
+
+export interface MinutePack {
+  minutes: number;
+  price: number;
 }
 
 export interface CurrentSubscription {
   plan: string;
   expires_at: string | null;
-  videos_used_this_period: number;
+  minutes: MinuteBalance;
 }
 
 export interface SubscribeResponse {

@@ -28,8 +28,14 @@ from backend.services.storage import s3_object_exists
 from backend.workers.tasks import process_video
 from backend.config import get_settings
 
-MAX_VIDEO_DURATION_MINUTES = 180  # routes.py bilan bir xil qiymat
-CACHE_HIT_PRICE = 5_000  # so'm -- allaqachon dublyaj qilingan video uchun qat'iy arzon narx
+# Bitta job uchun maksimal video davomiyligi -- plans.MAX_JOB_MINUTES bilan
+# bir xil (2026-08-31: 180 -> 120). routes.py bu qiymatni shu yerdan import qiladi.
+from backend.services.plans import MAX_JOB_MINUTES as MAX_VIDEO_DURATION_MINUTES
+
+# LEGACY (2026-08-31 gacha): kesh-hit uchun qat'iy narx. Endi kesh-hit ham
+# oddiy job kabi DAQIQA sarflaydi (alohida narx yo'q). Konstanta faqat eski
+# to'lov-route importlari buzilmasligi uchun qoldirilgan.
+CACHE_HIT_PRICE = 5_000
 
 # routes.py bilan bir xil ro'yxat -- shu yerda yagona manba, routes.py
 # bundan import qiladi (ikki joyda saqlanib, biri unutilib qolmasligi uchun).
@@ -84,7 +90,10 @@ def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
     return bool(video_path) and Path(video_path).exists()
 
 
-Outcome = Literal["queued", "ready", "awaiting_payment", "blocked", "too_long", "invalid_url", "fetch_error"]
+Outcome = Literal[
+    "queued", "ready", "insufficient_minutes", "blocked", "too_long",
+    "invalid_url", "fetch_error",
+]
 
 
 @dataclass
@@ -95,6 +104,7 @@ class JobCreationResult:
     duration_minutes: float | None = None
     amount: int | None = None
     error_detail: str | None = None
+    minutes_short: int | None = None  # outcome="insufficient_minutes" uchun
 
 
 async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_gender: str = "auto") -> JobCreationResult:
@@ -173,16 +183,18 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
 
     from backend.services.plans import check_quota, consume_quota, get_job_queue
-    covered_by_quota, amount = check_quota(db, user.id, duration_minutes)
+    covered, minutes_short = check_quota(db, user.id, duration_minutes)
+    if not covered:
+        # Daqiqa yetmadi -- job yaratilmaydi. Frontend "Buy additional minutes"
+        # CTA'sini ko'rsatadi (backend/api/minutes_routes.py orqali paket sotib olinadi).
+        return JobCreationResult(
+            outcome="insufficient_minutes",
+            video_title=title,
+            duration_minutes=duration_minutes,
+            minutes_short=minutes_short,
+        )
 
     job_id = str(uuid.uuid4())
-    if amount > 0:
-        status = JobStatus.AWAITING_PAYMENT
-        status_message = "To'lov kutilmoqda"
-    else:
-        status = JobStatus.PENDING
-        status_message = "Navbatga qo'shildi"
-
     job = DubbingJob(
         id=job_id,
         user_id=user.id,
@@ -192,23 +204,19 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         video_duration=duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=voice_gender,
-        status=status,
+        status=JobStatus.PENDING,
         progress=0.0,
-        status_message=status_message,
+        status_message="Navbatga qo'shildi",
         content_flagged=metadata_flagged,
     )
     db.add(job)
     db.commit()
 
-    if amount == 0:
-        if covered_by_quota:
-            consume_quota(db, user.id, duration_minutes)
-            job.quota_consumed = True
-            db.commit()
-        process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
-        return JobCreationResult(outcome="queued", job_id=job_id, video_title=title, duration_minutes=duration_minutes)
-
-    return JobCreationResult(outcome="awaiting_payment", job_id=job_id, video_title=title, duration_minutes=duration_minutes, amount=amount)
+    consume_quota(db, user.id, duration_minutes)
+    job.quota_consumed = True
+    db.commit()
+    process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
+    return JobCreationResult(outcome="queued", job_id=job_id, video_title=title, duration_minutes=duration_minutes)
 
 
 async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cached_job: DubbingJob, voice_gender: str) -> JobCreationResult:
@@ -219,13 +227,16 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
     duration_minutes = cached_job.video_duration / 60.0
 
     from backend.services.plans import check_quota, consume_quota
-    covered_by_quota, amount = check_quota(db, user.id, duration_minutes)
-    if not covered_by_quota:
-        amount = CACHE_HIT_PRICE
+    covered, minutes_short = check_quota(db, user.id, duration_minutes)
+    if not covered:
+        return JobCreationResult(
+            outcome="insufficient_minutes",
+            video_title=cached_job.video_title,
+            duration_minutes=duration_minutes,
+            minutes_short=minutes_short,
+        )
 
     job_id = str(uuid.uuid4())
-    status = JobStatus.AWAITING_PAYMENT if amount > 0 else JobStatus.PENDING
-
     job = DubbingJob(
         id=job_id,
         user_id=user.id,
@@ -245,24 +256,20 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
         translated_text=cached_job.translated_text,
         srt_content=cached_job.srt_content,
         uzbek_srt_content=cached_job.uzbek_srt_content,
-        status=status,
-        progress=0.0 if amount > 0 else 100.0,
-        status_message="To'lov kutilmoqda" if amount > 0 else "Tayyorlanmoqda...",
+        status=JobStatus.PENDING,
+        progress=100.0,
+        status_message="Tayyorlanmoqda...",
     )
     db.add(job)
     db.commit()
 
-    if amount == 0:
-        if covered_by_quota:
-            consume_quota(db, user.id, duration_minutes)
-            job.quota_consumed = True
-        job.status = JobStatus.COMPLETED
-        job.status_message = "Dublyaj tayyor!"
-        job.completed_at = datetime.utcnow()
-        db.commit()
-        return JobCreationResult(outcome="ready", job_id=job_id, video_title=cached_job.video_title, duration_minutes=duration_minutes)
-
-    return JobCreationResult(outcome="awaiting_payment", job_id=job_id, video_title=cached_job.video_title, duration_minutes=duration_minutes, amount=amount)
+    consume_quota(db, user.id, duration_minutes)
+    job.quota_consumed = True
+    job.status = JobStatus.COMPLETED
+    job.status_message = "Dublyaj tayyor!"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+    return JobCreationResult(outcome="ready", job_id=job_id, video_title=cached_job.video_title, duration_minutes=duration_minutes)
 
 
 def create_click_payment(db: Session, job: DubbingJob, amount: int, return_url: str) -> str:
