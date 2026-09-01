@@ -381,6 +381,24 @@ class ResolutionVariant(Base):
     __table_args__ = (UniqueConstraint("job_id", "resolution"),)
 
 
+class PushSubscription(Base):
+    """PWA Web Push obunasi (backend/services/push_service.py). Bir
+    foydalanuvchida bir necha qurilma/brauzer bo'lishi mumkin -> har biri
+    alohida qator. endpoint noyob -- qayta obuna bo'lganda upsert qilinadi.
+    Push 404/410 qaytarsa (obuna o'chgan) qator o'chiriladi."""
+    __tablename__ = "push_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
+    user_agent = Column(String(300), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 class ContentViolation(Base):
     """Safety Gate tomonidan bloklangan har bir urinish shu yerda saqlanadi
     (backend/services/content_safety.py). Ikki bosqichdan biri belgilaydi:

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
+import PushOptIn from '@/components/PushOptIn'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown
@@ -272,6 +273,7 @@ export default function DashboardPage() {
         </div>
 
         <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
+        <PushOptIn />
 
         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
 
