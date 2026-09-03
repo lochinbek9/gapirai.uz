@@ -1,36 +1,30 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '../src/components/ThemedText';
 import { ThemedView } from '../src/components/ThemedView';
-import { getErrorMessage } from '../src/api/errors';
 import * as plansApi from '../src/features/plans/api';
 import type { PlanDef } from '../src/features/plans/types';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useTheme } from '../src/theme/ThemeProvider';
 
-// Mirrors frontend/app/pricing/page.tsx content-wise. Subscribing hands off
-// to the system browser for Click's hosted checkout (Linking.openURL)
-// instead of an in-app WebView — same pattern already used for dubbing job
-// payments in app/video/[id].tsx's initiateClickPayment flow.
+// Variant A: obuna / to'lov mobil ilova ICHIDA amalga oshirilmaydi (Google
+// Play Payments siyosati). Bu ekran tariflarni KO'RSATADI; obuna bo'lish
+// gapirai.uz saytida (Linking.openURL). To'liq oqim: frontend/app/pricing/page.tsx.
+
+const WEB_PRICING_URL = 'https://gapirai.uz/pricing';
+
 const DEFAULT_PLANS: PlanDef[] = [
   { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 25, priority: false, tts_tier: 'edge' },
   { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge' },
   { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium' },
 ];
 
-function PlanCard({ plan, isCurrent, onSubscribe, subscribing }: {
-  plan: PlanDef;
-  isCurrent: boolean;
-  onSubscribe: (id: string) => void;
-  subscribing: boolean;
-}) {
+function PlanCard({ plan, isCurrent }: { plan: PlanDef; isCurrent: boolean }) {
   const { colors } = useTheme();
   const isPro = plan.id === 'pro';
-  const disabled = plan.id === 'free' || isCurrent || subscribing;
 
   return (
     <ThemedView
@@ -51,7 +45,12 @@ function PlanCard({ plan, isCurrent, onSubscribe, subscribing }: {
       )}
       <ThemedText style={styles.price}>
         {plan.price === 0 ? 'Bepul' : plan.price.toLocaleString('uz-UZ')}
-        {plan.price > 0 && <ThemedText variant="secondary" style={styles.priceSuffix}> so&apos;m/oy</ThemedText>}
+        {plan.price > 0 && (
+          <ThemedText variant="secondary" style={styles.priceSuffix}>
+            {' '}
+            so&apos;m/oy
+          </ThemedText>
+        )}
       </ThemedText>
 
       <ThemedView style={styles.features}>
@@ -68,25 +67,6 @@ function PlanCard({ plan, isCurrent, onSubscribe, subscribing }: {
           {'✓'} Video tahlil — cheklovsiz
         </ThemedText>
       </ThemedView>
-
-      <Pressable
-        onPress={() => onSubscribe(plan.id)}
-        disabled={disabled}
-        style={[
-          styles.subscribeButton,
-          disabled
-            ? { backgroundColor: colors.border }
-            : { backgroundColor: colors.accent },
-        ]}
-      >
-        {subscribing ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <ThemedText style={disabled ? { color: colors.textSecondary, fontWeight: '700' } : styles.subscribeText}>
-            {isCurrent ? 'Joriy tarif' : plan.id === 'free' ? 'Hozirgi tarif' : 'Tanlash'}
-          </ThemedText>
-        )}
-      </Pressable>
     </ThemedView>
   );
 }
@@ -96,39 +76,12 @@ export default function PricingScreen() {
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
   const isLoggedIn = status === 'signedIn';
-  const [subscribingId, setSubscribingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['plans'],
     queryFn: plansApi.getPlans,
     enabled: isLoggedIn,
   });
-
-  const subscribeMutation = useMutation({
-    mutationFn: (planId: string) => plansApi.subscribeToPlan(planId),
-    onMutate: (planId) => {
-      setSubscribingId(planId);
-      setError(null);
-    },
-    onSuccess: async (res) => {
-      if (res.success && res.payment_url) {
-        await Linking.openURL(res.payment_url);
-      } else {
-        setError("To'lov havolasini yaratishda xatolik yuz berdi.");
-      }
-    },
-    onError: (err) => setError(getErrorMessage(err, "To'lov havolasini yaratishda xatolik yuz berdi.")),
-    onSettled: () => setSubscribingId(null),
-  });
-
-  const handleSubscribe = (planId: string) => {
-    if (!isLoggedIn) {
-      router.push('/(auth)/login');
-      return;
-    }
-    subscribeMutation.mutate(planId);
-  };
 
   const plans = data?.plans?.length ? data.plans : DEFAULT_PLANS;
   const currentPlan = data?.current?.plan;
@@ -146,38 +99,38 @@ export default function PricingScreen() {
           <ThemedText style={styles.title}>Tarif rejalari</ThemedText>
           <ThemedText variant="secondary" style={styles.subtitle}>
             Har tarif oyiga ma&apos;lum daqiqa dublyaj beradi (haqiqiy video davomiyligi bo&apos;yicha).
-            Byudjet tugasa, saytdan qo&apos;shimcha daqiqa paketi sotib olasiz — ular tugamaydi.
+            Byudjet tugasa, qo&apos;shimcha daqiqa paketi sotib olasiz — ular tugamaydi.
           </ThemedText>
-
-          {!isLoggedIn && (
-            <ThemedView style={[styles.notice, { backgroundColor: colors.accentGlow, borderColor: colors.accent }]}>
-              <ThemedText style={{ color: colors.accent, fontSize: 13, textAlign: 'center' }}>
-                Tarifga obuna bo&apos;lish uchun kiring yoki ro&apos;yxatdan o&apos;ting.
-              </ThemedText>
-            </ThemedView>
-          )}
-
-          {error && (
-            <ThemedView style={[styles.notice, { backgroundColor: colors.danger + '20', borderColor: colors.danger }]}>
-              <ThemedText style={{ color: colors.danger, fontSize: 13, textAlign: 'center' }}>{error}</ThemedText>
-            </ThemedView>
-          )}
 
           {isLoading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
           ) : (
             <ThemedView style={styles.cardsContainer}>
               {plans.map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  isCurrent={currentPlan === plan.id}
-                  onSubscribe={handleSubscribe}
-                  subscribing={subscribingId === plan.id}
-                />
+                <PlanCard key={plan.id} plan={plan} isCurrent={currentPlan === plan.id} />
               ))}
             </ThemedView>
           )}
+
+          <ThemedView
+            style={[styles.webNotice, { backgroundColor: colors.accentGlow, borderColor: colors.accent }]}
+          >
+            <ThemedText
+              style={{ color: colors.accent, fontSize: 13, textAlign: 'center', fontWeight: '700' }}
+            >
+              Obuna bo&apos;lish va daqiqa paketlarini sotib olish
+            </ThemedText>
+            <ThemedText variant="secondary" style={styles.webNoticeText}>
+              To&apos;lov gapirai.uz saytida amalga oshiriladi. Obuna bo&apos;lgach, tarif shu ilovada ham
+              darhol faollashadi.
+            </ThemedText>
+            <Pressable
+              onPress={() => Linking.openURL(WEB_PRICING_URL).catch(() => {})}
+              style={[styles.webButton, { backgroundColor: colors.accent }]}
+            >
+              <ThemedText style={styles.webButtonText}>Saytda obuna bo&apos;lish</ThemedText>
+            </Pressable>
+          </ThemedView>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -191,7 +144,6 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40, gap: 14, alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '900', textAlign: 'center' },
   subtitle: { fontSize: 13, textAlign: 'center', maxWidth: 320 },
-  notice: { borderWidth: 1, borderRadius: 16, padding: 12, width: '100%', maxWidth: 400 },
   cardsContainer: { width: '100%', gap: 14, marginTop: 8 },
   card: { borderWidth: 1, borderRadius: 24, padding: 20, gap: 10, position: 'relative' },
   cardPro: { borderWidth: 2 },
@@ -210,6 +162,23 @@ const styles = StyleSheet.create({
   priceSuffix: { fontSize: 13, fontWeight: '500' },
   features: { gap: 8 },
   featureRow: { fontSize: 13 },
-  subscribeButton: { paddingVertical: 13, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  subscribeText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  webNotice: {
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    width: '100%',
+    maxWidth: 400,
+    gap: 10,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  webNoticeText: { fontSize: 12, textAlign: 'center', lineHeight: 17 },
+  webButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    alignItems: 'center',
+    width: '100%',
+  },
+  webButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
 });

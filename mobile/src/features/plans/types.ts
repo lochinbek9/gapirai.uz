@@ -28,13 +28,6 @@ export interface CurrentSubscription {
   minutes: MinuteBalance;
 }
 
-export interface SubscribeResponse {
-  success: boolean;
-  payment_url: string;
-  payment_id?: string;
-  amount: number;
-}
-
 export const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' };
 
 // ── Avtomatik to'lov (mirrors frontend/lib/api.ts, backend/services/recurring.py) ──
