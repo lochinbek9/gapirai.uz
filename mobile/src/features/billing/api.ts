@@ -1,39 +1,13 @@
 import { apiClient } from '../../api/client';
-import type { BillingOverview, BillingPreferences, SavedCard } from '../plans/types';
+import type { BillingOverview, BillingPreferences } from '../plans/types';
 
 // Mirrors frontend/lib/api.ts's billing block (backend/api/billing_routes.py).
-// Card number (PAN) is sent straight to the provider and never stored/logged.
+// Variant A: the mobile app never sends card data — binding/enabling happens
+// on gapirai.uz. Here we only read status and turn things OFF / remove a card.
 
 export async function getBillingOverview(): Promise<BillingOverview> {
   const res = await apiClient.get('/api/billing/overview');
   return res.data;
-}
-
-export async function bindCard(
-  provider: 'click' | 'payme',
-  cardNumber: string,
-  expire: string,
-): Promise<{ card: SavedCard; needs_code: boolean; phone_hint: string | null }> {
-  const res = await apiClient.post('/api/billing/cards', {
-    provider,
-    card_number: cardNumber,
-    expire,
-  });
-  return res.data;
-}
-
-export async function verifyCard(cardId: string, code: string): Promise<{ card: SavedCard }> {
-  const res = await apiClient.post(`/api/billing/cards/${cardId}/verify`, { code });
-  return res.data;
-}
-
-export async function resendCardCode(cardId: string): Promise<{ phone_hint: string | null }> {
-  const res = await apiClient.post(`/api/billing/cards/${cardId}/resend`);
-  return res.data;
-}
-
-export async function setDefaultCard(cardId: string): Promise<void> {
-  await apiClient.post(`/api/billing/cards/${cardId}/default`);
 }
 
 export async function deleteCard(cardId: string): Promise<void> {
