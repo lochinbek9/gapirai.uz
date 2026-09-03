@@ -196,3 +196,46 @@ def send_subscription_reminder_email(to_email: str, name: str, plan_name: str, e
     except Exception as e:
         logger.error(f"Obuna eslatmasini yuborishda xatolik ({to_email}): {e}")
         return False
+
+
+def send_billing_email(to_email: str, name: str, subject: str, body_lines: list[str],
+                       cta_text: str = "Dashboard", cta_url: str = "https://gapirai.uz/dashboard") -> bool:
+    """Avtomatik to'lov bildirishnomalari — obuna uzaytirildi / to'lov
+    muvaffaqiyatsiz / tarif FREE'ga tushirildi / daqiqa avtomatik to'ldirildi
+    (backend/services/recurring.py)."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY sozlanmagan — billing email yuborilmadi.")
+        return False
+
+    greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
+    text_body = greeting + "\n\n" + "\n".join(body_lines) + f"\n\n{cta_text}: {cta_url}\n\nGapirAI.uz jamoasi"
+    html_lines = "".join(f'<p style="color:#334155;font-size:14px;">{ln}</p>' for ln in body_lines)
+    html_body = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="color:#1e293b;margin:0 0 16px;">GapirAI<span style="color:#7c3aed;">.uz</span></h2>
+      <p style="color:#334155;font-size:14px;">{greeting}</p>
+      {html_lines}
+      <a href="{cta_url}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9);color:#fff;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:12px;margin:16px 0;">{cta_text}</a>
+      <p style="color:#94a3b8;font-size:11px;margin-top:24px;">GapirAI.uz jamoasi</p>
+    </div>
+    """
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body,
+                "text": text_body,
+            },
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend xatoligi (billing, {to_email}): {response.status_code} {response.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Billing email yuborishda xatolik ({to_email}): {e}")
+        return False

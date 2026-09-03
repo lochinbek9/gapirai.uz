@@ -315,6 +315,82 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
   await apiClient.post('/api/push/unsubscribe', { endpoint })
 }
 
+/* ── Avtomatik to'lov (bog'langan kartalar + auto-renew / auto top-up) ── */
+
+export interface SavedCard {
+  id: string
+  provider: 'click' | 'payme'
+  card_mask: string | null
+  card_type: string | null
+  expire: string | null
+  is_active: boolean
+  is_default: boolean
+  phone_hint: string | null
+  last_error: string | null
+  created_at: string | null
+}
+
+export interface BillingPreferences {
+  auto_renew: boolean
+  auto_renew_plan: string | null
+  auto_topup_enabled: boolean
+  auto_topup_pack: number | null
+  in_grace: boolean
+  grace_until: string | null
+  renew_failed_attempts: number
+}
+
+export interface BillingOverview {
+  providers: { click: boolean; payme: boolean }
+  cards: SavedCard[]
+  has_active_card: boolean
+  current_plan: string
+  current_plan_paid: boolean
+  preferences: BillingPreferences
+  minute_balance: MinuteBalance
+  minute_packs: MinutePack[]
+}
+
+export async function getBillingOverview(): Promise<BillingOverview> {
+  const res = await apiClient.get('/api/billing/overview')
+  return res.data
+}
+
+export async function bindCard(
+  provider: 'click' | 'payme', card_number: string, expire: string,
+): Promise<{ card: SavedCard; needs_code: boolean; phone_hint: string | null }> {
+  const res = await apiClient.post('/api/billing/cards', { provider, card_number, expire })
+  return res.data
+}
+
+export async function verifyCard(cardId: string, code: string): Promise<{ card: SavedCard }> {
+  const res = await apiClient.post(`/api/billing/cards/${cardId}/verify`, { code })
+  return res.data
+}
+
+export async function resendCardCode(cardId: string): Promise<{ phone_hint: string | null }> {
+  const res = await apiClient.post(`/api/billing/cards/${cardId}/resend`)
+  return res.data
+}
+
+export async function setDefaultCard(cardId: string): Promise<void> {
+  await apiClient.post(`/api/billing/cards/${cardId}/default`)
+}
+
+export async function deleteCard(cardId: string): Promise<void> {
+  await apiClient.delete(`/api/billing/cards/${cardId}`)
+}
+
+export async function setAutoRenew(enabled: boolean, plan?: string): Promise<BillingPreferences> {
+  const res = await apiClient.put('/api/billing/auto-renew', { enabled, plan })
+  return res.data
+}
+
+export async function setAutoTopup(enabled: boolean, pack?: number | null): Promise<BillingPreferences> {
+  const res = await apiClient.put('/api/billing/auto-topup', { enabled, pack })
+  return res.data
+}
+
 export async function subscribeToPlan(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/plans/subscribe', { plan })
   return res.data

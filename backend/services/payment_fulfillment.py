@@ -11,7 +11,18 @@ from backend.workers.tasks import process_video
 def apply_successful_payment(db, payment) -> None:
     """payment.status allaqachon APPROVED qilib qo'yilgan bo'lishi kerak --
     bu funksiya faqat SHU to'lov nimaga tegishli ekaniga qarab (kutubxona
-    kirish huquqi / obuna / job) tegishli holatni faollashtiradi."""
+    kirish huquqi / obuna / job / daqiqa paketi) tegishli holatni
+    faollashtiradi.
+
+    IDEMPOTENT: fulfilled_at o'rnatilgan bo'lsa darhol qaytadi. Avtomatik
+    (karta tokeni) to'lovlarda fulfillment ikki yo'ldan kelishi mumkin —
+    provayder webhook'i (click /complete, payme PerformTransaction) VA
+    recurring.charge() ichidagi to'g'ridan-to'g'ri chaqiruv — qaysi biri
+    oldin ishlasa, ikkinchisi shu bayroq tufayli hech narsa qilmaydi
+    (aks holda daqiqa/obuna ikki marta kreditlanardi)."""
+    if getattr(payment, "fulfilled_at", None):
+        return
+
     if payment.is_library_access:
         user = db.query(User).filter(User.id == payment.user_id).first()
         if user and user.library_access_purchased_at is None:
@@ -40,3 +51,6 @@ def apply_successful_payment(db, payment) -> None:
                 job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
                 from backend.services.plans import get_job_queue
                 process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
+
+    payment.fulfilled_at = datetime.utcnow()
+    db.commit()

@@ -107,6 +107,24 @@ class JobCreationResult:
     minutes_short: int | None = None  # outcome="insufficient_minutes" uchun
 
 
+def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[bool, int]:
+    """check_quota() — daqiqa yetmasa va foydalanuvchi avtomatik to'ldirishni
+    yoqgan bo'lsa (Subscription.auto_topup_enabled + bog'langan karta), bir
+    marta avtomatik paket sotib olishga urinadi va qayta tekshiradi
+    (backend/services/recurring.py). Aks holda (covered, shortfall) qaytadi."""
+    from backend.services.plans import check_quota
+    covered, minutes_short = check_quota(db, user_id, duration_minutes)
+    if covered:
+        return True, 0
+    try:
+        from backend.services.recurring import try_auto_topup
+        if try_auto_topup(db, user_id, minutes_short):
+            return check_quota(db, user_id, duration_minutes)
+    except Exception as e:  # avtomatik to'ldirish hech qachon job yaratishni buzmasin
+        logger.warning("Auto top-up urinishi xato bilan tugadi user=%s: %s", user_id, e)
+    return covered, minutes_short
+
+
 async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_gender: str = "auto") -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
@@ -183,7 +201,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
 
     from backend.services.plans import check_quota, consume_quota, get_job_queue
-    covered, minutes_short = check_quota(db, user.id, duration_minutes)
+    covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
     if not covered:
         # Daqiqa yetmadi -- job yaratilmaydi. Frontend "Buy additional minutes"
         # CTA'sini ko'rsatadi (backend/api/minutes_routes.py orqali paket sotib olinadi).
@@ -227,7 +245,7 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
     duration_minutes = cached_job.video_duration / 60.0
 
     from backend.services.plans import check_quota, consume_quota
-    covered, minutes_short = check_quota(db, user.id, duration_minutes)
+    covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
     if not covered:
         return JobCreationResult(
             outcome="insufficient_minutes",

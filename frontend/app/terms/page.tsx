@@ -83,6 +83,18 @@ export default function TermsPage() {
               <p>
                 To'lov to'lov tashkilotining himoyalangan sahifasida amalga oshiriladi. GapirAI.uz foydalanuvchining karta raqami, amal qilish muddati va maxfiy kodlarini (CVV/CVC, SMS-tasdiqlash kodi) <strong>ko'rmaydi, qabul qilmaydi va saqlamaydi</strong> — bu ma'lumotlar bevosita to'lov tizimi tomonidan PCI DSS xalqaro standartiga muvofiq qayta ishlanadi.
               </p>
+              <p className="font-semibold text-gray-800 dark:text-slate-200">Avtomatik to'lov (ixtiyoriy)</p>
+              <p>
+                Foydalanuvchi o'z hisobida kartani bog'lab, <strong>avtomatik to'lov</strong>ni yoqishi mumkin:
+                (a) <em>obunani avtomatik uzaytirish</em> — tarif muddati tugaganda bog'langan kartadan tarif
+                narxi yechiladi; (b) <em>daqiqani avtomatik to'ldirish</em> — oylik daqiqa hajmi tugaganda
+                dublyaj to'xtamasligi uchun mos daqiqa paketi avtomatik sotib olinadi. Avtomatik to'lov
+                faqat foydalanuvchi kartani tasdiqlab, aniq rozilik bergandagina ishlaydi. Kartani bog'lashda
+                SMS-kod orqali tasdiqlash talab qilinadi. Foydalanuvchi avtomatik to'lovni istalgan vaqtda
+                hisobidagi sozlamalardan o'chirishi yoki kartani uzishi mumkin. Har bir avtomatik yechishdan
+                so'ng foydalanuvchiga bildirishnoma yuboriladi. Kartadan to'lov amalga oshmasa, obuna bir
+                necha kun imtiyozli muddat (grace) bilan saqlanadi, so'ng Bepul rejaga o'tkaziladi.
+              </p>
               <p className="font-semibold text-gray-800 dark:text-slate-200">Qaytarish shartlari</p>
               <p>
                 Xizmat ko'rsatilgunga qadar (dublyaj jarayoni boshlanmagan bo'lsa) foydalanuvchi to'lovni bekor qilishni so'rashi mumkin — mablag' o'sha karta hisobiga qaytariladi. Dublyaj yakunlangach yoki daqiqalar sarflanganidan so'ng to'langan mablag' qaytarilmaydi. Platforma tomonidagi texnik nosozlik tufayli xizmat ko'rsatilmagan taqdirda, sarflangan daqiqalar avtomatik ravishda foydalanuvchi hisobiga qaytariladi. Qaytarish bo'yicha murojaatlar: <a href="mailto:lodexgroups@gmail.com" className="text-violet-600 dark:text-violet-400 underline">lodexgroups@gmail.com</a>.

@@ -243,6 +243,31 @@ class Settings(BaseSettings):
     CLICK_SECRET_KEY: str = ""
     CLICK_MERCHANT_USER_ID: str = "89102"
 
+    # ---- Avtomatik to'lov (rekurrent) — backend/services/recurring.py ----
+    # Karta tokeni API'lari merchant akkauntda ALOHIDA yoqilishi kerak
+    # (Click: "card_token" imkoniyati; Payme: "Cards"/"Subscribe" API).
+    # Yoqilmaguncha bu flaglar False qolsin — karta bog'lash UI'da yashiriladi,
+    # auto-renew / auto top-up ishlamaydi, mavjud redirect-checkout esa
+    # o'zgarishsiz ishlayveradi.
+    CLICK_CARD_TOKEN_ENABLED: bool = False
+    PAYME_CARD_TOKEN_ENABLED: bool = False
+    # Click Card Token API bazasi (v2 merchant). Auth: generate_digest bilan
+    # bir xil (sha1(timestamp + secret)). service_id odatda checkout bilan bir
+    # xil, lekin Click alohida bersa CLICK_CARD_SERVICE_ID bilan almashtiriladi.
+    CLICK_CARD_API_URL: str = "https://api.click.uz/v2/merchant"
+    CLICK_CARD_SERVICE_ID: str = ""  # bo'sh -> CLICK_SERVICE_ID ishlatiladi
+    # Payme Cards/Subscribe API. cards.* metodlari X-Auth: <merchant_id>,
+    # receipts.* metodlari X-Auth: <merchant_id>:<key>. Sandbox rejimida
+    # checkout.test.paycom.uz/api ishlatiladi (PAYME_SANDBOX_MODE).
+    PAYME_CARD_API_URL: str = "https://checkout.paycom.uz/api"
+    PAYME_CARD_API_URL_SANDBOX: str = "https://checkout.test.paycom.uz/api"
+    # Bir foydalanuvchiga bir kunda ruxsat etilgan avtomatik daqiqa-to'ldirish
+    # soni (runaway/abuse himoyasi). Job yaratishda tekshiriladi.
+    AUTO_TOPUP_MAX_PER_DAY: int = 2
+    # Obuna avtomatik uzaytirilishi muvaffaqiyatsiz bo'lsa, tarif imtiyozlari
+    # shu kun davomida saqlanadi va har kuni qayta urinib ko'riladi; keyin FREE.
+    AUTO_RENEW_GRACE_DAYS: int = 3
+
     # Payme (Paycom) Payment -- Merchant API (backend/api/payme_routes.py).
     # PAYME_KEY ishlab chiqarish (checkout.paycom.uz) uchun, PAYME_TEST_KEY
     # esa pesochnitsa (test.paycom.uz) uchun -- ikkalasi ham Basic Auth
