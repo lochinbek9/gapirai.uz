@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '../src/components/ThemedText';
 import { ThemedView } from '../src/components/ThemedView';
+import * as billingApi from '../src/features/billing/api';
 import * as jobsApi from '../src/features/jobs/api';
 import { useJobs } from '../src/features/jobs/hooks/useJobs';
 import * as plansApi from '../src/features/plans/api';
@@ -22,6 +23,39 @@ function statusColor(status: Job['status'], colors: ReturnType<typeof useTheme>[
   if (status === 'completed') return colors.success;
   if (status === 'failed') return colors.danger;
   return colors.accent;
+}
+
+function BillingLink() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const { data } = useQuery({ queryKey: ['billing-overview'], queryFn: billingApi.getBillingOverview });
+  if (!data || (!data.providers.click && !data.providers.payme)) return null;
+
+  const p = data.preferences;
+  const on = p.auto_renew || p.auto_topup_enabled;
+  const summary = p.in_grace
+    ? "To'lov muammosi — kartani tekshiring"
+    : on
+      ? [p.auto_renew && 'obuna', p.auto_topup_enabled && 'daqiqa'].filter(Boolean).join(' + ') + ' avtomatik'
+      : "O'chiq — kartani bog'lang";
+
+  return (
+    <Pressable
+      onPress={() => router.push('/billing')}
+      style={[
+        styles.billingLink,
+        { backgroundColor: colors.surface, borderColor: p.in_grace ? colors.danger : colors.border },
+      ]}
+    >
+      <ThemedView style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ThemedText style={styles.billingTitle}>Avtomatik to&apos;lov</ThemedText>
+        <ThemedText variant="secondary" style={styles.billingSummary}>
+          {summary}
+        </ThemedText>
+      </ThemedView>
+      <ThemedText style={[styles.billingChevron, { color: colors.accent }]}>{'›'}</ThemedText>
+    </Pressable>
+  );
 }
 
 function PlanCard() {
@@ -57,7 +91,7 @@ function PlanCard() {
         style={[styles.planButton, { backgroundColor: colors.accent }]}
       >
         <ThemedText style={styles.planButtonText}>
-          {current.plan === 'free' ? 'Tarifni oshirish' : expiresSoon ? 'Yangilash' : "Tariflar"}
+          {current.plan === 'free' ? 'Tarifni oshirish' : expiresSoon ? 'Yangilash' : 'Tariflar'}
         </ThemedText>
       </Pressable>
     </ThemedView>
@@ -139,7 +173,12 @@ export default function DashboardScreen() {
           contentContainerStyle={styles.listContent}
           refreshing={isRefetching}
           onRefresh={refetch}
-          ListHeaderComponent={<PlanCard />}
+          ListHeaderComponent={
+            <>
+              <PlanCard />
+              <BillingLink />
+            </>
+          }
           renderItem={({ item }) => <JobCard job={item} onDelete={handleDelete} />}
           ListEmptyComponent={
             !isLoading ? (
@@ -181,6 +220,18 @@ const styles = StyleSheet.create({
   planMeta: { fontSize: 12, marginTop: 2 },
   planButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
   planButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+  billingLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  billingTitle: { fontSize: 14, fontWeight: '800' },
+  billingSummary: { fontSize: 12, marginTop: 2 },
+  billingChevron: { fontSize: 22, fontWeight: '800' },
   jobCard: {
     flexDirection: 'row',
     alignItems: 'center',
