@@ -162,6 +162,12 @@ export default function Footer() {
               <img src="/logos/uzum.png" alt="Uzum" className="h-6 w-auto object-contain" />
             </div>
           </div>
+          <Link
+            href="/terms#tolovlar"
+            className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2"
+          >
+            To'lov usullari va xavfsizlik haqida batafsil
+          </Link>
         </div>
       </div>
     </footer>
