@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Send, Youtube, Instagram, Github, Mail, ShieldCheck, FileText, Users, Info } from 'lucide-react'
+import { Send, Youtube, Instagram, Github, Mail, ShieldCheck, FileText, Users, Info, Smartphone, Apple } from 'lucide-react'
 
 export default function Footer() {
   return (
@@ -121,6 +121,34 @@ export default function Footer() {
 
         <div className="mt-10 pt-8 border-t border-black/5 dark:border-white/10 flex flex-col sm:flex-row sm:items-center gap-4">
           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">
+            Ilovani yuklab olish
+          </h3>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Link
+              href="/install#android"
+              className="flex items-center gap-2.5 h-11 px-4 rounded-xl bg-gray-900 text-white hover:bg-black dark:bg-white/10 dark:hover:bg-white/20 border border-black/5 dark:border-white/10 transition"
+            >
+              <Smartphone className="w-4 h-4 shrink-0" />
+              <span className="leading-none text-left">
+                <span className="block text-[9px] uppercase tracking-wider opacity-70">o'rnatish</span>
+                <span className="block text-xs font-bold">Android</span>
+              </span>
+            </Link>
+            <Link
+              href="/install#ios"
+              className="flex items-center gap-2.5 h-11 px-4 rounded-xl bg-gray-900 text-white hover:bg-black dark:bg-white/10 dark:hover:bg-white/20 border border-black/5 dark:border-white/10 transition"
+            >
+              <Apple className="w-4 h-4 shrink-0" />
+              <span className="leading-none text-left">
+                <span className="block text-[9px] uppercase tracking-wider opacity-70">o'rnatish</span>
+                <span className="block text-xs font-bold">iPhone</span>
+              </span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-4">
+          <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">
             To'lov turlari
           </h3>
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -134,6 +162,12 @@ export default function Footer() {
               <img src="/logos/uzum.png" alt="Uzum" className="h-6 w-auto object-contain" />
             </div>
           </div>
+          <Link
+            href="/terms#tolovlar"
+            className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2"
+          >
+            To'lov usullari va xavfsizlik haqida batafsil
+          </Link>
         </div>
       </div>
     </footer>

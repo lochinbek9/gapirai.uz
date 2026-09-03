@@ -120,10 +120,17 @@ def get_or_create_subscription(db, user_id) -> Subscription:
     # DIQQAT: purchased_minutes TEGILMAYDI -- sotib olingan daqiqalar hech
     # qachon tugamaydi, obuna bekor bo'lsa ham.
     if sub.plan != PlanTier.FREE and sub.expires_at and sub.expires_at < datetime.utcnow():
+        # Avtomatik uzaytirish grace davrida bo'lsa (backend/services/recurring.py)
+        # tarif imtiyozlari saqlanadi — kunlik cron kartadan qayta urinib ko'radi.
+        if getattr(sub, "grace_until", None) and sub.grace_until >= datetime.utcnow():
+            return sub
         sub.plan = PlanTier.FREE
         sub.expires_at = None
         sub.period_started_at = datetime.utcnow()
         sub.monthly_minutes_used = 0.0
+        if hasattr(sub, "auto_renew"):
+            sub.auto_renew = False
+            sub.grace_until = None
         db.commit()
         db.refresh(sub)
         return sub

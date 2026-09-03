@@ -356,6 +356,22 @@ class Subscription(Base):
     # oyga o'tadi (backend/services/plans.py).
     monthly_minutes_used = Column(Float, nullable=False, default=0.0)
     purchased_minutes = Column(Float, nullable=False, default=0.0)
+
+    # 2026-09-03: avtomatik to'lov (backend/services/recurring.py).
+    # auto_renew — obuna muddati tugaganda bog'langan kartadan avtomatik
+    # uzaytiriladi (kunlik cron: backend/scripts/auto_renew.py).
+    # grace_until — to'lov muvaffaqiyatsiz bo'lsa, shu vaqtgacha tarif
+    # imtiyozlari saqlanadi va har kuni qayta urinib ko'riladi; keyin FREE.
+    # auto_topup_* — daqiqa balansi yetmaganda avtomatik paket sotib olish
+    # (job yaratishda sinxron, backend/services/job_creation.py).
+    auto_renew = Column(Boolean, nullable=False, default=False)
+    auto_renew_plan = Column(String(20), nullable=True)
+    renew_failed_attempts = Column(Integer, nullable=False, default=0)
+    renew_last_attempt_at = Column(DateTime, nullable=True)
+    grace_until = Column(DateTime, nullable=True)
+    auto_topup_enabled = Column(Boolean, nullable=False, default=False)
+    auto_topup_pack = Column(Integer, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -19,6 +19,40 @@ class PaymentProvider(str, enum.Enum):
     UZUM = "uzum"
     MANUAL = "manual"
 
+
+class PaymentCard(Base):
+    """Foydalanuvchining avtomatik to'lov uchun bog'langan kartasi. DIQQAT:
+    bu yerda karta raqami (PAN) yoki CVV HECH QACHON saqlanmaydi — faqat
+    provayder (Click/Payme) bergan qayta ishlatiladigan token va niqoblangan
+    raqam. Karta raqami foydalanuvchi formasidan to'g'ridan-to'g'ri provayder
+    API'siga (TLS) yuboriladi, bazaga yozilmaydi.
+
+    Oqim: bind (POST card_token/request yoki cards.create) -> provayder
+    egasining telefoniga SMS kod yuboradi -> verify (sms_code) -> is_active=True.
+    Keyin charge (card_token/payment yoki receipts.pay) — provayder o'zining
+    webhook'ini (click /complete, payme PerformTransaction) chaqiradi, shu
+    orqali backend/services/payment_fulfillment.py ishga tushadi.
+    """
+    __tablename__ = "payment_cards"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    provider = Column(String(20), nullable=False)  # "click" | "payme"
+    token = Column(String, nullable=False)
+    card_mask = Column(String(30), nullable=True)
+    card_type = Column(String(20), nullable=True)   # "uzcard" | "humo"
+    expire = Column(String(5), nullable=True)        # "MM/YY" — faqat ma'lumot uchun
+    phone_hint = Column(String(20), nullable=True)
+    is_active = Column(Boolean, default=False, nullable=False)   # SMS tasdiqdan keyin
+    is_default = Column(Boolean, default=False, nullable=False)
+    consent_at = Column(DateTime, nullable=True)     # avtomatik yechishga rozilik vaqti
+    last_charged_at = Column(DateTime, nullable=True)
+    last_error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
 class Payment(Base):
     __tablename__ = "payments"
 
@@ -34,6 +68,15 @@ class Payment(Base):
     amount = Column(Float, nullable=False)
     provider = Column(Enum(PaymentProvider), default=PaymentProvider.CLICK)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+
+    # 2026-09-03: avtomatik to'lov. card_id — qaysi bog'langan karta bilan
+    # yechilgani; is_auto — foydalanuvchi aralashuvisiz (auto-renew yoki
+    # auto top-up) amalga oshirilgani. fulfilled_at — apply_successful_payment()
+    # bir martadan ortiq bajarilmasligi kafolati (webhook + to'g'ridan-to'g'ri
+    # API javobi poygaga kirsa).
+    card_id = Column(UUID(as_uuid=True), ForeignKey("payment_cards.id"), nullable=True)
+    is_auto = Column(Boolean, default=False, nullable=False)
+    fulfilled_at = Column(DateTime, nullable=True)
     
     click_transaction_id = Column(String, index=True)
     click_prepare_id = Column(BigInteger)

@@ -28,11 +28,40 @@ export interface CurrentSubscription {
   minutes: MinuteBalance;
 }
 
-export interface SubscribeResponse {
-  success: boolean;
-  payment_url: string;
-  payment_id?: string;
-  amount: number;
+export const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' };
+
+// ── Avtomatik to'lov (mirrors frontend/lib/api.ts, backend/services/recurring.py) ──
+
+export interface SavedCard {
+  id: string;
+  provider: 'click' | 'payme';
+  card_mask: string | null;
+  card_type: string | null;
+  expire: string | null;
+  is_active: boolean;
+  is_default: boolean;
+  phone_hint: string | null;
+  last_error: string | null;
+  created_at: string | null;
 }
 
-export const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' };
+export interface BillingPreferences {
+  auto_renew: boolean;
+  auto_renew_plan: string | null;
+  auto_topup_enabled: boolean;
+  auto_topup_pack: number | null;
+  in_grace: boolean;
+  grace_until: string | null;
+  renew_failed_attempts: number;
+}
+
+export interface BillingOverview {
+  providers: { click: boolean; payme: boolean };
+  cards: SavedCard[];
+  has_active_card: boolean;
+  current_plan: string;
+  current_plan_paid: boolean;
+  preferences: BillingPreferences;
+  minute_balance: MinuteBalance;
+  minute_packs: MinutePack[];
+}
