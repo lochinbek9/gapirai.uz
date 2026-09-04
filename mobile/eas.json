@@ -21,6 +21,9 @@
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "235172384103-ppm31k0mdn5co7fanr9ed4hcqb8u00qt.apps.googleusercontent.com"
       }
     }
   },

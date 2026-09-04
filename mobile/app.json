@@ -44,6 +44,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "owner": "gapiraiuz",
+    "extra": {
+      "eas": {
+        "projectId": "bf0943d6-c241-4259-acc4-e64195a03223"
+      }
     }
   }
 }
