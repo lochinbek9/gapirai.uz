@@ -20,6 +20,7 @@ from redis import Redis
 from backend.config import get_settings
 from backend.services.errors import PermanentError
 from backend.services import error_classification as errcls
+from backend.services import proxy_manager
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -303,76 +304,16 @@ def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True, proxy_url: s
                 logger.warning(f"Could not remove temp cookie file {temp_cookie_path}: {e}")
 
 
-# 2026-08-27 audit: replaced the old datacenter -> residential -> no-cookies
-# -> no-cookies-residential escalation chain entirely. A controlled,
-# isolated 12-video experiment (4 videos per path, no cross-path
-# escalation) measured:
-#   cookies+mweb, no proxy:     0/4 first-attempt, 0/4 eventual
-#   datacenter+mweb:            0/4 first-attempt, 0/4 eventual
-#   residential+mweb:           2/4 first-attempt, 3/4 eventual
-# Datacenter provided no measurable benefit over no proxy at all (both
-# dominated by LOGIN_REQUIRED at the info stage) -- sending every attempt
-# through it first was pure wasted latency before ever reaching the one
-# path that actually works. Residential is now the ONLY production path,
-# with exactly one bounded retry on that SAME path (proven to recover
-# genuinely retryable failures in the experiment) -- never a different
-# proxy tier, never more than one retry. Cookie-loading support is kept
-# intact (use_cookies=True) as an available-but-not-primary input; see
-# _CookieSessionLogger above for why cookie validity is tracked separately
-# from this retry decision rather than folded into it.
-_RESIDENTIAL_RETRY_SLEEP_BASE = 2.0
-_RESIDENTIAL_RETRY_SLEEP_JITTER = 2.0
-
-
-def _residential_attempt(action, extra: dict | None = None, use_cookies: bool = True):
-    """Runs `action(ydl)` via the residential proxy -- the primary production
-    ingestion path. On a RETRYABLE failure (error_classification.should_retry),
-    makes exactly one bounded retry on this SAME path; on a non-retryable
-    failure (AUTH_ERROR/VIDEO_UNAVAILABLE), fails immediately with no retry,
-    matching the existing no-blind-retry rule used everywhere else in this
-    pipeline. Never escalates to a different proxy tier -- datacenter is not
-    attempted (see the module-level comment above for why).
-
-    2026-08-30: PROXY_BILLING_ERROR is the one exception. It means the
-    residential proxy ACCOUNT is out of bandwidth/balance -- retrying the
-    same path, bounded or not, can never succeed until someone tops up the
-    account (a human, billing action, not something a retry loop can fix).
-    Verified live on production-new the same day: a direct (no-proxy) mweb +
-    PO-token request succeeded end-to-end (full video download, 15s) with
-    zero proxy involved, even with stale/absent cookies. So when the proxy
-    specifically reports billing exhaustion, ONE bounded no-proxy attempt is
-    tried before giving up -- turns a guaranteed-fail into a real chance of
-    success at zero extra proxy cost. This is the ONLY case that ever skips
-    the residential proxy; every other failure mode still stays on
-    residential-or-fail, per the original evidence-based design."""
-    last_exc: Exception | None = None
-    for attempt in range(2):
-        try:
-            with get_yt_dlp(extra, use_cookies=use_cookies, proxy_url=settings.YOUTUBE_RESIDENTIAL_PROXY_URL) as ydl:
-                return action(ydl)
-        except Exception as e:
-            last_exc = e
-            error_code = errcls.classify_text(str(e))
-            if error_code == errcls.PROXY_BILLING_ERROR:
-                logger.warning(
-                    "Residential proksi hisobida balans tugagan "
-                    f"[{error_code}] -- proksisiz bir marta zaxira urinish qilinmoqda..."
-                )
-                try:
-                    with get_yt_dlp(extra, use_cookies=use_cookies, proxy_url=None) as ydl:
-                        return action(ydl)
-                except Exception as e2:
-                    last_exc = e2
-                break
-            if attempt == 0 and errcls.should_retry(error_code):
-                logger.warning(
-                    f"Residential urinish muvaffaqiyatsiz [{error_code}] "
-                    f"({errcls.scrub_secrets(str(e))}), xuddi shu yo'lda bir marta qayta urinilmoqda..."
-                )
-                time.sleep(_RESIDENTIAL_RETRY_SLEEP_BASE + random.random() * _RESIDENTIAL_RETRY_SLEEP_JITTER)
-                continue
-            break
-    raise last_exc
+# 2026-08-27 audit found datacenter proxies gave zero measurable benefit
+# over a direct connection for YouTube's bot-check, and residential was the
+# only tier that actually helped -- see backend/services/proxy_manager.py's
+# module docstring for the full experiment writeup. That single-tier,
+# single-URL logic (formerly `_residential_attempt` here) has been replaced
+# by proxy_manager.run_with_proxy_chain(), a configurable multi-endpoint
+# chain (direct -> datacenter pool -> residential pool) driven by .env —
+# 2026-09-04, added once a single static residential URL was no longer
+# enough (needed rotation across several proxies + per-proxy health
+# tracking, not just one path with one fallback).
 
 
 def _extract_info_dict(ydl, youtube_url: str) -> dict:
@@ -457,7 +398,7 @@ def get_video_info(youtube_url: str) -> dict:
         return api_result
 
     try:
-        return _residential_attempt(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
+        return proxy_manager.run_with_proxy_chain(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
     except Exception as e2:
         code = errcls.classify_text(str(e2))
         if code == errcls.VIDEO_UNAVAILABLE:
@@ -520,7 +461,7 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
         return info.get("title", "Unknown"), float(info.get("duration", 0) or 0)
 
     try:
-        title, duration = _residential_attempt(_do_extract, extra=extra_opts, use_cookies=True)
+        title, duration = proxy_manager.run_with_proxy_chain(_do_extract, extra=extra_opts, use_cookies=True)
     except Exception as e2:
         code = errcls.classify_text(str(e2))
         if code == errcls.VIDEO_UNAVAILABLE:

@@ -324,6 +324,47 @@ class Settings(BaseSettings):
     # faqat zaxira sifatida, cheklangan trafik hajmini tejash uchun.
     YOUTUBE_RESIDENTIAL_PROXY_URL: str = ""
 
+    # ---- Proxy pool: rotation + health tracking (backend/services/proxy_manager.py) ----
+    # 2026-09-04: replaces the single-URL model above with an N-proxy-per-tier
+    # pool, so proxies can be added/removed/swapped in .env + `docker compose
+    # up -d backend worker` -- no code change, no redeploy. The single-URL
+    # vars above are NOT removed: if a *_PROXIES pool below is empty,
+    # proxy_manager falls back to treating YOUTUBE_PROXY_URL /
+    # YOUTUBE_RESIDENTIAL_PROXY_URL as a 1-proxy pool for that tier, so an
+    # existing deployment keeps working unchanged until someone opts into
+    # the pool form.
+    #
+    # Master switch. False (default): only the DIRECT attempt runs, exactly
+    # like a fresh install with no proxy configured at all -- proxy pools
+    # are simply not consulted, regardless of what's in *_PROXIES below.
+    PROXY_ENABLED: bool = False
+    # Try a direct (no-proxy) connection before any proxy tier. Cheap (one
+    # fast attempt) and occasionally succeeds even when proxies are
+    # configured, so it stays on by default; set False to skip straight to
+    # the proxy chain (e.g. once direct is known to reliably fail).
+    PROXY_DIRECT_FIRST: bool = True
+    # Comma-separated http://user:pass@host:port list. 2026-08-27 audit
+    # measured ZERO benefit over a direct connection for YouTube's bot-check
+    # (0/4 either way, in an isolated 4-video-per-path experiment) -- kept
+    # as a configurable, OFF-by-default rung rather than deleted, in case a
+    # different provider or YouTube's own detection changes. Do not expect
+    # this tier to help before re-testing it.
+    DATACENTER_PROXIES: str = ""
+    # Comma-separated http://user:pass@host:port list. The one tier proven
+    # to help in the same experiment (2/4 first-attempt, 3/4 eventual).
+    RESIDENTIAL_PROXIES: str = ""
+    # Hard cap on distinct endpoints (direct + datacenter + residential
+    # combined) tried per download call, regardless of how large the pools
+    # are -- bounds worst-case latency on a video that fails everywhere.
+    PROXY_MAX_RETRIES: int = 5
+    PROXY_TIMEOUT: int = 30
+    # How long a proxy that just failed is skipped in rotation. A proxy
+    # that reports PROXY_BILLING_ERROR (account out of balance) gets a much
+    # longer cooldown instead (see _BILLING_COOLDOWN_SECONDS in
+    # proxy_manager.py) -- that class of failure does not self-resolve in
+    # minutes.
+    PROXY_COOLDOWN_SECONDS: int = 300
+
     # YouTube Data API v3 (https://console.cloud.google.com) -- video metadata
     # (sarlavha/davomiylik/thumbnail) olishda yt-dlp skrapping o'rniga rasman
     # API ishlatiladi, bot-check xavfisiz. Bo'sh bo'lsa, eski yt-dlp yo'liga
