@@ -6,9 +6,9 @@
     "@hookform/resolvers": "^5.7.1",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.19.0",
-    "expo": "^54.0.36",
+    "expo": "~54.0.37",
     "expo-auth-session": "~7.0.11",
-    "expo-constants": "~18.0.13",
+    "expo-constants": "~18.0.14",
     "expo-crypto": "~15.0.9",
     "expo-image": "~3.0.11",
     "expo-linking": "~8.0.12",
@@ -53,6 +53,16 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "doctor": "expo-doctor"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-nitro-google-signin"
+        ],
+        "listUnknownPackages": false
+      }
+    }
   },
   "private": true
 }
