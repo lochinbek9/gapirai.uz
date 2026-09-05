@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import asyncio
 import logging
 import re
+import subprocess
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
 
 Outcome = Literal[
     "queued", "ready", "insufficient_minutes", "blocked", "too_long",
-    "invalid_url", "fetch_error",
+    "invalid_url", "fetch_error", "bad_file",
 ]
 
 
@@ -235,6 +236,93 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
     db.commit()
     process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
     return JobCreationResult(outcome="queued", job_id=job_id, video_title=title, duration_minutes=duration_minutes)
+
+
+def _media_duration_seconds(path: Path) -> float | None:
+    """api/routes.py:_get_media_duration_seconds bilan bir xil -- ffprobe
+    orqali. Xato bo'lsa None."""
+    try:
+        import json as _json
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return float(_json.loads(result.stdout)["format"]["duration"])
+    except Exception:
+        return None
+
+
+def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
+    """api/routes.py:upload_video_fallback bilan bir xil ffmpeg buyrug'i --
+    transkripsiya aynan shu formatdagi WAV faylni kutadi (16kHz mono PCM).
+    Muvaffaqiyatsiz bo'lsa False (fayl buzilgan/qo'llab-quvvatlanmaydigan)."""
+    proc = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(video_path), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_path)],
+        capture_output=True, text=True,
+    )
+    return proc.returncode == 0
+
+
+async def create_job_from_local_video_file(
+    db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
+) -> JobCreationResult:
+    """Diskda allaqachon mavjud video fayldan (YouTube havolasisiz) yangi job
+    yaratadi -- Telegram bot (backend/telegram_bot.py:handle_video) foydalanuvchi
+    video faylni to'g'ridan-to'g'ri yuborganda shu orqali ishlaydi (2026-09-04).
+
+    api/routes.py:upload_video_fallback bilan bir xil fayl->audio mantig'i
+    (video_path chaqiruvchi tomonidan allaqachon diskka yozilgan bo'lishi
+    kerak -- job_id bilan nomlangan papkada), create_dubbing_job bilan bir
+    xil davomiylik/kvota tekshiruvi.
+
+    Metadata (sarlavha/tavsif) Safety Gate BU YERDA yo'q -- fayl yuklashda
+    metadata umuman mavjud emas. Transkripsiyadan keyingi Safety Gate
+    (backend/workers/tasks.py, "transcript" bosqichi) esa BARCHA joblar uchun
+    -- manbasidan qat'i nazar -- o'zgarishsiz, shartsiz ishlaydi va aynan shu
+    yo'lni ham to'liq qamrab oladi."""
+    duration = _media_duration_seconds(video_path)
+    if not duration:
+        video_path.unlink(missing_ok=True)
+        return JobCreationResult(outcome="bad_file")
+
+    duration_minutes = duration / 60.0
+    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+        video_path.unlink(missing_ok=True)
+        return JobCreationResult(outcome="too_long", duration_minutes=duration_minutes)
+
+    covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
+    if not covered:
+        video_path.unlink(missing_ok=True)
+        return JobCreationResult(
+            outcome="insufficient_minutes", duration_minutes=duration_minutes, minutes_short=minutes_short,
+        )
+
+    audio_path = video_path.parent / "audio.wav"
+    if not _extract_audio_wav(video_path, audio_path):
+        video_path.unlink(missing_ok=True)
+        return JobCreationResult(outcome="bad_file")
+
+    from backend.services.plans import consume_quota, get_job_queue
+
+    job = DubbingJob(
+        id=job_id,
+        user_id=user.id,
+        youtube_url=source_url,
+        video_duration=duration,
+        voice_gender_setting=voice_gender,
+        original_video_path=str(video_path),
+        status=JobStatus.PENDING,
+        progress=0.0,
+        status_message="Navbatga qo'shildi",
+    )
+    db.add(job)
+    db.commit()
+
+    consume_quota(db, user.id, duration_minutes)
+    job.quota_consumed = True
+    db.commit()
+    process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
+    return JobCreationResult(outcome="queued", job_id=job_id, duration_minutes=duration_minutes)
 
 
 async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cached_job: DubbingJob, voice_gender: str) -> JobCreationResult:

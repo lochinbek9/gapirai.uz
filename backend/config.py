@@ -105,6 +105,23 @@ class Settings(BaseSettings):
     # jarayoni ishga tushmaydi va bildirishnomalar jimgina o'tkazib
     # yuboriladi (backend/services/telegram_notify.py: fail-open).
     TELEGRAM_BOT_TOKEN: str = ""
+
+    # Self-hosted local Telegram Bot API server (docker-compose.yml:
+    # telegram-bot-api, aiogram/telegram-bot-api image) -- rasmiy
+    # api.telegram.org 20MB'dan katta faylni yuklab bo'lmaydi, bu esa to'liq
+    # metrajli videolarni bot orqali qabul qilishga yetarli emas. Mahalliy
+    # server bilan bu chegara 2000MB'ga ko'tariladi (2026-09-04). API_ID/
+    # API_HASH https://my.telegram.org'dan -- shaxsiy hisob orqali, qo'lda,
+    # bir martalik qadam (avtomatlashtirilmaydi). Uchalasi ham bo'sh bo'lsa
+    # bot oddiy api.telegram.org'ga ulanadi va video-fayl qabul qilish
+    # o'chiq qoladi (backend/telegram_bot.py: faqat YouTube havolasi
+    # ishlaydi, xatosiz) -- mavjud YouTube-havola oqimiga hech qanday ta'sir
+    # qilmaydi.
+    TELEGRAM_API_ID: str = ""
+    TELEGRAM_API_HASH: str = ""
+    # telegram_bot konteyneridan telegram-bot-api konteyneriga ichki compose
+    # tarmog'i orqali manzil, masalan "http://telegram-bot-api:8081".
+    TELEGRAM_LOCAL_API_URL: str = ""
     # Tarjima uchun — gpt-4o-mini sifat jihatidan gpt-4o'ga deyarli teng
     # chiqdi (real taqqoslashda tasdiqlangan), narxi esa ~17x arzon.
     OPENAI_MODEL: str = "gpt-4o-mini"

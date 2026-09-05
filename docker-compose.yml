@@ -138,6 +138,32 @@ services:
     command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing -c ${WORKER_CONCURRENCY:-4}
 
   # ──────────────────────────────
+  # Self-hosted local Telegram Bot API server -- OPTIONAL, only actually used
+  # once TELEGRAM_API_ID/TELEGRAM_API_HASH are set in .env (see
+  # backend/config.py). Raises the file-download limit from api.telegram.org's
+  # 20MB to 2GB so telegram_bot can accept a video file directly (2026-09-04).
+  # The container always starts (it's harmless idle otherwise) -- telegram_bot
+  # only points at it when TELEGRAM_LOCAL_API_URL is also set.
+  #
+  # The SAME named volume is mounted at the SAME absolute path here and in
+  # telegram_bot below on purpose: in --local mode (TELEGRAM_LOCAL=1) this
+  # server hands python-telegram-bot an absolute file path on ITS OWN disk
+  # instead of serving the file over HTTP -- telegram_bot's local_mode(True)
+  # then just reads/copies that path directly. If the paths didn't match
+  # inside both containers, that path would resolve to nothing in telegram_bot.
+  # ──────────────────────────────
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    container_name: dubber_telegram_bot_api
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_LOCAL: "1"
+    volumes:
+      - telegram_bot_api_data:/var/lib/telegram-bot-api
+
+  # ──────────────────────────────
   # Telegram bot -- to'liq dublyaj xizmati Telegram ichida (backend/telegram_bot.py).
   # Job yaratish mantig'i backend/services/job_creation.py orqali web API
   # bilan bir xil (Safety Gate, kvota, davomiylik chegarasi hammasi ishlaydi).
@@ -162,12 +188,16 @@ services:
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro
+      # telegram-bot-api bilan bir xil path -- yuqoridagi izohga qarang.
+      - telegram_bot_api_data:/var/lib/telegram-bot-api
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       pot-provider:
+        condition: service_started
+      telegram-bot-api:
         condition: service_started
     command: python3 -m backend.telegram_bot
 
@@ -193,3 +223,4 @@ services:
 volumes:
   postgres_data:
   oauth_cache:
+  telegram_bot_api_data:

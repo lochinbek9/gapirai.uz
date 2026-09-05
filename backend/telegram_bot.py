@@ -18,6 +18,8 @@ telegram_bot), long-polling rejimida.
 """
 import logging
 import re
+import uuid
+from pathlib import Path
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -34,6 +36,7 @@ from backend.models.database import SessionLocal, User, DubbingJob, JobStatus
 from backend.services.job_creation import (
     create_dubbing_job,
     create_click_payment,
+    create_job_from_local_video_file,
     is_valid_youtube_url,
 )
 from backend.services.resolution_variants import request_resolution
@@ -52,6 +55,23 @@ logger = logging.getLogger("telegram_bot")
 settings = get_settings()
 
 _PHONE_RE = re.compile(r"^\+998\d{9}$")
+
+# 2026-09-04: to'g'ridan-to'g'ri video fayl qabul qilish -- faqat mahalliy
+# Telegram Bot API server (docker-compose.yml: telegram-bot-api) sozlangan
+# bo'lsa ishlaydi (settings.TELEGRAM_LOCAL_API_URL), chunki rasmiy
+# api.telegram.org'ning 20MB yuklab olish chegarasi to'liq metrajli
+# videolar uchun deyarli hech qachon yetarli emas. routes.py:
+# _ALLOWED_UPLOAD_CONTENT_TYPES/_CONTENT_TYPE_TO_EXT bilan bir xil ro'yxat.
+_ALLOWED_VIDEO_MIME_TO_EXT = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-matroska": ".mkv",
+    "video/webm": ".webm",
+}
+# Mahalliy Bot API server (--local) o'zi ham 2000MB'dan katta faylni qabul
+# qilmaydi -- foydalanuvchiga tushunarli xabar berish uchun shu yerda ham
+# oldindan tekshiramiz.
+TELEGRAM_MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024
 
 
 def _normalize_uz_phone(raw: str) -> str | None:
@@ -206,6 +226,94 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         db.close()
 
 
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Foydalanuvchi video faylni to'g'ridan-to'g'ri yuborsa -- YouTube
+    havolasisiz, faylning o'zidan job yaratadi
+    (backend/services/job_creation.py:create_job_from_local_video_file).
+    Faqat mahalliy Telegram Bot API server sozlangan bo'lsa ishlaydi
+    (settings.TELEGRAM_LOCAL_API_URL) -- aks holda YouTube-havola oqimi
+    o'zgarishsiz, bu funksiya faqat aniq xabar bilan rad etadi."""
+    chat_id = str(update.effective_chat.id)
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
+    finally:
+        db.close()
+
+    if not user:
+        await update.message.reply_text("Avval /start buyrug'ini yuborib, telefon raqamingizni ulashing.")
+        return
+
+    if not settings.TELEGRAM_LOCAL_API_URL:
+        await update.message.reply_text(
+            "Uzr, hozircha video fayl qabul qilinmaydi — faqat YouTube havolasini yuboring."
+        )
+        return
+
+    media = update.message.video or update.message.document
+    if media is None:
+        return
+
+    ext = _ALLOWED_VIDEO_MIME_TO_EXT.get(getattr(media, "mime_type", None) or "")
+    if not ext:
+        await update.message.reply_text("Faqat MP4, MOV, MKV yoki WebM formatidagi video fayllar qabul qilinadi.")
+        return
+
+    if media.file_size and media.file_size > TELEGRAM_MAX_VIDEO_BYTES:
+        await update.message.reply_text(
+            f"Fayl hajmi {TELEGRAM_MAX_VIDEO_BYTES // (1024 ** 3)} GB dan katta bo'lmasligi kerak."
+        )
+        return
+
+    await update.message.reply_text("⏳ Video qabul qilinmoqda, biroz kuting...")
+
+    job_id = str(uuid.uuid4())
+    job_dir = Path(settings.UPLOAD_DIR) / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    video_path = job_dir / f"video{ext}"
+
+    try:
+        tg_file = await context.bot.get_file(media.file_id)
+        await tg_file.download_to_drive(custom_path=str(video_path))
+    except Exception:
+        logger.exception(f"Telegram fayl yuklashda xato: job={job_id}")
+        video_path.unlink(missing_ok=True)
+        await update.message.reply_text("Video faylini olishda xatolik yuz berdi. Qaytadan urinib ko'ring.")
+        return
+
+    db = SessionLocal()
+    try:
+        # DB user'ni shu sessiyada qayta olish kerak -- yuqoridagi `user`
+        # boshqa (yopilgan) sessiyaga bog'langan edi (handle_text bilan bir xil naqsh).
+        user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
+        result = await create_job_from_local_video_file(
+            db, user, job_id, video_path,
+            source_url=f"telegram://file/{media.file_unique_id}",
+        )
+
+        if result.outcome == "bad_file":
+            await update.message.reply_text(
+                "Video faylini o'qib bo'lmadi — fayl buzilgan yoki qo'llab-quvvatlanmaydigan bo'lishi mumkin."
+            )
+        elif result.outcome == "too_long":
+            await update.message.reply_text(
+                f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). "
+                "Maksimal ruxsat etilgan davomiylik bilan qayta urinib ko'ring."
+            )
+        elif result.outcome == "insufficient_minutes":
+            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+            await update.message.reply_text(
+                f"Bu video ({result.duration_minutes:.0f} daqiqa) uchun {result.minutes_short} daqiqa yetishmayapti.\n\n"
+                f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
+            )
+        elif result.outcome == "queued":
+            await update.message.reply_text(
+                "✅ Video navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
+            )
+    finally:
+        db.close()
+
+
 async def handle_resolution_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Dublyaj tayyor bo'lganda yuborilgan xabardagi 360p/720p/1080p
     tugmalaridan biri bosilganda ishga tushadi -- veb bilan bir xil
@@ -249,9 +357,21 @@ def main() -> None:
         logger.error("TELEGRAM_BOT_TOKEN sozlanmagan -- bot ishga tushmaydi.")
         return
 
-    app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
+    builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
+    if settings.TELEGRAM_LOCAL_API_URL:
+        # Self-hosted local Bot API server (docker-compose.yml: telegram-bot-api)
+        # -- 20MB'lik rasmiy chegara o'rniga 2GB'gacha. local_mode(True)
+        # get_file()/download_to_drive()'ni serverga qayta HTTP so'rov
+        # yubormasdan, u allaqachon saqlagan lokal fayl yo'lidan to'g'ridan-to'g'ri
+        # o'qishga o'tkazadi (shared volume ikkala konteynerda ham bir xil
+        # yo'lda ulangan bo'lishi shart -- docker-compose.yml izohiga qarang).
+        base = settings.TELEGRAM_LOCAL_API_URL.rstrip("/")
+        builder = builder.base_url(f"{base}/bot").local_mode(True)
+        logger.info(f"Telegram bot mahalliy Bot API server orqali ishga tushmoqda: {base}")
+    app = builder.build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(handle_resolution_callback, pattern=r"^res:"))
 
