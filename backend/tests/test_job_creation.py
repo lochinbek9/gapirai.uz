@@ -91,6 +91,12 @@ class TestCreateDubbingJobCacheReuse(unittest.IsolatedAsyncioTestCase):
         self.user = User(id=uuid.uuid4(), name="Test User")
         self.youtube_url = "https://www.youtube.com/watch?v=abc12345678"
 
+        # Kunlik job chegarasi -- bu testlar kesh-hit qarorini tekshiradi,
+        # chegara emas (chegara test_daily_job_limit'da alohida sinaladi).
+        _p = patch.object(job_creation, "_daily_job_limit_reached", return_value=False)
+        _p.start()
+        self.addCleanup(_p.stop)
+
         # check_dubbing_job/videoni bazaga tegmasdan qisqa deb hisoblaydigan
         # get_video_info javobi -- 45 daqiqadan qisqa, check_quota shu bilan
         # bazaga tegmasdan (True, 0) qaytaradi (backend/services/plans.py:129).
@@ -177,6 +183,44 @@ class TestCreateDubbingJobCacheReuse(unittest.IsolatedAsyncioTestCase):
         mock_process_video.apply_async.assert_called_once()
         self.assertEqual(result.outcome, "queued")
         self.assertIsNotNone(result.job_id)
+
+    async def test_daily_limit_reached_short_circuits_before_any_work(self):
+        """Kunlik chegara -- get_video_info'gacha ham bormasdan
+        "daily_limit" qaytaradi."""
+        with patch.object(job_creation, "_daily_job_limit_reached", return_value=True), \
+             patch.object(job_creation, "get_settings", return_value=MagicMock(MAX_JOBS_PER_DAY=20)), \
+             patch("backend.services.job_creation.get_video_info") as mock_get_info:
+            result = await job_creation.create_dubbing_job(self.db, self.user, self.youtube_url)
+
+        self.assertEqual(result.outcome, "daily_limit")
+        self.assertEqual(result.daily_limit, 20)
+        mock_get_info.assert_not_called()
+
+
+class TestDailyJobLimit(unittest.TestCase):
+    """_daily_job_limit_reached() -- settings.MAX_JOBS_PER_DAY chegarasi."""
+
+    def _db_returning_count(self, n: int):
+        db = MagicMock()
+        db.query.return_value.filter.return_value.count.return_value = n
+        return db
+
+    @patch.object(job_creation, "get_settings")
+    def test_below_limit_is_allowed(self, mock_gs):
+        mock_gs.return_value = MagicMock(MAX_JOBS_PER_DAY=20)
+        self.assertFalse(job_creation._daily_job_limit_reached(self._db_returning_count(19), uuid.uuid4()))
+
+    @patch.object(job_creation, "get_settings")
+    def test_at_limit_is_blocked(self, mock_gs):
+        mock_gs.return_value = MagicMock(MAX_JOBS_PER_DAY=20)
+        self.assertTrue(job_creation._daily_job_limit_reached(self._db_returning_count(20), uuid.uuid4()))
+
+    @patch.object(job_creation, "get_settings")
+    def test_zero_limit_disables_and_never_queries(self, mock_gs):
+        mock_gs.return_value = MagicMock(MAX_JOBS_PER_DAY=0)
+        db = MagicMock()
+        self.assertFalse(job_creation._daily_job_limit_reached(db, uuid.uuid4()))
+        db.query.assert_not_called()
 
 
 if __name__ == "__main__":

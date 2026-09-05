@@ -222,6 +222,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 f"{result.minutes_short} daqiqa yetishmayapti.\n\n"
                 f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
             )
+        elif result.outcome == "daily_limit":
+            await update.message.reply_text(
+                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+                "Ertaga qaytadan urinib ko'ring."
+            )
     finally:
         db.close()
 
@@ -315,6 +320,11 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(
                 f"Bu video ({result.duration_minutes:.0f} daqiqa) uchun {result.minutes_short} daqiqa yetishmayapti.\n\n"
                 f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
+            )
+        elif result.outcome == "daily_limit":
+            await update.message.reply_text(
+                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+                "Ertaga qaytadan urinib ko'ring."
             )
         elif result.outcome == "queued":
             await update.message.reply_text(

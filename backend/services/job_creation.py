@@ -93,7 +93,7 @@ def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
 
 Outcome = Literal[
     "queued", "ready", "insufficient_minutes", "blocked", "too_long",
-    "invalid_url", "fetch_error", "bad_file",
+    "invalid_url", "fetch_error", "bad_file", "daily_limit",
 ]
 
 
@@ -106,6 +106,29 @@ class JobCreationResult:
     amount: int | None = None
     error_detail: str | None = None
     minutes_short: int | None = None  # outcome="insufficient_minutes" uchun
+    daily_limit: int | None = None    # outcome="daily_limit" uchun (chegara qiymati)
+
+
+def _daily_job_limit_reached(db: Session, user_id) -> bool:
+    """settings.MAX_JOBS_PER_DAY -- bitta foydalanuvchi 24 soatда yaratgan
+    (FAILED bo'lmagan) joblar soni shu chegaraga yetган bo'lsa True. Tarif
+    daqiqa kvotasidan ALOHIDA to'siq: runaway sikl / abuse navbatni
+    to'ldirib qo'ymasligi uchun. 0 = o'chirilgan."""
+    limit = get_settings().MAX_JOBS_PER_DAY
+    if not limit or limit <= 0:
+        return False
+    from datetime import timedelta
+    since = datetime.utcnow() - timedelta(hours=24)
+    count = (
+        db.query(DubbingJob)
+        .filter(
+            DubbingJob.user_id == user_id,
+            DubbingJob.created_at >= since,
+            DubbingJob.status != JobStatus.FAILED,
+        )
+        .count()
+    )
+    return count >= limit
 
 
 def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[bool, int]:
@@ -132,6 +155,9 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
     yoki Telegram xabari) ko'rinishini tanlaydi."""
     if not is_valid_youtube_url(youtube_url):
         return JobCreationResult(outcome="invalid_url")
+
+    if _daily_job_limit_reached(db, user.id):
+        return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
 
     # Kesh: agar shu video ALLAQACHON (istalgan foydalanuvchi tomonidan)
     # dublyaj qilingan bo'lsa, YouTube'ga so'rov yubormasdan (video ID
@@ -280,6 +306,10 @@ async def create_job_from_local_video_file(
     (backend/workers/tasks.py, "transcript" bosqichi) esa BARCHA joblar uchun
     -- manbasidan qat'i nazar -- o'zgarishsiz, shartsiz ishlaydi va aynan shu
     yo'lni ham to'liq qamrab oladi."""
+    if _daily_job_limit_reached(db, user.id):
+        video_path.unlink(missing_ok=True)
+        return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
+
     duration = _media_duration_seconds(video_path)
     if not duration:
         video_path.unlink(missing_ok=True)
