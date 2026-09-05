@@ -398,3 +398,18 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+def telegram_api_base() -> str:
+    """Telegram Bot API bazaviy manzili. Mahalliy server sozlangan bo'lsa
+    (TELEGRAM_LOCAL_API_URL, docker-compose.yml: telegram-bot-api) -- o'sha,
+    aks holda rasmiy bulut.
+
+    Botning O'ZI (telegram_bot.py, long-polling) va undan MUSTAQIL chiquvchi
+    xabarlar (telegram_notify.py -- "video tayyor", telegram_service.py --
+    baho/fikr) IKKALASI HAM shu manzildan foydalanishi SHART: bot mahalliy
+    serverga ko'chirilgach (bir martalik logOut), rasmiy bulut API o'sha
+    token uchun 401 qaytaradi -- ya'ni to'g'ridan-to'g'ri api.telegram.org'ga
+    yuborilgan har qanday sendMessage muvaffaqiyatsiz bo'ladi."""
+    base = (get_settings().TELEGRAM_LOCAL_API_URL or "").rstrip("/")
+    return base or "https://api.telegram.org"

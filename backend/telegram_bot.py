@@ -275,6 +275,16 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         tg_file = await context.bot.get_file(media.file_id)
         await tg_file.download_to_drive(custom_path=str(video_path))
+        # Mahalliy Bot API server (--local) faylni O'Z diskida saqlaydi va
+        # download_to_drive local rejimda uni KO'CHIRMAY, NUSXALAYDI --
+        # nusxa olingach asl faylni o'chiramiz, aks holda telegram_bot_api_data
+        # volume'i vaqt o'tib to'lib ketadi.
+        src = getattr(tg_file, "file_path", "") or ""
+        if src.startswith("/"):
+            try:
+                Path(src).unlink(missing_ok=True)
+            except OSError:
+                pass
     except Exception:
         logger.exception(f"Telegram fayl yuklashda xato: job={job_id}")
         video_path.unlink(missing_ok=True)

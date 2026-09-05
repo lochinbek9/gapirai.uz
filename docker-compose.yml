@@ -135,6 +135,10 @@ services:
         condition: service_healthy
       pot-provider:
         condition: service_started
+      # Job yakunlanganda "video tayyor" xabari telegram_notify.py orqali
+      # shu server orqali yuboriladi (bot bulutdan ko'chirilgan bo'lsa).
+      telegram-bot-api:
+        condition: service_started
     command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing -c ${WORKER_CONCURRENCY:-4}
 
   # ──────────────────────────────
