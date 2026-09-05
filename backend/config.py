@@ -14,6 +14,19 @@ class Settings(BaseSettings):
     # kerak bo'lsa kodga tegmasdan o'chirish mumkin.
     ENABLE_SEGMENT_QA: bool = True
     SEGMENT_QA_THRESHOLD: float = 0.75
+
+    # Bir foydalanuvchi 24 soat ichida yaratishi mumkin bo'lgan dublyaj
+    # joblari soni -- tarif daqiqa-kvotasidan ALOHIDA, uning ustidan
+    # qo'yilgan abuse / runaway-loop to'sig'i (backend/services/job_creation.py).
+    # FAILED joblar hisobga olinmaydi. 0 = cheksiz.
+    MAX_JOBS_PER_DAY: int = 20
+
+    # Disk auto-cleanup cron (backend/scripts/disk_cleanup.py) -- LOKAL disk
+    # nusxalarini eskirgach o'chiradi. S3 nusxalari alohida, o'z lifecycle'i
+    # bilan tozalanadi; bu esa outputs/ va uploads/ papkalarining cheksiz
+    # o'sishini to'xtatadi. 0 = o'sha papkani umuman tozalamaslik.
+    DISK_CLEANUP_OUTPUT_DAYS: int = 3
+    DISK_CLEANUP_UPLOAD_HOURS: int = 48
     # Tarjima tayyor bo'lgach, taxminiy TTS davomiyligi original segment
     # uzunligidan shu nisbatdan ko'p oshsa, bitta cheklangan qisqartirish
     # bosqichi ishga tushadi (translator.py). Avval 1.15 edi — foydalanuvchi

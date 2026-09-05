@@ -209,6 +209,12 @@ async def create_job(
                 "video_minutes": round(result.duration_minutes or 0, 1),
             },
         )
+    if result.outcome == "daily_limit":
+        raise HTTPException(
+            status_code=429,
+            detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+            "Ertaga qaytadan urinib ko'ring.",
+        )
     if result.outcome == "queued":
         return {"job_id": result.job_id, "status": "pending"}
     if result.outcome == "ready":
