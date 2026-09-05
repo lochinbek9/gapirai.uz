@@ -7,14 +7,17 @@ import logging
 
 import httpx
 
-from backend.config import get_settings
+from backend.config import get_settings, telegram_api_base
 
 logger = logging.getLogger(__name__)
 
 
 def _api_url(method: str) -> str:
     settings = get_settings()
-    return f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}"
+    # telegram_api_base(): mahalliy Bot API server sozlangan bo'lsa o'sha,
+    # aks holda api.telegram.org -- bot mahalliy serverga ko'chgach bulut
+    # 401 qaytaradi, shuning uchun bu chiquvchi xabar ham shu yerdan o'tishi shart.
+    return f"{telegram_api_base()}/bot{settings.TELEGRAM_BOT_TOKEN}/{method}"
 
 
 def send_telegram_message(chat_id: str, text: str, reply_markup: dict | None = None) -> bool:

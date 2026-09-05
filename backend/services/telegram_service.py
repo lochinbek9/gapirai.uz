@@ -6,7 +6,7 @@ import os
 import logging
 import httpx
 
-from backend.config import get_settings
+from backend.config import get_settings, telegram_api_base
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -65,7 +65,7 @@ def send_telegram_feedback(
         f"🔗 <b>Havola</b>: https://gapirai.uz/video/{job_id}"
     )
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = f"{telegram_api_base()}/bot{token}/sendMessage"
     payload = {
         "chat_id": target_chat,
         "text": text,
@@ -111,7 +111,7 @@ def send_telegram_platform_feedback(
         f"📝 <b>Xabar</b>: \"{message.strip()}\""
     )
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = f"{telegram_api_base()}/bot{token}/sendMessage"
     payload = {
         "chat_id": target_chat,
         "text": text,
