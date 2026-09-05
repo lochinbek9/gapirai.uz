@@ -279,6 +279,36 @@ class TestCrossHostCheckpointResume(unittest.TestCase):
 
         self.assertEqual(download_call_count["n"], 1, "a genuinely missing checkpoint must trigger a real download, not a stall")
 
+    def test_telegram_upload_job_with_lost_files_fails_permanently_not_ytdlp(self):
+        """A Telegram-uploaded video job (youtube_url = "telegram://file/...",
+        set by job_creation.create_job_from_local_video_file) whose local
+        audio.wav/video have been cleaned up must NOT be handed to yt-dlp --
+        the synthetic scheme just yields "Unsupported url scheme: telegram"
+        and 5 wasted retries. It has to fail immediately with a clear,
+        non-retryable error telling the user to re-send the file. The web
+        upload-video-fallback path is unaffected: it keeps a REAL youtube_url,
+        so it still (correctly) falls back to a fresh YouTube download here."""
+        self._make_job(
+            status=JobStatus.PENDING,
+            youtube_url="telegram://file/AgADBg0000fake",
+            original_video_path="/nonexistent/path/video.mp4",
+        )
+
+        def fail_if_called(*a, **kw):
+            raise AssertionError("a telegram:// job must never reach the YouTube downloader")
+
+        with patch("backend.workers.tasks.downloader.download_video", side_effect=fail_if_called), \
+             patch("backend.services.job_checkpoint.download_file_from_s3", return_value=False):
+            with self.assertRaises(PermanentError) as cm:
+                process_video.run(str(self.job_id))
+
+        self.assertEqual(cm.exception.code, "UPLOADED_SOURCE_MISSING")
+
+        self.db.expire_all()
+        row = self.db.query(DubbingJob).filter(DubbingJob.id == self.job_id).first()
+        self.assertEqual(row.status, JobStatus.FAILED)
+        self.assertEqual(row.error_code, "UPLOADED_SOURCE_MISSING")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -338,6 +338,27 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
             video_path = job.original_video_path
         else:
+            # Telegram bot orqali yuborilgan video fayl job'ining youtube_url'i
+            # sintetik ("telegram://file/..."), haqiqiy YouTube havolasi emas.
+            # Odatda lokal audio.wav/video hali joyida bo'lgani uchun yuqoridagi
+            # checkpoint bu bosqichni o'tkazib yuboradi -- lekin fayllar
+            # tozalanганdan keyin bu job qayta bu yerga tushsa (masalan qayta
+            # navbatga qo'yilsa, yoki checkpoint S3'da yo'q bo'lsa), synthetic
+            # URL'ni yt-dlp'ga berish mantiqsiz ("Unsupported url scheme:
+            # telegram") va 5 marta behuda retry qilinadi. Qayta yuklab olish
+            # IMKONSIZ, shuning uchun darhol, qayta-urinishsiz permanent xato --
+            # foydalanuvchi faylni Telegram orqali qaytadan yuborishi kerak.
+            # (Web'ning upload-video-fallback yo'li youtube_url'ni HAQIQIY
+            # havola sifatida saqlaydi, shuning uchun u bu yerda YouTube'dan
+            # qayta yuklashga o'tishi -- to'g'ri xatti-harakat -- buzilmaydi.)
+            from backend.services.job_creation import is_valid_youtube_url
+            if not is_valid_youtube_url(job.youtube_url or ""):
+                raise PermanentError(
+                    "Yuklangan video fayl serverda topilmadi (vaqtinchalik fayllar "
+                    "tozalangan bo'lishi mumkin). Iltimos, videoni Telegram orqali "
+                    "qaytadan yuboring.",
+                    code="UPLOADED_SOURCE_MISSING",
+                )
             _update_job(db, job, JobStatus.DOWNLOADING, 5.0, "YouTube'dan yuklanmoqda...")
             download_result = downloader.download_video(job.youtube_url, job_id)
             job.video_title = download_result["title"]
