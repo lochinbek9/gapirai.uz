@@ -1,8 +1,40 @@
 'use client'
 
+import Cookies from 'js-cookie'
 import { apiClient } from './api'
 import { setToken, setStoredUser } from './auth'
 import { getApiUrl } from './runtime-config'
+
+// Telegram WebView ichida ekanligimizni bildiruvchi bayroq. /tma auth
+// paytida qo'yiladi, keyin butun sayt shu orqali marketing chrome'ni
+// (PWA banner, fikr widgeti) yashiradi. Maxfiy ma'lumot emas -- shunchaki
+// UI ishorasi.
+const TMA_FLAG_COOKIE = 'tma_mode'
+
+function tmaCookieDomain(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  return window.location.hostname.endsWith('gapirai.uz') ? '.gapirai.uz' : undefined
+}
+
+export function markTmaMode() {
+  try {
+    Cookies.set(TMA_FLAG_COOKIE, '1', { expires: 1, sameSite: 'lax', domain: tmaCookieDomain() })
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Sayt Telegram Mini App ichida ochilganmi. Faqat klient tomonда to'g'ri
+ *  ishlaydi (SSR'da har doim false) -- chaqiruvchi mount'dan keyin tekshirsin. */
+export function isTmaMode(): boolean {
+  if (typeof window === 'undefined') return false
+  if (getWebApp()?.initData) return true
+  try {
+    return Cookies.get(TMA_FLAG_COOKIE) === '1'
+  } catch {
+    return false
+  }
+}
 
 // Telegram WebApp SDK'ning bizga kerakli qismi (to'liq typing shart emas).
 export interface TelegramWebApp {
@@ -71,6 +103,7 @@ export async function authenticateTma(initData: string): Promise<TmaUser> {
   }
   apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
   setStoredUser({ id: user.id, name: user.name, email: user.email })
+  markTmaMode()
   return user
 }
 
