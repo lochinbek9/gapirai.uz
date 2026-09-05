@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MessageSquarePlus, X, Star, Send, CheckCircle2, Loader2 } from 'lucide-react'
 import { submitPlatformFeedback } from '@/lib/api'
+import { useIsTmaMode } from '@/hooks/useIsTmaMode'
 
 export default function PlatformFeedbackWidget() {
   const [open, setOpen] = useState(false)
@@ -13,6 +14,7 @@ export default function PlatformFeedbackWidget() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isTma = useIsTmaMode()
 
   const handleClose = () => {
     setOpen(false)
@@ -43,6 +45,8 @@ export default function PlatformFeedbackWidget() {
   }
 
   const activeStars = hoverRating || rating
+
+  if (isTma) return null
 
   return (
     <>

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Download, X } from 'lucide-react'
+import { useIsTmaMode } from '@/hooks/useIsTmaMode'
 
 // Service worker registratsiyasi + "Ilovani o'rnatish" banneri (Android/Chrome
 // beforeinstallprompt). iOS Safari beforeinstallprompt bermaydi — u yerda
@@ -8,6 +9,7 @@ import { Download, X } from 'lucide-react'
 export default function PwaProvider() {
   const [deferred, setDeferred] = useState<any>(null)
   const [show, setShow] = useState(false)
+  const isTma = useIsTmaMode()
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
@@ -30,7 +32,7 @@ export default function PwaProvider() {
     return () => window.removeEventListener('beforeinstallprompt', onPrompt)
   }, [])
 
-  if (!show) return null
+  if (isTma || !show) return null
 
   const install = async () => {
     if (!deferred) return
