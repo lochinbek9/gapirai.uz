@@ -135,6 +135,10 @@ class Settings(BaseSettings):
     # telegram_bot konteyneridan telegram-bot-api konteyneriga ichki compose
     # tarmog'i orqali manzil, masalan "http://telegram-bot-api:8081".
     TELEGRAM_LOCAL_API_URL: str = ""
+    # Telegram Mini App manzili (bot menu tugmasi + /app buyrug'i shu yerni
+    # ochadi). Bo'sh bo'lsa FRONTEND_URL + "/tma" ishlatiladi. Telegram faqat
+    # HTTPS qabul qiladi -- HTTPS bo'lmasa menu tugmasi qo'yilmaydi.
+    TELEGRAM_MINIAPP_URL: str = ""
     # Tarjima uchun — gpt-4o-mini sifat jihatidan gpt-4o'ga deyarli teng
     # chiqdi (real taqqoslashda tasdiqlangan), narxi esa ~17x arzon.
     OPENAI_MODEL: str = "gpt-4o-mini"

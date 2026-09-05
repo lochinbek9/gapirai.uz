@@ -21,7 +21,16 @@ import re
 import uuid
 from pathlib import Path
 
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import (
+    Update,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    MenuButtonWebApp,
+    WebAppInfo,
+)
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -53,6 +62,18 @@ for _noisy in ("httpx", "httpcore", "telegram.ext.Application"):
 logger = logging.getLogger("telegram_bot")
 
 settings = get_settings()
+
+
+def _miniapp_url() -> str | None:
+    """Telegram Mini App manzili. TELEGRAM_MINIAPP_URL bo'sh bo'lsa
+    FRONTEND_URL'dan /tma sifatida hosil qilinadi. Telegram faqat HTTPS
+    qabul qiladi -- localhost/dev'da None qaytadi (menu tugmasi qo'yilmaydi)."""
+    url = (settings.TELEGRAM_MINIAPP_URL or "").strip()
+    if not url:
+        base = (settings.FRONTEND_URL or "").rstrip("/")
+        url = f"{base}/tma" if base else ""
+    return url if url.startswith("https://") else None
+
 
 _PHONE_RE = re.compile(r"^\+998\d{9}$")
 
@@ -108,7 +129,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user:
         await update.message.reply_text(
             f"Xush kelibsiz, {user.name or ''}! 👋\n\n"
-            "Menga istalgan YouTube havolasini yuboring — o'zbek tiliga dublyaj qilib beraman."
+            "Menga istalgan YouTube havolasini yoki video faylni yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
+            "Yoki ilovani ochib, videolaringiz va tarif holatini ko'ring:",
+            reply_markup=_miniapp_markup(),
         )
         return
 
@@ -120,6 +143,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "hisobingiz avtomatik tanilib, obuna/kvotangiz shu yerda ham ishlaydi):",
         reply_markup=ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True),
     )
+
+
+def _miniapp_markup() -> InlineKeyboardMarkup | None:
+    """"GapirAI ilovasini ochish" inline WebApp tugmasi -- URL sozlangan
+    bo'lsagina (HTTPS). Aks holda None (tugmasiz xabar)."""
+    url = _miniapp_url()
+    if not url:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🚀 GapirAI ilovasi", web_app=WebAppInfo(url=url))]])
+
+
+async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/app -- Mini App'ni ochuvchi tugma. Guruhlarda menu tugmasi
+    ko'rinmagani uchun ham foydali."""
+    markup = _miniapp_markup()
+    if not markup:
+        await update.message.reply_text("Ilova hozircha mavjud emas.")
+        return
+    await update.message.reply_text(
+        "GapirAI ilovasi — videolaringiz, dublyaj holati, tarif va kutubxona bir joyda:",
+        reply_markup=markup,
+    )
+
+
+async def _post_init(application: Application) -> None:
+    """Bot ishga tushganda standart menu tugmasini Mini App'ga o'rnatadi
+    (barcha foydalanuvchilar uchun, chat_id ko'rsatilmagan)."""
+    url = _miniapp_url()
+    if not url:
+        logger.info("TELEGRAM_MINIAPP_URL (yoki HTTPS FRONTEND_URL) yo'q -- menu tugmasi o'rnatilmadi.")
+        return
+    try:
+        await application.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="GapirAI", web_app=WebAppInfo(url=url))
+        )
+        logger.info(f"Menu tugmasi Mini App'ga o'rnatildi: {url}")
+    except Exception as e:
+        logger.warning(f"Menu tugmasini o'rnatib bo'lmadi: {e}")
 
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -160,9 +221,12 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(
         f"Rahmat, {name}! Hisobingiz ulandi. ✅\n\n"
-        "Endi menga istalgan YouTube havolasini yuboring — dublyajni boshlayman.",
+        "Endi menga istalgan YouTube havolasini yoki video faylni yuboring — dublyajni boshlayman.",
         reply_markup=ReplyKeyboardRemove(),
     )
+    markup = _miniapp_markup()
+    if markup:
+        await update.message.reply_text("Videolaringiz va tarif holatini ilovada kuzating:", reply_markup=markup)
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -224,7 +288,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
         elif result.outcome == "daily_limit":
             await update.message.reply_text(
-                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
                 "Ertaga qaytadan urinib ko'ring."
             )
     finally:
@@ -323,7 +387,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
         elif result.outcome == "daily_limit":
             await update.message.reply_text(
-                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
                 "Ertaga qaytadan urinib ko'ring."
             )
         elif result.outcome == "queued":
@@ -377,7 +441,7 @@ def main() -> None:
         logger.error("TELEGRAM_BOT_TOKEN sozlanmagan -- bot ishga tushmaydi.")
         return
 
-    builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
+    builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).post_init(_post_init)
     if settings.TELEGRAM_LOCAL_API_URL:
         # Self-hosted local Bot API server (docker-compose.yml: telegram-bot-api)
         # -- 20MB'lik rasmiy chegara o'rniga 2GB'gacha. local_mode(True)
@@ -390,6 +454,7 @@ def main() -> None:
         logger.info(f"Telegram bot mahalliy Bot API server orqali ishga tushmoqda: {base}")
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("app", app_command))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
