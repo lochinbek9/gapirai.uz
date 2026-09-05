@@ -4,8 +4,11 @@ chapterlar, konspekt, test va savol-javob generatsiya qiladi.
 
 Bitta servis, bitta transkript — har bir metod allaqachon olingan
 transcript_segments'dan ishlaydi (backend.services.transcriber orqali),
-hech qachon qayta transkripsiya qilmaydi. Barcha chaqiruvlar
-OPENAI_LIGHT_MODEL (gpt-4o-mini) bilan, JSON rejimida ishlaydi.
+hech qachon qayta transkripsiya qilmaydi. Barcha chaqiruvlar bitta
+_call_json() orqali, JSON rejimida: OPENAI_LIGHT_MODEL, va OpenAI xato
+bersa (masalan krediti tugasa) avtomatik Gemini'ga o'tadi — aks holda
+butun Learning Workspace navbatda qotib qolardi (translator.py bilan
+bir xil sabab, 2026-09-05).
 
 Xavfsizlik qoidasi (bugungi tarjima segmentlari xatosidan saboq): LLM
 javobidagi raqamli/strukturaviy maydonlar (timestamp, id, index) hech
@@ -15,6 +18,7 @@ tahlilni qulatmaydi.
 """
 import json
 import logging
+import time
 
 from openai import OpenAI
 
@@ -133,11 +137,46 @@ def _safe_float(value, default: float = 0.0) -> float:
         return default
 
 
+def _gemini_json(system_prompt: str, user_message: str, max_attempts: int = 5) -> dict:
+    """OpenAI muqobili -- translator._translate_chunk_gemini bilan bir xil
+    naqsh. Gemini ba'zan 429 beradi yoki JSON'ni yopuvchi qavssiz uzib
+    qo'yadi, shuning uchun ikkalasi ham qayta urinishga sabab bo'ladi."""
+    from google.genai import types
+    from backend.services.translator import _get_gemini_client, _gemini_text_model
+
+    config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        temperature=0.4,
+        response_mime_type="application/json",
+    )
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            response = _get_gemini_client().models.generate_content(
+                model=_gemini_text_model(), contents=user_message, config=config,
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            last_err = e
+            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+            if attempt == max_attempts - 1 or not (is_rate_limit or isinstance(e, json.JSONDecodeError)):
+                raise
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"Gemini JSON javobini o'qib bo'lmadi: {last_err}")
+
+
 def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3) -> dict:
-    """OpenAI'ga JSON-rejim so'rov, JSON parse xatosida qayta uriniladi
-    (Gemini tarjimasida ko'p marta ko'rilgan "yaxshi javob, buzuq JSON"
-    holatiga qarshi — bu yerda OpenAI JSON mode bilan kamdan-kam, lekin
-    baribir himoya sifatida saqlanadi)."""
+    """LLM'ga JSON-rejim so'rov. TRANSLATE_PROVIDER=gemini bo'lsa (yoki OpenAI
+    kaliti umuman yo'q bo'lsa) to'g'ridan-to'g'ri Gemini; aks holda OpenAI, va
+    OpenAI xato bersa (masalan krediti tugasa) Gemini'ga o'tadi -- aks holda
+    butun Learning Workspace (konspekt / 5 daqiqa / test / AI ustoz) navbatda
+    qotib qolardi (2026-09-05, translator.py bilan bir xil sabab). JSON parse
+    xatosida ham qayta uriniladi (model "yaxshi javob, buzuq JSON" holati)."""
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+
+    if (settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY) and gemini_available:
+        return _gemini_json(system_prompt, user_message)
+
     last_err = None
     for attempt in range(max_attempts):
         try:
@@ -154,6 +193,11 @@ def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3) -> 
         except json.JSONDecodeError as e:
             last_err = e
             logger.warning(f"VideoAnalysis JSON parse xatosi, qayta urinish {attempt + 1}/{max_attempts}: {e}")
+        except Exception as e:
+            if gemini_available:
+                logger.warning(f"VideoAnalysis OpenAI xato ({e}) — Gemini'ga o'tilmoqda.")
+                return _gemini_json(system_prompt, user_message)
+            raise
     raise RuntimeError(f"JSON javobini o'qib bo'lmadi: {last_err}")
 
 
