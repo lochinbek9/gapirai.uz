@@ -151,7 +151,11 @@ class Settings(BaseSettings):
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.5-flash"
+    # 2026-09-05: Google endi "gemini-3.5-flash" VA "gemini-2.5-flash"ni yangi
+    # hisoblarga bermaydi ("404 NOT_FOUND ... no longer available to new
+    # users. Please update ... to use models/gemini-3.6-flash" -- productionda
+    # AI Studio kaliti bilan tasdiqlangan). .env override qilishi mumkin.
+    GEMINI_MODEL: str = "gemini-3.6-flash"
 
     # Tarjima provayderi: "openai" | "gemini"
     TRANSLATE_PROVIDER: str = "openai"
@@ -171,10 +175,11 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
     # OpenAI (Whisper/GPT) krediti tugagan holatda transkripsiya va tarjima
-    # uchun Vertex AI zaxirasi ishlatadigan matn modeli — GEMINI_MODEL'dan
-    # alohida, chunki u AI Studio katalogiga mo'ljallangan va Vertex'da
-    # mavjud bo'lmasligi mumkin (masalan "gemini-3.5-flash" Vertex'da 404).
-    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-2.5-flash"
+    # uchun ishlatiladigan matn modeli — GEMINI_MODEL'dan alohida saqlanadi
+    # (transcriber._transcribe_chunk_gemini buni Vertex/AI Studio ikkalasida
+    # ham ishlatadi). 2026-09-05: "gemini-2.5-flash" yangi hisoblarga
+    # berilmaydi (404), shuning uchun GEMINI_MODEL bilan bir xil default.
+    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-3.6-flash"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
