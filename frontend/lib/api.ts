@@ -637,6 +637,29 @@ export async function searchTranscript(analysisId: string, query: string): Promi
   return res.data
 }
 
+// ---- Donat (loyihani qo'llab-quvvatlash) — login shart emas ----
+export interface DonateOptions {
+  presets: number[]
+  min: number
+  max: number
+}
+
+export async function getDonateOptions(): Promise<DonateOptions> {
+  const res = await apiClient.get('/api/donate/options')
+  return res.data
+}
+
+export async function createDonation(body: {
+  amount: number
+  provider: 'click' | 'payme'
+  name?: string
+  email?: string
+  message?: string
+}): Promise<{ success: boolean; payment_url: string; payment_id: string; amount: number }> {
+  const res = await apiClient.post('/api/donate', body)
+  return res.data
+}
+
 const ANALYSIS_KEY = "dubber_last_analysis"
 
 export function saveAnalysisId(id: string) {

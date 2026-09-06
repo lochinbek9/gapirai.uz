@@ -2,10 +2,13 @@
 Click (click_routes.py) va Payme (payme_routes.py) ikkalasi ham shu yerdan
 foydalanadi, ikki joyda saqlanmaydi (2026-08-19, Payme integratsiyasi
 qo'shilganda click_routes.py'dan ajratib olindi)."""
+import logging
 from datetime import datetime
 
 from backend.models.database import DubbingJob, JobStatus, User
 from backend.workers.tasks import process_video
+
+logger = logging.getLogger(__name__)
 
 
 def apply_successful_payment(db, payment) -> None:
@@ -23,7 +26,28 @@ def apply_successful_payment(db, payment) -> None:
     if getattr(payment, "fulfilled_at", None):
         return
 
-    if payment.is_library_access:
+    if getattr(payment, "is_donation", False):
+        # Donat -- yetkaziladigan narsa yo'q. Faqat qayd etamiz va (email
+        # bo'lsa) rahmat xabari yuboramiz. Xabar yuborilmasa ham donat
+        # bekor bo'lmaydi (fail-open).
+        logger.info(f"Donat tasdiqlandi: payment={payment.id} amount={payment.amount} donor={payment.donor_name or 'anonim'}")
+        if payment.donor_email:
+            try:
+                from backend.services.email_service import send_billing_email
+                send_billing_email(
+                    to_email=payment.donor_email,
+                    name=payment.donor_name or "",
+                    subject="Rahmat! Loyihani qo'llab-quvvatlaganingiz uchun",
+                    body_lines=[
+                        f"GapirAI.uz loyihasiga {int(payment.amount):,} so'm hissa qo'shganingiz uchun katta rahmat.".replace(",", " "),
+                        "Sizning yordamingiz videolarni ko'proq odamga, tezroq yetkazishga imkon beradi.",
+                    ],
+                    cta_text="Saytga o'tish",
+                    cta_url="https://gapirai.uz",
+                )
+            except Exception as e:
+                logger.warning(f"Donat rahmat xabari yuborilmadi payment={payment.id}: {e}")
+    elif payment.is_library_access:
         user = db.query(User).filter(User.id == payment.user_id).first()
         if user and user.library_access_purchased_at is None:
             user.library_access_purchased_at = datetime.utcnow()

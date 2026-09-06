@@ -40,6 +40,7 @@ from backend.api.minutes_routes import router as minutes_router
 from backend.api.push_routes import router as push_router
 from backend.api.billing_routes import router as billing_router
 from backend.api.tma_routes import router as tma_router
+from backend.api.donate_routes import router as donate_router
 
 settings = get_settings()
 
@@ -328,6 +329,7 @@ app.include_router(minutes_router)
 app.include_router(push_router)
 app.include_router(billing_router)
 app.include_router(tma_router)
+app.include_router(donate_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
