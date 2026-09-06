@@ -167,6 +167,23 @@ async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+async def donate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/donate -- loyihani qo'llab-quvvatlash sahifasiga havola. Sahifa
+    login talab qilmaydi (backend/api/donate_routes.py), oddiy brauzerda
+    ochiladi -- to'lov (Click/Payme) redirect'lari WebView'dan ko'ra tashqi
+    brauzerda ishonchliroq, shuning uchun web_app emas, oddiy url tugmasi."""
+    base = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+    markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("💛 Qo'llab-quvvatlash", url=f"{base}/donate")]]
+    )
+    await update.message.reply_text(
+        "GapirAI.uz — mustaqil loyiha. 🙏\n\n"
+        "Har bir hissa videolarni ko'proq odamga, tezroq yetkazishga yordam beradi. "
+        "Click yoki Payme orqali istalgan summada qo'llab-quvvatlashingiz mumkin:",
+        reply_markup=markup,
+    )
+
+
 async def _post_init(application: Application) -> None:
     """Bot ishga tushganda standart menu tugmasini Mini App'ga o'rnatadi
     (barcha foydalanuvchilar uchun, chat_id ko'rsatilmagan)."""
@@ -455,6 +472,7 @@ def main() -> None:
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("app", app_command))
+    app.add_handler(CommandHandler("donate", donate_command))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

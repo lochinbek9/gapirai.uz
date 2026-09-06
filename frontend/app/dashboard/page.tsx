@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
 import PushOptIn from '@/components/PushOptIn'
 import BillingCard from '@/components/billing/BillingCard'
+import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown
@@ -276,6 +277,7 @@ export default function DashboardPage() {
         <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
         <BillingCard />
         <PushOptIn />
+        <DonateCTA className="mb-6" />
 
         <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
 
