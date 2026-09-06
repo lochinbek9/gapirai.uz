@@ -77,7 +77,17 @@ class Payment(Base):
     card_id = Column(UUID(as_uuid=True), ForeignKey("payment_cards.id"), nullable=True)
     is_auto = Column(Boolean, default=False, nullable=False)
     fulfilled_at = Column(DateTime, nullable=True)
-    
+
+    # 2026-09-05: loyihaga ixtiyoriy donat (qo'llab-quvvatlash). job_id/plan/
+    # is_library_access/minutes_purchased ning hech biri o'rnatilmaydi.
+    # user_id ham NULL bo'lishi mumkin (login shart emas) -- donor o'zini
+    # ixtiyoriy tanishtiradi. Fulfillment yetkaziladigan narsa yo'q, faqat
+    # fulfilled_at + rahmat xabari (backend/services/payment_fulfillment.py).
+    is_donation = Column(Boolean, default=False, nullable=False)
+    donor_name = Column(String(120), nullable=True)
+    donor_email = Column(String(255), nullable=True)
+    donor_message = Column(String(500), nullable=True)
+
     click_transaction_id = Column(String, index=True)
     click_prepare_id = Column(BigInteger)
     click_status = Column(Integer)

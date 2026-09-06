@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Send, Youtube, Instagram, Github, Mail, ShieldCheck, FileText, Users, Info, Smartphone, Apple } from 'lucide-react'
+import { Send, Youtube, Instagram, Github, Mail, ShieldCheck, FileText, Users, Info, Smartphone, Apple, Heart } from 'lucide-react'
 
 export default function Footer() {
   return (
@@ -39,6 +39,11 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/about" className="hover:text-blue-600 dark:hover:text-blue-400 transition">Afzalliklarimiz</Link>
+              </li>
+              <li>
+                <Link href="/donate" className="inline-flex items-center gap-1 font-semibold text-rose-500 hover:text-rose-600 transition">
+                  <Heart className="w-3.5 h-3.5" fill="currentColor" /> Loyihani qo‘llab-quvvatlash
+                </Link>
               </li>
             </ul>
           </div>
