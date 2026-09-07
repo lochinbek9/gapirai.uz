@@ -83,9 +83,9 @@ export default function VideoResult({ job, onReset }: Props) {
         >
           <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-            Video tayyor va shaxsiy foydalanish uchun mavjud, lekin kontent siyosatimizga ko'ra
-            (diniy, 18+, zo'ravonlik yoki shunga o'xshash kategoriya) <strong>Ommaviy videolar</strong> kutubxonasiga
-            chiqarilmaydi. Iltimos, keyingi safar bunday kontentni yubormaslikni so'raymiz.
+            Video tayyor va shaxsiy foydalanish uchun mavjud. Ammo kontent siyosatimizga ko'ra
+            (diniy, 18+, zo'ravonlik yoki shunga o'xshash kategoriya) bunday videolarni
+            keyingi safar yubormaslikni so'raymiz.
           </p>
         </motion.div>
       )}

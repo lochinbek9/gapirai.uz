@@ -183,8 +183,11 @@ def _handle_get_information(db: Session, params: dict, req_id):
     if not payment or payment.status != PaymentStatus.PENDING:
         return rpc_error(PaynetErrors.CLIENT_NOT_FOUND, "To'lov topilmadi yoki muddati o'tgan.", req_id)
 
-    label = "Kutubxona kirish huquqi" if payment.is_library_access else (
-        f"Tarif: {payment.plan}" if payment.plan else "Video dublyaj"
+    label = (
+        "Loyihaga donat" if getattr(payment, "is_donation", False)
+        else f"Tarif: {payment.plan}" if payment.plan
+        else f"{payment.minutes_purchased} daqiqa paketi" if payment.minutes_purchased
+        else "Video dublyaj"
     )
     return rpc_result({
         # Paynet texnik jamoasi tasdiqladi (2026-08-24): "status" STRING

@@ -60,9 +60,8 @@ class Payment(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id"), nullable=True) # Linked to a video dubbing job
     plan = Column(String(20), nullable=True)  # "standard" | "pro" — set instead of job_id for a subscription renewal payment
-    is_library_access = Column(Boolean, default=False, nullable=False)  # 2026-08-19: Ommaviy videolar kutubxonasiga bir martalik kirish to'lovi -- job_id/plan ikkalasi ham bo'sh
     # 2026-08-31: minute-pack xaridi -- paket hajmi (daqiqa: 30/60/120/300).
-    # job_id / plan / is_library_access o'rniga o'rnatiladi. To'lov tasdiqlangach
+    # job_id / plan o'rniga o'rnatiladi. To'lov tasdiqlangach
     # backend/services/payment_fulfillment.py Subscription.purchased_minutes'ga qo'shadi.
     minutes_purchased = Column(Integer, nullable=True)
     amount = Column(Float, nullable=False)
@@ -79,7 +78,7 @@ class Payment(Base):
     fulfilled_at = Column(DateTime, nullable=True)
 
     # 2026-09-05: loyihaga ixtiyoriy donat (qo'llab-quvvatlash). job_id/plan/
-    # is_library_access/minutes_purchased ning hech biri o'rnatilmaydi.
+    # minutes_purchased ning hech biri o'rnatilmaydi.
     # user_id ham NULL bo'lishi mumkin (login shart emas) -- donor o'zini
     # ixtiyoriy tanishtiradi. Fulfillment yetkaziladigan narsa yo'q, faqat
     # fulfilled_at + rahmat xabari (backend/services/payment_fulfillment.py).

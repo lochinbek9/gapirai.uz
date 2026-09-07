@@ -54,8 +54,8 @@ export default function TermsPage() {
               </ul>
               <p>
                 Yuqoridagi diniy, 18+, zo'ravonlik va shunga o'xshash kategoriyalar (CSAM bundan mustasno) uchun dublyaj
-                jarayonining o'zi to'xtatilmaydi — video shaxsiy foydalanish uchun tayyorlanadi. Lekin bunday video hech qachon
-                "Ommaviy videolar" ochiq kutubxonasiga chiqarilmaydi va boshqa foydalanuvchilarga ko'rsatilmaydi.
+                jarayonining o'zi to'xtatilmaydi — video shaxsiy foydalanish uchun tayyorlanadi. Lekin bunday kontentni
+                yubormaslikni so'raymiz; takroriy holatlarda hisob bloklanishi mumkin.
               </p>
             </section>
 

@@ -138,44 +138,6 @@ def initiate_job_payment(
     return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": amount}
 
 
-@router.post("/initiate-library")
-def initiate_library_payment(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """payme_routes.py:initiate_library_payment bilan bir xil naqsh --
-    checkout havolasi o'rniga faqat Uzum "account" raqamini qaytaradi
-    (yuqoridagi initiate_job_payment bilan bir xil sabab). Bu metod ilgari
-    umuman yo'q edi -- Uzum faqat video (job) to'lovlari uchun qurilgan,
-    kutubxona kirish huquqi uchun na backend endpoint, na frontend tugma
-    bor edi (2026-08-24, foydalanuvchi kutubxona sahifasida Uzum tugmasi
-    ko'rinmayotganini payqadi)."""
-    from backend.api.routes import LIBRARY_ACCESS_PRICE
-    if current_user.library_access_purchased_at is not None:
-        return {"success": True, "message": "Kirish huquqi allaqachon mavjud.", "amount": 0}
-
-    payment = db.query(Payment).filter(
-        Payment.user_id == current_user.id,
-        Payment.is_library_access.is_(True),
-        Payment.status == PaymentStatus.PENDING,
-        Payment.provider == PaymentProvider.UZUM,
-    ).first()
-    if not payment:
-        payment = Payment(
-            user_id=current_user.id, is_library_access=True, amount=LIBRARY_ACCESS_PRICE,
-            provider=PaymentProvider.UZUM, status=PaymentStatus.PENDING,
-        )
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
-
-    if not payment.uzum_account_id:
-        payment.uzum_account_id = account_id_from_payment_id(payment.id)
-        db.commit()
-
-    return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": LIBRARY_ACCESS_PRICE}
-
-
 # ─────────────────────────────────────────────────────────────────────────
 # 2. Webhook (Uzum -> bizning backend)
 # ─────────────────────────────────────────────────────────────────────────

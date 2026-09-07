@@ -26,7 +26,6 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "Dublyaj qilish", short_name: "Dublyaj", url: "/?src=pwa-shortcut" },
-      { name: "Kutubxona", short_name: "Kutubxona", url: "/library?src=pwa-shortcut" },
       { name: "Mening videolarim", short_name: "Dashboard", url: "/dashboard?src=pwa-shortcut" },
     ],
     // TypeScript MetadataRoute.Manifest hali share_target'ni bilmaydi —
