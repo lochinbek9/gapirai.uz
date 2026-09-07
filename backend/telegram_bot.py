@@ -128,10 +128,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if user:
         await update.message.reply_text(
-            f"Xush kelibsiz, {user.name or ''}! 👋\n\n"
-            "Menga istalgan YouTube havolasini yoki video faylni yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
-            "Yoki ilovani ochib, videolaringiz va tarif holatini ko'ring:",
-            reply_markup=_miniapp_markup(),
+            f"Xush kelibsiz, {user.name or ''}! 👋\n\nNima qilmoqchisiz?",
+            reply_markup=_main_menu_markup(),
         )
         return
 
@@ -145,6 +143,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+def _donate_url() -> str:
+    return f"{(settings.FRONTEND_URL or 'https://gapirai.uz').rstrip('/')}/donate"
+
+
 def _miniapp_markup() -> InlineKeyboardMarkup | None:
     """"GapirAI ilovasini ochish" inline WebApp tugmasi -- URL sozlangan
     bo'lsagina (HTTPS). Aks holda None (tugmasiz xabar)."""
@@ -152,6 +154,49 @@ def _miniapp_markup() -> InlineKeyboardMarkup | None:
     if not url:
         return None
     return InlineKeyboardMarkup([[InlineKeyboardButton("🚀 GapirAI ilovasi", web_app=WebAppInfo(url=url))]])
+
+
+def _main_menu_markup() -> InlineKeyboardMarkup:
+    """Foydalanuvchi kirishi bilan ko'rsatiladigan asosiy menyu -- "nima
+    qilmoqchisiz?". Dublyaj (callback), donat (to'g'ridan-to'g'ri url --
+    to'lov redirect'lari tashqi brauzerda ishonchliroq), ilova (WebApp,
+    faqat HTTPS URL bo'lsa)."""
+    rows = [
+        [InlineKeyboardButton("🎬 Video dublyaj qilish", callback_data="menu:dub")],
+        [InlineKeyboardButton("🧠 Videoni tahlil qilish", callback_data="menu:learn")],
+        [InlineKeyboardButton("💛 Loyihani qo'llab-quvvatlash", url=_donate_url())],
+    ]
+    mini = _miniapp_url()
+    if mini:
+        rows.append([InlineKeyboardButton("🚀 Ilova (videolarim, tarif)", web_app=WebAppInfo(url=mini))])
+    return InlineKeyboardMarkup(rows)
+
+
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/menu -- asosiy menyuni qayta ko'rsatadi."""
+    await update.message.reply_text("Nima qilmoqchisiz?", reply_markup=_main_menu_markup())
+
+
+async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Asosiy menyu tugmalari (callback_data="menu:..."). Tanlangan rejim
+    context.user_data['mode']'ga yoziladi -- keyingi YouTube havolasi shu
+    rejimga qarab dublyaj yoki tahlil sifatida ishlanadi (handle_text)."""
+    query = update.callback_query
+    await query.answer()
+    action = (query.data or "").split(":", 1)[-1]
+    if action == "dub":
+        context.user_data["mode"] = "dub"
+        await query.message.reply_text(
+            "🎬 YouTube havolasini yoki video faylni yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
+            "Video tayyor bo'lganda shu yerga xabar yuboraman."
+        )
+    elif action == "learn":
+        context.user_data["mode"] = "learn"
+        await query.message.reply_text(
+            "🧠 YouTube havolasini yuboring — video bo'yicha konspekt, 5 daqiqalik xulosa, "
+            "test va AI ustoz tayyorlab beraman (dublyaj ham qilinadi).\n\n"
+            "Tayyor bo'lganda shu yerga tahlil havolasini yuboraman."
+        )
 
 
 async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -162,20 +207,15 @@ async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("Ilova hozircha mavjud emas.")
         return
     await update.message.reply_text(
-        "GapirAI ilovasi — videolaringiz, dublyaj holati, tarif va kutubxona bir joyda:",
+        "GapirAI ilovasi — videolaringiz, dublyaj holati va tarif bir joyda:",
         reply_markup=markup,
     )
 
 
 async def donate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/donate -- loyihani qo'llab-quvvatlash sahifasiga havola. Sahifa
-    login talab qilmaydi (backend/api/donate_routes.py), oddiy brauzerda
-    ochiladi -- to'lov (Click/Payme) redirect'lari WebView'dan ko'ra tashqi
-    brauzerda ishonchliroq, shuning uchun web_app emas, oddiy url tugmasi."""
-    base = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
-    markup = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("💛 Qo'llab-quvvatlash", url=f"{base}/donate")]]
-    )
+    """/donate -- loyihani qo'llab-quvvatlash sahifasiga havola (asosiy yo'l
+    /start menyusidagi tugma; bu buyruq to'g'ridan-to'g'ri yozganlar uchun)."""
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton("💛 Qo'llab-quvvatlash", url=_donate_url())]])
     await update.message.reply_text(
         "GapirAI.uz — mustaqil loyiha. 🙏\n\n"
         "Har bir hissa videolarni ko'proq odamga, tezroq yetkazishga yordam beradi. "
@@ -185,8 +225,18 @@ async def donate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def _post_init(application: Application) -> None:
-    """Bot ishga tushganda standart menu tugmasini Mini App'ga o'rnatadi
-    (barcha foydalanuvchilar uchun, chat_id ko'rsatilmagan)."""
+    """Bot ishga tushganda: buyruqlar ro'yxati + (HTTPS bo'lsa) Mini App
+    menu tugmasi -- barcha foydalanuvchilar uchun, chat_id ko'rsatilmagan."""
+    try:
+        await application.bot.set_my_commands([
+            ("start", "Boshlash / asosiy menyu"),
+            ("menu", "Asosiy menyu"),
+            ("donate", "Loyihani qo'llab-quvvatlash"),
+            ("app", "GapirAI ilovasi"),
+        ])
+    except Exception as e:
+        logger.warning(f"Buyruqlar ro'yxatini o'rnatib bo'lmadi: {e}")
+
     url = _miniapp_url()
     if not url:
         logger.info("TELEGRAM_MINIAPP_URL (yoki HTTPS FRONTEND_URL) yo'q -- menu tugmasi o'rnatilmadi.")
@@ -237,13 +287,10 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         db.close()
 
     await update.message.reply_text(
-        f"Rahmat, {name}! Hisobingiz ulandi. ✅\n\n"
-        "Endi menga istalgan YouTube havolasini yoki video faylni yuboring — dublyajni boshlayman.",
+        f"Rahmat, {name}! Hisobingiz ulandi. ✅",
         reply_markup=ReplyKeyboardRemove(),
     )
-    markup = _miniapp_markup()
-    if markup:
-        await update.message.reply_text("Videolaringiz va tarif holatini ilovada kuzating:", reply_markup=markup)
+    await update.message.reply_text("Nima qilmoqchisiz?", reply_markup=_main_menu_markup())
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -262,8 +309,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     url = _looks_like_youtube_url(text)
     if not url:
-        await update.message.reply_text("Iltimos, YouTube video havolasini yuboring (masalan: https://youtube.com/watch?v=...).")
+        await update.message.reply_text(
+            "Iltimos, YouTube video havolasini yoki video faylni yuboring.",
+            reply_markup=_main_menu_markup(),
+        )
         return
+
+    # Menyuda tanlangan rejim (bir martalik) -- "learn" bo'lsa dublyajdan
+    # tashqari Learning Workspace tahlili ham yaratiladi.
+    mode = context.user_data.pop("mode", "dub")
 
     await update.message.reply_text("⏳ Video tekshirilmoqda...")
 
@@ -273,6 +327,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # boshqa (yopilgan) sessiyaga bog'langan edi.
         user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
         result = await create_dubbing_job(db, user, url, voice_gender="auto")
+
+        frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
 
         if result.outcome == "invalid_url":
             await update.message.reply_text("Bu YouTube havolasi noto'g'ri ko'rinadi.")
@@ -287,17 +343,33 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). "
                 "Maksimal ruxsat etilgan davomiylik bilan qayta urinib ko'ring."
             )
-        elif result.outcome == "queued":
-            await update.message.reply_text(
-                f"✅ \"{result.video_title}\" navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
-            )
-        elif result.outcome == "ready":
-            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
-            await update.message.reply_text(
-                f"✅ \"{result.video_title}\" allaqachon tayyor!\n\n{frontend_url}/video/{result.job_id}"
-            )
+        elif result.outcome in ("queued", "ready"):
+            analysis_url = None
+            if mode == "learn":
+                try:
+                    job = db.query(DubbingJob).filter(DubbingJob.id == result.job_id).first()
+                    if job:
+                        from backend.api.learn_routes import _create_linked_analysis
+                        analysis = _create_linked_analysis(db, user, url, job)
+                        analysis_url = f"{frontend_url}/learn/{analysis.id}"
+                except Exception:
+                    logger.exception("Tahlil yaratishda xato")
+
+            if analysis_url:
+                verb = "tahlil qilinmoqda" if result.outcome == "queued" else "tayyor"
+                await update.message.reply_text(
+                    f"✅ \"{result.video_title}\" {verb}.\n\n"
+                    f"Konspekt, xulosa, test va AI ustoz:\n{analysis_url}"
+                )
+            elif result.outcome == "queued":
+                await update.message.reply_text(
+                    f"✅ \"{result.video_title}\" navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
+                )
+            else:
+                await update.message.reply_text(
+                    f"✅ \"{result.video_title}\" allaqachon tayyor!\n\n{frontend_url}/video/{result.job_id}"
+                )
         elif result.outcome == "insufficient_minutes":
-            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
             await update.message.reply_text(
                 f"\"{result.video_title}\" ({result.duration_minutes:.0f} daqiqa) uchun "
                 f"{result.minutes_short} daqiqa yetishmayapti.\n\n"
@@ -471,11 +543,13 @@ def main() -> None:
         logger.info(f"Telegram bot mahalliy Bot API server orqali ishga tushmoqda: {base}")
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu_command))
     app.add_handler(CommandHandler("app", app_command))
     app.add_handler(CommandHandler("donate", donate_command))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern=r"^menu:"))
     app.add_handler(CallbackQueryHandler(handle_resolution_callback, pattern=r"^res:"))
 
     logger.info("Telegram bot ishga tushdi (long polling).")
