@@ -57,9 +57,6 @@ class User(Base):
     auth_provider = Column(String(20), nullable=False, default="password")  # "password" | "google" | "phone"
     role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
-    # 2026-08-19: bir martalik to'lov -- Ommaviy videolar (/library)
-    # kutubxonasiga umrbod kirish, tarif kvotasidan mustaqil.
-    library_access_purchased_at = Column(DateTime, nullable=True)
 
     jobs = relationship("DubbingJob", back_populates="user", lazy="dynamic")
 

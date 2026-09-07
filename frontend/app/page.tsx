@@ -13,7 +13,7 @@ import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
-import { LayoutDashboard, LogIn, X, UserPlus, Library } from "lucide-react";
+import { LayoutDashboard, LogIn, X, UserPlus } from "lucide-react";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -373,13 +373,6 @@ export default function Home() {
 
         {/* Right Controls */}
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/library"
-            className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
-          >
-            <Library className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
-            Dublaj videolar
-          </Link>
           {isLoggedIn ? (
             <Link
               href="/dashboard"

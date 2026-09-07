@@ -7,8 +7,8 @@ import { waitForWebApp, authenticateTma, applyTelegramTheme } from '@/lib/tma'
 
 /** Telegram Mini App kirish ko'prigi: initData'ni tekshirtirib, tizim
  *  sessiyasini o'rnatadi va foydalanuvchini haqiqiy to'liq saytga
- *  (/dashboard) o'tkazadi. Undan keyin barcha sahifalar (kutubxona,
- *  Learning Workspace, tarif, to'lov) o'zgarishsiz ishlaydi -- marketing
+ *  (/dashboard) o'tkazadi. Undan keyin barcha sahifalar (Learning
+ *  Workspace, tarif, to'lov) o'zgarishsiz ishlaydi -- marketing
  *  chrome esa TMA rejimida yashiriladi (hooks/useIsTmaMode). */
 export default function TmaBridge() {
   const router = useRouter()

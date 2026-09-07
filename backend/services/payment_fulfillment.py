@@ -5,7 +5,7 @@ qo'shilganda click_routes.py'dan ajratib olindi)."""
 import logging
 from datetime import datetime
 
-from backend.models.database import DubbingJob, JobStatus, User
+from backend.models.database import DubbingJob, JobStatus
 from backend.workers.tasks import process_video
 
 logger = logging.getLogger(__name__)
@@ -13,9 +13,8 @@ logger = logging.getLogger(__name__)
 
 def apply_successful_payment(db, payment) -> None:
     """payment.status allaqachon APPROVED qilib qo'yilgan bo'lishi kerak --
-    bu funksiya faqat SHU to'lov nimaga tegishli ekaniga qarab (kutubxona
-    kirish huquqi / obuna / job / daqiqa paketi) tegishli holatni
-    faollashtiradi.
+    bu funksiya faqat SHU to'lov nimaga tegishli ekaniga qarab (donat /
+    obuna / job / daqiqa paketi) tegishli holatni faollashtiradi.
 
     IDEMPOTENT: fulfilled_at o'rnatilgan bo'lsa darhol qaytadi. Avtomatik
     (karta tokeni) to'lovlarda fulfillment ikki yo'ldan kelishi mumkin —
@@ -47,10 +46,6 @@ def apply_successful_payment(db, payment) -> None:
                 )
             except Exception as e:
                 logger.warning(f"Donat rahmat xabari yuborilmadi payment={payment.id}: {e}")
-    elif payment.is_library_access:
-        user = db.query(User).filter(User.id == payment.user_id).first()
-        if user and user.library_access_purchased_at is None:
-            user.library_access_purchased_at = datetime.utcnow()
     elif payment.minutes_purchased:
         # 2026-08-31: daqiqa paketi xaridi -> Subscription.purchased_minutes'ga
         # qo'shiladi (hech qachon tugamaydi). Provayder webhooklari (click_complete,

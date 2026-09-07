@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import uuid
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
@@ -13,8 +12,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant, ContentViolation
-from backend.models.payment import Payment, PaymentStatus, PaymentProvider
+from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant
 from backend.services.auth import get_current_user, get_optional_user
 from backend.services.downloader import get_video_info
 from backend.config import get_settings
@@ -27,15 +25,11 @@ from backend.services.job_creation import (
     is_valid_youtube_url as _is_valid_youtube_url,
     create_dubbing_job,
 )
-from backend.services.click_service import generate_payment_url
-import time
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["dubbing"])
-
-LIBRARY_ACCESS_PRICE = 5_000  # so'm -- Ommaviy videolar kutubxonasiga bir martalik, umrbod kirish narxi
 
 
 class CreateJobRequest(BaseModel):
@@ -393,226 +387,6 @@ async def upload_video_fallback(
     process_video.apply_async(args=[str(job_id)], task_id=str(job_id), queue=get_job_queue(db, current_user.id))
 
     return {"success": True, "message": "Video qabul qilindi, ishlov berish boshlandi."}
-
-
-class LibraryItem(BaseModel):
-    job_id: str
-    youtube_url: str
-    video_title: Optional[str] = None
-    video_duration: Optional[float] = None
-    video_thumbnail: Optional[str] = None
-    speaker_gender: Optional[str] = None
-    created_at: Optional[str] = None
-
-
-@router.get("/library", dependencies=[Depends(rate_limit("library", 60, 600))])
-def list_public_library(
-    limit: int = Query(24, le=60),
-    offset: int = 0,
-    db: Session = Depends(get_db),
-) -> list[LibraryItem]:
-    """Ommaviy katalog -- barcha tugallangan, ASL (source_job_id yo'q,
-    ya'ni kesh-nusxa emas) joblar, hech qanday login talab qilinmaydi.
-    ContentViolation'da qayd etilgan (hatto faqat ogohlantirish darajasida
-    ham) URL'lar bu ro'yxatda ko'rinmaydi -- ochiq kashfiyot ro'yxati
-    to'g'ridan-to'g'ri so'ralgan (bilingan URL) qayta yuklashdan farqli
-    o'laroq ancha kengroq auditoriyaga chiqadi, shuning uchun bu yerda
-    ehtiyotkorroq filtr qo'llaymiz."""
-    flagged_urls = db.query(ContentViolation.youtube_url).distinct()
-    jobs = (
-        db.query(DubbingJob)
-        .filter(
-            DubbingJob.status == JobStatus.COMPLETED,
-            DubbingJob.source_job_id.is_(None),
-            DubbingJob.content_flagged.is_(False),
-            DubbingJob.youtube_url.notin_(flagged_urls),
-        )
-        .order_by(DubbingJob.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-    return [
-        LibraryItem(
-            job_id=str(j.id),
-            youtube_url=j.youtube_url,
-            video_title=j.video_title,
-            video_duration=j.video_duration,
-            video_thumbnail=j.video_thumbnail,
-            speaker_gender=j.speaker_gender,
-            created_at=j.created_at.isoformat() if j.created_at else None,
-        )
-        for j in jobs
-    ]
-
-
-@router.get("/library/{job_id}/eligible")
-def library_item_eligible(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
-    """Bitta job hozir ham ommaviy kutubxonaga mos keladimi -- tomosha
-    sahifasi (/library/[id]) to'g'ridan-to'g'ri havola orqali ochilganda
-    ham kontent xavfsizligi bo'yicha keyinchalik bayroqlangan videoni
-    ko'rsatmaslik uchun ishlatiladi (GET /api/library ro'yxati o'zi bunday
-    videoni ko'rsatmaydi, lekin uni bilgan odam to'g'ridan-to'g'ri havola
-    bilan ochib olishi mumkin edi -- shu bo'shliqni yopadi)."""
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-    if not job or job.status != JobStatus.COMPLETED or job.source_job_id is not None or job.content_flagged:
-        return {"eligible": False}
-    flagged = db.query(ContentViolation).filter(ContentViolation.youtube_url == job.youtube_url).first()
-    return {"eligible": flagged is None}
-
-
-@router.get("/library/{job_id}/resolutions")
-def list_library_resolutions(
-    job_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """list_resolutions bilan bir xil, lekin sifat cheklovi TOMOSHABIN
-    (current_user) tarifiga qarab hisoblanadi, video egasiniki emas --
-    kutubxonada tomosha qilayotgan odam ko'pincha video egasi emas
-    (2026-08-19, foydalanuvchi so'rovi).
-
-    2026-08-21: bu yerda ilgari FAQAT current_user borligi tekshirilardi --
-    kutubxona kirish to'lovini (5 000 so'm) qilmagan har qanday login qilgan
-    foydalanuvchi ham to'liq ro'yxatni (barcha rezolyutsiyalar "available")
-    ko'ra olardi. Frontend sahifasi (/library/[id]) to'lovni tekshirib
-    yo'naltiradi, lekin API'ning o'zi tekshirmagani uchun to'g'ridan-to'g'ri
-    chaqirilsa bo'shliq bo'lardi."""
-    if current_user.library_access_purchased_at is None:
-        raise HTTPException(status_code=403, detail="Kutubxonaga kirish huquqi yo'q — avval 5 000 so'm to'lovini amalga oshiring.")
-
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-    if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
-
-    from backend.services.plans import RESOLUTION_ORDER
-    # 2026-08-19: foydalanuvchi so'rovi bilan kutubxonada 1080p VAQTINCHA barcha
-    # tomoshabinlar uchun bepul -- get_max_resolution_for_user() chaqiruvi
-    # o'chirilgan, qaytarish uchun uni tiklash kifoya.
-    max_idx = len(RESOLUTION_ORDER) - 1
-
-    variant_status = {
-        v.resolution: v.status
-        for v in db.query(ResolutionVariant).filter(ResolutionVariant.job_id == job.storage_id).all()
-    }
-
-    master_missing = False
-    if settings.AWS_BUCKET_NAME:
-        from backend.services.storage import s3_object_exists
-        master_missing = not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
-
-    resolutions = []
-    for i, res in enumerate(RESOLUTION_ORDER):
-        available = i <= max_idx
-        status = "ready" if res == "720p" else variant_status.get(res, "not_requested")
-        if master_missing and status == "ready":
-            status = "expired"
-        resolutions.append({"resolution": res, "available": available, "status": status})
-
-    return {"resolutions": resolutions}
-
-
-@router.post("/library/{job_id}/resolutions/{resolution}")
-def request_library_resolution(
-    job_id: uuid.UUID,
-    resolution: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """request_resolution bilan bir xil, lekin TOMOSHABIN tarifi bo'yicha
-    (yuqoridagi list_library_resolutions bilan bir xil sabab). To'lov
-    tekshiruvi ham xuddi shu funksiyada bir xil sababga ko'ra kerak edi."""
-    if current_user.library_access_purchased_at is None:
-        raise HTTPException(status_code=403, detail="Kutubxonaga kirish huquqi yo'q — avval 5 000 so'm to'lovini amalga oshiring.")
-
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-    if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
-
-    from backend.services.resolution_variants import request_resolution as _request_resolution
-    # 2026-08-19: yuqoridagi list_library_resolutions bilan bir xil sabab --
-    # kutubxonada 1080p vaqtincha barcha tomoshabinlar uchun bepul.
-    result = _request_resolution(db, job, resolution, max_resolution_override="1080p")
-
-    if result.outcome == "invalid":
-        raise HTTPException(status_code=400, detail="Noto'g'ri rezolyutsiya.")
-    if result.outcome == "forbidden":
-        raise HTTPException(status_code=403, detail="Bu sifat sizning tarif rejangizda mavjud emas.")
-    if result.outcome == "expired":
-        raise HTTPException(status_code=410, detail="Bu video fayli endi mavjud emas — saqlash muddati tugagan.")
-    if result.outcome == "ready":
-        return {"status": "ready", "download_url": result.download_url}
-    return {"status": "processing"}
-
-
-@router.get("/library/access")
-def get_library_access(
-    current_user: User = Depends(get_current_user),
-) -> dict:
-    return {"has_access": current_user.library_access_purchased_at is not None}
-
-
-@router.post("/library/purchase")
-def purchase_library_access(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict:
-    """Ommaviy videolar kutubxonasiga bir martalik kirish to'lovi -- job_id
-    yoki plan bilan bog'liq emas (Payment.is_library_access orqali
-    ajratiladi, backend/api/click_routes.py:click_complete)."""
-    if current_user.library_access_purchased_at is not None:
-        return {"success": True, "message": "Kirish huquqi allaqachon mavjud.", "amount": 0}
-
-    existing_pending = db.query(Payment).filter(
-        Payment.user_id == current_user.id,
-        Payment.is_library_access.is_(True),
-        Payment.status == PaymentStatus.PENDING,
-    ).first()
-
-    if not existing_pending:
-        payment = Payment(
-            user_id=current_user.id,
-            is_library_access=True,
-            amount=LIBRARY_ACCESS_PRICE,
-            provider=PaymentProvider.CLICK,
-            status=PaymentStatus.PENDING,
-            click_create_time=int(time.time()),
-        )
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
-    else:
-        payment = existing_pending
-
-    merchant_id = settings.CLICK_MERCHANT_ID or "56653"
-    service_id = settings.CLICK_SERVICE_ID or "108780"
-    merchant_user_id = getattr(settings, "CLICK_MERCHANT_USER_ID", "") or "89102"
-
-    origin_header = request.headers.get("origin") or request.headers.get("referer")
-    if origin_header:
-        parsed = urlparse(origin_header)
-        base_origin = f"{parsed.scheme}://{parsed.netloc}"
-        return_url = f"{base_origin}/library"
-    else:
-        frontend_url = settings.FRONTEND_URL or "https://gapirai.uz"
-        return_url = f"{frontend_url.rstrip('/')}/library"
-
-    payment_url = generate_payment_url(
-        merchant_id=merchant_id,
-        service_id=service_id,
-        transaction_param=str(payment.id),
-        amount=LIBRARY_ACCESS_PRICE,
-        return_url=return_url,
-        merchant_user_id=merchant_user_id,
-    )
-
-    return {
-        "success": True,
-        "payment_url": payment_url,
-        "payment_id": str(payment.id),
-        "amount": LIBRARY_ACCESS_PRICE,
-    }
 
 
 @router.delete("/jobs/{job_id}", status_code=204)

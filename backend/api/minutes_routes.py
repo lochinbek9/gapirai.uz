@@ -3,8 +3,8 @@ daqiqa sotib oladi (backend/services/plans.py: MINUTE_PACKS). Sotib olingan
 daqiqalar Subscription.purchased_minutes'ga qo'shiladi (fulfillment:
 backend/services/payment_fulfillment.py) va HECH QACHON tugamaydi.
 
-Naqsh: routes.py:purchase_library_access (Click) va payme_routes._build_checkout_url
-(Payme) bilan bir xil -- bir martalik, job/plan bilan bog'liq bo'lmagan to'lov.
+Naqsh: donate_routes.py (Click) va payme_routes._build_checkout_url (Payme)
+bilan bir xil -- bir martalik, job/plan bilan bog'liq bo'lmagan to'lov.
 """
 import time
 from urllib.parse import urlparse

@@ -178,35 +178,6 @@ def initiate_subscription_payment(
     return {"success": True, "payment_url": payment_url, "payment_id": str(payment.id), "amount": plan.price}
 
 
-@router.post("/initiate-library")
-def initiate_library_payment(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    from backend.api.routes import LIBRARY_ACCESS_PRICE
-    if current_user.library_access_purchased_at is not None:
-        return {"success": True, "message": "Kirish huquqi allaqachon mavjud.", "amount": 0}
-
-    payment = db.query(Payment).filter(
-        Payment.user_id == current_user.id,
-        Payment.is_library_access.is_(True),
-        Payment.status == PaymentStatus.PENDING,
-        Payment.provider == PaymentProvider.PAYME,
-    ).first()
-    if not payment:
-        payment = Payment(
-            user_id=current_user.id, is_library_access=True, amount=LIBRARY_ACCESS_PRICE,
-            provider=PaymentProvider.PAYME, status=PaymentStatus.PENDING,
-        )
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
-
-    payment_url = _build_checkout_url(request, payment, "/library")
-    return {"success": True, "payment_url": payment_url, "payment_id": str(payment.id), "amount": LIBRARY_ACCESS_PRICE}
-
-
 # ─────────────────────────────────────────────────────────────────────────
 # 2. Merchant API (Payme -> bizning backend, JSON-RPC 2.0)
 # ─────────────────────────────────────────────────────────────────────────
