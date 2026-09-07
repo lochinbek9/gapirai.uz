@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
 import { getPlans, subscribeToPlan, subscribeToPlanPayme, purchaseMinutes, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import DonateCTA from '@/components/DonateCTA'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
 
@@ -242,6 +243,8 @@ export default function PricingPage() {
             ))}
           </div>
         </div>
+
+        <DonateCTA variant="line" className="pt-2 pb-4" />
       </div>
     </div>
   )

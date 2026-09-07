@@ -1,9 +1,15 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { Heart, ArrowRight } from 'lucide-react'
+import { markDonated } from '@/lib/donateModal'
 
 export default function DonateThanksPage() {
+  useEffect(() => {
+    markDonated()
+  }, [])
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-violet-50 to-white px-4 dark:from-[#15121f] dark:to-[#0f0f10]">
       <div className="max-w-sm text-center">

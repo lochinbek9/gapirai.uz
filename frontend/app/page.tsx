@@ -13,6 +13,7 @@ import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
+import DonateCTA from "@/components/DonateCTA";
 import { LayoutDashboard, LogIn, X, UserPlus } from "lucide-react";
 
 
@@ -527,6 +528,10 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-4">
+        <DonateCTA />
       </section>
 
       <Footer />

@@ -12,6 +12,7 @@ import {
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
+import DonateCTA from '@/components/DonateCTA'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -417,6 +418,8 @@ export default function VideoPage() {
                     initialRating={job.rating}
                     initialComment={job.feedback_comment}
                   />
+
+                  <DonateCTA variant="line" className="pt-2" />
                 </div>
               )}
 
