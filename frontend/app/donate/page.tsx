@@ -5,6 +5,11 @@ import Link from 'next/link'
 import axios from 'axios'
 import { Heart, Loader2, ArrowLeft } from 'lucide-react'
 import { getDonateOptions, createDonation, DonateOptions } from '@/lib/api'
+import UzumAccountCard from '@/components/UzumAccountCard'
+
+const PROVIDERS = ['click', 'payme', 'uzum'] as const
+type Provider = (typeof PROVIDERS)[number]
+const PROVIDER_LABEL: Record<Provider, string> = { click: 'Click', payme: 'Payme', uzum: 'Uzum' }
 
 const FALLBACK: DonateOptions = { presets: [10000, 25000, 50000, 100000], min: 1000, max: 10000000 }
 
@@ -16,12 +21,13 @@ export default function DonatePage() {
   const [opts, setOpts] = useState<DonateOptions>(FALLBACK)
   const [amount, setAmount] = useState<number>(FALLBACK.presets[1])
   const [customRaw, setCustomRaw] = useState('')
-  const [provider, setProvider] = useState<'click' | 'payme'>('click')
+  const [provider, setProvider] = useState<Provider>('click')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
 
   useEffect(() => {
     getDonateOptions().then(setOpts).catch(() => {})
@@ -46,7 +52,15 @@ export default function DonatePage() {
         email: email.trim() || undefined,
         message: message.trim() || undefined,
       })
-      window.location.href = res.payment_url
+      if (res.account) {
+        setUzumAccount({ account: res.account, amount: res.amount })
+        setSubmitting(false)
+      } else if (res.payment_url) {
+        window.location.href = res.payment_url
+      } else {
+        setError('Xatolik yuz berdi. Qayta urinib ko‘ring.')
+        setSubmitting(false)
+      }
     } catch (e) {
       const detail = axios.isAxiosError(e) ? e.response?.data?.detail : null
       setError(typeof detail === 'string' ? detail : 'Xatolik yuz berdi. Qayta urinib ko‘ring.')
@@ -117,20 +131,22 @@ export default function DonatePage() {
           {/* Provider */}
           <label className="mb-2 mt-5 block text-xs font-bold uppercase tracking-wide text-gray-500">To‘lov turi</label>
           <div className="flex gap-2">
-            {(['click', 'payme'] as const).map((pv) => (
+            {PROVIDERS.map((pv) => (
               <button
                 key={pv}
-                onClick={() => setProvider(pv)}
-                className={`flex-1 rounded-xl border py-2.5 text-sm font-bold capitalize transition ${
+                onClick={() => { setProvider(pv); setUzumAccount(null) }}
+                className={`flex-1 rounded-xl border py-2.5 text-sm font-bold transition ${
                   provider === pv
                     ? 'border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-300'
                     : 'border-gray-200 text-gray-600 dark:border-white/15 dark:text-gray-300'
                 }`}
               >
-                {pv === 'click' ? 'Click' : 'Payme'}
+                {PROVIDER_LABEL[pv]}
               </button>
             ))}
           </div>
+
+          {uzumAccount && <div className="mt-4"><UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} /></div>}
 
           {/* Optional identity */}
           <div className="mt-5 space-y-2">
@@ -164,11 +180,15 @@ export default function DonatePage() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-violet-600 py-3.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" fill="currentColor" />}
-            {valid ? `${formatSom(effectiveAmount)} so‘m qo‘llab-quvvatlash` : 'Summani tanlang'}
+            {valid
+              ? provider === 'uzum'
+                ? `${formatSom(effectiveAmount)} so‘m — Uzum hisob raqamini olish`
+                : `${formatSom(effectiveAmount)} so‘m qo‘llab-quvvatlash`
+              : 'Summani tanlang'}
           </button>
 
           <p className="mt-3 text-center text-[11px] text-gray-400">
-            To‘lov {provider === 'click' ? 'Click' : 'Payme'} orqali xavfsiz amalga oshiriladi. Karta ma’lumotlari saytda saqlanmaydi.
+            To‘lov {PROVIDER_LABEL[provider]} orqali xavfsiz amalga oshiriladi. Karta ma’lumotlari saytda saqlanmaydi.
           </p>
         </div>
       </div>

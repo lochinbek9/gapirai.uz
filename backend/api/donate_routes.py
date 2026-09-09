@@ -78,7 +78,7 @@ def create_donation(
             status_code=400,
             detail=f"Summa {DONATION_MIN:,} - {DONATION_MAX:,} so'm oralig'ida bo'lishi kerak.".replace(",", " "),
         )
-    if req.provider not in ("click", "payme"):
+    if req.provider not in ("click", "payme", "uzum"):
         raise HTTPException(status_code=400, detail="Noto'g'ri to'lov turi.")
 
     settings = get_settings()
@@ -92,7 +92,10 @@ def create_donation(
         base_origin = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
     return_url = f"{base_origin}/donate/thanks"
 
-    provider_enum = PaymentProvider.PAYME if req.provider == "payme" else PaymentProvider.CLICK
+    provider_enum = {
+        "payme": PaymentProvider.PAYME,
+        "uzum": PaymentProvider.UZUM,
+    }.get(req.provider, PaymentProvider.CLICK)
     payment = Payment(
         user_id=current_user.id if current_user else None,
         is_donation=True,
@@ -107,6 +110,13 @@ def create_donation(
     db.add(payment)
     db.commit()
     db.refresh(payment)
+
+    if provider_enum == PaymentProvider.UZUM:
+        # Uzum'da checkout havolasi yo'q -- foydalanuvchi ilovasida "account"
+        # raqamini kiritib to'laydi (backend/api/uzum_routes.py webhooklari
+        # to'lovni is_donation bayrog'iga qarab qayta ishlaydi).
+        from backend.api.uzum_routes import uzum_account_response
+        return uzum_account_response(db, payment)
 
     if provider_enum == PaymentProvider.PAYME:
         from backend.services.payme_service import generate_payme_checkout_url
