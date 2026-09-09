@@ -3,9 +3,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
-import { getPlans, subscribeToPlan, subscribeToPlanPayme, purchaseMinutes, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
+import { getPlans, subscribeToPlan, subscribeToPlanPayme, subscribeToPlanUzum, purchaseMinutes, purchaseMinutesUzum, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
+import UzumAccountCard from '@/components/UzumAccountCard'
+
+type PayProvider = 'click' | 'payme' | 'uzum'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
 
@@ -20,6 +23,7 @@ export default function PricingPage() {
   const [buyingPack, setBuyingPack] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -33,14 +37,17 @@ export default function PricingPage() {
       .finally(() => setLoading(false))
   }, [authLoading])
 
-  const handleBuyPack = async (pack: number, provider: 'click' | 'payme' = 'click') => {
+  const handleBuyPack = async (pack: number, provider: PayProvider = 'click') => {
     if (!isLoggedIn) { router.push('/login'); return }
     setBuyingPack(pack)
     setError(null)
-    const w = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    // Uzum'da redirect yo'q -- popup ochmaymiz.
+    const w = provider !== 'uzum' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
-      const res = await purchaseMinutes(pack, provider)
-      if (res.success && res.payment_url) {
+      const res = provider === 'uzum' ? await purchaseMinutesUzum(pack) : await purchaseMinutes(pack, provider)
+      if (provider === 'uzum' && res.success && 'account' in res && res.account) {
+        setUzumAccount({ account: res.account as number, amount: res.amount })
+      } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (w) w.location.href = res.payment_url
         else window.location.href = res.payment_url
       } else {
@@ -55,17 +62,22 @@ export default function PricingPage() {
     }
   }
 
-  const handleSubscribe = async (planId: string, provider: 'click' | 'payme' = 'click') => {
+  const handleSubscribe = async (planId: string, provider: PayProvider = 'click') => {
     if (!isLoggedIn) {
       router.push('/login')
       return
     }
     setSubscribing(planId)
     setError(null)
-    const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    const paymentWindow = provider !== 'uzum' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
-      const res = await (provider === 'payme' ? subscribeToPlanPayme(planId) : subscribeToPlan(planId))
-      if (res.success && res.payment_url) {
+      const res =
+        provider === 'uzum' ? await subscribeToPlanUzum(planId)
+        : provider === 'payme' ? await subscribeToPlanPayme(planId)
+        : await subscribeToPlan(planId)
+      if (provider === 'uzum' && res.success && 'account' in res && res.account) {
+        setUzumAccount({ account: res.account as number, amount: res.amount })
+      } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (paymentWindow) paymentWindow.location.href = res.payment_url
         else window.location.href = res.payment_url
       } else {
@@ -197,13 +209,22 @@ export default function PricingPage() {
                     ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? "Hozirgi tarif" : 'Click orqali tanlash'}
                   </button>
                   {plan.id !== 'free' && !isCurrent && (
-                    <button
-                      onClick={() => handleSubscribe(plan.id, 'payme')}
-                      disabled={subscribing === plan.id}
-                      className="w-full py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
-                    >
-                      Payme orqali to'lash
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSubscribe(plan.id, 'payme')}
+                        disabled={subscribing === plan.id}
+                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                      >
+                        Payme
+                      </button>
+                      <button
+                        onClick={() => handleSubscribe(plan.id, 'uzum')}
+                        disabled={subscribing === plan.id}
+                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                      >
+                        Uzum
+                      </button>
+                    </div>
                   )}
                 </div>
               )
@@ -232,13 +253,22 @@ export default function PricingPage() {
                 >
                   {buyingPack === p.minutes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Sotib olish'}
                 </button>
-                <button
-                  onClick={() => handleBuyPack(p.minutes, 'payme')}
-                  disabled={buyingPack === p.minutes}
-                  className="w-full py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
-                >
-                  Payme
-                </button>
+                <div className="flex w-full gap-1.5">
+                  <button
+                    onClick={() => handleBuyPack(p.minutes, 'payme')}
+                    disabled={buyingPack === p.minutes}
+                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                  >
+                    Payme
+                  </button>
+                  <button
+                    onClick={() => handleBuyPack(p.minutes, 'uzum')}
+                    disabled={buyingPack === p.minutes}
+                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                  >
+                    Uzum
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -246,6 +276,23 @@ export default function PricingPage() {
 
         <DonateCTA variant="line" className="pt-2 pb-4" />
       </div>
+
+      {uzumAccount && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setUzumAccount(null)}
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-[#1b1b20]" onClick={(e) => e.stopPropagation()}>
+            <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} />
+            <button
+              onClick={() => setUzumAccount(null)}
+              className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
+            >
+              Yopish
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

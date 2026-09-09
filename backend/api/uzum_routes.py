@@ -138,6 +138,82 @@ def initiate_job_payment(
     return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": amount}
 
 
+def uzum_account_response(db: Session, payment: Payment) -> dict:
+    """Har qanday PENDING Uzum to'lovi uchun yagona javob shakli -- Uzum'da
+    checkout havolasi yo'q, foydalanuvchi ilovasida shu "account" raqamini
+    kiritib to'laydi. Webhook (_find_by_account -> apply_successful_payment)
+    to'lov turini Payment bayroqlariga qarab o'zi hal qiladi."""
+    if not payment.uzum_account_id:
+        payment.uzum_account_id = account_id_from_payment_id(payment.id)
+        db.commit()
+    return {
+        "success": True,
+        "account": payment.uzum_account_id,
+        "payment_id": str(payment.id),
+        "amount": payment.amount,
+    }
+
+
+class InitiateSubscriptionRequest(BaseModel):
+    plan: str
+
+
+@router.post("/initiate-subscription")
+def initiate_subscription_payment(
+    req: InitiateSubscriptionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from backend.services.plans import PLANS
+    if req.plan not in PLANS or req.plan == "free":
+        raise HTTPException(status_code=400, detail="Noto'g'ri tarif tanlandi.")
+    plan = PLANS[req.plan]
+
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id, Payment.plan == req.plan,
+        Payment.status == PaymentStatus.PENDING, Payment.provider == PaymentProvider.UZUM,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, plan=req.plan, amount=plan.price,
+            provider=PaymentProvider.UZUM, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    return uzum_account_response(db, payment)
+
+
+class InitiateMinutesRequest(BaseModel):
+    pack: int
+
+
+@router.post("/initiate-minutes")
+def initiate_minutes_payment(
+    req: InitiateMinutesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from backend.services.plans import MINUTE_PACKS
+    if req.pack not in MINUTE_PACKS:
+        raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
+    amount = MINUTE_PACKS[req.pack]
+
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id, Payment.minutes_purchased == req.pack,
+        Payment.status == PaymentStatus.PENDING, Payment.provider == PaymentProvider.UZUM,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, minutes_purchased=req.pack, amount=amount,
+            provider=PaymentProvider.UZUM, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    return uzum_account_response(db, payment)
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # 2. Webhook (Uzum -> bizning backend)
 # ─────────────────────────────────────────────────────────────────────────
