@@ -23,7 +23,7 @@ export default function PricingPage() {
   const [buyingPack, setBuyingPack] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -46,7 +46,7 @@ export default function PricingPage() {
     try {
       const res = provider === 'uzum' ? await purchaseMinutesUzum(pack) : await purchaseMinutes(pack, provider)
       if (provider === 'uzum' && res.success && 'account' in res && res.account) {
-        setUzumAccount({ account: res.account as number, amount: res.amount })
+        setUzumAccount({ account: res.account as number, amount: res.amount, deeplink: 'payment_url' in res ? res.payment_url : undefined })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (w) w.location.href = res.payment_url
         else window.location.href = res.payment_url
@@ -76,7 +76,7 @@ export default function PricingPage() {
         : provider === 'payme' ? await subscribeToPlanPayme(planId)
         : await subscribeToPlan(planId)
       if (provider === 'uzum' && res.success && 'account' in res && res.account) {
-        setUzumAccount({ account: res.account as number, amount: res.amount })
+        setUzumAccount({ account: res.account as number, amount: res.amount, deeplink: 'payment_url' in res ? res.payment_url : undefined })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (paymentWindow) paymentWindow.location.href = res.payment_url
         else window.location.href = res.payment_url
@@ -283,7 +283,7 @@ export default function PricingPage() {
           onClick={() => setUzumAccount(null)}
         >
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-[#1b1b20]" onClick={(e) => e.stopPropagation()}>
-            <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} />
+            <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} />
             <button
               onClick={() => setUzumAccount(null)}
               className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"

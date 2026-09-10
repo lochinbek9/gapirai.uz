@@ -5,8 +5,12 @@ asosida qurilgan -- to'liq so'rov/javob shakllari va xatolik kodlari
 backend/services/uzum_service.py'dagi izohda. Ikki yo'nalish:
 
 1. Bizning backend Uzum orqali to'lash uchun "account" raqamini beradi
-   (/initiate): checkout havolasi emas -- Uzum'da bizga ma'lum checkout-URL
-   mexanizmi yo'q, foydalanuvchi Uzum ilovasi orqali o'zi to'laydi.
+   (/initiate). 2026-09-10: Uzum servisni faollashtirib deeplink shaklini
+   berdi -- endi javobda `payment_url` ham qaytadi
+   (https://uzumbank.uz/open-service?serviceId=<id>&account=<account>), u
+   Uzum ilovasidagi to'lov formasini ochib "account" maydonini oldindan
+   to'ldiradi. "account" raqami qo'lda kiritish uchun fallback sifatida
+   qoladi (deeplink ochilmaydigan desktop holatlari uchun).
 
 2. Uzum bizning backendga 5 ta webhook yuboradi (/check, /create, /confirm,
    /reverse, /status). MUHIM: Uzum idempotent qayta chaqiruvni XATO deb
@@ -45,6 +49,13 @@ router = APIRouter(prefix="/api/payments/uzum", tags=["uzum"])
 
 def _amount_tiyin(so_um_amount: float) -> int:
     return int(round(so_um_amount * 100))
+
+
+def uzum_deeplink(account_id: int) -> str:
+    """Uzum ilovasidagi to'lov formasini ochuvchi universal havola. `account`
+    parametri Uzum tomonida forma maydonini oldindan to'ldiradi (Uzum
+    2026-09-10 shu shaklni berdi)."""
+    return f"https://uzumbank.uz/open-service?serviceId={get_settings().UZUM_SERVICE_ID}&account={account_id}"
 
 
 def _err(error_code: str) -> JSONResponse:
@@ -135,20 +146,28 @@ def initiate_job_payment(
         payment.uzum_account_id = account_id_from_payment_id(payment.id)
         db.commit()
 
-    return {"success": True, "account": payment.uzum_account_id, "payment_id": str(payment.id), "amount": amount}
+    return {
+        "success": True,
+        "account": payment.uzum_account_id,
+        "payment_url": uzum_deeplink(payment.uzum_account_id),
+        "payment_id": str(payment.id),
+        "amount": amount,
+    }
 
 
 def uzum_account_response(db: Session, payment: Payment) -> dict:
-    """Har qanday PENDING Uzum to'lovi uchun yagona javob shakli -- Uzum'da
-    checkout havolasi yo'q, foydalanuvchi ilovasida shu "account" raqamini
-    kiritib to'laydi. Webhook (_find_by_account -> apply_successful_payment)
-    to'lov turini Payment bayroqlariga qarab o'zi hal qiladi."""
+    """Har qanday PENDING Uzum to'lovi uchun yagona javob shakli. `payment_url`
+    -- Uzum ilovasidagi to'lov formasini ochuvchi deeplink; `account` -- shu
+    formaga qo'lda kiritiladigan raqam (deeplink ochilmasa fallback). Webhook
+    (_find_by_account -> apply_successful_payment) to'lov turini Payment
+    bayroqlariga qarab o'zi hal qiladi."""
     if not payment.uzum_account_id:
         payment.uzum_account_id = account_id_from_payment_id(payment.id)
         db.commit()
     return {
         "success": True,
         "account": payment.uzum_account_id,
+        "payment_url": uzum_deeplink(payment.uzum_account_id),
         "payment_id": str(payment.id),
         "amount": payment.amount,
     }
