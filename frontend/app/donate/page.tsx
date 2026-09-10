@@ -27,7 +27,7 @@ export default function DonatePage() {
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number } | null>(null)
+  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
 
   useEffect(() => {
     getDonateOptions().then(setOpts).catch(() => {})
@@ -53,7 +53,7 @@ export default function DonatePage() {
         message: message.trim() || undefined,
       })
       if (res.account) {
-        setUzumAccount({ account: res.account, amount: res.amount })
+        setUzumAccount({ account: res.account, amount: res.amount, deeplink: res.payment_url })
         setSubmitting(false)
       } else if (res.payment_url) {
         window.location.href = res.payment_url
@@ -146,7 +146,7 @@ export default function DonatePage() {
             ))}
           </div>
 
-          {uzumAccount && <div className="mt-4"><UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} /></div>}
+          {uzumAccount && <div className="mt-4"><UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} /></div>}
 
           {/* Optional identity */}
           <div className="mt-5 space-y-2">

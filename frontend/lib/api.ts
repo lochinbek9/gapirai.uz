@@ -162,11 +162,10 @@ export async function initiatePaymePayment(jobId: string): Promise<{ success: bo
   return res.data
 }
 
-// Uzum'da checkout havolasi yo'q -- foydalanuvchi Uzum ilovasida shu "account"
-// raqamini o'zi kiritib to'laydi (backend/api/uzum_routes.py). amount===0
-// bo'lsa video allaqachon bepul/kvota bilan qoplangan (payment_url'siz holat
-// bilan bir xil semantik).
-export async function initiateUzumPayment(jobId: string): Promise<{ success: boolean; account?: number; payment_id?: string; amount: number }> {
+// Uzum: `payment_url` -- ilovadagi to'lov formasini ochuvchi deeplink;
+// `account` -- shu formaga qo'lda kiritish fallback'i (backend/api/uzum_routes.py).
+// amount===0 bo'lsa video allaqachon bepul/kvota bilan qoplangan.
+export async function initiateUzumPayment(jobId: string): Promise<{ success: boolean; account?: number; payment_url?: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/uzum/initiate', { job_id: jobId })
   return res.data
 }
@@ -345,14 +344,14 @@ export async function subscribeToPlanPayme(plan: string): Promise<{ success: boo
   return res.data
 }
 
-// Uzum'da checkout havolasi yo'q -- {account, amount} qaytadi, foydalanuvchi
-// Uzum ilovasida shu raqamni kiritib to'laydi (backend/api/uzum_routes.py).
-export async function subscribeToPlanUzum(plan: string): Promise<{ success: boolean; account?: number; payment_id?: string; amount: number }> {
+// Uzum: `payment_url` (ilova deeplink) + `account` (qo'lda kiritish fallback)
+// qaytadi (backend/api/uzum_routes.py).
+export async function subscribeToPlanUzum(plan: string): Promise<{ success: boolean; account?: number; payment_url?: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/uzum/initiate-subscription', { plan })
   return res.data
 }
 
-export async function purchaseMinutesUzum(pack: number): Promise<{ success: boolean; account?: number; payment_id?: string; amount: number }> {
+export async function purchaseMinutesUzum(pack: number): Promise<{ success: boolean; account?: number; payment_url?: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/payments/uzum/initiate-minutes', { pack })
   return res.data
 }

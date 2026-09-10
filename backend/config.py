@@ -322,15 +322,17 @@ class Settings(BaseSettings):
     # flag. Payme kassani production uchun tasdiqlagach, False qiling.
     PAYME_SANDBOX_MODE: bool = True
 
-    # Uzum Bank (Merchant webhook API) -- integratsiya hali ishlab chiqilmoqda
-    # (2026-08-20). Uzum bizga POST /check, /create, /confirm, /reverse,
-    # /status so'rovlarini shu login/parol bilan Basic Auth orqali yuboradi
-    # -- Click/Payme'dan farqli, bu qiymatlarni BIZ tanlaymiz va Uzum'ga
-    # beramiz (ular bizga bermaydi). UZUM_SERVICE_ID ham shunday -- test
-    # bosqichida biz belgilaymiz, keyin Uzum production ID beradi.
+    # Uzum Bank (Merchant webhook API). Uzum bizga POST /check, /create,
+    # /confirm, /reverse, /status so'rovlarini shu login/parol bilan Basic
+    # Auth orqali yuboradi -- Click/Payme'dan farqli, WEBHOOK_USERNAME/
+    # PASSWORD'ni BIZ tanlaymiz va Uzum'ga beramiz (ular bizga bermaydi).
+    # UZUM_SERVICE_ID esa 2026-09-10 servis faollashtirilganda Uzum tomonidan
+    # berilgan production qiymat (test bosqichida boshqa ID ishlatilgan edi).
+    # Foydalanuvchi to'lov formasini shu deeplink ochadi:
+    #   https://uzumbank.uz/open-service?serviceId=<UZUM_SERVICE_ID>&account=<account>
     UZUM_WEBHOOK_USERNAME: str = ""
     UZUM_WEBHOOK_PASSWORD: str = ""
-    UZUM_SERVICE_ID: int = 1
+    UZUM_SERVICE_ID: int = 498658777
 
     # Paynet (UZPAYNET) Universal Web-Service (JSON-RPC 2.0, Basic Auth) --
     # backend/api/paynet_routes.py. Xuddi Uzum kabi, login/parol va

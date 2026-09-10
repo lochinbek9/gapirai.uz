@@ -112,9 +112,9 @@ def create_donation(
     db.refresh(payment)
 
     if provider_enum == PaymentProvider.UZUM:
-        # Uzum'da checkout havolasi yo'q -- foydalanuvchi ilovasida "account"
-        # raqamini kiritib to'laydi (backend/api/uzum_routes.py webhooklari
-        # to'lovni is_donation bayrog'iga qarab qayta ishlaydi).
+        # Uzum javobida ham `payment_url` (deeplink), ham `account` (qo'lda
+        # kiritish fallback) qaytadi -- webhooklar to'lovni is_donation
+        # bayrog'iga qarab qayta ishlaydi (backend/api/uzum_routes.py).
         from backend.api.uzum_routes import uzum_account_response
         return uzum_account_response(db, payment)
 
