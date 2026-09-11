@@ -161,8 +161,12 @@ class Settings(BaseSettings):
     # AI Studio kaliti bilan tasdiqlangan). .env override qilishi mumkin.
     GEMINI_MODEL: str = "gemini-3.6-flash"
 
-    # Tarjima provayderi: "openai" | "gemini"
-    TRANSLATE_PROVIDER: str = "openai"
+    # Tarjima provayderi: "openai" | "gemini". 2026-09-11: OpenAI krediti
+    # tugagani sababli loyiha to'liq Gemini'ga o'tkazildi (bepul tarif) --
+    # default shu holatni aks ettiradi, shunda yangi/toza deploy ham
+    # .env override'siz to'g'ri ishlaydi (GEMINI_MODEL uchun PR #16'dagi
+    # bilan bir xil mulohaza).
+    TRANSLATE_PROVIDER: str = "gemini"
 
     # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
     GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"

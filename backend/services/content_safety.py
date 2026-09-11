@@ -16,10 +16,12 @@ esa alohida GPT klassifikatori orqali — moderation endpoint bu
 kategoriyalarni tanimaydi, chunki ular umumiy "zararli kontent" emas,
 balki GapirAI'ning o'z biznes qarori.
 
-Xizmat vaqtinchalik ishlamay qolsa (API xatosi, tarmoq muammosi) — FAIL
-OPEN: video bloklanmaydi. Sabab: moderatsiya qo'shimcha xavfsizlik
-qatlami, asosiy xizmat emas — vaqtinchalik OpenAI nosozligi butun
-saytni to'xtatib qo'ymasligi kerak.
+OpenAI kaliti yo'q yoki xato bersa (masalan krediti tugagan, 2026-09
+holati) — Gemini'ga o'tiladi (`_gemini_safety_check`, ikkala tekshiruvni
+bitta chaqiruvga birlashtiradi). Ikkalasi ham ishlamasa — FAIL OPEN: video
+bloklanmaydi. Sabab: moderatsiya qo'shimcha xavfsizlik qatlami, asosiy
+xizmat emas — vaqtinchalik provayder nosozligi butun saytni to'xtatib
+qo'ymasligi kerak.
 """
 from dataclasses import dataclass
 import json
@@ -96,6 +98,52 @@ def _moderation_check(text: str) -> SafetyResult:
     return SafetyResult(allowed=True)
 
 
+_GEMINI_SAFETY_PROMPT = (
+    "Siz video kontent moderatori. Berilgan matn (sarlavha/tavsif/transkript) "
+    "quyidagi kategoriyalardan biriga tegishlimi tekshiring:\n"
+    "- sexual_minors: voyaga yetmaganlar ishtirokidagi jinsiy kontent (ENG JIDDIY toifa)\n"
+    "- sexual_explicit: pornografik/18+ kontent\n"
+    "- graphic_violence: haddan tashqari grafik zo'ravonlik\n"
+    "- hate_violent_extremism: nafrat yoki zo'ravonlikni qo'zg'atuvchi kontent\n"
+    "- self_harm: o'ziga zarar yetkazishni targ'ib qilish\n"
+    "- religious_content: diniy kontent (targ'ibot, va'z, diniy ta'lim, diniy tarix hikoyasi)\n"
+    "- terrorism_extremism: terroristik/ekstremistik targ'ibot, rekrutlash yoki ulug'lash\n"
+    "- illegal_activity: aniq noqonuniy faoliyatni o'rgatish yoki targ'ib qilish\n\n"
+    "Oddiy tarix, ilm-fan, texnologiya, biznes, sport, ta'lim, yangiliklar kontenti "
+    "BLOKLANMAYDI — hatto diniy urush yoki jinoyat haqida BEZARARLI tarixiy/hujjatli "
+    "tarzda gapirsa ham, agar bu targ'ibot yoki instruksiya bo'lmasa.\n\n"
+    'Faqat shu JSON formatda javob bering: '
+    '{"category": string yoki null, "reason": string yoki null}\n'
+    'Hech biriga to\'g\'ri kelmasa: {"category": null, "reason": null}'
+)
+
+
+def _gemini_safety_check(text: str) -> SafetyResult:
+    """OpenAI moderation + _policy_classify'ning Gemini muqobili -- ikkalasi
+    bitta chaqiruvga birlashtirilgan (Gemini bepul tarif so'rov limitini
+    tejash uchun). OpenAI mavjud bo'lmaganda yoki xato bersa ishlatiladi."""
+    from google.genai import types
+    from backend.services.translator import _get_gemini_client, _gemini_text_model
+
+    config = types.GenerateContentConfig(
+        system_instruction=_GEMINI_SAFETY_PROMPT,
+        temperature=0.0,
+        response_mime_type="application/json",
+    )
+    response = _get_gemini_client().models.generate_content(
+        model=_gemini_text_model(), contents=text[:6000], config=config,
+    )
+    result = json.loads(response.text)
+    category = result.get("category") if isinstance(result, dict) else None
+    if not category:
+        return SafetyResult(allowed=True)
+    if category == "sexual_minors":
+        return SafetyResult(False, "sexual_minors", result.get("reason") or "Voyaga yetmaganlar ishtirokidagi jinsiy kontent aniqlandi.")
+    # Qolgan barcha kategoriyalar -- endi faqat ogohlantirish (2026-08-16 qarori,
+    # _moderation_check/_policy_classify bilan bir xil siyosat).
+    return SafetyResult(True, category, result.get("reason") or "")
+
+
 _POLICY_SYSTEM_PROMPT = (
     "Siz video kontent moderatori. Berilgan matn (sarlavha/tavsif/transkript) "
     "quyidagi kategoriyalardan biriga tegishlimi tekshiring:\n"
@@ -140,7 +188,10 @@ def check_safety(text: str) -> SafetyResult:
     bilan yozib qo'yadi, lekin jarayonni to'xtatmaydi)."""
     if not settings.CONTENT_SAFETY_ENABLED or not text.strip():
         return SafetyResult(allowed=True)
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     try:
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY not set")
         moderation_result = _moderation_check(text)
         if not moderation_result.allowed:
             return moderation_result  # faqat CSAM shu yerda to'xtaydi
@@ -151,5 +202,12 @@ def check_safety(text: str) -> SafetyResult:
             return moderation_result
         return policy_result
     except Exception as e:
+        if gemini_available:
+            try:
+                logger.info(f"OpenAI kontent xavfsizligi ishlamadi ({e}) — Gemini'ga o'tilmoqda.")
+                return _gemini_safety_check(text)
+            except Exception as e2:
+                logger.error(f"Kontent xavfsizligi: Gemini ham ishlamadi (fail-open, bloklanmadi): {e2}")
+                return SafetyResult(allowed=True)
         logger.error(f"Kontent xavfsizligi tekshiruvida xato (fail-open, bloklanmadi): {e}")
         return SafetyResult(allowed=True)
