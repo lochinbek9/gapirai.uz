@@ -4,7 +4,8 @@ Speech Optimizer — translated Uzbek matnni Azure/Edge TTS uchun tayyorlaydi.
 Ikki qatlam:
 1. Qoidaviy (har doim, bepul): raqamlarni so'zga, qisqartmalarni og'zaki shaklga
    (PRONUNCIATION_DICT + PronunciationMemory) va URL'larni "havola"ga o'giradi.
-2. LLM qatlami (faqat FREE_MODE o'chiq va OPENAI_API_KEY mavjud bo'lsa): uzun
+2. LLM qatlami (OpenAI pullik rejimda YOKI Gemini kaliti mavjud bo'lsa --
+   Gemini bepul tarifi bo'lgani uchun FREE_MODE'da ham ishlaydi): uzun
    gaplarni bo'ladi, kitobiy iboralarni og'zaki nutqqa moslaydi, tinish
    belgilarini tabiiy pauzalarga qarab qo'yadi. Qatlam-1 natijasidagi
    raqam/qisqartma o'zgartirishlariga tegmaydi.
@@ -277,59 +278,103 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
+def _reconcile(segments: list[dict], optimized) -> list[dict] | None:
+    """LLM javobidagi 'segments' ro'yxatini original segmentlar bilan
+    moslashtiradi. 'id'/'start'/'end' hech qachon modeldan ishonib
+    olinmaydi (LLM ularni tashlab qoldirishi/o'zgartirishi mumkin — TTS
+    bosqichida KeyError('id') bilan butun jobni qulatmasligi uchun),
+    faqat 'text' olinadi. Javob shakli noto'g'ri bo'lsa None qaytadi."""
+    if not (isinstance(optimized, list) and optimized and "text" in optimized[0]):
+        return None
+    if len(optimized) != len(segments):
+        logger.warning(
+            f"LLM optimize segment soni mos kelmadi (original={len(segments)}, "
+            f"natija={len(optimized)}) — pozitsiya bo'yicha moslashtirilmoqda."
+        )
+    reconciled = []
+    for i, orig in enumerate(segments):
+        text = orig.get("text", "")
+        if i < len(optimized) and isinstance(optimized[i], dict):
+            candidate = optimized[i].get("text")
+            if candidate:
+                text = candidate
+        reconciled.append({**orig, "text": text})
+    return reconciled
+
+
+def _optimize_instruction(segments: list[dict]) -> str:
     user_message = json.dumps(segments, ensure_ascii=True, indent=2)
-    instruction = (
+    return (
         "Quyidagi segmentlarni Azure TTS uchun og'zaki nutqqa moslang.\n"
         "JAVOB FORMATI — faqat shu ko'rinishda:\n"
         '{"segments": [{"id": ..., "start": ..., "end": ..., "text": "OPTIMALLASHTIRILGAN MATN"}, ...]}\n\n'
         f"{user_message}"
     )
+
+
+def _gemini_optimize_chunk(segments: list[dict]) -> list[dict]:
+    """_llm_optimize_chunk bilan bir xil vazifa, Gemini orqali -- OpenAI
+    krediti tugaganda yoki FREE_MODE'da ham ishlaydi (Gemini bepul tarifi
+    bor), video_analysis.py'dagi _gemini_json bilan bir xil naqsh."""
+    from google.genai import types
+    from backend.services.translator import _get_gemini_client, _gemini_text_model
+
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        temperature=0.3,
+        response_mime_type="application/json",
+    )
+    try:
+        response = _get_gemini_client().models.generate_content(
+            model=_gemini_text_model(), contents=_optimize_instruction(segments), config=config,
+        )
+        result = json.loads(response.text)
+        reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)
+        if reconciled is not None:
+            return reconciled
+    except Exception as e:
+        logger.warning(f"Gemini speech optimization chunk failed, falling back to rule-based output only: {e}")
+    return segments
+
+
+def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
+    """OpenAI orqali optimallashtiradi; kalit yo'q yoki xato bo'lsa (masalan
+    krediti tugagan) Gemini'ga o'tadi -- aks holda faqat qoidaviy natija
+    qoladi."""
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    if not _client:
+        return _gemini_optimize_chunk(segments) if gemini_available else segments
     try:
         response = _get_client().chat.completions.create(
             model=settings.OPENAI_LIGHT_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": instruction},
+                {"role": "user", "content": _optimize_instruction(segments)},
             ],
             temperature=0.3,
             response_format={"type": "json_object"},
         )
         result = json.loads(response.choices[0].message.content)
-        optimized = result.get("segments") if isinstance(result, dict) else result
-        if isinstance(optimized, list) and optimized and "text" in optimized[0]:
-            # LLM 'id'/'start'/'end' ni tashlab qoldirishi yoki
-            # o'zgartirishi mumkin — TTS bosqichida KeyError('id') bilan
-            # butun jobni qulatmasligi uchun ular hech qachon modeldan
-            # ishonib olinmaydi, faqat 'text' olinadi.
-            if len(optimized) != len(segments):
-                logger.warning(
-                    f"LLM optimize segment soni mos kelmadi (original={len(segments)}, "
-                    f"natija={len(optimized)}) — pozitsiya bo'yicha moslashtirilmoqda."
-                )
-            reconciled = []
-            for i, orig in enumerate(segments):
-                text = orig.get("text", "")
-                if i < len(optimized) and isinstance(optimized[i], dict):
-                    candidate = optimized[i].get("text")
-                    if candidate:
-                        text = candidate
-                reconciled.append({**orig, "text": text})
+        reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)
+        if reconciled is not None:
             return reconciled
     except Exception as e:
+        if gemini_available:
+            logger.warning(f"OpenAI speech optimization xato ({e}) — Gemini'ga o'tilmoqda.")
+            return _gemini_optimize_chunk(segments)
         logger.warning(f"LLM speech optimization chunk failed, falling back to rule-based output only: {e}")
     return segments
 
 
-def _llm_optimize(segments: list[dict]) -> list[dict]:
+def _chunked_optimize(segments: list[dict], chunk_fn) -> list[dict]:
     if not segments:
         return []
     chunk_size = 30
     chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
     if len(chunks) == 1:
-        return _llm_optimize_chunk(chunks[0])
+        return chunk_fn(chunks[0])
     with ThreadPoolExecutor(max_workers=5) as executor:
-        results = list(executor.map(_llm_optimize_chunk, chunks))
+        results = list(executor.map(chunk_fn, chunks))
     merged: list[dict] = []
     for r in results:
         merged.extend(r)
@@ -356,12 +401,17 @@ def optimize_segments(segments: list[dict]) -> list[dict]:
         for seg in segments
     ]
 
-    if settings.FREE_MODE or not _client:
-        logger.info("FREE_MODE (yoki OPENAI_API_KEY yo'q): faqat qoidaviy speech optimization qo'llanildi.")
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    use_openai = _client and not settings.FREE_MODE
+    if not use_openai and not gemini_available:
+        logger.info("OpenAI (pullik rejim) yoki Gemini kaliti yo'q: faqat qoidaviy speech optimization qo'llanildi.")
         return rule_based
 
-    logger.info("LLM speech optimization ishlamoqda...")
-    optimized = _llm_optimize(rule_based)
+    # FREE_MODE'da OpenAI'ni ataylab chetlab o'tamiz (xarajatni oldini olish
+    # uchun kiritilgan bayroq), lekin Gemini bepul tarifi bo'lsa undan
+    # foydalanishni davom ettiramiz -- sifat yaxshi bo'lishi bepulga tushadi.
+    logger.info(f"LLM speech optimization ishlamoqda ({'OpenAI' if use_openai else 'Gemini'})...")
+    optimized = _chunked_optimize(rule_based, _llm_optimize_chunk if use_openai else _gemini_optimize_chunk)
     # LLM o'z chiqishida boshqa apostrof shaklini ishlatgan bo'lishi mumkin —
     # yakuniy o'tishda yana kanonik shaklga keltiramiz.
     return [{**seg, "text": normalize_apostrophes(seg.get("text", ""))} for seg in optimized]

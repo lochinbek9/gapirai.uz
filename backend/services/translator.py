@@ -149,8 +149,16 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     if not segments:
         return []
 
-    if settings.FREE_MODE:
-        logger.info("FREE_MODE: Translating segments using free Google Translate API...")
+    # FREE_MODE (2026-08-04, Gemini integratsiyasidan OLDIN qo'shilgan)
+    # tarjimani _translate_chunk'ga umuman yetkazmasdan xom Google
+    # Translate'ga (SYSTEM_PROMPT'dagi dublyaj sifati qoidalarisiz, so'zma-so'z
+    # mashina tarjimasi) yo'naltirardi -- Gemini kaliti bo'lsa ham. Gemini
+    # kaliti mavjud bo'lganda endi pastdagi LLM yo'liga (TRANSLATE_PROVIDER
+    # orqali Gemini) o'tkaziladi -- u ham bepul, lekin sifat ancha yaxshi.
+    # Xom Google Translate endi faqat Gemini kaliti UMUMAN yo'q bo'lgandagi
+    # oxirgi chora sifatida qoladi.
+    if settings.FREE_MODE and not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
+        logger.info("FREE_MODE (Gemini kaliti yo'q): Translating segments using free Google Translate API...")
         with ThreadPoolExecutor(max_workers=5) as executor:
             return list(executor.map(_translate_segment_free, segments))
 

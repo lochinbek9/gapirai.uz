@@ -126,33 +126,50 @@ def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, 
     logger.info("\n".join(lines))
 
 
+_GENDER_SYSTEM_PROMPT = (
+    "You analyze video transcripts and determine the speaker's gender. "
+    "Reply with ONLY one word: 'male' or 'female'. "
+    "If unclear or multiple speakers, reply 'male'."
+)
+
+
 def _detect_gender(transcript_text: str) -> str:
-    """Detect speaker gender with OpenAI."""
+    """Detect speaker gender -- OpenAI birinchi, kaliti yo'q/xato bo'lsa
+    Gemini (bepul tarif), ikkalasi ham ishlamasa 'male'ga tushiriladi."""
+    snippet = transcript_text[:1000]
     try:
-        snippet = transcript_text[:1000]
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY not set")
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         resp = client.chat.completions.create(
             model=settings.OPENAI_LIGHT_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You analyze video transcripts and determine the speaker's gender. "
-                        "Reply with ONLY one word: 'male' or 'female'. "
-                        "If unclear or multiple speakers, reply 'male'."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Transcript: {snippet}",
-                },
+                {"role": "system", "content": _GENDER_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Transcript: {snippet}"},
             ],
             max_tokens=5,
             temperature=0,
         )
         result = resp.choices[0].message.content.strip().lower()
         return "female" if "female" in result else "male"
-    except Exception:
+    except Exception as e:
+        if settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX:
+            try:
+                from google.genai import types
+                from backend.services.translator import _get_gemini_client, _gemini_text_model
+
+                config = types.GenerateContentConfig(
+                    system_instruction=_GENDER_SYSTEM_PROMPT, temperature=0, max_output_tokens=5,
+                )
+                response = _get_gemini_client().models.generate_content(
+                    model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
+                )
+                result = (response.text or "").strip().lower()
+                return "female" if "female" in result else "male"
+            except Exception as e2:
+                logger.debug(f"_detect_gender: Gemini ham ishlamadi ({e2}), 'male'ga tushirildi.")
+                return "male"
+        logger.debug(f"_detect_gender xato ({e}), 'male'ga tushirildi.")
         return "male"
 
 
