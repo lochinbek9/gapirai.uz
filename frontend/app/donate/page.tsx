@@ -6,10 +6,11 @@ import axios from 'axios'
 import { Heart, Loader2, ArrowLeft } from 'lucide-react'
 import { getDonateOptions, createDonation, DonateOptions } from '@/lib/api'
 import UzumAccountCard from '@/components/UzumAccountCard'
+import PaynetOrderCard from '@/components/PaynetOrderCard'
 
-const PROVIDERS = ['click', 'payme', 'uzum'] as const
+const PROVIDERS = ['click', 'payme', 'uzum', 'paynet'] as const
 type Provider = (typeof PROVIDERS)[number]
-const PROVIDER_LABEL: Record<Provider, string> = { click: 'Click', payme: 'Payme', uzum: 'Uzum' }
+const PROVIDER_LABEL: Record<Provider, string> = { click: 'Click', payme: 'Payme', uzum: 'Uzum', paynet: 'Paynet' }
 
 const FALLBACK: DonateOptions = { presets: [10000, 25000, 50000, 100000], min: 1000, max: 10000000 }
 
@@ -28,6 +29,7 @@ export default function DonatePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
+  const [paynetOrder, setPaynetOrder] = useState<{ orderId: string; amount: number } | null>(null)
 
   useEffect(() => {
     getDonateOptions().then(setOpts).catch(() => {})
@@ -54,6 +56,9 @@ export default function DonatePage() {
       })
       if (res.account) {
         setUzumAccount({ account: res.account, amount: res.amount, deeplink: res.payment_url })
+        setSubmitting(false)
+      } else if (res.order_id) {
+        setPaynetOrder({ orderId: res.order_id, amount: res.amount })
         setSubmitting(false)
       } else if (res.payment_url) {
         window.location.href = res.payment_url
@@ -130,12 +135,12 @@ export default function DonatePage() {
 
           {/* Provider */}
           <label className="mb-2 mt-5 block text-xs font-bold uppercase tracking-wide text-gray-500">To‘lov turi</label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PROVIDERS.map((pv) => (
               <button
                 key={pv}
-                onClick={() => { setProvider(pv); setUzumAccount(null) }}
-                className={`flex-1 rounded-xl border py-2.5 text-sm font-bold transition ${
+                onClick={() => { setProvider(pv); setUzumAccount(null); setPaynetOrder(null) }}
+                className={`rounded-xl border py-2.5 text-sm font-bold transition ${
                   provider === pv
                     ? 'border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-300'
                     : 'border-gray-200 text-gray-600 dark:border-white/15 dark:text-gray-300'
@@ -147,6 +152,7 @@ export default function DonatePage() {
           </div>
 
           {uzumAccount && <div className="mt-4"><UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} /></div>}
+          {paynetOrder && <div className="mt-4"><PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} /></div>}
 
           {/* Optional identity */}
           <div className="mt-5 space-y-2">
@@ -183,7 +189,9 @@ export default function DonatePage() {
             {valid
               ? provider === 'uzum'
                 ? `${formatSom(effectiveAmount)} so‘m — Uzum hisob raqamini olish`
-                : `${formatSom(effectiveAmount)} so‘m qo‘llab-quvvatlash`
+                : provider === 'paynet'
+                  ? `${formatSom(effectiveAmount)} so‘m — Paynet buyurtma raqamini olish`
+                  : `${formatSom(effectiveAmount)} so‘m qo‘llab-quvvatlash`
               : 'Summani tanlang'}
           </button>
 
