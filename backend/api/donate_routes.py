@@ -35,7 +35,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 class DonateRequest(BaseModel):
     amount: int
-    provider: str = "click"          # "click" | "payme"
+    provider: str = "click"          # "click" | "payme" | "uzum" | "paynet"
     name: str | None = None
     email: str | None = None
     message: str | None = None
@@ -78,7 +78,7 @@ def create_donation(
             status_code=400,
             detail=f"Summa {DONATION_MIN:,} - {DONATION_MAX:,} so'm oralig'ida bo'lishi kerak.".replace(",", " "),
         )
-    if req.provider not in ("click", "payme", "uzum"):
+    if req.provider not in ("click", "payme", "uzum", "paynet"):
         raise HTTPException(status_code=400, detail="Noto'g'ri to'lov turi.")
 
     settings = get_settings()
@@ -95,6 +95,7 @@ def create_donation(
     provider_enum = {
         "payme": PaymentProvider.PAYME,
         "uzum": PaymentProvider.UZUM,
+        "paynet": PaymentProvider.PAYNET,
     }.get(req.provider, PaymentProvider.CLICK)
     payment = Payment(
         user_id=current_user.id if current_user else None,
@@ -117,6 +118,14 @@ def create_donation(
         # bayrog'iga qarab qayta ishlaydi (backend/api/uzum_routes.py).
         from backend.api.uzum_routes import uzum_account_response
         return uzum_account_response(db, payment)
+
+    if provider_enum == PaymentProvider.PAYNET:
+        # Paynet'da ham checkout havolasi yo'q -- foydalanuvchi Paynet
+        # ilovasi yoki bankomatda shu order_id'ni kiritib to'laydi
+        # (backend/api/paynet_routes.py webhooklari to'lovni is_donation
+        # bayrog'iga qarab qayta ishlaydi).
+        from backend.api.paynet_routes import paynet_order_response
+        return paynet_order_response(db, payment)
 
     if provider_enum == PaymentProvider.PAYME:
         from backend.services.payme_service import generate_payme_checkout_url

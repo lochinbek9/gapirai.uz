@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
-import { getPlans, subscribeToPlan, subscribeToPlanPayme, subscribeToPlanUzum, purchaseMinutes, purchaseMinutesUzum, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
+import { getPlans, subscribeToPlan, subscribeToPlanPayme, subscribeToPlanUzum, subscribeToPlanPaynet, purchaseMinutes, purchaseMinutesUzum, purchaseMinutesPaynet, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
 import UzumAccountCard from '@/components/UzumAccountCard'
+import PaynetOrderCard from '@/components/PaynetOrderCard'
 
-type PayProvider = 'click' | 'payme' | 'uzum'
+type PayProvider = 'click' | 'payme' | 'uzum' | 'paynet'
 
 const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
 
@@ -24,6 +25,7 @@ export default function PricingPage() {
   const [error, setError] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
+  const [paynetOrder, setPaynetOrder] = useState<{ orderId: string; amount: number } | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -41,12 +43,17 @@ export default function PricingPage() {
     if (!isLoggedIn) { router.push('/login'); return }
     setBuyingPack(pack)
     setError(null)
-    // Uzum'da redirect yo'q -- popup ochmaymiz.
-    const w = provider !== 'uzum' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    // Uzum/Paynet'da redirect yo'q -- popup ochmaymiz.
+    const w = provider !== 'uzum' && provider !== 'paynet' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
-      const res = provider === 'uzum' ? await purchaseMinutesUzum(pack) : await purchaseMinutes(pack, provider)
+      const res =
+        provider === 'uzum' ? await purchaseMinutesUzum(pack)
+        : provider === 'paynet' ? await purchaseMinutesPaynet(pack)
+        : await purchaseMinutes(pack, provider)
       if (provider === 'uzum' && res.success && 'account' in res && res.account) {
         setUzumAccount({ account: res.account as number, amount: res.amount, deeplink: 'payment_url' in res ? res.payment_url : undefined })
+      } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
+        setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (w) w.location.href = res.payment_url
         else window.location.href = res.payment_url
@@ -69,14 +76,17 @@ export default function PricingPage() {
     }
     setSubscribing(planId)
     setError(null)
-    const paymentWindow = provider !== 'uzum' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
+    const paymentWindow = provider !== 'uzum' && provider !== 'paynet' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
       const res =
         provider === 'uzum' ? await subscribeToPlanUzum(planId)
+        : provider === 'paynet' ? await subscribeToPlanPaynet(planId)
         : provider === 'payme' ? await subscribeToPlanPayme(planId)
         : await subscribeToPlan(planId)
       if (provider === 'uzum' && res.success && 'account' in res && res.account) {
         setUzumAccount({ account: res.account as number, amount: res.amount, deeplink: 'payment_url' in res ? res.payment_url : undefined })
+      } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
+        setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
         if (paymentWindow) paymentWindow.location.href = res.payment_url
         else window.location.href = res.payment_url
@@ -224,6 +234,13 @@ export default function PricingPage() {
                       >
                         Uzum
                       </button>
+                      <button
+                        onClick={() => handleSubscribe(plan.id, 'paynet')}
+                        disabled={subscribing === plan.id}
+                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                      >
+                        Paynet
+                      </button>
                     </div>
                   )}
                 </div>
@@ -268,6 +285,13 @@ export default function PricingPage() {
                   >
                     Uzum
                   </button>
+                  <button
+                    onClick={() => handleBuyPack(p.minutes, 'paynet')}
+                    disabled={buyingPack === p.minutes}
+                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                  >
+                    Paynet
+                  </button>
                 </div>
               </div>
             ))}
@@ -286,6 +310,23 @@ export default function PricingPage() {
             <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} />
             <button
               onClick={() => setUzumAccount(null)}
+              className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
+            >
+              Yopish
+            </button>
+          </div>
+        </div>
+      )}
+
+      {paynetOrder && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setPaynetOrder(null)}
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-[#1b1b20]" onClick={(e) => e.stopPropagation()}>
+            <PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} />
+            <button
+              onClick={() => setPaynetOrder(null)}
               className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
             >
               Yopish

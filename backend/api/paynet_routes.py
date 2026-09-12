@@ -5,9 +5,12 @@
    "order_id"ni (Payment.id) qaytaramiz. Payme/Click'dan farqli -- hujjatda
    Paynet tomonidan taqdim etiladigan checkout havolasi ko'rsatilmagan
    (bu -- klient poastavshik agentiga/ilovasiga o'zi murojaat qilib, shu
-   order_id'ni kiritib to'laydigan "billing agregator" modeli). Frontend
-   foydalanuvchiga shu order_id'ni ko'rsatishi kerak (2026-08-20, hali
-   frontend qismi yozilmagan -- UX kelishilishi kerak).
+   order_id'ni kiritib to'laydigan "billing agregator" modeli). 2026-09-12:
+   foydalanuvchi (loyiha egasi) shaxsan sinab tasdiqladi -- to'lov **Paynet
+   ilovasi** yoki **bankomat** orqali, "GapirAI"ni topib shu order_id'ni
+   kiritish bilan amalga oshadi. Frontend (donate/tarif/paket) endi shu
+   ko'rsatmani beradigan `PaynetOrderCard`dan foydalanadi (Uzum'ning
+   account-raqami kartasi bilan bir xil naqsh).
 
 2. Paynet bizning backendga so'rov yuboradi (/webhook): bitta JSON-RPC 2.0
    kirish nuqtasi, "method" maydoni orqali tarmoqlanadi (Payme'ning Merchant
@@ -148,6 +151,75 @@ def initiate_job_payment(
         db.commit()
 
     return {"success": True, "order_id": str(payment.id), "payment_id": str(payment.id), "amount": amount}
+
+
+def paynet_order_response(db: Session, payment: Payment) -> dict:
+    """Har qanday PENDING Paynet to'lovi uchun yagona javob shakli -- Uzum'ga
+    o'xshab checkout havolasi yo'q, foydalanuvchi Paynet ilovasi yoki
+    bankomatda shu order_id'ni (Payment.id, o'zi) kiritib to'laydi. Webhook
+    (_find_by_order_id -> apply_successful_payment) to'lov turini Payment
+    bayroqlariga qarab o'zi hal qiladi."""
+    return {"success": True, "order_id": str(payment.id), "payment_id": str(payment.id), "amount": payment.amount}
+
+
+class InitiateSubscriptionRequest(BaseModel):
+    plan: str
+
+
+@router.post("/initiate-subscription")
+def initiate_subscription_payment(
+    req: InitiateSubscriptionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from backend.services.plans import PLANS
+    if req.plan not in PLANS or req.plan == "free":
+        raise HTTPException(status_code=400, detail="Noto'g'ri tarif tanlandi.")
+    plan = PLANS[req.plan]
+
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id, Payment.plan == req.plan,
+        Payment.status == PaymentStatus.PENDING, Payment.provider == PaymentProvider.PAYNET,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, plan=req.plan, amount=plan.price,
+            provider=PaymentProvider.PAYNET, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    return paynet_order_response(db, payment)
+
+
+class InitiateMinutesRequest(BaseModel):
+    pack: int
+
+
+@router.post("/initiate-minutes")
+def initiate_minutes_payment(
+    req: InitiateMinutesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from backend.services.plans import MINUTE_PACKS
+    if req.pack not in MINUTE_PACKS:
+        raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
+    amount = MINUTE_PACKS[req.pack]
+
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id, Payment.minutes_purchased == req.pack,
+        Payment.status == PaymentStatus.PENDING, Payment.provider == PaymentProvider.PAYNET,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, minutes_purchased=req.pack, amount=amount,
+            provider=PaymentProvider.PAYNET, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    return paynet_order_response(db, payment)
 
 
 # ─────────────────────────────────────────────────────────────────────────
