@@ -161,12 +161,18 @@ class Settings(BaseSettings):
     # AI Studio kaliti bilan tasdiqlangan). .env override qilishi mumkin.
     GEMINI_MODEL: str = "gemini-3.6-flash"
 
-    # Tarjima provayderi: "openai" | "gemini". 2026-09-11: OpenAI krediti
-    # tugagani sababli loyiha to'liq Gemini'ga o'tkazildi (bepul tarif) --
-    # default shu holatni aks ettiradi, shunda yangi/toza deploy ham
-    # .env override'siz to'g'ri ishlaydi (GEMINI_MODEL uchun PR #16'dagi
-    # bilan bir xil mulohaza).
-    TRANSLATE_PROVIDER: str = "gemini"
+    # Tarjima provayderi: "openai" | "gemini". 2026-09-11 OpenAI krediti
+    # tugagani sababli vaqtincha "gemini"ga o'tkazilgan edi, lekin
+    # 2026-09-12 aniqlandiki, Gemini bepul tarifi yangi hisoblarni FAQAT
+    # gemini-3.6-flash'ga majburlaydi va bu modelning bepul kvotasi kuniga
+    # 20 ta so'rov bilan cheklangan (yangi kalit ham, boshqa modelga
+    # o'tish ham yordam bermadi -- ikkalasi ham sinovdan o'tkazilgan).
+    # OpenAI krediti to'ldirilgach "openai"ga qaytarildi -- narx taqqoslash
+    # (2026-09-12) GPT-4o-mini'ni ($0.15/$0.60 1M token) Gemini'ning har
+    # qanday variantidan (bepul yoki pullik) amaliyroq qildi. Gemini kodi
+    # o'chirilmadi -- OpenAI xato bersa (yana krediti tugasa) avtomatik
+    # Gemini'ga o'tish hamon ishlaydi (translator.py/_call_json naqshlari).
+    TRANSLATE_PROVIDER: str = "openai"
 
     # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
     GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
