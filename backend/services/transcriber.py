@@ -329,43 +329,79 @@ def transcribe_audio(audio_path: str, language: str | None = "en") -> dict:
         }
     """
     if settings.FREE_MODE:
-        try:
-            from faster_whisper import WhisperModel
-            logger.info("FREE_MODE: Running local faster-whisper transcription (small model on CPU)...")
+        result = _transcribe_local_whisper(audio_path, language)
+        if result is not None:
+            return result
+        logger.error("Falling back to OpenAI...")
 
-            model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
-            segments, info = model.transcribe(audio_path, beam_size=5, language=language)
-            
-            segments_list = []
-            full_text_parts = []
-            for i, segment in enumerate(segments, start=1):
-                text = segment.text.strip()
-                if not text:
-                    continue
-                full_text_parts.append(text)
-                segments_list.append({
-                    "id": i,
-                    "start": round(segment.start, 3),
-                    "end": round(segment.end, 3),
-                    "text": text
-                })
-                
-            srt_lines = []
-            for seg in segments_list:
-                srt_lines.append(str(seg["id"]))
-                srt_lines.append(f"{_format_time(seg['start'])} --> {_format_time(seg['end'])}")
-                srt_lines.append(seg["text"])
-                srt_lines.append("")
-                
-            return {
-                "text": " ".join(full_text_parts),
-                "segments": segments_list,
-                "srt": "\n".join(srt_lines),
-                "language": info.language,
-            }
-        except Exception as e:
-            logger.error(f"Local faster-whisper transcription failed: {e}. Falling back to OpenAI...")
+    try:
+        return _transcribe_via_api(audio_path, language)
+    except Exception as e:
+        # 2026-09-12: OpenAI (kredit tugagan) va Gemini (kuniga-20 bepul
+        # tarif devori) BIR VAQTDA ishlamay qolgan haqiqiy production
+        # hodisasi -- FREE_MODE=False bo'lganda (hozirgi holat) bu yerda
+        # hech qanday zaxira yo'q edi, video butunlay muvaffaqiyatsiz
+        # bo'lardi. Lokal faster-whisper hech qanday API kreditiga bog'liq
+        # emas -- shuning uchun FREE_MODE yoqilganmi yo'qmi qat'i nazar,
+        # OXIRGI CHORA sifatida shu yerda ham sinab ko'riladi (tarjimadagi
+        # _translate_chunk_free_mt bilan bir xil mulohaza).
+        logger.error(f"OpenAI/Gemini transkripsiya ikkalasi ham ishlamadi ({e}) — oxirgi chora sifatida lokal Whisper'ga o'tilmoqda.")
+        result = _transcribe_local_whisper(audio_path, language)
+        if result is not None:
+            return result
+        raise
 
+
+def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | None:
+    """Lokal faster-whisper (CPU, hech qanday API/kredit shart emas).
+    Muvaffaqiyatsiz bo'lsa None qaytaradi (xato logga yoziladi) -- xato
+    ko'tarilmaydi, chunki chaqiruvchi ikkala holatda ham (FREE_MODE'ning
+    o'zi, yoki OpenAI+Gemini ikkalasi ham ishlamagandagi oxirgi chora)
+    keyingi qadamga (OpenAI yoki `raise`) o'zi qaror qiladi."""
+    try:
+        from faster_whisper import WhisperModel
+        logger.info("Running local faster-whisper transcription (small model on CPU)...")
+
+        model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
+        segments, info = model.transcribe(audio_path, beam_size=5, language=language)
+
+        segments_list = []
+        full_text_parts = []
+        for i, segment in enumerate(segments, start=1):
+            text = segment.text.strip()
+            if not text:
+                continue
+            full_text_parts.append(text)
+            segments_list.append({
+                "id": i,
+                "start": round(segment.start, 3),
+                "end": round(segment.end, 3),
+                "text": text
+            })
+
+        srt_lines = []
+        for seg in segments_list:
+            srt_lines.append(str(seg["id"]))
+            srt_lines.append(f"{_format_time(seg['start'])} --> {_format_time(seg['end'])}")
+            srt_lines.append(seg["text"])
+            srt_lines.append("")
+
+        return {
+            "text": " ".join(full_text_parts),
+            "segments": segments_list,
+            "srt": "\n".join(srt_lines),
+            "language": info.language,
+        }
+    except Exception as e:
+        logger.error(f"Local faster-whisper transcription failed: {e}.")
+        return None
+
+
+def _transcribe_via_api(audio_path: str, language: str | None) -> dict:
+    """OpenAI Whisper API -> (Gemini kaliti bo'lsa) Gemini zaxirasi bilan
+    audio'ni bo'lak-bo'lak transkripsiya qiladi. Ikkalasi ham ishlamasa
+    chaqiruvchiga (transcribe_audio) ko'tarib beradi -- u yerda lokal
+    Whisper oxirgi chora sifatida sinaladi."""
     segments_list = []
     full_text_parts = []
     detected_language = language
