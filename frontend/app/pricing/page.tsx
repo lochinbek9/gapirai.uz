@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
 import { getPlans, subscribeToPlan, subscribeToPlanPayme, subscribeToPlanUzum, subscribeToPlanPaynet, purchaseMinutes, purchaseMinutesUzum, purchaseMinutesPaynet, PlanDef, CurrentSubscription, MinutePack } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
@@ -26,6 +26,22 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
   const [paynetOrder, setPaynetOrder] = useState<{ orderId: string; amount: number } | null>(null)
+  // Bosh sahifada video yuborilganda daqiqa yetmasa (402 insufficient_minutes),
+  // matnli xabar o'rniga to'g'ridan-to'g'ri shu yerga (?reason=...) yo'naltiriladi
+  // va shu modal chiqadi (2026-09-14). useSearchParams o'rniga plain
+  // window.location.search ishlatildi -- Next.js'da useSearchParams static
+  // sahifani Suspense chegarasiz build vaqtida buzishi mumkin, bu sahifa esa
+  // hozircha (loading holatisiz) statik sifatida yig'iladi.
+  const [showInsufficientMinutes, setShowInsufficientMinutes] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reason') === 'insufficient_minutes') {
+      setShowInsufficientMinutes(true)
+      window.history.replaceState({}, '', '/pricing')
+    }
+  }, [])
 
   useEffect(() => {
     if (authLoading) return
@@ -38,6 +54,16 @@ export default function PricingPage() {
       .catch(() => setError("Tariflarni yuklashda xatolik yuz berdi."))
       .finally(() => setLoading(false))
   }, [authLoading])
+
+  const scrollToPacks = () => {
+    setShowInsufficientMinutes(false)
+    // Modal yopilishi (re-render)dan keyingi taktga qoldiramiz. "smooth"
+    // sinovda modal yopilishi bilan bir vaqtda chaqirilganda ba'zan hech
+    // narsa qilmasdan o'tib ketishi kuzatildi -- "instant" har doim ishlaydi.
+    setTimeout(() => {
+      document.getElementById('minute-packs')?.scrollIntoView({ behavior: 'instant', block: 'start' })
+    }, 50)
+  }
 
   const handleBuyPack = async (pack: number, provider: PayProvider = 'click') => {
     if (!isLoggedIn) { router.push('/login'); return }
@@ -250,7 +276,7 @@ export default function PricingPage() {
         )}
 
         {/* Qo'shimcha daqiqa paketlari */}
-        <div className="space-y-4 pt-4">
+        <div id="minute-packs" className="space-y-4 pt-4">
           <div className="text-center space-y-1.5">
             <h2 className="text-xl font-black text-gray-900 dark:text-white">Qo'shimcha daqiqalar</h2>
             <p className="text-xs text-gray-500 dark:text-slate-400 max-w-lg mx-auto">
@@ -328,6 +354,35 @@ export default function PricingPage() {
             <button
               onClick={() => setPaynetOrder(null)}
               className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
+            >
+              Yopish
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showInsufficientMinutes && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setShowInsufficientMinutes(false)}
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-[#1b1b20]" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">Daqiqangiz yetarli emas</h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+              Bu videoni dublyaj qilish uchun oylik byudjetingiz yetmayapti. Qo'shimcha daqiqa paketini sotib oling — tugamaydi, keyingi oyga o'tadi.
+            </p>
+            <button
+              onClick={scrollToPacks}
+              className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            >
+              Qo'shimcha daqiqa sotib olish
+            </button>
+            <button
+              onClick={() => setShowInsufficientMinutes(false)}
+              className="mt-2 w-full rounded-2xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
             >
               Yopish
             </button>

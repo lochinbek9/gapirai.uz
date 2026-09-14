@@ -325,7 +325,10 @@ export default function Home() {
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 402 && detail && typeof detail === "object" && detail.error === "insufficient_minutes") {
-        setError(`${detail.message} → gapirai.uz/pricing`);
+        // Matnli xabar ko'rsatib qo'ymasdan — to'g'ridan-to'g'ri /pricing'ga
+        // o'tkazamiz, u yerda "yetarli daqiqa yo'q" modali chiqadi (2026-09-14).
+        router.push("/pricing?reason=insufficient_minutes");
+        return;
       } else {
         setError((typeof detail === "string" ? detail : detail?.message) || "Xatolik yuz berdi. Qayta urinib ko'ring.");
       }
