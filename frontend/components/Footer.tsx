@@ -166,10 +166,8 @@ export default function Footer() {
             <div className="flex items-center justify-center h-11 px-4 rounded-xl bg-gray-100 border border-black/5 dark:border-white/10">
               <img src="/logos/uzum.png" alt="Uzum" className="h-6 w-auto object-contain" />
             </div>
-            {/* Paynet uchun logotip fayli yo'q (public/logos/da hali qo'shilmagan) --
-                boshqalar bilan bir xil o'lchamdagi matnli belgi ishlatildi. */}
             <div className="flex items-center justify-center h-11 px-4 rounded-xl bg-gray-100 border border-black/5 dark:border-white/10">
-              <span className="text-sm font-black tracking-tight text-teal-600">Paynet</span>
+              <img src="/logos/paynetlogo.png" alt="Paynet" className="h-7 w-auto object-contain" />
             </div>
           </div>
           <Link
