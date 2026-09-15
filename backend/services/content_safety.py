@@ -159,7 +159,10 @@ _POLICY_SYSTEM_PROMPT = (
 
 
 def _policy_classify(text: str) -> SafetyResult:
-    """GapirAI'ning o'ziga xos biznes kategoriyalari uchun GPT klassifikatori."""
+    """GapirAI'ning o'ziga xos biznes kategoriyalari uchun GPT klassifikatori.
+    Bu yerda temperature/max_tokens berilmagani uchun gpt-5 oilasi (masalan
+    OPENAI_LIGHT_MODEL=gpt-5-nano) bilan ham o'zgarishsiz mos keladi --
+    backend/services/openai_compat.py'ga hojat yo'q."""
     client = _get_client()
     response = client.chat.completions.create(
         model=settings.OPENAI_LIGHT_MODEL,

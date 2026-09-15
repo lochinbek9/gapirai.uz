@@ -147,11 +147,17 @@ class Settings(BaseSettings):
     # small = 500MB RAM, 100% accuracy, ~4s per 8s audio on CPU
     # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
     WHISPER_MODEL: str = "small"
-    # Nutq optimallashtirish (raqam/ohang moslashtirish) va jins aniqlash kabi
-    # mexanik, sifatga unchalik sezgir bo'lmagan vazifalar uchun — OPENAI_MODEL
-    # dan alohida saqlanadi, shunda kerak bo'lsa tarjima sifatini mustaqil
-    # oshirish/pasaytirish mumkin, bu vazifalarga ta'sir qilmasdan.
-    OPENAI_LIGHT_MODEL: str = "gpt-4o-mini"
+    # Nutq optimallashtirish (raqam/ohang moslashtirish), jins aniqlash,
+    # xavfsizlik klassifikatori va Video tahlil (Learning Workspace) kabi
+    # mexanik/tasniflash vazifalari uchun — OPENAI_MODEL (asosiy tarjima)
+    # dan ATAYLAB alohida saqlanadi, shunda tarjima sifatini bulardan
+    # mustaqil oshirish/pasaytirish mumkin. 2026-09-15: eng arzon
+    # gpt-5-nano'ga o'tkazildi ($0.05/$0.40 1M token — gpt-4o-mini'dan
+    # ~3x arzon; asosiy tarjima OPENAI_MODEL'da sifat uchun gpt-4o-mini'da
+    # QOLDIRILDI). gpt-5 oilasi eski 'temperature'/'max_tokens'
+    # parametrlarini qabul qilmaydi — barcha chaqiruvchilar
+    # backend/services/openai_compat.py orqali mos parametr to'plamini oladi.
+    OPENAI_LIGHT_MODEL: str = "gpt-5-nano"
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
