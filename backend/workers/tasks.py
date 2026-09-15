@@ -136,6 +136,8 @@ _GENDER_SYSTEM_PROMPT = (
 def _detect_gender(transcript_text: str) -> str:
     """Detect speaker gender -- OpenAI birinchi, kaliti yo'q/xato bo'lsa
     Gemini (bepul tarif), ikkalasi ham ishlamasa 'male'ga tushiriladi."""
+    from backend.services.openai_compat import light_model_kwargs
+
     snippet = transcript_text[:1000]
     try:
         if not settings.OPENAI_API_KEY:
@@ -147,10 +149,9 @@ def _detect_gender(transcript_text: str) -> str:
                 {"role": "system", "content": _GENDER_SYSTEM_PROMPT},
                 {"role": "user", "content": f"Transcript: {snippet}"},
             ],
-            max_tokens=5,
-            temperature=0,
+            **light_model_kwargs(temperature=0, max_tokens=5),
         )
-        result = resp.choices[0].message.content.strip().lower()
+        result = (resp.choices[0].message.content or "").strip().lower()
         return "female" if "female" in result else "male"
     except Exception as e:
         if settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX:

@@ -341,6 +341,8 @@ def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
     """OpenAI orqali optimallashtiradi; kalit yo'q yoki xato bo'lsa (masalan
     krediti tugagan) Gemini'ga o'tadi -- aks holda faqat qoidaviy natija
     qoladi."""
+    from backend.services.openai_compat import light_model_kwargs
+
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     if not _client:
         return _gemini_optimize_chunk(segments) if gemini_available else segments
@@ -351,8 +353,8 @@ def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": _optimize_instruction(segments)},
             ],
-            temperature=0.3,
             response_format={"type": "json_object"},
+            **light_model_kwargs(temperature=0.3),
         )
         result = json.loads(response.choices[0].message.content)
         reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)

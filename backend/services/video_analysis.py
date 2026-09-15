@@ -172,6 +172,8 @@ def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3) -> 
     butun Learning Workspace (konspekt / 5 daqiqa / test / AI ustoz) navbatda
     qotib qolardi (2026-09-05, translator.py bilan bir xil sabab). JSON parse
     xatosida ham qayta uriniladi (model "yaxshi javob, buzuq JSON" holati)."""
+    from backend.services.openai_compat import light_model_kwargs
+
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
 
     if (settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY) and gemini_available:
@@ -186,8 +188,8 @@ def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3) -> 
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.4,
                 response_format={"type": "json_object"},
+                **light_model_kwargs(temperature=0.4),
             )
             return json.loads(response.choices[0].message.content)
         except json.JSONDecodeError as e:
