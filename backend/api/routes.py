@@ -36,6 +36,9 @@ class CreateJobRequest(BaseModel):
     youtube_url: str
     target_language: str = "uz"
     voice_gender: str = "auto"   # auto / male / female
+    # 2026-09-16: "Subtitr" rejimi -- dublyaj audiosi/videosi yaratilmaydi,
+    # faqat transkripsiya+tarjima+VTT/SRT (backend/services/job_creation.py).
+    subtitle_only: bool = False
 
 
 class VideoInfoResponse(BaseModel):
@@ -73,6 +76,7 @@ class JobResponse(BaseModel):
     fallback_available: bool = False
     fallback_reason: Optional[str] = None
     linked_analysis_id: Optional[str] = None
+    subtitle_only: bool = False
 
 
 # YouTube yuklab olish DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan (video
@@ -139,6 +143,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         feedback_speed_ok=None if redact else job.feedback_speed_ok,
         content_flagged=job.content_flagged,
         linked_analysis_id=str(job.linked_analysis_id) if job.linked_analysis_id else None,
+        subtitle_only=bool(job.subtitle_only),
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
         # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
@@ -176,7 +181,9 @@ async def create_job(
 ) -> dict:
     # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
     # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
-    result = await create_dubbing_job(db, current_user, request.youtube_url, request.voice_gender)
+    result = await create_dubbing_job(
+        db, current_user, request.youtube_url, request.voice_gender, subtitle_only=request.subtitle_only,
+    )
 
     if result.outcome == "invalid_url":
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
@@ -407,7 +414,10 @@ def delete_job(
 
 @router.get("/jobs/{job_id}/subtitles.vtt")
 def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
-    """O'zbekcha subtitrlarni WebVTT formatida qaytarish."""
+    """O'zbekcha subtitrlarni WebVTT formatida qaytarish -- video pleerning
+    <track> elementi shuni ishlatadi (VideoPlayer.tsx), shuning uchun
+    Content-Disposition: attachment QO'YILMAYDI (brauzer inline o'qishi
+    kerak, yuklab olish sifatida emas)."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.uzbek_srt_content:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
@@ -415,6 +425,28 @@ def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
         content=job.uzbek_srt_content,
         media_type="text/vtt",
         headers={"Access-Control-Allow-Origin": "*"},
+    )
+
+
+@router.get("/jobs/{job_id}/subtitles.srt")
+def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """O'zbekcha subtitrlarni SRT formatida, yuklab olish uchun qaytaradi
+    (2026-09-16, "Subtitr" rejimi) -- .vtt'dan farqli, bu to'g'ridan-to'g'ri
+    foydalanuvchi yuklab oladigan fayl, shuning uchun Content-Disposition
+    beriladi."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or not job.translated_segments:
+        raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
+    from backend.workers.tasks import _segments_to_srt
+    srt_content = _segments_to_srt(job.translated_segments)
+    filename = f"{job_id}.uz.srt"
+    return Response(
+        content=srt_content,
+        media_type="application/x-subrip",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
 
 
