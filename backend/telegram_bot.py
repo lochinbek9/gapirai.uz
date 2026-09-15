@@ -163,6 +163,7 @@ def _main_menu_markup() -> InlineKeyboardMarkup:
     faqat HTTPS URL bo'lsa)."""
     rows = [
         [InlineKeyboardButton("🎬 Video dublyaj qilish", callback_data="menu:dub")],
+        [InlineKeyboardButton("📝 Subtitr yaratish", callback_data="menu:subtitle")],
         [InlineKeyboardButton("🧠 Videoni tahlil qilish", callback_data="menu:learn")],
         [InlineKeyboardButton("💛 Loyihani qo'llab-quvvatlash", url=_donate_url())],
     ]
@@ -189,6 +190,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.message.reply_text(
             "🎬 YouTube havolasini yoki video faylni yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
             "Video tayyor bo'lganda shu yerga xabar yuboraman."
+        )
+    elif action == "subtitle":
+        context.user_data["mode"] = "subtitle"
+        await query.message.reply_text(
+            "📝 YouTube havolasini yuboring — o'zbekcha subtitr (.srt/.vtt) tayyorlab beraman. "
+            "Dublyaj audiosi yaratilmaydi, shuning uchun tezroq.\n\n"
+            "Tayyor bo'lganda shu yerga havola yuboraman."
         )
     elif action == "learn":
         context.user_data["mode"] = "learn"
@@ -326,7 +334,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # DB user'ni shu sessiyada qayta olish kerak -- yuqoridagi `user`
         # boshqa (yopilgan) sessiyaga bog'langan edi.
         user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
-        result = await create_dubbing_job(db, user, url, voice_gender="auto")
+        result = await create_dubbing_job(db, user, url, voice_gender="auto", subtitle_only=(mode == "subtitle"))
 
         frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
 
@@ -360,6 +368,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 await update.message.reply_text(
                     f"✅ \"{result.video_title}\" {verb}.\n\n"
                     f"Konspekt, xulosa, test va AI ustoz:\n{analysis_url}"
+                )
+            elif mode == "subtitle":
+                # Subtitr rejimi TTS/audio kutmaydi, tez tayyor bo'ladi va
+                # process_video() bu holatda telegram bildirishnomasini
+                # yubormaydi (backend/workers/tasks.py) -- shuning uchun
+                # havolani navbatga qo'shilgan zahoti beramiz, sahifaning
+                # o'zi progressni ko'rsatib turadi (frontend/app/subtitles/[id]).
+                verb = "tayyorlanmoqda" if result.outcome == "queued" else "tayyor"
+                await update.message.reply_text(
+                    f"📝 \"{result.video_title}\" subtitri {verb}.\n\n{frontend_url}/subtitles/{result.job_id}"
                 )
             elif result.outcome == "queued":
                 await update.message.reply_text(
