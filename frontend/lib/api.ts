@@ -47,6 +47,9 @@ export interface Job {
   // routes.py:_job_to_response, POST /jobs/{id}/upload-video).
   fallback_available?: boolean
   fallback_reason?: string | null
+  // 2026-09-16: "Subtitr" rejimi -- true bo'lsa dublyaj audiosi/videosi
+  // yaratilmagan, faqat transkripsiya+tarjima+subtitr (output_video_url yo'q).
+  subtitle_only?: boolean
 }
 
 export type JobStatus =
@@ -88,8 +91,9 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 export async function createJob(
   youtube_url: string,
   voice_gender: string = 'auto',
+  subtitle_only: boolean = false,
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender })
+  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender, subtitle_only })
   return res.data
 }
 
@@ -172,6 +176,10 @@ export async function initiateUzumPayment(jobId: string): Promise<{ success: boo
 
 export function getDownloadUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/video`
+}
+
+export function getSubtitleDownloadUrl(jobId: string, format: 'srt' | 'vtt' = 'srt'): string {
+  return `${API_URL}/api/jobs/${jobId}/subtitles.${format}`
 }
 
 export interface ResolutionOption {

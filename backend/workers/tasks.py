@@ -73,6 +73,36 @@ def _segments_to_vtt(segments: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _sec_to_srt_time(seconds: float) -> str:
+    """Soniyani SRT vaqt formatiga o'girish: HH:MM:SS,mmm (VTT'dan farqli --
+    nuqta emas, vergul)."""
+    ms = int((seconds % 1) * 1000)
+    s = int(seconds) % 60
+    m = int(seconds // 60) % 60
+    h = int(seconds // 3600)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _segments_to_srt(segments: list[dict]) -> str:
+    """Tarjima qilingan segmentlardan SRT subtitr yaratish -- _segments_to_vtt
+    bilan bir xil manba, faqat formatlash farq qiladi (raqamli sarlavha,
+    vergulli vaqt)."""
+    lines = []
+    counter = 0
+    for seg in segments:
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        counter += 1
+        start = _sec_to_srt_time(seg["start"])
+        end = _sec_to_srt_time(seg["end"])
+        lines.append(str(counter))
+        lines.append(f"{start} --> {end}")
+        lines.append(text)
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _cleanup_upload_dir(job_id: str) -> None:
     """
     uploads/{job_id}/ (yuklab olingan asl video + transkripsiya uchun
@@ -511,6 +541,22 @@ def process_video(self: Task, job_id: str) -> dict:
             job.translated_segments = translated_segments
             db.commit()
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "ok")
+
+        # "Subtitr" rejimi -- dublyaj audiosi/videosi umuman kerak emas,
+        # TRANSLATE tugagach (transkript+tarjima+vaqt kodlari tayyor bo'lgach)
+        # SPEECH_OPT/TTS/MERGE'ni butunlay o'tkazib yuborib job darhol
+        # COMPLETED qilinadi. Claim bo'shatish/progress tozalash/db.close()
+        # pastdagi umumiy `finally` blokida (funksiya oxirida) baribir
+        # ishlaydi -- try ichidan return qilish ularni chetlab o'tmaydi.
+        if job.subtitle_only:
+            if not job.uzbek_srt_content:
+                job.uzbek_srt_content = _segments_to_vtt(translated_segments)
+            _update_job(db, job, JobStatus.COMPLETED, 100.0, "Subtitr tayyor!")
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            _cleanup_upload_dir(job_id)
+            _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED (subtitle-only)")
+            return {"job_id": job_id, "status": "completed"}
 
         # BOSQICH 4.5: Nutq uchun optimallashtirish (raqamlar, qisqartmalar, og'zaki uslub)
         # Faqat TTS kirishi uchun — subtitr matni yuqoridagi tarjimadan o'zgarishsiz qoladi,

@@ -9,6 +9,7 @@ import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
 import AnalysisUrlForm from "@/components/AnalysisUrlForm";
+import SubtitleUrlForm from "@/components/SubtitleUrlForm";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -196,7 +197,7 @@ export default function Home() {
   const [voiceGender, setVoiceGender] = useState("auto");
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [mode, setMode] = useState<"dub" | "analyze">("dub");
+  const [mode, setMode] = useState<"dub" | "subtitle" | "analyze">("dub");
   const startRef = useRef<number | null>(null);
 
   const handleCancel = async () => {
@@ -426,6 +427,17 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setMode("subtitle")}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                      mode === "subtitle"
+                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    Subtitr yaratish
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setMode("analyze")}
                     className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                       mode === "analyze"
@@ -448,6 +460,8 @@ export default function Home() {
                     onGenderChange={setVoiceGender}
                     onSubmit={handleSubmit}
                   />
+                ) : mode === "subtitle" ? (
+                  <SubtitleUrlForm />
                 ) : (
                   <AnalysisUrlForm />
                 )}

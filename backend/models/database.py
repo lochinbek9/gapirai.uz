@@ -88,6 +88,12 @@ class DubbingJob(Base):
     translated_text = Column(Text)
     srt_content = Column(Text)
     uzbek_srt_content = Column(Text)   # O'zbekcha subtitrlar (WebVTT format)
+    # 2026-09-16: "Subtitr" rejimi -- True bo'lsa process_video() TRANSLATE
+    # bosqichidan keyin TTS/audio-birlashtirish (SPEECH_OPT/TTS/MERGE)ni
+    # butunlay o'tkazib yuborib, job'ni darhol COMPLETED qiladi. Faqat
+    # transkripsiya+tarjima+vaqt kodlari kerak, dublyaj audiosi/videosi
+    # yaratilmaydi -- tezroq va TTS xarajatisiz.
+    subtitle_only = Column(Boolean, nullable=False, default=False)
 
     # Checkpoint uchun: har bosqichning xom (timestamp'li) segment ro'yxati.
     # Pipeline qayta ishga tushganda (crash/retry) shu maydonlar orqali

@@ -149,10 +149,16 @@ def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[
     return covered, minutes_short
 
 
-async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_gender: str = "auto") -> JobCreationResult:
+async def create_dubbing_job(
+    db: Session, user: User, youtube_url: str, voice_gender: str = "auto", subtitle_only: bool = False,
+) -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
-    yoki Telegram xabari) ko'rinishini tanlaydi."""
+    yoki Telegram xabari) ko'rinishini tanlaydi.
+
+    subtitle_only=True -- "Subtitr" rejimi (2026-09-16): dublyaj audiosi/
+    videosi yaratilmaydi, faqat transkripsiya+tarjima+VTT/SRT (process_video()
+    TRANSLATE bosqichidan keyin darhol COMPLETED qiladi, tasks.py)."""
     if not is_valid_youtube_url(youtube_url):
         return JobCreationResult(outcome="invalid_url")
 
@@ -164,11 +170,20 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
     # URL matnining o'zidan ajratiladi) va Safety Gate'ni qayta ishlatmasdan
     # tayyor natijani arzon narxda taqdim etamiz (2026-08-15, foydalanuvchi
     # so'rovi -- YouTube bot-check va OpenAI xarajatini ham kamaytiradi).
+    # subtitle_only so'rovlari kesh'ni chetlab o'tadi (2026-09-16) -- to'liq
+    # dublyaj keshidan subtitr olish o'zi xavfsiz bo'lardi (audio ortiqcha,
+    # zarar yo'q), lekin buni to'g'ri sinash uchun _create_job_from_cache()ni
+    # ham subtitle_only bilan mos qilish kerak edi; V1'da soddalik uchun
+    # har doim yangi (tez, TTS'siz) ishlov beriladi.
     video_id = extract_youtube_video_id(youtube_url)
-    if video_id:
+    if video_id and not subtitle_only:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
+            # Faqat TO'LIQ dublyaj qilingan (audio/video mavjud) joblar --
+            # subtitle_only=True keshi audio/videoga ega emas, to'liq
+            # dublyaj so'rovini noto'g'ri "tayyor" deb belgilamasligi kerak.
+            DubbingJob.subtitle_only.is_(False),
         )
         if voice_gender in ("male", "female"):
             cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
@@ -253,6 +268,7 @@ async def create_dubbing_job(db: Session, user: User, youtube_url: str, voice_ge
         progress=0.0,
         status_message="Navbatga qo'shildi",
         content_flagged=metadata_flagged,
+        subtitle_only=subtitle_only,
     )
     db.add(job)
     db.commit()
