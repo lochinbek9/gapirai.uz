@@ -341,27 +341,51 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
             time.sleep(backoff)
 
 
-def _translate_chunk(segments: list[dict]) -> list[dict]:
-    """Bir bo'lak segmentlarni tarjima qilish — TRANSLATE_PROVIDER ga qarab.
+def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:
+    """Oxirgi chora -- OpenAI HAM, Gemini HAM ishlamasa (ikkalasi ham
+    kvota/kredit tugagan holat, 2026-09-12 haqiqiy production hodisasi:
+    OpenAI 429 insufficient_quota -> Gemini 429 RESOURCE_EXHAUSTED bir xil
+    videoda ketma-ket), dublyaj butunlay to'xtab QOLMASIN deb xom (LLM'siz)
+    Google Translate/MyMemory'ga tushiladi -- xuddi FREE_MODE'ning eski
+    yo'li (translate_segments()dagi _translate_segment_free bilan bir xil).
+    Sifat pastroq (SYSTEM_PROMPT'dagi tabiiy dublyaj qoidalari, raqam/nom
+    talaffuzi qo'llanmaydi) -- lekin video muvaffaqiyatsiz bo'lib navbatda
+    abadiy qayta urinaverishdan ko'ra ancha yaxshi."""
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        return list(executor.map(_translate_segment_free, segments))
 
-    TRANSLATE_PROVIDER="openai" bo'lsa ham, OpenAI muvaffaqiyatsiz bo'lsa
-    (masalan krediti tugasa) Gemini'ga avtomatik o'tadi — aks holda butun
-    video navbatda qotib qoladi (2026-08-09 OpenAI krediti tugash hodisasi
-    sabab qo'shildi)."""
+
+def _translate_chunk(segments: list[dict]) -> list[dict]:
+    """Bir bo'lak segmentlarni tarjima qilish -- TRANSLATE_PROVIDER ga qarab,
+    uch pog'onali zaxira bilan: OpenAI -> Gemini -> xom Google Translate
+    (oxirgi chora). Ilgari faqat ikki pog'ona bor edi (OpenAI -> Gemini) --
+    2026-09-12 ikkalasi ham bir vaqtda kvota tugashi (OpenAI insufficient_quota
+    + Gemini free-tier RESOURCE_EXHAUSTED) kuzatilgach, video butunlay
+    muvaffaqiyatsiz bo'lib qolmasligi uchun uchinchi pog'ona qo'shildi."""
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
 
     if settings.TRANSLATE_PROVIDER == "gemini":
-        return _translate_chunk_gemini(segments, clean_segments)
+        try:
+            return _translate_chunk_gemini(segments, clean_segments)
+        except Exception as e:
+            logger.warning(f"Gemini tarjima muvaffaqiyatsiz ({e}) — bepul (LLM'siz) tarjimaga o'tilmoqda.")
+            return _translate_chunk_free_mt(segments)
 
     try:
         return _translate_chunk_openai(segments, clean_segments)
     except Exception as e:
-        if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
-            raise
+        if not gemini_available:
+            logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) va Gemini kaliti yo'q — bepul (LLM'siz) tarjimaga o'tilmoqda.")
+            return _translate_chunk_free_mt(segments)
         logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
-        return _translate_chunk_gemini(segments, clean_segments)
+        try:
+            return _translate_chunk_gemini(segments, clean_segments)
+        except Exception as e2:
+            logger.warning(f"Gemini ham muvaffaqiyatsiz ({e2}) — bepul (LLM'siz) tarjimaga (oxirgi chora) o'tilmoqda.")
+            return _translate_chunk_free_mt(segments)
 
 
 _CALIBRATED_RATE_CACHE: dict = {"value": None, "computed_at": 0.0}
