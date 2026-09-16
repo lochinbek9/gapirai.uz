@@ -186,7 +186,7 @@ export default function UrlInput({
         {loading ? (
           <><Loader2 size={18} className="animate-spin" /> Vazifa yaratilmoqda...</>
         ) : (
-          <><Sparkles size={18} /> Videoni o'rganishni boshlash</>
+          <><Sparkles size={18} /> Video dublaj qilish</>
         )}
       </motion.button>
 

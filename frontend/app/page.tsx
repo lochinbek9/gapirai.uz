@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { learnVideo, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
+import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
@@ -315,14 +315,13 @@ export default function Home() {
     startRef.current = null;
     setElapsed(0);
     try {
-      // learnVideo() bitta so'rovda HAM dublyaj, HAM o'quv materiallarini
-      // (konspekt/5-daqiqada/test/AI ustoz) boshlaydi -- natija Learning
-      // Workspace'da (frontend/app/learn/[id]) ko'rsatiladi, shu sahifada
-      // inline kutish shart emas (bu sahifadagi eski "processing"/"done"
-      // holatlari faqat oldingi, saqlangan job'larni davom ettirish uchun
-      // qoladi).
-      const { dubbing_job_id } = await learnVideo(url, voiceGender);
-      router.push(`/learn/${dubbing_job_id}`);
+      // 2026-09-16: bosh sahifaning asosiy tabi endi SOF dublyaj (o'quv
+      // materiallari/tahlil bilan birlashtirilmagan) -- Subtitr va Video
+      // tahlil qilish endi o'zining alohida tablari bor, shuning uchun bu
+      // yerda learnVideo() (dublyaj+tahlil birga) o'rniga oddiy createJob()
+      // ishlatiladi, natija /learn/[id] emas /video/[id]da ko'rsatiladi.
+      const { job_id } = await createJob(url, voiceGender);
+      router.push(`/video/${job_id}`);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 402 && detail && typeof detail === "object" && detail.error === "insufficient_minutes") {
@@ -423,7 +422,7 @@ export default function Home() {
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     }`}
                   >
-                    O'rganish
+                    Video dublaj qilish
                   </button>
                   <button
                     type="button"
