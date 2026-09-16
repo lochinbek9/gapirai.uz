@@ -172,6 +172,15 @@ services:
       TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_LOCAL: "1"
+    # postgres/redis bilan bir xil naqsh (2026-09-16, worker scaling): boshqa
+    # worker host'dagi Celery worker Telegram orqali kelgan (YouTube-havolali)
+    # ish tugaganda TELEGRAM_LOCAL_API_URL orqali shu serverga xabar yuborishi
+    # uchun ochiq -- xuddi shu bot tokenining YAGONA autentifikatsiya
+    # sessiyasi shu yerda, boshqa host o'zining alohida telegram-bot-api
+    # konteynerini ishga tushirmasligi kerak (mumkin bo'lgan token/sessiya
+    # to'qnashuvi).
+    ports:
+      - "${COMPOSE_HOST_IP:-172.31.27.238}:8081:8081"
     volumes:
       - telegram_bot_api_data:/var/lib/telegram-bot-api
 

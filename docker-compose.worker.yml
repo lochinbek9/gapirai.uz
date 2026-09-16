@@ -1,0 +1,58 @@
+# Qo'shimcha worker host uchun (2026-09-16, worker scaling) -- asosiy
+# docker-compose.yml faqat host-1'da ishlatiladi (Postgres/Redis/backend/
+# telegram_bot shu yerda). Bu fayl esa scaling uchun qo'shiladigan HAR QANDAY
+# yangi host'da ishlatiladi -- FAQAT worker + pot-provider'ni ko'taradi.
+#
+# Nega asosiy docker-compose.yml'ning o'zini shu yerda ham ishlatib
+# bo'lmaydi: "worker" xizmati o'sha faylda postgres/redis/telegram-bot-api'ga
+# depends_on orqali bog'langan -- agar shu faylni boshqa host'da to'liq ishga
+# tushirsak, Compose ularni ham (bo'sh/mustaqil nusxa sifatida) shu yerda
+# ko'tarib yuborardi, bu esa noto'g'ri (asosiy host'dagi Postgres/Redis'ga
+# ulanish kerak, mahalliy emas).
+#
+# Ishga tushirish: docker compose -f docker-compose.worker.yml up -d
+#
+# .env shu papkada bo'lishi kerak, asosiy host'dagi bilan bir xil qiymatlar
+# (bir xil Redis parol/DB parol/API kalitlar), FAQAT quyidagilar farq qiladi:
+#   DATABASE_URL=postgresql://dubber:dubber123@172.31.27.238:5439/dubber_db
+#   REDIS_URL=redis://:<parol>@172.31.27.238:6379/0
+#   CELERY_BROKER_URL=redis://:<parol>@172.31.27.238:6379/0
+#   CELERY_RESULT_BACKEND=redis://:<parol>@172.31.27.238:6379/0
+#   TELEGRAM_LOCAL_API_URL=http://172.31.27.238:8081
+# (172.31.27.238 -- asosiy hostning VPC-ichki IP'i, .env.example emas, real
+# qiymat -- boshqa VPC/muhitga ko'chirilsa moslashtiring.)
+#
+# video_processing_local navbati ATAYLAB yo'q (WORKER_QUEUES standart
+# qiymatida) -- Telegram orqali yuklangan video FAYLlar faqat asosiy
+# host diskida bor (backend/services/plans.py: LOCAL_UPLOAD_QUEUE).
+
+services:
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    container_name: dubber_pot_provider
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: dubber_worker
+    restart: unless-stopped
+    mem_limit: ${WORKER_MEM_LIMIT:-6.5g}
+    stop_grace_period: 120s
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app/backend
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./cookies.txt:/app/cookies.txt:ro
+      - oauth_cache:/root/.cache/yt-dlp
+      - ${HOME}/.secrets/gapirai:/app/secrets:ro
+    depends_on:
+      pot-provider:
+        condition: service_started
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing} -c ${WORKER_CONCURRENCY:-4}
+
+volumes:
+  oauth_cache:
