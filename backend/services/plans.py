@@ -45,6 +45,15 @@ MINUTE_PACKS: dict[int, int] = {
 PRIORITY_QUEUE = "video_processing_priority"
 DEFAULT_QUEUE = "video_processing"
 
+# Telegram orqali yuborilgan video FAYL (link emas) shu navbatga tushadi.
+# Sabab: bunday job'ning original video fayli faqat uni qabul qilgan hostning
+# lokal diskida bor (create_job_from_local_video_file, job_creation.py) —
+# YouTube-havolali joblardan farqli, S3'dan boshqa hostda tiklab bo'lmaydi
+# (tasks.py DOWNLOAD bosqichi). 2026-09-16dan boshlab worker scaling uchun
+# qo'shilgan qo'shimcha hostlar (WORKER_QUEUES orqali) bu navbatni ATAYLAB
+# tinglamaydi — faqat asosiy host (uploads/ papkasi bor) tinglaydi.
+LOCAL_UPLOAD_QUEUE = "video_processing_local"
+
 
 @dataclass(frozen=True)
 class PlanDef:

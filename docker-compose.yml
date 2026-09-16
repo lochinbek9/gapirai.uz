@@ -139,7 +139,15 @@ services:
       # shu server orqali yuboriladi (bot bulutdan ko'chirilgan bo'lsa).
       telegram-bot-api:
         condition: service_started
-    command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing -c ${WORKER_CONCURRENCY:-4}
+    # WORKER_QUEUES -- WORKER_CONCURRENCY/WORKER_MEM_LIMIT kabi har bir host
+    # o'z .env faylida belgilaydi (2026-09-16, worker scaling). Standart --
+    # uchala navbat ham (asosiy host, Telegram fayl-yuklash shu yerda ishlaydi).
+    # Scaling uchun qo'shiladigan YANGI worker host'lar .env'da
+    # WORKER_QUEUES=video_processing_priority,video_processing qo'yishi kerak --
+    # video_processing_local'ni ATAYLAB qo'ymasdan, chunki ular Telegram orqali
+    # yuklangan video fayllarga (faqat asosiy hostning diskida bor) ega emas
+    # (backend/services/plans.py LOCAL_UPLOAD_QUEUE izohiga qarang).
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing,video_processing_local} -c ${WORKER_CONCURRENCY:-4}
 
   # ──────────────────────────────
   # Self-hosted local Telegram Bot API server -- OPTIONAL, only actually used

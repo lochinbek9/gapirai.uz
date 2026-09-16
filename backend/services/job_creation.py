@@ -348,7 +348,7 @@ async def create_job_from_local_video_file(
         video_path.unlink(missing_ok=True)
         return JobCreationResult(outcome="bad_file")
 
-    from backend.services.plans import consume_quota, get_job_queue
+    from backend.services.plans import consume_quota, LOCAL_UPLOAD_QUEUE
 
     job = DubbingJob(
         id=job_id,
@@ -367,7 +367,11 @@ async def create_job_from_local_video_file(
     consume_quota(db, user.id, duration_minutes)
     job.quota_consumed = True
     db.commit()
-    process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
+    # Doim LOCAL_UPLOAD_QUEUE — get_job_queue()'ning Pro/Free navbatlari emas,
+    # chunki bu job'ning video fayli faqat SHU hostning diskida bor (yuqoridagi
+    # original_video_path). Agar scaling uchun qo'shilgan boshqa worker host bu
+    # job'ni olib ketsa, faylni topolmay xato beradi (tasks.py DOWNLOAD bosqichi).
+    process_video.apply_async(args=[job_id], task_id=job_id, queue=LOCAL_UPLOAD_QUEUE)
     return JobCreationResult(outcome="queued", job_id=job_id, duration_minutes=duration_minutes)
 
 
