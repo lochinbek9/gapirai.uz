@@ -139,7 +139,15 @@ services:
       # shu server orqali yuboriladi (bot bulutdan ko'chirilgan bo'lsa).
       telegram-bot-api:
         condition: service_started
-    command: celery -A backend.workers.celery_app worker -l info -Q video_processing_priority,video_processing -c ${WORKER_CONCURRENCY:-4}
+    # WORKER_QUEUES -- WORKER_CONCURRENCY/WORKER_MEM_LIMIT kabi har bir host
+    # o'z .env faylida belgilaydi (2026-09-16, worker scaling). Standart --
+    # uchala navbat ham (asosiy host, Telegram fayl-yuklash shu yerda ishlaydi).
+    # Scaling uchun qo'shiladigan YANGI worker host'lar .env'da
+    # WORKER_QUEUES=video_processing_priority,video_processing qo'yishi kerak --
+    # video_processing_local'ni ATAYLAB qo'ymasdan, chunki ular Telegram orqali
+    # yuklangan video fayllarga (faqat asosiy hostning diskida bor) ega emas
+    # (backend/services/plans.py LOCAL_UPLOAD_QUEUE izohiga qarang).
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing,video_processing_local} -c ${WORKER_CONCURRENCY:-4}
 
   # ──────────────────────────────
   # Self-hosted local Telegram Bot API server -- OPTIONAL, only actually used
@@ -164,6 +172,15 @@ services:
       TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_LOCAL: "1"
+    # postgres/redis bilan bir xil naqsh (2026-09-16, worker scaling): boshqa
+    # worker host'dagi Celery worker Telegram orqali kelgan (YouTube-havolali)
+    # ish tugaganda TELEGRAM_LOCAL_API_URL orqali shu serverga xabar yuborishi
+    # uchun ochiq -- xuddi shu bot tokenining YAGONA autentifikatsiya
+    # sessiyasi shu yerda, boshqa host o'zining alohida telegram-bot-api
+    # konteynerini ishga tushirmasligi kerak (mumkin bo'lgan token/sessiya
+    # to'qnashuvi).
+    ports:
+      - "${COMPOSE_HOST_IP:-172.31.27.238}:8081:8081"
     volumes:
       - telegram_bot_api_data:/var/lib/telegram-bot-api
 
