@@ -100,6 +100,16 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://dubber:dubber123@localhost:5432/dubber_db"
     ASYNC_DATABASE_URL: str = "postgresql+asyncpg://dubber:dubber123@localhost:5432/dubber_db"
+    # SQLAlchemy ulanish hovuzi -- HAR jarayon (uvicorn worker / celery child)
+    # uchun alohida. Postgres max_connections (standart 100) dan oshib
+    # ketmasligi kerak: jami = jarayonlar soni x (POOL_SIZE + MAX_OVERFLOW).
+    # Ilgari qat'iy 3+2 edi: bir jarayonda 5 tadan ko'p bir vaqtdagi so'rov
+    # ulanish kutib turardi va butun sayt (login/dashboard ham) qotardi.
+    DB_POOL_SIZE: int = 8
+    DB_MAX_OVERFLOW: int = 4
+    # Ulanish bo'sh bo'lmasa 30s emas, shuncha sekunddan keyin xato -- sayt
+    # osilib qolmasdan tezroq "band" javobini beradi.
+    DB_POOL_TIMEOUT: int = 10
 
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"

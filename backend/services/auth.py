@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 import bcrypt as _bcrypt
@@ -82,3 +83,22 @@ def get_optional_user(
     if not payload:
         return None
     return db.query(User).filter(User.id == payload["sub"]).first()
+
+
+def get_optional_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> Optional[uuid.UUID]:
+    """Token bo'lsa user id'ni bazaga TEGMASDAN qaytaradi, aks holda None.
+    Faqat egalikni (job.user_id == id) solishtiradigan, User qatorining o'zi
+    kerak bo'lmagan juda tez-tez chaqiriladigan endpointlar uchun (GET
+    /jobs/{id} har foydalanuvchidan 1.5s sekinroq polling qilinadi) -- har
+    so'rovda bitta User SELECT'ini tejaydi."""
+    if not credentials:
+        return None
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        return None
+    try:
+        return uuid.UUID(str(payload["sub"]))
+    except (KeyError, ValueError):
+        return None
