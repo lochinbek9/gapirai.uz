@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant
-from backend.services.auth import get_current_user, get_optional_user
+from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
 from backend.services.downloader import get_video_info
 from backend.config import get_settings
 from backend.services.rate_limiter import rate_limit
@@ -230,20 +230,24 @@ async def create_job(
 def get_job(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> JobResponse:
     """Job ma'lumotlarini olish.
     - Egasi (authenticated) -> to'liq javob.
     - Authenticated, lekin egasi emas -> 404 (IDOR/enumeratsiyani yashiradi).
     - Anonim -> FAQAT tugallangan job, va faqat ulashsa bo'ladigan maydonlar
       (transkript / xato matni / baho-fikr yashiriladi). Jarayondagi / xato
-      bo'lgan job anonimga umuman ko'rinmaydi."""
+      bo'lgan job anonimga umuman ko'rinmaydi.
+
+    Bu endpoint har kutayotgan foydalanuvchidan davriy so'raladi, shuning
+    uchun User qatorini yuklamaymiz -- egalikni faqat token'dagi id bilan
+    solishtiramiz (bitta SELECT kam)."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    is_owner = current_user is not None and job.user_id == current_user.id
-    if current_user is not None and not is_owner:
+    is_owner = current_user_id is not None and job.user_id == current_user_id
+    if current_user_id is not None and not is_owner:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
     if not is_owner:
