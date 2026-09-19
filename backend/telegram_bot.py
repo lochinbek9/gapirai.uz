@@ -47,6 +47,8 @@ from backend.services.job_creation import (
     create_click_payment,
     create_job_from_local_video_file,
     is_valid_youtube_url,
+    queue_rejection_message,
+    check_queue_capacity,
 )
 from backend.services.resolution_variants import request_resolution
 
@@ -398,6 +400,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
                 "Ertaga qaytadan urinib ko'ring."
             )
+        elif result.outcome in ("active_limit", "queue_full"):
+            await update.message.reply_text(queue_rejection_message(result))
     finally:
         db.close()
 
@@ -439,6 +443,17 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(
             f"Fayl hajmi {TELEGRAM_MAX_VIDEO_BYTES // (1024 ** 3)} GB dan katta bo'lmasligi kerak."
         )
+        return
+
+    # Navbat to'la / faol job chegarasi bo'lsa, faylni (2GB gacha) yuklab
+    # olishdan OLDIN rad etamiz -- yuk ostida bekorga disk/tarmoq sarflamaslik.
+    db = SessionLocal()
+    try:
+        rejection = check_queue_capacity(db, user.id)
+    finally:
+        db.close()
+    if rejection:
+        await update.message.reply_text(queue_rejection_message(rejection))
         return
 
     await update.message.reply_text("⏳ Video qabul qilinmoqda, biroz kuting...")
@@ -497,6 +512,8 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
                 "Ertaga qaytadan urinib ko'ring."
             )
+        elif result.outcome in ("active_limit", "queue_full"):
+            await update.message.reply_text(queue_rejection_message(result))
         elif result.outcome == "queued":
             await update.message.reply_text(
                 "✅ Video navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."

@@ -24,6 +24,7 @@ from backend.services.job_creation import (
     MAX_VIDEO_DURATION_MINUTES,
     is_valid_youtube_url as _is_valid_youtube_url,
     create_dubbing_job,
+    queue_rejection_message,
 )
 
 settings = get_settings()
@@ -77,6 +78,10 @@ class JobResponse(BaseModel):
     fallback_reason: Optional[str] = None
     linked_analysis_id: Optional[str] = None
     subtitle_only: bool = False
+    # Faqat kutayotgan (PENDING) job egasiga, va navbat worker o'rinlaridan
+    # uzunroq bo'lgandagina to'ldiriladi (backend/services/queue_load.py).
+    queue_position: Optional[int] = None
+    queue_eta_minutes: Optional[int] = None
 
 
 # YouTube yuklab olish DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan (video
@@ -216,6 +221,12 @@ async def create_job(
             detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
             "Ertaga qaytadan urinib ko'ring.",
         )
+    if result.outcome == "active_limit":
+        raise HTTPException(status_code=429, detail=queue_rejection_message(result))
+    if result.outcome == "queue_full":
+        raise HTTPException(
+            status_code=503, detail=queue_rejection_message(result), headers={"Retry-After": "300"},
+        )
     if result.outcome == "queued":
         return {"job_id": result.job_id, "status": "pending"}
     if result.outcome == "ready":
@@ -256,7 +267,23 @@ def get_job(
             raise HTTPException(status_code=404, detail="Job topilmadi.")
         return _job_to_response(job, redact=True)
 
-    return _job_to_response(job)
+    response = _job_to_response(job)
+    if job.status == JobStatus.PENDING and job.created_at:
+        # Navbat worker o'rinlaridan qisqa bo'lsa job zum bir necha soniyada
+        # boshlanadi -- "1-o'rin" kabi shovqin ko'rsatmaymiz. Uzun bo'lganda
+        # foydalanuvchi "nega hech narsa bo'lmayapti" demasligi uchun o'rin va
+        # taxminiy kutishni status_message orqali (frontend uni allaqachon
+        # ko'rsatadi) aytamiz.
+        from backend.services import queue_load
+        position = queue_load.queue_position(db, job)
+        if position > max(1, settings.QUEUE_WORKER_SLOTS):
+            eta = queue_load.estimate_wait_minutes(position)
+            response.queue_position = position
+            response.queue_eta_minutes = eta
+            response.status_message = (
+                f"Navbatda: {position}-o'rin, taxminan {queue_load.format_wait(eta)} kutish"
+            )
+    return response
 
 
 @router.get("/jobs")

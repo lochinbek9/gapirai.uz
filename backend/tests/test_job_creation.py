@@ -97,6 +97,11 @@ class TestCreateDubbingJobCacheReuse(unittest.IsolatedAsyncioTestCase):
         _p.start()
         self.addCleanup(_p.stop)
 
+        # Navbat himoyasi ham shunday -- test_queue_load.py'da alohida sinaladi.
+        _q = patch.object(job_creation, "check_queue_capacity", return_value=None)
+        _q.start()
+        self.addCleanup(_q.stop)
+
         # check_dubbing_job/videoni bazaga tegmasdan qisqa deb hisoblaydigan
         # get_video_info javobi -- 45 daqiqadan qisqa, check_quota shu bilan
         # bazaga tegmasdan (True, 0) qaytaradi (backend/services/plans.py:129).

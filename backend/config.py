@@ -21,6 +21,23 @@ class Settings(BaseSettings):
     # FAILED joblar hisobga olinmaydi. 0 = cheksiz.
     MAX_JOBS_PER_DAY: int = 20
 
+    # Navbat himoyasi (2026-09-19, backend/services/queue_load.py). Maqsad --
+    # ko'p foydalanuvchi bir vaqtda yuborganda sayt qotmasin, ortiqcha yuk
+    # esa tushunarli xabar bilan rad etilsin.
+    # Bitta foydalanuvchining bir vaqtdagi FAOL (navbatda/ishlanayotgan)
+    # joblari chegarasi -- bittasi butun navbatni egallab olmasligi uchun.
+    # 0 = cheksiz.
+    MAX_ACTIVE_JOBS_PER_USER: int = 3
+    # Jami parallel ishlov beruvchi worker o'rinlari (WORKER_CONCURRENCY
+    # yig'indisi: host-1 2 + worker-3 4 = 6). Faqat ETA/rad qilish taxmini
+    # uchun -- worker qo'shilganda/olinganda shu yerni yangilang.
+    QUEUE_WORKER_SLOTS: int = 6
+    # Bitta job o'rtacha necha daqiqa oladi (~10 daqiqalik video CPU'da 10-15 daq).
+    QUEUE_AVG_JOB_MINUTES: float = 12.0
+    # Taxminiy kutish shu daqiqadan oshsa, yangi (ustuvor bo'lmagan) job'lar
+    # "navbat to'la" deb rad etiladi. 0 = o'chirilgan.
+    MAX_QUEUE_WAIT_MINUTES: int = 120
+
     # Disk auto-cleanup cron (backend/scripts/disk_cleanup.py) -- LOKAL disk
     # nusxalarini eskirgach o'chiradi. S3 nusxalari alohida, o'z lifecycle'i
     # bilan tozalanadi; bu esa outputs/ va uploads/ papkalarining cheksiz
