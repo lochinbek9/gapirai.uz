@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import get_db, DubbingJob, VideoAnalysis, AnalysisStatus, User
 from backend.services.auth import get_current_user
-from backend.services.job_creation import create_dubbing_job, MAX_VIDEO_DURATION_MINUTES
+from backend.services.job_creation import create_dubbing_job, queue_rejection_message, MAX_VIDEO_DURATION_MINUTES
 from backend.services.rate_limiter import rate_limit
 from backend.services.video_analysis import find_cached_analysis, clone_analysis_for_user
 from backend.workers.analysis_tasks import analyze_video_task
@@ -132,6 +132,12 @@ async def learn_video(
             status_code=429,
             detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
             "Ertaga qaytadan urinib ko'ring.",
+        )
+    if result.outcome == "active_limit":
+        raise HTTPException(status_code=429, detail=queue_rejection_message(result))
+    if result.outcome == "queue_full":
+        raise HTTPException(
+            status_code=503, detail=queue_rejection_message(result), headers={"Retry-After": "300"},
         )
 
     dubbing_job = db.query(DubbingJob).filter(DubbingJob.id == result.job_id).first()

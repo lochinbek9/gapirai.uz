@@ -50,6 +50,11 @@ export interface Job {
   // 2026-09-16: "Subtitr" rejimi -- true bo'lsa dublyaj audiosi/videosi
   // yaratilmagan, faqat transkripsiya+tarjima+subtitr (output_video_url yo'q).
   subtitle_only?: boolean
+  // 2026-09-19: navbat worker o'rinlaridan uzun bo'lganda kutayotgan job
+  // uchun to'ldiriladi (backend/services/queue_load.py). Matn allaqachon
+  // status_message'ga yozilgan -- bular boshqa UI (masalan mobil) uchun.
+  queue_position?: number | null
+  queue_eta_minutes?: number | null
 }
 
 export type JobStatus =

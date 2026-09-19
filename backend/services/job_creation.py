@@ -94,6 +94,7 @@ def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
 Outcome = Literal[
     "queued", "ready", "insufficient_minutes", "blocked", "too_long",
     "invalid_url", "fetch_error", "bad_file", "daily_limit",
+    "active_limit", "queue_full",
 ]
 
 
@@ -107,6 +108,41 @@ class JobCreationResult:
     error_detail: str | None = None
     minutes_short: int | None = None  # outcome="insufficient_minutes" uchun
     daily_limit: int | None = None    # outcome="daily_limit" uchun (chegara qiymati)
+    active_limit: int | None = None   # outcome="active_limit" uchun (bir vaqtdagi faol job chegarasi)
+    queue_wait_minutes: int | None = None  # outcome="queue_full" uchun (taxminiy kutish)
+
+
+def check_queue_capacity(db: Session, user_id) -> "JobCreationResult | None":
+    """Navbat himoyasi (backend/services/queue_load.py): foydalanuvchi bir
+    vaqtdagi faol job chegarasiga yetgan yoki navbat haddan tashqari uzun
+    bo'lsa rad natijasini, aks holda None qaytaradi. Chaqiruvchilar buni
+    keshdan KEYIN, lekin YouTube/Safety Gate/ffmpeg kabi qimmat ishlardan
+    OLDIN tekshiradi -- yuk ostida ortiqcha ish qilmaslik uchun. Kesh-hit
+    worker sarflamaydi, shuning uchun bu tekshiruvga tushmaydi."""
+    from backend.services import queue_load
+    limit = queue_load.active_limit_reached(db, user_id)
+    if limit is not None:
+        return JobCreationResult(outcome="active_limit", active_limit=limit)
+    wait = queue_load.overload_wait_minutes(db, user_id)
+    if wait is not None:
+        return JobCreationResult(outcome="queue_full", queue_wait_minutes=wait)
+    return None
+
+
+def queue_rejection_message(result: "JobCreationResult") -> str:
+    """active_limit / queue_full uchun foydalanuvchiga ko'rsatiladigan matn --
+    veb (HTTP detail) va Telegram bot bir xil gapirishi uchun bitta joyda."""
+    from backend.services import queue_load
+    if result.outcome == "active_limit":
+        return (
+            f"Sizda allaqachon {result.active_limit} ta video ishlanmoqda. "
+            "Ulardan biri tugagach yangisini yuborishingiz mumkin."
+        )
+    return (
+        "Hozir server juda band — navbat uzun "
+        f"(taxminiy kutish: {queue_load.format_wait(result.queue_wait_minutes or 1)}). "
+        "Iltimos, birozdan so'ng qayta urinib ko'ring."
+    )
 
 
 def _daily_job_limit_reached(db: Session, user_id) -> bool:
@@ -190,6 +226,10 @@ async def create_dubbing_job(
         cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
         if cached_job and _cached_job_files_exist(cached_job):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
+
+    rejection = check_queue_capacity(db, user.id)
+    if rejection:
+        return rejection
 
     try:
         info = await asyncio.to_thread(get_video_info, youtube_url)
@@ -325,6 +365,11 @@ async def create_job_from_local_video_file(
     if _daily_job_limit_reached(db, user.id):
         video_path.unlink(missing_ok=True)
         return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
+
+    rejection = check_queue_capacity(db, user.id)
+    if rejection:
+        video_path.unlink(missing_ok=True)
+        return rejection
 
     duration = _media_duration_seconds(video_path)
     if not duration:
