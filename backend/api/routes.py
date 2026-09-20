@@ -30,7 +30,7 @@ from backend.services.job_creation import (
     queue_rejection_message,
     JobCreationResult,
 )
-from backend.services import subtitle_export
+from backend.services import subtitle_export, subtitle_cues
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -628,6 +628,21 @@ def delete_job(
     db.commit()
 
 
+def _subtitle_cues_for(job) -> list | None:
+    """Faqat "Subtitr" rejimidagi job'lar uchun: tarjima gaplarini qisqa, o'qib
+    bo'ladigan kuelarga aylantiradi (backend/services/subtitle_cues.py). So'rov
+    paytida hisoblanadi -- shuning uchun bu tuzatishdan OLDIN yaratilgan
+    subtitrlar ham yaxshilanadi. Dublyaj job'lari o'zgarmaydi (ularning subtitri
+    dublyaj audiosi vaqtiga moslangan). Xatoda None -- eski yo'lga qaytiladi."""
+    if not getattr(job, "subtitle_only", False) or not job.translated_segments:
+        return None
+    try:
+        return subtitle_cues.build_cues(job.translated_segments, job.transcript_segments or [])
+    except Exception:
+        logger.exception(f"Subtitr kuelarini qurishda xato: job={job.id}")
+        return None
+
+
 @router.get("/jobs/{job_id}/subtitles.vtt")
 def get_subtitles(
     job_id: uuid.UUID,
@@ -642,12 +657,14 @@ def get_subtitles(
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.uzbek_srt_content:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
+    cues = _subtitle_cues_for(job)
+    content = subtitle_cues.cues_to_vtt(cues) if cues else job.uzbek_srt_content
     headers = {"Access-Control-Allow-Origin": "*"}
     if download:
         headers["Content-Disposition"] = subtitle_export.content_disposition(
             subtitle_export.download_filename(job.video_title, job_id, "vtt")
         )
-    return Response(content=job.uzbek_srt_content, media_type="text/vtt", headers=headers)
+    return Response(content=content, media_type="text/vtt", headers=headers)
 
 
 @router.get("/jobs/{job_id}/subtitles.srt")
@@ -660,8 +677,12 @@ def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.translated_segments:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
-    from backend.workers.tasks import _segments_to_srt
-    srt_content = _segments_to_srt(job.translated_segments)
+    cues = _subtitle_cues_for(job)
+    if cues:
+        srt_content = subtitle_cues.cues_to_srt(cues)
+    else:
+        from backend.workers.tasks import _segments_to_srt
+        srt_content = _segments_to_srt(job.translated_segments)
     return Response(
         content=srt_content,
         media_type="application/x-subrip",
