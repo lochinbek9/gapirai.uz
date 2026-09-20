@@ -3,8 +3,8 @@ import { Clock, Users2, Captions, MonitorPlay, Volume2, Ban } from "lucide-react
 const FEATURES = [
   {
     icon: Clock,
-    title: "45 daqiqagacha bepul",
-    desc: "Davomiyligi 45 daqiqadan qisqa videolarni istalgancha, to'lovsiz dublyaj qiling.",
+    title: "Oyiga 5 daqiqa bepul",
+    desc: "Har oy 5 daqiqagacha videoni to'lovsiz dublyaj qiling. Ko'proq kerak bo'lsa — oylik tarif yoki qo'shimcha daqiqa paketi.",
   },
   {
     icon: Users2,
