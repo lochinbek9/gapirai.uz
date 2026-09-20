@@ -309,7 +309,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     return [], "", language
 
 
-def transcribe_audio(audio_path: str, language: str | None = "en") -> dict:
+def transcribe_audio(audio_path: str, language: str | None = "en", primary: str = "openai") -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
@@ -335,7 +335,7 @@ def transcribe_audio(audio_path: str, language: str | None = "en") -> dict:
         logger.error("Falling back to OpenAI...")
 
     try:
-        return _transcribe_via_api(audio_path, language)
+        return _transcribe_via_api(audio_path, language, primary)
     except Exception as e:
         # 2026-09-12: OpenAI (kredit tugagan) va Gemini (kuniga-20 bepul
         # tarif devori) BIR VAQTDA ishlamay qolgan haqiqiy production
@@ -397,7 +397,16 @@ def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | N
         return None
 
 
-def _transcribe_via_api(audio_path: str, language: str | None) -> dict:
+def _transcribe_provider_order(primary: str) -> list[str]:
+    """API provayderlar tartibi: primary="gemini" va Gemini sozlangan bo'lsa Gemini -> OpenAI,
+    aks holda (standart) OpenAI -> Gemini (Gemini sozlangan bo'lsa). Sozlanmagan provayder
+    ro'yxatda umuman bo'lmaydi."""
+    gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    order = ["gemini", "openai"] if (primary == "gemini" and gemini_ok) else ["openai", "gemini"]
+    return [name for name in order if name == "openai" or gemini_ok]
+
+
+def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "openai") -> dict:
     """OpenAI Whisper API -> (Gemini kaliti bo'lsa) Gemini zaxirasi bilan
     audio'ni bo'lak-bo'lak transkripsiya qiladi. Ikkalasi ham ishlamasa
     chaqiruvchiga (transcribe_audio) ko'tarib beradi -- u yerda lokal
@@ -407,13 +416,15 @@ def _transcribe_via_api(audio_path: str, language: str | None) -> dict:
     detected_language = language
 
     def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str]:
-        try:
-            return _transcribe_chunk(cpath, offset_seconds=offset, language=language)
-        except Exception as e:
-            if not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
-                raise
-            logger.warning(f"OpenAI transkripsiya muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
-            return _transcribe_chunk_gemini(cpath, offset_seconds=offset, language=language)
+        last_error: Exception | None = None
+        for name in _transcribe_provider_order(primary):
+            fn = _transcribe_chunk_gemini if name == "gemini" else _transcribe_chunk
+            try:
+                return fn(cpath, offset_seconds=offset, language=language)
+            except Exception as e:
+                last_error = e
+                logger.warning(f"{name} transkripsiya muvaffaqiyatsiz ({e}) — keyingi provayderga o'tilmoqda.")
+        raise last_error  # type: ignore[misc]  (order har doim kamida bitta provayderni o'z ichiga oladi)
 
     with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
         chunk_paths = _chunk_audio(audio_path, Path(temp_dir))

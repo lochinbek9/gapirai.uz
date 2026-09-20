@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ClipboardPaste, FileText, Loader2, Youtube } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { createJob } from "@/lib/api";
+import { createJob, SubtitleSourceLanguage } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 /** "Subtitr" rejimi (2026-09-16) -- AnalysisUrlForm bilan bir xil, o'zicha
@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
  * yuboradi va natija sahifasiga (/subtitles/[id]) o'tkazadi. Dublyaj
  * audiosi/videosi yaratilmaydi -- backend/services/job_creation.py
  * subtitle_only=true bilan chaqiriladi. */
-export default function SubtitleUrlForm() {
+export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLanguage?: SubtitleSourceLanguage }) {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
@@ -37,7 +37,7 @@ export default function SubtitleUrlForm() {
     setLoading(true);
     setError(null);
     try {
-      const { job_id } = await createJob(url, "auto", true);
+      const { job_id } = await createJob(url, "auto", true, sourceLanguage);
       router.push(`/subtitles/${job_id}`);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -118,7 +118,7 @@ export default function SubtitleUrlForm() {
       </motion.button>
 
       <div className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
-        {["SRT", "VTT", "Vaqt kodlari", "O'zbekcha tarjima"].map((label, i) => (
+        {["SRT", "VTT", "Vaqt kodlari", sourceLanguage === "uz" ? "O'zbekcha STT (tarjimasiz)" : "O'zbekcha tarjima"].map((label, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">{label}</span>

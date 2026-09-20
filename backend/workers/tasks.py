@@ -57,6 +57,13 @@ def _sec_to_vtt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
 
 
+def is_uzbek_source(job) -> bool:
+    """"Subtitr" rejimida video o'zbekcha nutqli deb belgilanganmi: shunda nutq o'zbekcha STT bilan
+    matnga aylantiriladi va TARJIMA QILINMAYDI (LLM chaqiruvi ham, qisqartirish ham yo'q --
+    aytilgan gap so'zma-so'z subtitr bo'ladi). Dublyaj job'lari uchun hech qachon True emas."""
+    return bool(getattr(job, "subtitle_only", False)) and getattr(job, "source_language", None) == "uz"
+
+
 def segments_source_for_cues(job) -> list:
     """Subtitr kuelari uchun manba segmentlari (Whisper, so'z vaqtlari bilan) --
     bo'sh bo'lsa [] (subtitle_cues shunda faqat tarjima vaqtlariga tayanadi)."""
@@ -430,13 +437,18 @@ def process_video(self: Task, job_id: str) -> dict:
         # ular bo'lsa, qimmat/uzoq transkripsiya qayta bajarilmaydi.
         current_stage = "TRANSCRIBE"
         stage_t0 = time.monotonic()
+        uzbek_source = is_uzbek_source(job)
         if job.transcript_segments:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
             segments = job.transcript_segments
             transcript_text = job.transcript_text or ""
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(audio_path)
+            transcript = transcriber.transcribe_audio(
+                audio_path,
+                language="uz" if uzbek_source else "en",
+                primary=settings.STT_UZ_PRIMARY if uzbek_source else "openai",
+            )
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
@@ -523,8 +535,13 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
             translated_segments = job.translated_segments
         else:
-            _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
-            translated_segments = translator.translate_segments(segments)
+            if uzbek_source:
+                # Nutq allaqachon o'zbekcha: tarjima ham, qisqartirish ham kerak emas.
+                _update_job(db, job, JobStatus.TRANSLATING, 40.0, "Subtitr tayyorlanmoqda...")
+                translated_segments = translator.passthrough_segments(segments)
+            else:
+                _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
+                translated_segments = translator.translate_segments(segments)
 
             # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
             # uzunroq chiqqan tarjimalar BIR MARTA qisqartiriladi (haqiqiy
@@ -536,7 +553,9 @@ def process_video(self: Task, job_id: str) -> dict:
             # faqat o'qish tezligi chegaradan (subtitle_cues.MAX_READ_CPS) oshadigan
             # gaplar qisqartiriladi, ularning oynasi esa so'z vaqtlari bo'yicha
             # aniqlashtiriladi (subtitr aynan shu oynada ko'rinadi).
-            if job.subtitle_only:
+            if uzbek_source:
+                over_budget = {}
+            elif job.subtitle_only:
                 over_budget = subtitle_cues.reading_budgets(translated_segments, segments_source_for_cues(job))
             else:
                 over_budget = {}

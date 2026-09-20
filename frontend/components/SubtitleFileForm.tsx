@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FileText, FileVideo, Loader2, UploadCloud, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { detectVideoContentType, getMinuteBalance, uploadJobFile, SUBTITLE_UPLOAD_MAX_BYTES } from "@/lib/api";
+import { detectVideoContentType, getMinuteBalance, uploadJobFile, SUBTITLE_UPLOAD_MAX_BYTES, SubtitleSourceLanguage } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 /** "Subtitr" rejimi -- video FAYLDAN (2026-09-20): foydalanuvchi qurilmasidagi
@@ -58,7 +58,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export default function SubtitleFileForm() {
+export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLanguage?: SubtitleSourceLanguage }) {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,7 +119,7 @@ export default function SubtitleFileForm() {
     setProgress(0);
     setError(null);
     try {
-      const { job_id } = await uploadJobFile(file, { subtitleOnly: true }, setProgress, controller.signal);
+      const { job_id } = await uploadJobFile(file, { subtitleOnly: true, sourceLanguage }, setProgress, controller.signal);
       router.push(`/subtitles/${job_id}`);
     } catch (err: any) {
       if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
@@ -201,7 +201,7 @@ export default function SubtitleFileForm() {
           onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }}
         />
         <p className="text-[10px] text-slate-400 dark:text-gray-600 ml-1">
-          Videodagi nutq o'zbekchaga tarjima qilinib, subtitr (.srt/.vtt/.txt) tayyorlanadi — dublyaj audiosi yo'q.
+          {sourceLanguage === "uz" ? "Nutq o'zbekcha matnga aylantirilib (tarjimasiz), " : "Videodagi nutq o'zbekchaga tarjima qilinib, "}subtitr (.srt/.vtt/.txt) tayyorlanadi — dublyaj audiosi yo'q.
         </p>
       </div>
 

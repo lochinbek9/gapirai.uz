@@ -101,6 +101,11 @@ class DubbingJob(Base):
     # transkripsiya+tarjima+vaqt kodlari kerak, dublyaj audiosi/videosi
     # yaratilmaydi -- tezroq va TTS xarajatisiz.
     subtitle_only = Column(Boolean, nullable=False, default=False)
+    # 2026-09-20: "Subtitr" rejimida video tili. "uz" -- nutq o'zbekcha STT bilan matnga aylantiriladi
+    # va TARJIMA QILINMAYDI; NULL -- eski xatti-harakat (chet tildagi video -> o'zbekchaga tarjima).
+    # DIQQAT: ustun qo'lda `ALTER TABLE` bilan qo'shiladi (create_tables'ga tegilmaydi, pastga qarang) va
+    # kod deploy qilinishidan OLDIN mavjud bo'lishi shart -- ORM uni har bir SELECT/INSERT'ga qo'shadi.
+    source_language = Column(String(10), nullable=True)
 
     # Checkpoint uchun: har bosqichning xom (timestamp'li) segment ro'yxati.
     # Pipeline qayta ishga tushganda (crash/retry) shu maydonlar orqali

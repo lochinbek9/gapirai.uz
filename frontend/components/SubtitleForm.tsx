@@ -4,12 +4,14 @@ import { useState } from "react";
 import { FileVideo, Youtube } from "lucide-react";
 import SubtitleUrlForm from "@/components/SubtitleUrlForm";
 import SubtitleFileForm from "@/components/SubtitleFileForm";
+import type { SubtitleSourceLanguage } from "@/lib/api";
 
 /** "Subtitr" tabi (2026-09-20): manba tanlovi -- YouTube havolasi YOKI qurilmadagi
  * video fayl. Ikkala forma ham o'zicha mustaqil va bir xil natija sahifasiga
  * (/subtitles/[id]) olib boradi. */
 export default function SubtitleForm() {
   const [source, setSource] = useState<"url" | "file">("url");
+  const [lang, setLang] = useState<SubtitleSourceLanguage>("auto");
 
   const tab = (id: "url" | "file", label: string, Icon: typeof Youtube) => (
     <button
@@ -33,7 +35,35 @@ export default function SubtitleForm() {
         {tab("url", "YouTube havolasi", Youtube)}
         {tab("file", "Video fayl", FileVideo)}
       </div>
-      {source === "url" ? <SubtitleUrlForm /> : <SubtitleFileForm />}
+      <div className="space-y-1.5">
+        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Video tili</span>
+        <div className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5" role="group" aria-label="Video tili">
+          {([
+            ["auto", "Boshqa til → o'zbekcha tarjima"],
+            ["uz", "O'zbekcha (tarjimasiz)"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setLang(id)}
+              aria-pressed={lang === id}
+              className={`flex-1 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all ${
+                lang === id
+                  ? "bg-white dark:bg-white/10 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-slate-400 dark:text-gray-600 ml-1">
+          {lang === "uz"
+            ? "Videodagi o'zbekcha nutq o'zbekcha subtitrga aylantiriladi — tarjima qilinmaydi."
+            : "Chet tildagi (masalan ingliz) nutq o'zbekchaga tarjima qilinib subtitr tayyorlanadi."}
+        </p>
+      </div>
+      {source === "url" ? <SubtitleUrlForm sourceLanguage={lang} /> : <SubtitleFileForm sourceLanguage={lang} />}
     </div>
   );
 }
