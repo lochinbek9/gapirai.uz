@@ -177,6 +177,34 @@ def _bucket_words_into_segments(words: list[dict], segments: list[dict]) -> None
         })
 
 
+# OpenAI Whisper API `language` sifatida rad etadigan tillar (400: "Language 'uz' is not supported",
+# 2026-08-12 productionda tasdiqlangan, commit 3759074).
+_OPENAI_REJECTED_LANGUAGE_HINTS = frozenset({"uz"})
+# Dekoderni o'zbek (lotin) yozuviga yo'naltiruvchi qisqa namuna matn.
+_UZ_STT_PROMPT = (
+    "Assalomu alaykum, aziz doʻstlar! Bugun oʻzbek tilida gaplashamiz: "
+    "gʻoya, maʼlumot, oʻqish, toʻgʻri, yoʻq, boʻladi, koʻrsatish."
+)
+
+
+class WrongLanguageError(Exception):
+    """STT natijasi kutilgan tilda emas: masalan o'zbekcha nutq o'rniga TURKCHA matn qaytdi
+    (Whisper o'zbekchani tez-tez shunday adashtiradi). Bunday matn subtitr sifatida
+    foydalanuvchiga BERILMAYDI -- keyingi provayder sinaladi yoki job aniq xato bilan tugaydi."""
+
+
+_TURKISH_LETTERS = frozenset("çÇğĞıİöÖşŞüÜ")   # o'zbek (lotin/kirill) matnida deyarli uchramaydi
+
+
+def looks_turkish(text: str | None) -> bool:
+    """Matn turkchaga o'xshaydimi: turk alifbosiga xos harflar (ç ğ ı ö ş ü) ulushi >= 3%
+    (haqiqiy turkcha matnda ~10-12%, o'zbekchada ~0%). Juda qisqa matn (<30 harf) uchun False."""
+    letters = [c for c in (text or "") if c.isalpha()]
+    if len(letters) < 30:
+        return False
+    return sum(c in _TURKISH_LETTERS for c in letters) / len(letters) >= 0.03
+
+
 def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | None = "en") -> tuple[list[dict], str, str]:
     # OpenAI'ning "language" parametri faqat cheklangan ISO-639-1 ro'yxatini
     # qabul qiladi — "uz" o'sha ro'yxatda YO'Q va 400 xato bilan rad etiladi
@@ -190,8 +218,15 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | N
         "response_format": "verbose_json",
         "timestamp_granularities": ["segment", "word"],
     }
-    if language:
+    # Yuqoridagi izoh talabi shu yerda BAJARILADI: OpenAI rad etadigan tillar ("uz") uchun
+    # `language` yuborilmaydi (aks holda har chaqiruv 400 bilan yiqilib, zanjir doim
+    # zaxiraga -- ko'pincha lokal kichik Whisper'ga -- tushardi, u esa o'zbekchani turkcha
+    # yozadi). O'rniga o'zbekcha `prompt` beriladi: dekoderni o'zbek yozuviga (lotin, oʻ/gʻ)
+    # yo'naltiradi. Til avtomatik aniqlanadi; turkcha chiqsa looks_turkish() ushlaydi.
+    if language and language not in _OPENAI_REJECTED_LANGUAGE_HINTS:
         kwargs["language"] = language
+    if language == "uz":
+        kwargs["prompt"] = _UZ_STT_PROMPT
 
     with chunk_path.open("rb") as audio_file:
         kwargs["file"] = audio_file
@@ -244,6 +279,9 @@ _TRANSCRIBE_LANGUAGE_NAMES = {"en": "English", "uz": "Uzbek"}
 
 def _build_transcribe_prompt(language: str | None) -> str:
     lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language) if language else "whatever language is spoken"
+    if language == "uz":
+        lang_name = ("Uzbek (the language is Uzbek, NOT Turkish; write it in the Uzbek Latin alphabet "
+                     "with oʻ and gʻ)")
     return (
         f"Transcribe this audio clip verbatim in {lang_name}, exactly as spoken. "
         "Split the transcription into short natural subtitle-style segments "
@@ -328,7 +366,7 @@ def transcribe_audio(audio_path: str, language: str | None = "en", primary: str 
             "language": str,       # Aniqlangan til
         }
     """
-    if settings.FREE_MODE:
+    if settings.FREE_MODE and language != "uz":
         result = _transcribe_local_whisper(audio_path, language)
         if result is not None:
             return result
@@ -336,7 +374,14 @@ def transcribe_audio(audio_path: str, language: str | None = "en", primary: str 
 
     try:
         return _transcribe_via_api(audio_path, language, primary)
+    except WrongLanguageError:
+        raise   # boshqa tildagi matnni "oxirgi chora" bilan yashirmaymiz
     except Exception as e:
+        if language == "uz":
+            # Lokal "small" Whisper o'zbekchani turkcha/axlat matnga aylantiradi -- foydalanuvchiga
+            # yaroqsiz subtitr berishdan ko'ra aniq xato bilan tugash yaxshi.
+            logger.error(f"O'zbekcha transkripsiya API orqali bajarilmadi ({e}); lokal Whisper o'zbekcha uchun ishlatilmaydi.")
+            raise
         # 2026-09-12: OpenAI (kredit tugagan) va Gemini (kuniga-20 bepul
         # tarif devori) BIR VAQTDA ishlamay qolgan haqiqiy production
         # hodisasi -- FREE_MODE=False bo'lganda (hozirgi holat) bu yerda
@@ -420,7 +465,10 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
         for name in _transcribe_provider_order(primary):
             fn = _transcribe_chunk_gemini if name == "gemini" else _transcribe_chunk
             try:
-                return fn(cpath, offset_seconds=offset, language=language)
+                segs, text, lang = fn(cpath, offset_seconds=offset, language=language)
+                if language == "uz" and looks_turkish(text):
+                    raise WrongLanguageError(f"{name}: o'zbekcha nutq o'rniga turkcha matn qaytardi")
+                return segs, text, lang
             except Exception as e:
                 last_error = e
                 logger.warning(f"{name} transkripsiya muvaffaqiyatsiz ({e}) — keyingi provayderga o'tilmoqda.")

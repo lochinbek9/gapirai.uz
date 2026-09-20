@@ -444,11 +444,19 @@ def process_video(self: Task, job_id: str) -> dict:
             transcript_text = job.transcript_text or ""
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(
-                audio_path,
-                language="uz" if uzbek_source else "en",
-                primary=settings.STT_UZ_PRIMARY if uzbek_source else "openai",
-            )
+            try:
+                transcript = transcriber.transcribe_audio(
+                    audio_path,
+                    language="uz" if uzbek_source else "en",
+                    primary=settings.STT_UZ_PRIMARY if uzbek_source else "openai",
+                )
+            except transcriber.WrongLanguageError as exc:
+                _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
+                raise PermanentError(
+                    "Nutqni o'zbekcha matnga aylantirib bo'lmadi: xizmat boshqa tilda (turkcha) matn qaytardi. "
+                    "Video haqiqatan o'zbekcha ekanini tekshiring yoki birozdan so'ng qayta urinib ko'ring.",
+                    code="STT_WRONG_LANGUAGE",
+                ) from exc
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")

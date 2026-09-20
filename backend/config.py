@@ -194,10 +194,11 @@ class Settings(BaseSettings):
     # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
     WHISPER_MODEL: str = "small"
     # O'zbekcha nutqni (subtitr rejimi, tarjimasiz) matnga aylantirishda AVVAL qaysi provayder
-    # sinaladi: "openai" (Whisper, so'z vaqtlari aniq, lekin o'zbek tilida zaif) yoki "gemini"
-    # (o'zbek matni yaxshiroq, lekin vaqtlari taxminiy). Gemini kaliti/Vertex sozlanmagan bo'lsa
-    # doim OpenAI; birinchisi xato bersa ikkinchisiga o'tiladi (transcriber._transcribe_via_api).
-    STT_UZ_PRIMARY: str = "openai"
+    # sinaladi: "gemini" (o'zbek matni yaxshiroq, vaqtlari taxminiy; standart) yoki "openai"
+    # (Whisper: so'z vaqtlari aniq, lekin o'zbek tilida zaif va tilni faqat avto-aniqlaydi, ba'zan
+    # turkcha chiqaradi). Gemini kaliti/Vertex sozlanmagan bo'lsa doim OpenAI; birinchisi xato
+    # bersa yoki matn turkchaga o'xshasa ikkinchisiga o'tiladi (transcriber._transcribe_via_api).
+    STT_UZ_PRIMARY: str = "gemini"
     # Nutq optimallashtirish (raqam/ohang moslashtirish), jins aniqlash,
     # xavfsizlik klassifikatori va Video tahlil (Learning Workspace) kabi
     # mexanik/tasniflash vazifalari uchun — OPENAI_MODEL (asosiy tarjima)
