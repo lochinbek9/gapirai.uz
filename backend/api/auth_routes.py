@@ -128,22 +128,26 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVeri
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
     if db.query(User).filter(User.email == req.email.lower()).first():
         raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
+    # bcrypt (~230ms CPU) ochiq tranzaksiya ichida ishlamasin -- ulanish hovuzga
+    # qaytadi. Shu sabab oddiy qiymatlarni oldindan olamiz.
+    db.rollback()
+    email = req.email.lower().strip()
+    name = req.name.strip()
+    password_hash = hash_password(req.password)
 
-    user = User(
-        email=req.email.lower().strip(),
-        name=req.name.strip(),
-        password_hash=hash_password(req.password),
-        is_verified=False,
-    )
+    user = User(email=email, name=name, password_hash=password_hash, is_verified=False)
     db.add(user)
     db.commit()
     db.refresh(user)
 
     code = _issue_code(user, db)
-    if not send_verification_email(user.email, code, user.name):
+    # Resend chaqiruvi (timeout bilan) paytida DB ulanishi band turmasin: sekin
+    # Resend hovuzni tugatib, butun API'ni to'xtatib qo'ymasligi kerak.
+    db.close()
+    if not send_verification_email(email, code, name):
         raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
-    return PendingVerificationResponse(email=user.email, message="Tasdiqlash kodi emailingizga yuborildi.")
+    return PendingVerificationResponse(email=email, message="Tasdiqlash kodi emailingizga yuborildi.")
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", 10, 600))])
@@ -151,14 +155,19 @@ def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificati
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
-    if not verify_password(req.password, user.password_hash):
+    # bcrypt ochiq tranzaksiyada ishlamasin (register'dagi kabi), va parolsiz
+    # (faqat Google) akkaunt uchun 500 emas 401 qaytsin.
+    password_hash, email, name = user.password_hash, user.email, user.name
+    db.rollback()
+    if not password_hash or not verify_password(req.password, password_hash):
         raise HTTPException(status_code=401, detail="Parol noto'g'ri.")
 
     code = _issue_code(user, db)
-    if not send_verification_email(user.email, code, user.name):
+    db.close()  # Resend chaqiruvi paytida ulanish band turmasin
+    if not send_verification_email(email, code, name):
         raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
-    return PendingVerificationResponse(email=user.email, message="Tasdiqlash kodi emailingizga yuborildi.")
+    return PendingVerificationResponse(email=email, message="Tasdiqlash kodi emailingizga yuborildi.")
 
 
 @router.post("/verify-code", dependencies=[Depends(rate_limit("verify_code", 10, 600))])
@@ -240,6 +249,7 @@ def phone_request_code(req: PhoneRequestCodeRequest, db: Session = Depends(get_d
         db.refresh(user)
 
     code = _issue_phone_code(user, db)
+    db.close()  # SMS provayderi chaqiruvi paytida ulanish band turmasin
     if not send_otp_sms(phone, code):
         raise HTTPException(status_code=500, detail="SMS yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
@@ -275,11 +285,13 @@ def resend_code(req: ResendCodeRequest, db: Session = Depends(get_db)) -> Pendin
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
 
+    email, name = user.email, user.name  # _issue_code commit'i ularni "eskirtiradi"
     code = _issue_code(user, db)
-    if not send_verification_email(user.email, code, user.name):
+    db.close()  # Resend chaqiruvi paytida ulanish band turmasin
+    if not send_verification_email(email, code, name):
         raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
-    return PendingVerificationResponse(email=user.email, message="Kod qayta yuborildi.")
+    return PendingVerificationResponse(email=email, message="Kod qayta yuborildi.")
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit("forgot_password", 5, 600))])
@@ -288,11 +300,13 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
 
+    email, name = user.email, user.name
     code = _issue_code(user, db)
-    if not send_password_reset_email(user.email, code, user.name):
+    db.close()  # Resend chaqiruvi paytida ulanish band turmasin
+    if not send_password_reset_email(email, code, name):
         raise HTTPException(status_code=500, detail="Kodni yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
 
-    return PendingVerificationResponse(email=user.email, message="Parolni tiklash kodi emailingizga yuborildi.")
+    return PendingVerificationResponse(email=email, message="Parolni tiklash kodi emailingizga yuborildi.")
 
 
 @router.post("/reset-password", dependencies=[Depends(rate_limit("reset_password", 10, 600))])

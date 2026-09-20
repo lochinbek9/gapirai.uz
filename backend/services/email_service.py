@@ -19,6 +19,11 @@ CODE_TTL_MINUTES = 10
 RESEND_API_URL = "https://api.resend.com/emails"
 
 
+# Kirish/ro'yxat/parol tiklash kodlari so'rov ICHIDA yuboriladi (auth_routes.py):
+# Resend sekinlashsa so'rov oqimi shuncha band turadi, shuning uchun qisqa.
+_OTP_EMAIL_TIMEOUT_S = 5
+
+
 def generate_verification_code() -> str:
     return f"{random.randint(0, 999999):06d}"
 
@@ -67,7 +72,7 @@ def _send_code_email(to_email: str, code: str, name: str, subject: str, intro: s
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=15,
+            timeout=_OTP_EMAIL_TIMEOUT_S,
         )
         if response.status_code in (200, 201):
             return True
