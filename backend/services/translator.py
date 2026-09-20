@@ -388,6 +388,18 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
             return _translate_chunk_free_mt(segments)
 
 
+def passthrough_segments(segments: list[dict]) -> list[dict]:
+    """O'zbekcha manba uchun "tarjima": matn o'zgarishsiz (faqat tozalanadi), id/vaqtlar saqlanadi.
+    LLM/tarmoq chaqiruvi YO'Q -- subtitr rejimida nutq allaqachon o'zbekcha (STT natijasi)."""
+    out = []
+    for i, seg in enumerate(segments or [], start=1):
+        text = " ".join(_clean_text(seg.get("text", "")).split())   # ortiqcha probel/qator uzilishlarini yig'ish
+        if not text:
+            continue
+        out.append({"id": seg.get("id", i), "start": seg.get("start", 0.0), "end": seg.get("end", 0.0), "text": text})
+    return out
+
+
 _CALIBRATED_RATE_CACHE: dict = {"value": None, "computed_at": 0.0}
 _DEFAULT_CHARS_PER_SECOND = 15.0  # taxminiy — TTSUsageLog'da hali ma'lumot bo'lmasa
 

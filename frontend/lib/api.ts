@@ -93,12 +93,17 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
   return res.data
 }
 
+/** Subtitr rejimida video tili: 'auto' -- chet tildagi video (o'zbekchaga tarjima qilinadi),
+ * 'uz' -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ (backend faqat subtitle_only bilan qabul qiladi). */
+export type SubtitleSourceLanguage = 'auto' | 'uz'
+
 export async function createJob(
   youtube_url: string,
   voice_gender: string = 'auto',
   subtitle_only: boolean = false,
+  source_language: SubtitleSourceLanguage = 'auto',
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender, subtitle_only })
+  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender, subtitle_only, source_language })
   return res.data
 }
 
@@ -177,14 +182,14 @@ export function detectVideoContentType(file: File): string | null {
 
 export async function uploadJobFile(
   file: File,
-  opts: { subtitleOnly?: boolean; voiceGender?: string } = {},
+  opts: { subtitleOnly?: boolean; voiceGender?: string; sourceLanguage?: SubtitleSourceLanguage } = {},
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
 ): Promise<{ job_id: string; status: string }> {
   const contentType = detectVideoContentType(file)
   if (!contentType) throw new Error('Qo\'llab-quvvatlanmaydigan video formati')
   const res = await apiClient.post('/api/jobs/upload', file, {
-    params: { subtitle_only: opts.subtitleOnly ?? true, voice_gender: opts.voiceGender ?? 'auto' },
+    params: { subtitle_only: opts.subtitleOnly ?? true, voice_gender: opts.voiceGender ?? 'auto', source_language: opts.sourceLanguage ?? 'auto' },
     headers: { 'Content-Type': contentType, 'X-File-Name': encodeURIComponent(file.name) },
     onUploadProgress: (e) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))

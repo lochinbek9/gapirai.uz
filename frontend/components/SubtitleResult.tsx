@@ -77,7 +77,7 @@ export default function SubtitleResult({ job, onReset }: Props) {
               onClick={() => setShowText((v) => !v)}
               className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
             >
-              {showText ? "Tarjima matnini yashirish" : "Tarjima matnini ko'rsatish"}
+              {showText ? "Matnni yashirish" : "Matnni ko'rsatish"}
             </button>
             <button
               onClick={copyText}

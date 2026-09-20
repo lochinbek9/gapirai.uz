@@ -45,6 +45,9 @@ class CreateJobRequest(BaseModel):
     # 2026-09-16: "Subtitr" rejimi -- dublyaj audiosi/videosi yaratilmaydi,
     # faqat transkripsiya+tarjima+VTT/SRT (backend/services/job_creation.py).
     subtitle_only: bool = False
+    # "auto" -- chet tildagi video (o'zbekchaga tarjima qilinadi, eski xatti-harakat);
+    # "uz" -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ (faqat subtitr rejimida).
+    source_language: str = "auto"
 
 
 class VideoInfoResponse(BaseModel):
@@ -192,6 +195,19 @@ async def video_info(url: str) -> VideoInfoResponse:
         raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
 
 
+def _normalize_source_language(value: Optional[str], subtitle_only: bool) -> Optional[str]:
+    """Video tili: "auto"/bo'sh -> None (eski xatti-harakat), "uz" -> "uz". "uz" faqat subtitr rejimida
+    ma'noga ega (o'zbekcha nutqni o'zbekchaga "dublyaj" qilish ma'nosiz) -- aks holda 400."""
+    value = (value or "auto").strip().lower()
+    if value == "auto":
+        return None
+    if value != "uz":
+        raise HTTPException(status_code=400, detail="Video tili noto'g'ri: faqat 'auto' yoki 'uz'.")
+    if not subtitle_only:
+        raise HTTPException(status_code=400, detail="O'zbekcha manba faqat subtitr rejimida qo'llanadi.")
+    return "uz"
+
+
 def _raise_for_outcome(result: JobCreationResult) -> None:
     """Job yaratish natijasidagi rad holatlarini HTTP xatosiga aylantiradi
     (queued/ready -- xato emas, hech narsa qilmaydi). POST /jobs (YouTube) va
@@ -255,8 +271,10 @@ async def create_job(
 ) -> dict:
     # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
     # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
+    source_language = _normalize_source_language(request.source_language, request.subtitle_only)
     result = await create_dubbing_job(
         db, current_user, request.youtube_url, request.voice_gender, subtitle_only=request.subtitle_only,
+        source_language=source_language,
     )
 
     _raise_for_outcome(result)
@@ -290,6 +308,7 @@ def _upload_display_title(raw_name: Optional[str]) -> str:
 
 def _finish_uploaded_job(
     user_id, job_id: str, video_path: Path, subtitle_only: bool, voice_gender: str, title: str,
+    source_language: Optional[str] = None,
 ) -> JobCreationResult:
     """Yuklash tugagach ffprobe/kvota/ffmpeg/DB ishlari -- SINXRON, threadpool'da
     chaqiriladi (event loop bloklanmasin). O'z DB sessiyasini ochadi: yuklash
@@ -303,7 +322,7 @@ def _finish_uploaded_job(
             return JobCreationResult(outcome="bad_file")
         return create_job_from_local_video_file_sync(
             db, user, job_id, video_path, source_url=f"upload://{job_id}", voice_gender=voice_gender,
-            subtitle_only=subtitle_only, video_title=title,
+            subtitle_only=subtitle_only, video_title=title, source_language=source_language,
         )
     finally:
         db.close()
@@ -314,6 +333,7 @@ async def upload_job_file(
     request: Request,
     subtitle_only: bool = Query(True),
     voice_gender: str = Query("auto"),
+    source_language: str = Query("auto"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -349,6 +369,7 @@ async def upload_job_file(
 
     if voice_gender not in ("auto", "male", "female"):
         voice_gender = "auto"
+    source_language = _normalize_source_language(source_language, subtitle_only)  # fayl o'qilishidan OLDIN
     user_id = current_user.id
     rejection = precheck_local_upload(db, user_id)
     # Yuklash daqiqalar davom etadi: DB ulanishini shu yerda qaytaramiz (aks holda
@@ -401,7 +422,7 @@ async def upload_job_file(
     try:
         result = await run_in_threadpool(
             _finish_uploaded_job, user_id, job_id, video_path, subtitle_only, voice_gender,
-            _upload_display_title(request.headers.get("x-file-name")),
+            _upload_display_title(request.headers.get("x-file-name")), source_language,
         )
     except BaseException:
         # DB/ffmpeg kutilmagan xatosi: job yaratilmadi, demak fayl ham hech kimga

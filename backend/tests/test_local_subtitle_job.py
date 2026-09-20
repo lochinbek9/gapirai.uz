@@ -86,6 +86,23 @@ class TestCreateLocalSubtitleJob(unittest.TestCase):
         _, kwargs = self.apply_async.call_args
         self.assertEqual(kwargs["queue"], LOCAL_UPLOAD_QUEUE)         # boshqa worker host fayl topa olmaydi
 
+    def test_uzbek_source_is_recorded_only_for_subtitle_jobs(self):
+        jc.create_job_from_local_video_file_sync(
+            self.db, self.user, self.job_id, self.video, source_url="upload://x", subtitle_only=True, source_language="uz",
+        )
+        self.assertEqual(self.db.added[0].source_language, "uz")
+
+    def test_uzbek_source_is_ignored_for_dubbing_jobs_and_unknown_values(self):
+        jc.create_job_from_local_video_file_sync(
+            self.db, self.user, self.job_id, self.video, source_url="upload://x", subtitle_only=False, source_language="uz",
+        )
+        self.assertIsNone(self.db.added[0].source_language)     # dublyajda o'zbekcha manba ma'nosiz
+        make_video(self.video)
+        jc.create_job_from_local_video_file_sync(
+            self.db, self.user, str(uuid.uuid4()), self.video, source_url="upload://y", subtitle_only=True, source_language="fr",
+        )
+        self.assertIsNone(self.db.added[1].source_language)
+
     def test_default_is_still_a_normal_dub_job(self):
         jc.create_job_from_local_video_file_sync(
             self.db, self.user, self.job_id, self.video, source_url="telegram://file/x",

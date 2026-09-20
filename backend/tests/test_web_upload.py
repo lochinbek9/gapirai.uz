@@ -130,9 +130,10 @@ class TestUploadSuccessAndFailure(UploadTestBase):
         payload = bytes(range(256)) * 2000  # ~500 KB
         seen = {}
 
-        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title):
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
             seen.update(user_id=user_id, video_path=video_path, subtitle_only=subtitle_only,
-                        voice_gender=voice_gender, title=title, data=Path(video_path).read_bytes())
+                        voice_gender=voice_gender, title=title, source_language=source_language,
+                        data=Path(video_path).read_bytes())
             return JobCreationResult(outcome="queued", job_id=job_id, duration_minutes=3.0)
 
         with patch.object(routes, "_finish_uploaded_job", side_effect=fake_finish):
@@ -155,7 +156,7 @@ class TestUploadSuccessAndFailure(UploadTestBase):
 
         def fake_finish(user_id, job_id, video_path, *a):
             seen["path"] = Path(video_path)
-            seen["title"] = a[-1]
+            seen["title"] = a[2]
             return JobCreationResult(outcome="queued", job_id=job_id)
 
         with patch.object(routes, "_finish_uploaded_job", side_effect=fake_finish):
@@ -167,6 +168,37 @@ class TestUploadSuccessAndFailure(UploadTestBase):
         self.assertTrue(str(seen["path"].resolve()).startswith(str(Path(self.tmp.name).resolve())))
         self.assertEqual(seen["path"].name, "video.webm")
         self.assertEqual(seen["title"], "passwd")
+
+    def test_uzbek_source_language_is_passed_through_for_subtitles(self):
+        seen = {}
+
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
+            seen["lang"], seen["sub"] = source_language, subtitle_only
+            return JobCreationResult(outcome="queued", job_id=job_id)
+
+        with patch.object(routes, "_finish_uploaded_job", side_effect=fake_finish):
+            r = self.client.post("/api/jobs/upload?source_language=uz", content=b"x" * 500, headers={"Content-Type": "video/mp4"})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual((seen["lang"], seen["sub"]), ("uz", True))
+
+    def test_default_source_language_is_none_meaning_translate(self):
+        seen = {}
+
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
+            seen["lang"] = source_language
+            return JobCreationResult(outcome="queued", job_id=job_id)
+
+        with patch.object(routes, "_finish_uploaded_job", side_effect=fake_finish):
+            self.client.post("/api/jobs/upload", content=b"x" * 500, headers={"Content-Type": "video/mp4"})
+        self.assertIsNone(seen["lang"])
+
+    def test_invalid_or_dubbing_uzbek_source_is_400_before_anything_is_read(self):
+        for query in ("source_language=klingon", "source_language=uz&subtitle_only=false"):
+            with self.subTest(query=query):
+                r = self.client.post(f"/api/jobs/upload?{query}", content=b"x" * 500, headers={"Content-Type": "video/mp4"})
+                self.assertEqual(r.status_code, 400)
+                self.assertEqual(self.files_on_disk(), [])
+                self.precheck_mock.assert_not_called()
 
     def test_rejected_after_upload_removes_the_job_dir(self):
         def fake_finish(user_id, job_id, video_path, *a):

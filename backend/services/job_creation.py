@@ -187,6 +187,7 @@ def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[
 
 async def create_dubbing_job(
     db: Session, user: User, youtube_url: str, voice_gender: str = "auto", subtitle_only: bool = False,
+    source_language: str | None = None,
 ) -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
@@ -194,7 +195,8 @@ async def create_dubbing_job(
 
     subtitle_only=True -- "Subtitr" rejimi (2026-09-16): dublyaj audiosi/
     videosi yaratilmaydi, faqat transkripsiya+tarjima+VTT/SRT (process_video()
-    TRANSLATE bosqichidan keyin darhol COMPLETED qiladi, tasks.py)."""
+    TRANSLATE bosqichidan keyin darhol COMPLETED qiladi, tasks.py).
+    source_language="uz" (faqat subtitle_only bilan) -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ."""
     if not is_valid_youtube_url(youtube_url):
         return JobCreationResult(outcome="invalid_url")
 
@@ -309,6 +311,7 @@ async def create_dubbing_job(
         status_message="Navbatga qo'shildi",
         content_flagged=metadata_flagged,
         subtitle_only=subtitle_only,
+        source_language="uz" if (subtitle_only and source_language == "uz") else None,
     )
     db.add(job)
     db.commit()
@@ -347,7 +350,7 @@ def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
 
 def create_job_from_local_video_file_sync(
     db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
-    subtitle_only: bool = False, video_title: str | None = None,
+    subtitle_only: bool = False, video_title: str | None = None, source_language: str | None = None,
 ) -> JobCreationResult:
     """Diskda allaqachon mavjud video fayldan (YouTube havolasisiz) yangi job
     yaratadi -- Telegram bot (backend/telegram_bot.py:handle_video) foydalanuvchi
@@ -409,6 +412,7 @@ def create_job_from_local_video_file_sync(
         video_duration=duration,
         voice_gender_setting=voice_gender,
         subtitle_only=subtitle_only,
+        source_language="uz" if (subtitle_only and source_language == "uz") else None,
         original_video_path=str(video_path),
         status=JobStatus.PENDING,
         progress=0.0,
@@ -430,12 +434,12 @@ def create_job_from_local_video_file_sync(
 
 async def create_job_from_local_video_file(
     db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
-    subtitle_only: bool = False, video_title: str | None = None,
+    subtitle_only: bool = False, video_title: str | None = None, source_language: str | None = None,
 ) -> JobCreationResult:
     """Telegram bot (async) uchun o'ram -- mantiq yuqoridagi sinxron yadroda."""
     return create_job_from_local_video_file_sync(
         db, user, job_id, video_path, source_url, voice_gender,
-        subtitle_only=subtitle_only, video_title=video_title,
+        subtitle_only=subtitle_only, video_title=video_title, source_language=source_language,
     )
 
 
