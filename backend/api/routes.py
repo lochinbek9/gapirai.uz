@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from pathlib import Path
 from typing import Optional
 
@@ -90,6 +90,15 @@ class JobResponse(BaseModel):
 # /jobs/{id}/upload-video). Aniqlanishi _job_to_response'da: shunchaki
 # original_video_path bo'sh-ligi (boshqa bosqichda muvaffaqiyatsiz bo'lgan
 # job uchun video allaqachon bor, qayta yuklash befoyda).
+
+
+_JOB_RESPONSE_DEFERRED = (
+    defer(DubbingJob.srt_content),
+    defer(DubbingJob.transcript_segments),
+    defer(DubbingJob.translated_segments),
+    defer(DubbingJob.speech_segments),
+    defer(DubbingJob.segment_qa),
+)
 
 
 def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
@@ -253,7 +262,7 @@ def get_job(
     Bu endpoint har kutayotgan foydalanuvchidan davriy so'raladi, shuning
     uchun User qatorini yuklamaymiz -- egalikni faqat token'dagi id bilan
     solishtiramiz (bitta SELECT kam)."""
-    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    job = db.query(DubbingJob).options(*_JOB_RESPONSE_DEFERRED).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
@@ -296,6 +305,7 @@ def list_jobs(
     """Foydalanuvchining o'z joblari."""
     jobs = (
         db.query(DubbingJob)
+        .options(*_JOB_RESPONSE_DEFERRED)
         .filter(DubbingJob.user_id == current_user.id)
         .order_by(DubbingJob.created_at.desc())
         .offset(offset)
