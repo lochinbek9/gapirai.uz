@@ -68,8 +68,8 @@ curl -sI -H "Authorization: Bearer x" -H "Origin: https://gapirai.uz" https://ap
 ## Ulanishlar chegarasi (`nginx.conf`)
 
 `worker_connections 4096` (avval Ubuntu standarti 768). Har proksilanadigan so'rov 2 ta ulanish oladi (mijoz +
-backend), ya'ni bitta worker ~2000 ta bir vaqtdagi so'rovni ko'taradi; `worker_processes auto` (t3.medium'da 2 ta)
-bo'yicha jami ~4000. `worker_rlimit_nofile 16384` -- worker'ning ochiq fayl chegarasi: `worker_connections`dan kamida
+backend), ya'ni bitta worker ~2000 ta bir vaqtdagi so'rovni ko'taradi; `worker_processes auto` = vCPU soni (host-1'da
+4 ta, 2026-09-20 holatiga), jami ~8000 bir vaqtdagi so'rov. `worker_rlimit_nofile 16384` -- worker'ning ochiq fayl chegarasi: `worker_connections`dan kamida
 2 baravar katta bo'lishi kerak (kesh va log fayllari ham fd oladi), aks holda nginx xato logiga `Too many open
 files` yozadi. Ularni faqat birga o'zgartiring.
 
