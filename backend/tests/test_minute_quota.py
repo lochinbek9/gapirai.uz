@@ -29,35 +29,41 @@ class TestMinuteQuota(unittest.TestCase):
     def _sub(self):
         return self.db.query(Subscription).filter(Subscription.user_id == self.user.id).first()
 
-    def test_free_plan_25_minute_budget(self):
-        covered, short = plans.check_quota(self.db, self.user.id, 20.0)
+    def test_free_plan_monthly_budget(self):
+        cap = plans.PLANS["free"].monthly_minutes  # kvota o'zgarsa test buzilmasin
+
+        covered, short = plans.check_quota(self.db, self.user.id, cap - 1)
         self.assertTrue(covered)
         self.assertEqual(short, 0)
 
-        covered, short = plans.check_quota(self.db, self.user.id, 40.0)
+        covered, short = plans.check_quota(self.db, self.user.id, cap + 15)
         self.assertFalse(covered)
-        self.assertEqual(short, 15)  # 40 - 25
+        self.assertEqual(short, 15)  # (cap + 15) - cap
 
     def test_consume_then_blocked_then_refund(self):
-        plans.consume_quota(self.db, self.user.id, 20.0)
-        self.assertAlmostEqual(self._sub().monthly_minutes_used, 20.0)
+        cap = plans.PLANS["free"].monthly_minutes
+        used = cap - 2  # 2 daqiqa qoladi
+        plans.consume_quota(self.db, self.user.id, used)
+        self.assertAlmostEqual(self._sub().monthly_minutes_used, used)
 
-        covered, short = plans.check_quota(self.db, self.user.id, 10.0)
+        covered, short = plans.check_quota(self.db, self.user.id, 7.0)
         self.assertFalse(covered)
-        self.assertEqual(short, 5)  # 10 needed, 5 left
+        self.assertEqual(short, 5)  # 7 needed, 2 left
 
-        plans.refund_quota(self.db, self.user.id, 20.0)
+        plans.refund_quota(self.db, self.user.id, used)
         self.assertAlmostEqual(self._sub().monthly_minutes_used, 0.0)
 
     def test_purchased_minutes_cover_overflow_and_never_reset(self):
+        cap = plans.PLANS["free"].monthly_minutes
         plans.add_purchased_minutes(self.db, self.user.id, 60)
-        # 25 monthly + 60 purchased = 85 available
-        covered, short = plans.check_quota(self.db, self.user.id, 80.0)
+        # cap monthly + 60 purchased available; 55 daqiqa oylikdan tashqari sarflanadi
+        spend = cap + 55
+        covered, short = plans.check_quota(self.db, self.user.id, spend)
         self.assertTrue(covered)
 
-        plans.consume_quota(self.db, self.user.id, 80.0)
+        plans.consume_quota(self.db, self.user.id, spend)
         sub = self._sub()
-        self.assertAlmostEqual(sub.monthly_minutes_used, 25.0)   # monthly drained first
+        self.assertAlmostEqual(sub.monthly_minutes_used, cap)    # monthly drained first
         self.assertAlmostEqual(sub.purchased_minutes, 5.0)       # 60 - 55
 
         # Billing cycle rolls over -> monthly resets, purchased untouched

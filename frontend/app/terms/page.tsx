@@ -65,7 +65,7 @@ export default function TermsPage() {
                 GapirAI.uz xizmatlari oylik obuna tariflari va qo'shimcha daqiqa paketlari asosida taqdim etiladi. Sarf haqiqiy video davomiyligi (daqiqa) bo'yicha o'lchanadi:
               </p>
               <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Bepul (Free)</strong> — 0 so'm, oyiga 25 daqiqagacha dublyaj;</li>
+                <li><strong>Bepul (Free)</strong> — 0 so'm, oyiga 5 daqiqagacha dublyaj;</li>
                 <li><strong>Standart</strong> — oyiga 49 000 so'm (yoki yiliga 490 000 so'm), oyiga 300 daqiqa;</li>
                 <li><strong>Pro</strong> — oyiga 199 000 so'm (yoki yiliga 1 990 000 so'm), oyiga 400 daqiqa, premium ovoz va 1080p sifat.</li>
               </ul>

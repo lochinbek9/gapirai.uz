@@ -1,8 +1,8 @@
 """Tarif rejalar — DAQIQA kvotasi, narx, ustuvorlik va TTS sifat darajasi.
 
 2026-08-31: model "oyiga N video, cheksiz davomiylik"dan "oyiga N DAQIQA"ga
-o'zgartirildi. Har tarif oylik daqiqa byudjeti beradi (Free 25 / Standard 300
-/ Pro 400). Sarf haqiqiy video davomiyligi bo'yicha o'lchanadi. Byudjet
+o'zgartirildi. Har tarif oylik daqiqa byudjeti beradi (Free 5 / Standard 300
+/ Pro 400; Free 2026-09-20da 25 dan 5 ga tushirildi). Sarf haqiqiy video davomiyligi bo'yicha o'lchanadi. Byudjet
 tugaganda foydalanuvchi daqiqa paketi sotib oladi (+30/+60/+120/+300) —
 sotib olingan daqiqalar HECH QACHON tugamaydi, keyingi oyga o'tadi.
 
@@ -69,7 +69,7 @@ class PlanDef:
 
 
 PLANS: dict[str, PlanDef] = {
-    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=25,  priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="360p"),
+    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="360p"),
     "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p"),
     "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p",  period_days=365),
     "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p"),

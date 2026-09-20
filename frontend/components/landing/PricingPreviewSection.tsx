@@ -21,7 +21,7 @@ export default function PricingPreviewSection() {
         Tarif rejalari
       </h2>
       <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 text-center mb-6 sm:mb-8">
-        45 daqiqadan qisqa videolar har doim bepul.
+        Bepul tarifda oyiga 5 daqiqa dublyaj.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {plans.map((plan) => (

@@ -13,7 +13,7 @@ export default function FinalCtaSection() {
           Videongizni hoziroq o'zbekchalashtiring
         </h2>
         <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-          45 daqiqagacha bo'lgan videolar bepul. YouTube havolasini kiriting va bir necha daqiqada tayyor bo'lsin.
+          Har oy 5 daqiqa dublyaj bepul. YouTube havolasini kiriting va bir necha daqiqada tayyor bo'lsin.
         </p>
         <button
           type="button"

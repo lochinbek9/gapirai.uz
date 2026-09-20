@@ -43,7 +43,7 @@ export default function TermsScreen() {
       <InfoSection heading="4. Tariflar, to'lovlar va to'lov usullari">
         <ThemedText variant="secondary" style={styles.p}>
           Xizmatlar oylik obuna tariflari va qo&apos;shimcha daqiqa paketlari asosida taqdim etiladi. Sarf
-          haqiqiy video davomiyligi bo&apos;yicha o&apos;lchanadi: Bepul — oyiga 25 daqiqa; Standart — 49 000
+          haqiqiy video davomiyligi bo&apos;yicha o&apos;lchanadi: Bepul — oyiga 5 daqiqa; Standart — 49 000
           so&apos;m/oy, 300 daqiqa; Pro — 199 000 so&apos;m/oy, 400 daqiqa. Oylik hajm tugagach
           qo&apos;shimcha paket sotib olinadi (+30 / +60 / +120 / +300 daqiqa); sotib olingan daqiqalar
           muddatsiz. 1 video — maksimum 120 daqiqa. Narxlar yakuniy va so&apos;mda.

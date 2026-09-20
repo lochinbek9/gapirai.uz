@@ -14,7 +14,7 @@ const FAQS = [
   },
   {
     q: 'Platformadan foydalanish bepulmi?',
-    a: "Ha, davomiyligi 45 daqiqagacha bo'lgan videolarni o'zbek tiliga o'girish to'liq bepul. Undan uzunroq videolarni dublyaj qilish uchun esa Click tizimi orqali to'lov amalga oshirilishi talab qilinadi.",
+    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 300 daqiqa, 49 000 so'm; Pro — oyiga 400 daqiqa, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi.",
   },
   {
     q: 'Dublyaj qilish qancha vaqt oladi?',

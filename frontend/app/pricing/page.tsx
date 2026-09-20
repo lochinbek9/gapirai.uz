@@ -414,7 +414,7 @@ function MeshBackground() {
 // (backend /api/plans login talab qiladi) — narxlar backend/services/plans.py
 // bilan bir xil, faqat ko'rsatish uchun.
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 25, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
+  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
   { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
   { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
   { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
