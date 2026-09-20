@@ -345,8 +345,9 @@ def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
     return proc.returncode == 0
 
 
-async def create_job_from_local_video_file(
+def create_job_from_local_video_file_sync(
     db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
+    subtitle_only: bool = False, video_title: str | None = None,
 ) -> JobCreationResult:
     """Diskda allaqachon mavjud video fayldan (YouTube havolasisiz) yangi job
     yaratadi -- Telegram bot (backend/telegram_bot.py:handle_video) foydalanuvchi
@@ -361,7 +362,12 @@ async def create_job_from_local_video_file(
     metadata umuman mavjud emas. Transkripsiyadan keyingi Safety Gate
     (backend/workers/tasks.py, "transcript" bosqichi) esa BARCHA joblar uchun
     -- manbasidan qat'i nazar -- o'zgarishsiz, shartsiz ishlaydi va aynan shu
-    yo'lni ham to'liq qamrab oladi."""
+    yo'lni ham to'liq qamrab oladi.
+
+    Bu SINXRON yadro: FastAPI (POST /api/jobs/upload) uni threadpool'da
+    chaqiradi, Telegram bot esa pastdagi async o'ram orqali. subtitle_only=True
+    -- "Subtitr" rejimi (dublyaj audiosi/videosi yo'q); video_title -- yuklangan
+    fayl nomi (YouTube'dagi sarlavha o'rniga natija sahifasida ko'rsatiladi)."""
     if _daily_job_limit_reached(db, user.id):
         video_path.unlink(missing_ok=True)
         return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
@@ -399,8 +405,10 @@ async def create_job_from_local_video_file(
         id=job_id,
         user_id=user.id,
         youtube_url=source_url,
+        video_title=video_title,
         video_duration=duration,
         voice_gender_setting=voice_gender,
+        subtitle_only=subtitle_only,
         original_video_path=str(video_path),
         status=JobStatus.PENDING,
         progress=0.0,
@@ -418,6 +426,40 @@ async def create_job_from_local_video_file(
     # job'ni olib ketsa, faylni topolmay xato beradi (tasks.py DOWNLOAD bosqichi).
     process_video.apply_async(args=[job_id], task_id=job_id, queue=LOCAL_UPLOAD_QUEUE)
     return JobCreationResult(outcome="queued", job_id=job_id, duration_minutes=duration_minutes)
+
+
+async def create_job_from_local_video_file(
+    db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
+    subtitle_only: bool = False, video_title: str | None = None,
+) -> JobCreationResult:
+    """Telegram bot (async) uchun o'ram -- mantiq yuqoridagi sinxron yadroda."""
+    return create_job_from_local_video_file_sync(
+        db, user, job_id, video_path, source_url, voice_gender,
+        subtitle_only=subtitle_only, video_title=video_title,
+    )
+
+
+def precheck_local_upload(db: Session, user_id) -> "JobCreationResult | None":
+    """Fayl yuklash BOSHLANMASDAN oldin arzon tekshiruvlar: kunlik chegara,
+    navbat himoyasi va daqiqa qoldig'i. Maqsad -- foydalanuvchi 1 GB videoni
+    yuklab bo'lgach "daqiqangiz qolmagan" degan rad javobini olmasligi va
+    serverimiz ortiqcha trafik/disk sarflamasligi (Telegram bot ham faylni
+    yuklashdan oldin xuddi shunday tekshiradi). Aniq davomiylik/kvota
+    tekshiruvi baribir yuklashdan KEYIN (create_job_from_local_video_file_sync)."""
+    if _daily_job_limit_reached(db, user_id):
+        return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
+    rejection = check_queue_capacity(db, user_id)
+    if rejection:
+        return rejection
+    from backend.services.plans import get_minute_balance, get_or_create_subscription
+    balance = get_minute_balance(db, user_id)
+    if balance["total_available"] < 0.5:
+        sub = get_or_create_subscription(db, user_id)
+        # Avtomatik to'ldirish yoqilgan bo'lsa (_quota_or_autotopup) daqiqa
+        # yuklashdan keyin o'zi to'ldiriladi -- oldindan rad qilmaymiz.
+        if not getattr(sub, "auto_topup_enabled", False):
+            return JobCreationResult(outcome="insufficient_minutes")
+    return None
 
 
 async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cached_job: DubbingJob, voice_gender: str) -> JobCreationResult:

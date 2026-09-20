@@ -497,6 +497,10 @@ def process_video(self: Task, job_id: str) -> dict:
             setting = job.voice_gender_setting or "auto"
             if setting in ("male", "female"):
                 gender = setting
+            elif job.subtitle_only:
+                # "Subtitr" rejimida ovoz yaratilmaydi -- jins hech qayerda
+                # ishlatilmaydi, shuning uchun bekorga LLM chaqirmaymiz.
+                gender = "male"
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
                 gender = _detect_gender(transcript_text)
@@ -521,8 +525,11 @@ def process_video(self: Task, job_id: str) -> dict:
             # TTS chaqirilmasdan, belgi-tezlik evristikasi bilan taxmin
             # qilinadi). TRANSLATE checkpoint'i bilan birga saqlanadi —
             # qayta ishlashda ikkalasi ham birga o'tkazib yuboriladi.
+            # Faqat DUBLYAJ uchun: TTS o'qish vaqti segmentga sig'sin. Subtitrda
+            # ovoz yo'q -- qisqartirish (qo'shimcha LLM chaqiruvi) kerak emas va
+            # tarjima matnini keraksiz kesib yuborardi.
             over_budget = {}
-            for seg in translated_segments:
+            for seg in ([] if job.subtitle_only else translated_segments):
                 target = seg.get("end", 0) - seg.get("start", 0)
                 if target <= 0:
                     continue

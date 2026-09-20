@@ -130,7 +130,7 @@ async def learn_video(
     if result.outcome == "daily_limit":
         raise HTTPException(
             status_code=429,
-            detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+            detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
             "Ertaga qaytadan urinib ko'ring.",
         )
     if result.outcome == "active_limit":

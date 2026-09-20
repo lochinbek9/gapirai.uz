@@ -152,6 +152,51 @@ export async function uploadVideoFallback(
   return res.data
 }
 
+// "Subtitr" rejimi -- video FAYLDAN (YouTube havolasisiz) job yaratish
+// (backend/api/routes.py: POST /api/jobs/upload). Fayl xom bayt oqimi sifatida
+// yuboriladi (multipart emas): Content-Type -- video turi, nomi -- X-File-Name.
+// SUBTITLE_UPLOAD_MAX_BYTES backend'dagi WEB_UPLOAD_MAX_MB (1024) bilan bir xil
+// bo'lishi kerak -- bu faqat client tomonidagi tekshiruv, haqiqiy chegarani
+// backend va nginx (client_max_body_size) qo'yadi.
+export const SUBTITLE_UPLOAD_MAX_BYTES = 1024 * 1024 * 1024 // 1 GB
+const SUBTITLE_UPLOAD_EXT_TO_TYPE: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.webm': 'video/webm',
+}
+
+/** Brauzer .mkv (va ba'zan boshqa) fayllar uchun file.type'ni bo'sh qoldirishi
+ * mumkin (Windows) -- shunda kengaytmadan aniqlaymiz. Ruxsat etilmagan bo'lsa null. */
+export function detectVideoContentType(file: File): string | null {
+  if (UPLOAD_ALLOWED_CONTENT_TYPES.includes(file.type)) return file.type
+  const dot = file.name.lastIndexOf('.')
+  const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ''
+  return SUBTITLE_UPLOAD_EXT_TO_TYPE[ext] ?? null
+}
+
+export async function uploadJobFile(
+  file: File,
+  opts: { subtitleOnly?: boolean; voiceGender?: string } = {},
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
+): Promise<{ job_id: string; status: string }> {
+  const contentType = detectVideoContentType(file)
+  if (!contentType) throw new Error('Qo\'llab-quvvatlanmaydigan video formati')
+  const res = await apiClient.post('/api/jobs/upload', file, {
+    params: { subtitle_only: opts.subtitleOnly ?? true, voice_gender: opts.voiceGender ?? 'auto' },
+    headers: { 'Content-Type': contentType, 'X-File-Name': encodeURIComponent(file.name) },
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+    signal,
+    timeout: 0, // katta fayl/sekin aloqa: standart timeout yuklashni uzib qo'ymasin
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+  })
+  return res.data
+}
+
 export async function listJobs(): Promise<Job[]> {
   const res = await apiClient.get('/api/jobs')
   return res.data
@@ -183,8 +228,14 @@ export function getDownloadUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/video`
 }
 
-export function getSubtitleDownloadUrl(jobId: string, format: 'srt' | 'vtt' = 'srt'): string {
-  return `${API_URL}/api/jobs/${jobId}/subtitles.${format}`
+export type SubtitleFormat = 'srt' | 'vtt' | 'txt'
+
+/** Subtitr faylini YUKLAB OLISH havolasi. .srt/.txt backend'da doim attachment;
+ * .vtt esa pleerning <track> elementi uchun odatda inline beriladi, shuning
+ * uchun bu yerda `?download=1` bilan attachment so'raladi. */
+export function getSubtitleDownloadUrl(jobId: string, format: SubtitleFormat = 'srt'): string {
+  const base = `${API_URL}/api/jobs/${jobId}/subtitles.${format}`
+  return format === 'vtt' ? `${base}?download=1` : base
 }
 
 export interface ResolutionOption {

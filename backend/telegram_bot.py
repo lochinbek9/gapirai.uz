@@ -434,6 +434,11 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if media is None:
         return
 
+    # Menyudan "Subtitr yaratish" tanlangan bo'lsa, fayl ham subtitrga ketadi
+    # (2026-09-20). Rejim bir martalik -- fayl muvaffaqiyatli olingach o'chiriladi;
+    # yaroqsiz fayl yuborilsa rejim saqlanib qoladi.
+    subtitle_only = context.user_data.get("mode") == "subtitle"
+
     ext = _ALLOWED_VIDEO_MIME_TO_EXT.get(getattr(media, "mime_type", None) or "")
     if not ext:
         await update.message.reply_text("Faqat MP4, MOV, MKV yoki WebM formatidagi video fayllar qabul qilinadi.")
@@ -487,9 +492,13 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # DB user'ni shu sessiyada qayta olish kerak -- yuqoridagi `user`
         # boshqa (yopilgan) sessiyaga bog'langan edi (handle_text bilan bir xil naqsh).
         user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
+        context.user_data.pop("mode", None)
+        file_name = getattr(media, "file_name", None) or ""
         result = await create_job_from_local_video_file(
             db, user, job_id, video_path,
             source_url=f"telegram://file/{media.file_unique_id}",
+            subtitle_only=subtitle_only,
+            video_title=(file_name.rsplit(".", 1)[0][:120] or None) if subtitle_only else None,
         )
 
         if result.outcome == "bad_file":
@@ -514,6 +523,14 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
         elif result.outcome in ("active_limit", "queue_full"):
             await update.message.reply_text(queue_rejection_message(result))
+        elif result.outcome == "queued" and subtitle_only:
+            # Subtitr job'lari tugaganda bildirishnoma yubormaydi (tasks.py),
+            # shuning uchun havolani darhol beramiz -- sahifa progressni o'zi
+            # ko'rsatadi va .srt/.vtt/.txt yuklab olish tugmalari shu yerda.
+            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+            await update.message.reply_text(
+                f"📝 Subtitr tayyorlanmoqda.\n\n{frontend_url}/subtitles/{result.job_id}"
+            )
         elif result.outcome == "queued":
             await update.message.reply_text(
                 "✅ Video navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
