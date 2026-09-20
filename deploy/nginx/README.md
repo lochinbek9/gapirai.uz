@@ -11,7 +11,7 @@ emas, ularni certbot boshqaradi.
 
 | Repoda | Serverda | Nima qiladi |
 |---|---|---|
-| `nginx.conf` | `/etc/nginx/nginx.conf` | Ubuntu standarti (o'zgarishsiz), `conf.d` va `sites-enabled` ni ulaydi |
+| `nginx.conf` | `/etc/nginx/nginx.conf` | Ubuntu standarti + `worker_connections 4096` va `worker_rlimit_nofile 16384` (pastga qarang); `conf.d` va `sites-enabled` ni ulaydi |
 | `sites-available/gapirai.uz` | `/etc/nginx/sites-available/gapirai.uz` (`sites-enabled/` da symlink) | `gapirai.uz` -> Next.js `:3000`; `api.gapirai.uz` -> backend `:8000` (+ job keshi); HTTP -> HTTPS yo'naltirish |
 | `sites-available/admin.gapirai.uz` | xuddi shunday | `admin.gapirai.uz` -> Next.js `:3000` (`/` uchun keshsiz) |
 | `conf.d/gapirai-cache.conf` | `/etc/nginx/conf.d/gapirai-cache.conf` | Job keshi zonasi (`proxy_cache_path`) |
@@ -65,10 +65,21 @@ curl -sI -H "Origin: https://gapirai.uz" https://api.gapirai.uz/api/jobs/$J | gr
 curl -sI -H "Authorization: Bearer x" -H "Origin: https://gapirai.uz" https://api.gapirai.uz/api/jobs/$J | grep -i x-cache   # BYPASS
 ```
 
+## Ulanishlar chegarasi (`nginx.conf`)
+
+`worker_connections 4096` (avval Ubuntu standarti 768). Har proksilanadigan so'rov 2 ta ulanish oladi (mijoz +
+backend), ya'ni bitta worker ~2000 ta bir vaqtdagi so'rovni ko'taradi; `worker_processes auto` (t3.medium'da 2 ta)
+bo'yicha jami ~4000. `worker_rlimit_nofile 16384` -- worker'ning ochiq fayl chegarasi: `worker_connections`dan kamida
+2 baravar katta bo'lishi kerak (kesh va log fayllari ham fd oladi), aks holda nginx xato logiga `Too many open
+files` yozadi. Ularni faqat birga o'zgartiring.
+
+Tekshirish (host-1):
+```bash
+sudo nginx -T 2>/dev/null | grep -E 'worker_(connections|rlimit_nofile)'
+grep 'open files' /proc/$(pgrep -f 'nginx: worker' | head -1)/limits      # 16384
+```
+
 ## Ochiq masalalar
 
-- `worker_connections 768` (`nginx.conf`): har proksilanadigan so'rov 2 ta ulanish oladi (mijoz + backend), minglab
-  bir vaqtda ochiq ulanishda nginx o'zi chegaraga yaqinlashadi. Ko'tarishda `worker_rlimit_nofile` ham qo'shing.
-  Hali o'zgartirilmagan.
 - Ildizdagi `DEPLOYMENT.md` eskirgan (boshqa domen va Supervisor haqida), hozirgi tizim docker-compose'da. nginx
   haqida shu README to'g'ri.
