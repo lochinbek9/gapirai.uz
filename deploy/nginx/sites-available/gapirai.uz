@@ -1,0 +1,104 @@
+server {
+    server_name gapirai.uz www.gapirai.uz;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    listen [::]:443 ssl ipv6only=on;
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/gapirai.uz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gapirai.uz/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    server_name api.gapirai.uz;
+
+    # 2026-09-20: login qilinmagan (anonim) GET /api/jobs/<uuid> uchun 10s kesh --
+    # ommaviy ulashilgan havola minglab marta ochilsa backend'ga bir necha marta boradi.
+    # Authorization bor so'rov keshni butunlay chetlab o'tadi va SAQLANMAYDI (egasining
+    # to'liq javobi begonaga berilmasligi uchun). Kalitga Origin qo'shilgan: backend
+    # access-control-allow-origin'ga so'rovning Origin'ini aynan qaytaradi.
+    location ~ "^/api/jobs/[0-9a-fA-F-]{36}$" {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+
+        proxy_cache gapirai_jobs;
+        proxy_cache_key "$scheme$host$request_uri|$http_origin";
+        proxy_cache_bypass $http_authorization;
+        proxy_no_cache $http_authorization;
+        proxy_ignore_headers Vary;
+        proxy_cache_valid 200 10s;
+        proxy_cache_lock on;
+        proxy_cache_lock_timeout 5s;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        add_header X-Cache-Status $upstream_cache_status always;
+
+        gzip on;
+        gzip_types application/json;
+        gzip_proxied any;
+        gzip_min_length 256;
+        gzip_comp_level 4;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen [::]:443 ssl;
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/gapirai.uz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gapirai.uz/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    if ($host = www.gapirai.uz) {
+        return 301 https://$host$request_uri;
+    }
+    if ($host = gapirai.uz) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    listen [::]:80;
+    server_name gapirai.uz www.gapirai.uz;
+    return 404;
+}
+
+server {
+    if ($host = api.gapirai.uz) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    listen [::]:80;
+    server_name api.gapirai.uz;
+    return 404;
+}
