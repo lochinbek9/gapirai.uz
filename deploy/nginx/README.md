@@ -65,6 +65,20 @@ curl -sI -H "Origin: https://gapirai.uz" https://api.gapirai.uz/api/jobs/$J | gr
 curl -sI -H "Authorization: Bearer x" -H "Origin: https://gapirai.uz" https://api.gapirai.uz/api/jobs/$J | grep -i x-cache   # BYPASS
 ```
 
+## Video fayl yuklash (`api.gapirai.uz/api/jobs/upload`)
+
+Standart `client_max_body_size` 1 MB, shuning uchun bu bitta yo'l uchun alohida `location = /api/jobs/upload`
+bor: `client_max_body_size 1100m` (backend `WEB_UPLOAD_MAX_MB=1024` dan biroz katta -- haqiqiy chegarani
+backend qo'yadi, nginx faqat undan oldin kesmasligi kerak), `proxy_request_buffering off` (fayl nginx diskiga
+oraliq yozilmay backend'ga oqadi) va uzun timeout'lar (sekin mobil aloqa). Boshqa API yo'llari o'zgarmagan.
+Chegarani o'zgartirsangiz uchta joyni birga o'zgartiring: `backend/config.py` `WEB_UPLOAD_MAX_MB`, shu
+`client_max_body_size` va `frontend/lib/api.ts` `SUBTITLE_UPLOAD_MAX_BYTES`.
+
+Tekshirish (host-1, `apply.sh` dan keyin; 401 chiqishi to'g'ri -- so'rov backend'ga yetib bordi, nginx 413 bermadi):
+```bash
+head -c 5000000 /dev/zero | curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Content-Type: video/mp4" --data-binary @- https://api.gapirai.uz/api/jobs/upload   # 401
+```
+
 ## Ulanishlar chegarasi (`nginx.conf`)
 
 `worker_connections 4096` (avval Ubuntu standarti 768). Har proksilanadigan so'rov 2 ta ulanish oladi (mijoz +

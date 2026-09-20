@@ -6,13 +6,14 @@ import subprocess
 import uuid
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, defer
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, DubbingJob, JobStatus, User, ResolutionVariant
+from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
 from backend.services.downloader import get_video_info
 from backend.config import get_settings
@@ -24,8 +25,12 @@ from backend.services.job_creation import (
     MAX_VIDEO_DURATION_MINUTES,
     is_valid_youtube_url as _is_valid_youtube_url,
     create_dubbing_job,
+    create_job_from_local_video_file_sync,
+    precheck_local_upload,
     queue_rejection_message,
+    JobCreationResult,
 )
+from backend.services import subtitle_export
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -187,22 +192,20 @@ async def video_info(url: str) -> VideoInfoResponse:
         raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
 
 
-@router.post("/jobs", status_code=201, dependencies=[Depends(rate_limit("create_job", 8, 600))])
-async def create_job(
-    request: CreateJobRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict:
-    # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
-    # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
-    result = await create_dubbing_job(
-        db, current_user, request.youtube_url, request.voice_gender, subtitle_only=request.subtitle_only,
-    )
-
+def _raise_for_outcome(result: JobCreationResult) -> None:
+    """Job yaratish natijasidagi rad holatlarini HTTP xatosiga aylantiradi
+    (queued/ready -- xato emas, hech narsa qilmaydi). POST /jobs (YouTube) va
+    POST /jobs/upload (fayl) bir xil matn/kodlar bilan javob berishi uchun
+    bitta joyda."""
     if result.outcome == "invalid_url":
         raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
     if result.outcome == "fetch_error":
         raise HTTPException(status_code=400, detail=f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
+    if result.outcome == "bad_file":
+        raise HTTPException(
+            status_code=400,
+            detail="Video faylini o'qib bo'lmadi — fayl buzilgan yoki qo'llab-quvvatlanmaydigan bo'lishi mumkin.",
+        )
     if result.outcome == "blocked":
         raise HTTPException(
             status_code=403,
@@ -215,11 +218,17 @@ async def create_job(
         )
     if result.outcome == "insufficient_minutes":
         # Daqiqa yetmadi -- frontend "Buy additional minutes" CTA'sini ko'rsatadi.
+        # minutes_short=None -- fayl yuklashdan OLDINGI tekshiruv (davomiylik
+        # hali noma'lum): daqiqa qoldig'ining o'zi tugagan.
+        if result.minutes_short is None:
+            message = "Daqiqangiz qolmagan. Qo'shimcha daqiqa sotib oling yoki tarifni yangilang."
+        else:
+            message = f"Bu video uchun {result.minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa sotib oling."
         raise HTTPException(
             status_code=402,
             detail={
                 "error": "insufficient_minutes",
-                "message": f"Bu video uchun {result.minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa sotib oling.",
+                "message": message,
                 "minutes_short": result.minutes_short,
                 "video_minutes": round(result.duration_minutes or 0, 1),
             },
@@ -227,7 +236,7 @@ async def create_job(
     if result.outcome == "daily_limit":
         raise HTTPException(
             status_code=429,
-            detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatда {result.daily_limit} ta). "
+            detail=f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
             "Ertaga qaytadan urinib ko'ring.",
         )
     if result.outcome == "active_limit":
@@ -236,6 +245,21 @@ async def create_job(
         raise HTTPException(
             status_code=503, detail=queue_rejection_message(result), headers={"Retry-After": "300"},
         )
+
+
+@router.post("/jobs", status_code=201, dependencies=[Depends(rate_limit("create_job", 8, 600))])
+async def create_job(
+    request: CreateJobRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
+    # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.
+    result = await create_dubbing_job(
+        db, current_user, request.youtube_url, request.voice_gender, subtitle_only=request.subtitle_only,
+    )
+
+    _raise_for_outcome(result)
     if result.outcome == "queued":
         return {"job_id": result.job_id, "status": "pending"}
     if result.outcome == "ready":
@@ -243,6 +267,153 @@ async def create_job(
         # allaqachon COMPLETED, backend/services/job_creation.py).
         return {"job_id": result.job_id, "status": "completed"}
 
+    raise HTTPException(status_code=500, detail="Kutilmagan holat.")
+
+
+# Yuklangan videoning ruxsat etilgan turlari: mavjud upload_video_fallback bilan
+# BIR XIL (_ALLOWED_UPLOAD_CONTENT_TYPES / _CONTENT_TYPE_TO_EXT pastda e'lon qilingan).
+_UPLOAD_WRITE_BUFFER = 1024 * 1024  # diskka 1 MB'lab yozamiz (har 64 KB uchun thread almashtirmaslik)
+
+
+def _upload_display_title(raw_name: Optional[str]) -> str:
+    """X-File-Name sarlavhasidan (URL-kodlangan) natija sahifasida ko'rsatiladigan
+    sarlavha: faqat fayl nomi (yo'lsiz), kengaytmasiz, boshqaruv belgilarisiz,
+    qisqartirilgan. Bu matn FAQAT ko'rsatish/yuklab olish nomi uchun -- diskdagi
+    fayl nomi HECH QACHON undan olinmaydi (path traversal imkonsiz)."""
+    from urllib.parse import unquote
+    name = unquote(raw_name or "")[:300].replace("\\", "/").rsplit("/", 1)[-1]
+    name = re.sub(r"[\x00-\x1f\x7f]+", " ", name)
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    stem = " ".join(stem.split())[:120]
+    return stem or "Yuklangan video"
+
+
+def _finish_uploaded_job(
+    user_id, job_id: str, video_path: Path, subtitle_only: bool, voice_gender: str, title: str,
+) -> JobCreationResult:
+    """Yuklash tugagach ffprobe/kvota/ffmpeg/DB ishlari -- SINXRON, threadpool'da
+    chaqiriladi (event loop bloklanmasin). O'z DB sessiyasini ochadi: yuklash
+    minutlab davom etishi mumkin, shuning uchun request sessiyasi/ulanishi
+    oldindan yopilgan (poolni band qilmaslik uchun)."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            video_path.unlink(missing_ok=True)
+            return JobCreationResult(outcome="bad_file")
+        return create_job_from_local_video_file_sync(
+            db, user, job_id, video_path, source_url=f"upload://{job_id}", voice_gender=voice_gender,
+            subtitle_only=subtitle_only, video_title=title,
+        )
+    finally:
+        db.close()
+
+
+@router.post("/jobs/upload", status_code=201, dependencies=[Depends(rate_limit("upload_job", 10, 600))])
+async def upload_job_file(
+    request: Request,
+    subtitle_only: bool = Query(True),
+    voice_gender: str = Query("auto"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Video FAYLDAN (YouTube havolasisiz) job yaratadi -- asosan "Subtitr"
+    rejimi uchun (2026-09-20), lekin subtitle_only=false bo'lsa dublyaj ham.
+
+    So'rov tanasi -- XOM fayl baytlari (multipart EMAS): `Content-Type: video/mp4`
+    kabi, `Content-Length` majburiy, fayl nomi `X-File-Name` (URL-kodlangan)
+    sarlavhasida. Sabab: multipart Starlette'da avval vaqtinchalik faylga to'liq
+    yoziladi va keyin yana nusxalanadi (1 GB uchun disk ikki baravar band);
+    xom oqim esa to'g'ridan-to'g'ri job papkasiga yoziladi.
+
+    Tartib: (1) arzon tekshiruvlar -- tur/hajm/kunlik chegara/navbat/daqiqa
+    qoldig'i/diskda joy -- BARCHASI fayl o'qilishidan OLDIN; (2) DB ulanishi
+    yopiladi (yuklash uzoq davom etadi); (3) fayl diskka oqim bilan yoziladi;
+    (4) davomiylik/kvota/audio ajratish threadpool'da. Job faqat host-1 diskida
+    turgan fayl bilan ishlashi uchun LOCAL_UPLOAD_QUEUE'ga tushadi."""
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if content_type not in _ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Faqat MP4, MOV, MKV yoki WebM formatlar qabul qilinadi.")
+
+    limit = settings.WEB_UPLOAD_MAX_MB * 1024 * 1024
+    try:
+        content_length = int(request.headers.get("content-length", ""))
+    except ValueError:
+        raise HTTPException(status_code=411, detail="Fayl hajmi (Content-Length) ko'rsatilmagan.")
+    if content_length <= 0:
+        raise HTTPException(status_code=400, detail="Fayl bo'sh.")
+    if content_length > limit:
+        raise HTTPException(
+            status_code=413, detail=f"Fayl hajmi {settings.WEB_UPLOAD_MAX_MB} MB dan katta bo'lmasligi kerak.",
+        )
+
+    if voice_gender not in ("auto", "male", "female"):
+        voice_gender = "auto"
+    user_id = current_user.id
+    rejection = precheck_local_upload(db, user_id)
+    # Yuklash daqiqalar davom etadi: DB ulanishini shu yerda qaytaramiz (aks holda
+    # bir nechta parallel yuklash pool'ni (kichik) band qilib saytni qotiradi).
+    db.close()
+    if rejection:
+        _raise_for_outcome(rejection)
+
+    upload_root = Path(settings.UPLOAD_DIR)
+    upload_root.mkdir(parents=True, exist_ok=True)
+    reserve = int(settings.UPLOAD_MIN_FREE_DISK_GB * 1024 ** 3)
+    if shutil.disk_usage(upload_root).free < content_length + reserve:
+        raise HTTPException(
+            status_code=503,
+            detail="Server hozir yangi fayl qabul qila olmaydi (disk to'lgan). Birozdan so'ng qayta urinib ko'ring.",
+            headers={"Retry-After": "300"},
+        )
+
+    job_id = str(uuid.uuid4())
+    job_dir = upload_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    video_path = job_dir / f"video{_CONTENT_TYPE_TO_EXT[content_type]}"
+
+    size = 0
+    buffer = bytearray()
+    try:
+        with open(video_path, "wb") as f:
+            async for chunk in request.stream():
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(
+                        status_code=413, detail=f"Fayl hajmi {settings.WEB_UPLOAD_MAX_MB} MB dan katta bo'lmasligi kerak.",
+                    )
+                buffer += chunk
+                if len(buffer) >= _UPLOAD_WRITE_BUFFER:
+                    await run_in_threadpool(f.write, bytes(buffer))
+                    buffer.clear()
+            if buffer:
+                await run_in_threadpool(f.write, bytes(buffer))
+        if size != content_length:
+            raise HTTPException(status_code=400, detail="Yuklash to'liq tugamadi. Qaytadan urinib ko'ring.")
+    except BaseException:
+        # 413 / mijoz uzilishi / boshqa har qanday xato: yarim yozilgan fayl va
+        # bo'sh job papkasi diskda qolib ketmasin (disk to'lishining oldini olish).
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+
+    try:
+        result = await run_in_threadpool(
+            _finish_uploaded_job, user_id, job_id, video_path, subtitle_only, voice_gender,
+            _upload_display_title(request.headers.get("x-file-name")),
+        )
+    except BaseException:
+        # DB/ffmpeg kutilmagan xatosi: job yaratilmadi, demak fayl ham hech kimga
+        # kerak emas -- yetim (1 GB gacha) bo'lib diskda qolmasin.
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+    if result.outcome != "queued":
+        # create_job_from_local_video_file_sync faylni o'zi o'chiradi; bo'sh papkani ham.
+        shutil.rmtree(job_dir, ignore_errors=True)
+    _raise_for_outcome(result)
+    if result.outcome == "queued":
+        return {"job_id": result.job_id, "status": "pending"}
     raise HTTPException(status_code=500, detail="Kutilmagan holat.")
 
 
@@ -431,8 +602,12 @@ async def upload_video_fallback(
     db.commit()
 
     from backend.workers.tasks import process_video
-    from backend.services.plans import get_job_queue
-    process_video.apply_async(args=[str(job_id)], task_id=str(job_id), queue=get_job_queue(db, current_user.id))
+    from backend.services.plans import LOCAL_UPLOAD_QUEUE
+    # Yuklangan fayl faqat SHU host (host-1) diskida turibdi -- boshqa worker
+    # host (worker-3) uni topa olmasdi va YouTube'dan qayta yuklashga tushardi
+    # (aynan shuni bu yo'l chetlab o'tishi kerak). Shuning uchun har doim
+    # LOCAL_UPLOAD_QUEUE (create_job_from_local_video_file_sync bilan bir xil).
+    process_video.apply_async(args=[str(job_id)], task_id=str(job_id), queue=LOCAL_UPLOAD_QUEUE)
 
     return {"success": True, "message": "Video qabul qilindi, ishlov berish boshlandi."}
 
@@ -454,19 +629,25 @@ def delete_job(
 
 
 @router.get("/jobs/{job_id}/subtitles.vtt")
-def get_subtitles(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_subtitles(
+    job_id: uuid.UUID,
+    download: bool = Query(False),
+    db: Session = Depends(get_db),
+):
     """O'zbekcha subtitrlarni WebVTT formatida qaytarish -- video pleerning
-    <track> elementi shuni ishlatadi (VideoPlayer.tsx), shuning uchun
+    <track> elementi shuni ishlatadi (VideoPlayer.tsx), shuning uchun odatda
     Content-Disposition: attachment QO'YILMAYDI (brauzer inline o'qishi
-    kerak, yuklab olish sifatida emas)."""
+    kerak, yuklab olish sifatida emas). Faqat `?download=1` bilan (natija
+    sahifasidagi "VTT yuklab olish" tugmasi) attachment beriladi."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.uzbek_srt_content:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
-    return Response(
-        content=job.uzbek_srt_content,
-        media_type="text/vtt",
-        headers={"Access-Control-Allow-Origin": "*"},
-    )
+    headers = {"Access-Control-Allow-Origin": "*"}
+    if download:
+        headers["Content-Disposition"] = subtitle_export.content_disposition(
+            subtitle_export.download_filename(job.video_title, job_id, "vtt")
+        )
+    return Response(content=job.uzbek_srt_content, media_type="text/vtt", headers=headers)
 
 
 @router.get("/jobs/{job_id}/subtitles.srt")
@@ -474,19 +655,47 @@ def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """O'zbekcha subtitrlarni SRT formatida, yuklab olish uchun qaytaradi
     (2026-09-16, "Subtitr" rejimi) -- .vtt'dan farqli, bu to'g'ridan-to'g'ri
     foydalanuvchi yuklab oladigan fayl, shuning uchun Content-Disposition
-    beriladi."""
+    beriladi. Fayl nomi video sarlavhasi (yuklangan videoda -- fayl nomi)
+    bo'yicha: `<nom>.uz.srt`."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.translated_segments:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
     from backend.workers.tasks import _segments_to_srt
     srt_content = _segments_to_srt(job.translated_segments)
-    filename = f"{job_id}.uz.srt"
     return Response(
         content=srt_content,
         media_type="application/x-subrip",
         headers={
             "Access-Control-Allow-Origin": "*",
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": subtitle_export.content_disposition(
+                subtitle_export.download_filename(job.video_title, job_id, "srt")
+            ),
+        },
+    )
+
+
+@router.get("/jobs/{job_id}/subtitles.txt")
+def get_subtitles_txt(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Subtitr MATNINI oddiy .txt sifatida yuklab olish (2026-09-20): har bir
+    subtitr qatori alohida satrda, vaqt kodlarisiz -- o'qish, nusxalash yoki
+    boshqa joyga qo'yish uchun. Segmentlar yo'q eski job'larda yaxlit tarjima
+    matni beriladi."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
+    text = subtitle_export.segments_to_txt(job.translated_segments) or subtitle_export.plain_text_fallback(
+        job.translated_text
+    )
+    if not text:
+        raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
+    return Response(
+        content=text,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Content-Disposition": subtitle_export.content_disposition(
+                subtitle_export.download_filename(job.video_title, job_id, "txt")
+            ),
         },
     )
 

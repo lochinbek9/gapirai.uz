@@ -9,7 +9,7 @@ import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import UrlInput from "@/components/UrlInput";
 import AnalysisUrlForm from "@/components/AnalysisUrlForm";
-import SubtitleUrlForm from "@/components/SubtitleUrlForm";
+import SubtitleForm from "@/components/SubtitleForm";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -460,7 +460,7 @@ export default function Home() {
                     onSubmit={handleSubmit}
                   />
                 ) : mode === "subtitle" ? (
-                  <SubtitleUrlForm />
+                  <SubtitleForm />
                 ) : (
                   <AnalysisUrlForm />
                 )}

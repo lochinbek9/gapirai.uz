@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     # FAILED joblar hisobga olinmaydi. 0 = cheksiz.
     MAX_JOBS_PER_DAY: int = 20
 
+    # Veb orqali video fayl yuklash (POST /api/jobs/upload). Fayl host-1
+    # diskiga tushadi (faqat shu host o'qiy oladi -- LOCAL_UPLOAD_QUEUE),
+    # shuning uchun chegara ataylab past. nginx `client_max_body_size`
+    # (deploy/nginx/sites-available/gapirai.uz) shundan biroz KATTA bo'lishi
+    # kerak, frontend/lib/api.ts SUBTITLE_UPLOAD_MAX_BYTES esa aynan shunga teng.
+    WEB_UPLOAD_MAX_MB: int = 1024
+    # Yuklash boshlanishidan oldin diskda fayl hajmidan TASHQARI shuncha GB
+    # bo'sh joy bo'lishi shart (disk to'lib qolib worker/DB yiqilmasin).
+    UPLOAD_MIN_FREE_DISK_GB: float = 6.0
+
     # Navbat himoyasi (2026-09-19, backend/services/queue_load.py). Maqsad --
     # ko'p foydalanuvchi bir vaqtda yuborganda sayt qotmasin, ortiqcha yuk
     # esa tushunarli xabar bilan rad etilsin.
