@@ -9,7 +9,7 @@ from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus
-from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger
+from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
 from backend.services.errors import PermanentError
 from backend.services import error_classification
 from backend.services.content_safety import check_safety
@@ -55,6 +55,12 @@ def _sec_to_vtt_time(seconds: float) -> str:
     m = int(seconds // 60) % 60
     h = int(seconds // 3600)
     return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
+
+def segments_source_for_cues(job) -> list:
+    """Subtitr kuelari uchun manba segmentlari (Whisper, so'z vaqtlari bilan) --
+    bo'sh bo'lsa [] (subtitle_cues shunda faqat tarjima vaqtlariga tayanadi)."""
+    return job.transcript_segments or []
 
 
 def _segments_to_vtt(segments: list[dict]) -> str:
@@ -525,17 +531,22 @@ def process_video(self: Task, job_id: str) -> dict:
             # TTS chaqirilmasdan, belgi-tezlik evristikasi bilan taxmin
             # qilinadi). TRANSLATE checkpoint'i bilan birga saqlanadi —
             # qayta ishlashda ikkalasi ham birga o'tkazib yuboriladi.
-            # Faqat DUBLYAJ uchun: TTS o'qish vaqti segmentga sig'sin. Subtitrda
-            # ovoz yo'q -- qisqartirish (qo'shimcha LLM chaqiruvi) kerak emas va
-            # tarjima matnini keraksiz kesib yuborardi.
-            over_budget = {}
-            for seg in ([] if job.subtitle_only else translated_segments):
-                target = seg.get("end", 0) - seg.get("start", 0)
-                if target <= 0:
-                    continue
-                estimated = translator.estimate_duration_seconds(seg.get("text", ""))
-                if estimated > target * settings.DURATION_OVERAGE_TOLERANCE:
-                    over_budget[seg["id"]] = target
+            # DUBLYAJ: TTS o'qish vaqti segmentga sig'sin. SUBTITR: ovoz yo'q, lekin
+            # matn ekranda o'qib bo'ladigan tezlikda bo'lishi kerak -- shuning uchun
+            # faqat o'qish tezligi chegaradan (subtitle_cues.MAX_READ_CPS) oshadigan
+            # gaplar qisqartiriladi, ularning oynasi esa so'z vaqtlari bo'yicha
+            # aniqlashtiriladi (subtitr aynan shu oynada ko'rinadi).
+            if job.subtitle_only:
+                over_budget = subtitle_cues.reading_budgets(translated_segments, segments_source_for_cues(job))
+            else:
+                over_budget = {}
+                for seg in translated_segments:
+                    target = seg.get("end", 0) - seg.get("start", 0)
+                    if target <= 0:
+                        continue
+                    estimated = translator.estimate_duration_seconds(seg.get("text", ""))
+                    if estimated > target * settings.DURATION_OVERAGE_TOLERANCE:
+                        over_budget[seg["id"]] = target
             if over_budget:
                 logger.info(f"Job {job_id}: {len(over_budget)} segment vaqt byudjetidan oshib ketgan — qisqartirilmoqda.")
                 to_shorten = [s for s in translated_segments if s["id"] in over_budget]
@@ -556,7 +567,15 @@ def process_video(self: Task, job_id: str) -> dict:
         # pastdagi umumiy `finally` blokida (funksiya oxirida) baribir
         # ishlaydi -- try ichidan return qilish ularni chetlab o'tmaydi.
         if job.subtitle_only:
-            if not job.uzbek_srt_content:
+            # Subtitr kuelari: qisqa (<=2 qator), so'z vaqtlariga mos, o'qib bo'ladigan
+            # tezlikda (backend/services/subtitle_cues.py). Xato bo'lsa job yiqilmaydi --
+            # eski (gap darajasidagi) VTT'ga qaytamiz.
+            try:
+                job.uzbek_srt_content = subtitle_cues.cues_to_vtt(
+                    subtitle_cues.build_cues(translated_segments, segments_source_for_cues(job))
+                )
+            except Exception:
+                logger.exception(f"[JOB {job_id}] Subtitr kuelarini qurishda xato -- gap darajasidagi VTT ishlatiladi")
                 job.uzbek_srt_content = _segments_to_vtt(translated_segments)
             _update_job(db, job, JobStatus.COMPLETED, 100.0, "Subtitr tayyor!")
             job.completed_at = datetime.utcnow()
