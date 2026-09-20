@@ -1,3 +1,4 @@
+import threading
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
@@ -18,12 +19,42 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 kun
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+class AuthBusyError(Exception):
+    """bcrypt darvozasi to'la -- kirish/ro'yxatdan o'tish urinishlari juda ko'p.
+    main.py'dagi handler buni HTTP 503 + Retry-After'ga aylantiradi."""
+
+
+class BcryptGate:
+    """Jarayon ichida bir vaqtda ishlaydigan bcrypt sonini `active` bilan,
+    ularni kutib turganlarni `waiting` bilan cheklaydi. Darvoza to'la bo'lsa
+    kutmasdan AuthBusyError -- shu bilan bir jarayondagi 40 talik threadpool
+    kutuvchi kirish so'rovlari bilan to'lib, polling/dashboard so'rovlarini
+    ochlikda qoldirmaydi (kutish navbati `waiting * ~230ms` dan uzun emas)."""
+
+    def __init__(self, active: int, waiting: int):
+        active = max(1, active)
+        self._active = threading.BoundedSemaphore(active)
+        self._admission = threading.BoundedSemaphore(active + max(0, waiting))
+
+    def run(self, fn, *args):
+        if not self._admission.acquire(blocking=False):
+            raise AuthBusyError()
+        try:
+            with self._active:
+                return fn(*args)
+        finally:
+            self._admission.release()
+
+
+_gate = BcryptGate(settings.BCRYPT_MAX_CONCURRENT, settings.BCRYPT_MAX_WAITING)
+
+
 def hash_password(password: str) -> str:
-    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+    return _gate.run(lambda: _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode())
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _bcrypt.checkpw(plain.encode(), hashed.encode())
+    return _gate.run(lambda: _bcrypt.checkpw(plain.encode(), hashed.encode()))
 
 
 def create_access_token(user_id: str, email: str) -> str:

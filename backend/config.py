@@ -127,6 +127,15 @@ class Settings(BaseSettings):
     # Ulanish bo'sh bo'lmasa 30s emas, shuncha sekunddan keyin xato -- sayt
     # osilib qolmasdan tezroq "band" javobini beradi.
     DB_POOL_TIMEOUT: int = 10
+    # bcrypt darvozasi (backend/services/auth.py) -- HAR uvicorn jarayoni uchun.
+    # bcrypt ~230ms CPU oladi; cheklovsiz bo'lsa kirish to'lqini yuzlab
+    # parallel xeshlash oqimi ochib, CPU'ni saytning qolgan so'rovlaridan
+    # tortib oladi. Bir vaqtda ishlaydigan soni + navbatda kutuvchilar soni;
+    # undan ortig'i darhol 503 (Retry-After) bilan rad etiladi -- kutuvchi
+    # oqimlar threadpool'ni (jarayonda 40 ta) egallab, polling'ni ham
+    # to'xtatib qo'ymasligi uchun kutish navbati ATAYLAB qisqa.
+    BCRYPT_MAX_CONCURRENT: int = 1
+    BCRYPT_MAX_WAITING: int = 5
 
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"

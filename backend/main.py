@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 from backend.config import get_settings
 from backend.models.database import create_tables
+from backend.services.auth import AuthBusyError
 from backend.api.routes import router
 from backend.api.auth_routes import router as auth_router
 from backend.api.click_routes import router as click_router
@@ -292,6 +293,18 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+@app.exception_handler(AuthBusyError)
+async def auth_busy_handler(request: Request, exc: AuthBusyError):
+    """bcrypt darvozasi to'la (backend/services/auth.py:BcryptGate) -- 500 emas,
+    tushunarli 503. Bu handler Exception handler'dan aniqroq, shuning uchun
+    birinchi tanlanadi; CORS sarlavhalarini middleware o'zi qo'shadi."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Hozir kirish urinishlari juda ko'p. Bir necha soniyadan keyin qayta urinib ko'ring."},
+        headers={"Retry-After": "5"},
+    )
 
 
 @app.exception_handler(Exception)
