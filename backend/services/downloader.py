@@ -119,6 +119,8 @@ YOUTUBE_COOKIES_MAX_AGE_HOURS = float(os.getenv("YOUTUBE_COOKIES_MAX_AGE_HOURS",
 
 def _cookies_are_stale(path: str) -> bool:
     try:
+        if not os.path.isfile(path) or os.path.getsize(path) < 50:
+            return True
         age_hours = (time.time() - os.path.getmtime(path)) / 3600
     except OSError:
         return True
@@ -135,7 +137,8 @@ def cookie_status() -> dict:
     """Explicit, inspectable cookie state -- present/absent, fresh/stale,
     age in hours. No cookie contents, ever. Intended for operator-facing
     diagnostics (e.g. an admin/health endpoint), not end-user output."""
-    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
+    from backend.services.cookie_manager import get_effective_cookies_path
+    cookies_target = get_effective_cookies_path()
     if not os.path.isfile(cookies_target):
         return {"present": False, "fresh": False, "age_hours": None}
     age_hours = (time.time() - os.path.getmtime(cookies_target)) / 3600
@@ -196,7 +199,6 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
         "quiet": True,
         "no_warnings": True,
         "logger": _CookieSessionLogger(),
-        "force_ipv4": True,
         "socket_timeout": 30,
         "retries": 5,
         "fragment_retries": 5,
@@ -206,26 +208,8 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
         },
         "extractor_args": {
             "youtube": {
-                # "web" client ataylab CHIQARIB TASHLANGAN — cookies bilan
-                # ishlatilganda deyarli har doim "Requested format is not
-                # available" xatosiga olib kelardi (2026-08-13, real
-                # foydalanuvchi joblarida tasdiqlangan: xuddi shu video "web"
-                # bilan muvaffaqiyatsiz, faqat ios/android/mweb bilan
-                # muvaffaqiyatli bo'ldi).
-                #
-                # 2026-08-27 audit: mweb ENDI BIRINCHI — YouTube'ning "GVS PO
-                # Token'ni video ID'ga bog'lash" tajribasi (yt-dlp o'zi
-                # aniqlagan, o'zgartirib bo'lmaydi) haqiqiy, ishlaydigan PO
-                # token'ni FAQAT mweb mijoziga beradi. Ilgari ios birinchi
-                # bo'lgani uchun yt-dlp har safar avval ios formatlarini
-                # so'rar, PO token yo'qligini aniqlab ularni tashlab yuborar
-                # ("...may yield HTTP Error 403", productionda tasdiqlangan),
-                # va faqat SHUNDAN KEYIN mweb'ga o'tardi — bekorchi so'rov va
-                # kechikish, hech qanday foyda bermasdan. mweb birinchi bo'lsa,
-                # ishlaydigan PO token'li javob DARHOL kelib, ios/android'ga
-                # umuman ehtiyoj qolmaydi (ular hali ham zaxira sifatida
-                # qoladi -- agar mweb muvaffaqiyatsiz bo'lsa).
-                "player_client": ["mweb", "ios", "android"],
+                # Zamonaviy yt-dlp va bgutil pot-provider bilan ishlaydigan mijozlar
+                "player_client": ["web", "mweb", "tv_downgraded", "visionos"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
             # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
@@ -273,8 +257,9 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
         opts["proxy"] = settings.YOUTUBE_PROXY_URL
 
     temp_cookie_path = None
-    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
-    if use_cookies and os.path.isfile(cookies_target) and not _cookies_are_stale(cookies_target):
+    from backend.services.cookie_manager import get_effective_cookies_path
+    cookies_target = get_effective_cookies_path()
+    if use_cookies and os.path.isfile(cookies_target) and os.path.getsize(cookies_target) >= 50 and not _cookies_are_stale(cookies_target):
         try:
             tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
             shutil.copyfile(cookies_target, tmp.name)
@@ -406,6 +391,30 @@ def get_video_info(youtube_url: str) -> dict:
                 "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
                 code=errcls.VIDEO_UNAVAILABLE,
             ) from e2
+
+        # Favqulodda oEmbed zaxirasi: agar yt-dlp bot-blok yoki tarmoq xatosi bersa ham,
+        # frontend'ga video sarlavhasi va rasmini tezkor ko'rsatish uchun.
+        m = _YT_VIDEO_ID_RE.search(youtube_url or "")
+        if m:
+            video_id = m.group(1)
+            try:
+                oembed_resp = requests.get(
+                    f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json",
+                    timeout=5,
+                )
+                if oembed_resp.status_code == 200:
+                    data = oembed_resp.json()
+                    logger.info(f"oEmbed fallback metadata olindi for {video_id}")
+                    return {
+                        "title": data.get("title", "Unknown"),
+                        "duration": 0,
+                        "thumbnail": data.get("thumbnail_url", f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"),
+                        "uploader": data.get("author_name", ""),
+                        "description": "",
+                    }
+            except Exception:
+                pass
+
         # Texnik xabar -- faqat server logi uchun (bu funksiya to'g'ridan-to'g'ri
         # job_creation.py'dan chaqiriladi, u o'zining xavfsiz umumiy xabarini
         # qaytaradi va bu matnni foydalanuvchiga hech qachon ko'rsatmaydi).

@@ -190,24 +190,24 @@ export default function VideoPage() {
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4 pointer-events-auto">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 sm:py-4 flex items-center gap-3 sm:gap-4 pointer-events-auto">
           <button
             onClick={() => router.push("/dashboard")}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm shrink-0"
             aria-label="Orqaga qaytish"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
-            <span className="text-lg font-black tracking-tight text-white">
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-7 sm:h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <span className="text-base sm:text-lg font-black tracking-tight text-white">
               GapirAI<span className="text-violet-500">.uz</span>
             </span>
           </Link>
         </div>
       </header>
 
-      <div className={theaterMode ? 'w-full' : 'max-w-6xl mx-auto px-6 py-8'}>
+      <div className={theaterMode ? 'w-full' : 'max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8'}>
         <div className={theaterMode
           ? 'flex flex-col gap-0'
           : 'grid grid-cols-1 lg:grid-cols-3 gap-8'
@@ -375,7 +375,7 @@ export default function VideoPage() {
             {/* Title & info (below player, padded in theater mode) */}
             <div className={theaterMode ? 'max-w-6xl mx-auto px-6 pt-6 space-y-4' : 'space-y-4'}>
               <div>
-                <h1 className="text-xl font-bold text-white mb-2">
+                <h1 className="text-lg sm:text-xl font-bold text-white mb-2 leading-snug">
                   {job.video_title || "Noma'lum video"}
                 </h1>
                 <div className="flex items-center gap-4 text-slate-400 text-sm">

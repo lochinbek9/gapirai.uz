@@ -558,11 +558,23 @@ def synthesize_segments(
     original_end_ms = last["end_ms"]
     total_ms = max(natural_end_ms, original_end_ms) + 200
 
-    combined = AudioSegment.silent(duration=total_ms, frame_rate=_FRAME_RATE)
-
     # 4. Har bir segmentni o'zining ANIQ vaqt koordinatasiga o'rnatish
+    # DIQQAT: combined.overlay() har iteratsiyada butun buferni yangidan xotirada
+    # nusxalaydi (500 segment x 50MB = 25GB virtual allokatsiya va OOM-kill).
+    # Segmentlar 2-bosqichda ketma-ket (non-overlapping) qilinganligi sababli,
+    # ularni sukunat oraliqlari bilan bitta o'tishda yig'amiz.
+    combined = AudioSegment.empty()
+    current_pos_ms = 0
     for item in seg_data:
-        combined = combined.overlay(item["audio"], position=item["start_ms"])
+        seg_audio = item["audio"].set_frame_rate(_FRAME_RATE).set_channels(1)
+        start_ms = max(item["start_ms"], current_pos_ms)
+        if start_ms > current_pos_ms:
+            combined += AudioSegment.silent(duration=start_ms - current_pos_ms, frame_rate=_FRAME_RATE)
+        combined += seg_audio
+        current_pos_ms = start_ms + len(seg_audio)
+
+    if total_ms > current_pos_ms:
+        combined += AudioSegment.silent(duration=total_ms - current_pos_ms, frame_rate=_FRAME_RATE)
 
     # Final headroom normalization to prevent clipping/crackling
     combined = combined.normalize(headroom=1.5)

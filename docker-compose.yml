@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: dubber
       POSTGRES_PASSWORD: dubber123
     ports:
-      - "${COMPOSE_HOST_IP:-172.31.27.238}:5439:5432"
+      - "${COMPOSE_HOST_IP:-127.0.0.1}:5439:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass 0061f8931184fe1276650305600d5409df1a3af2692094d5
     ports:
-      - "${COMPOSE_HOST_IP:-172.31.27.238}:6379:6379"
+      - "${COMPOSE_HOST_IP:-127.0.0.1}:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "0061f8931184fe1276650305600d5409df1a3af2692094d5", "--no-auth-warning", "ping"]
       interval: 5s
@@ -103,7 +103,7 @@ services:
     # chegarasi ichida qoladi -- chegaradan oshsa faqat SHU konteyner
     # ichidagi bitta jarayon o'ldiriladi, task_reject_on_worker_lost=True
     # (celery_app.py) uni xavfsiz qayta navbatga qo'yadi.
-    mem_limit: ${WORKER_MEM_LIMIT:-6.5g}
+    mem_limit: ${WORKER_MEM_LIMIT:-3.5g}
     # Docker standart to'xtash muddati (10s) process_video'ning soat
     # davomida ishlashi mumkinligidan (time_limit=3600s) ancha qisqa --
     # har qanday `docker restart`/deploy vazifani SIGTERM'ga javob berish
@@ -147,7 +147,7 @@ services:
     # video_processing_local'ni ATAYLAB qo'ymasdan, chunki ular Telegram orqali
     # yuklangan video fayllarga (faqat asosiy hostning diskida bor) ega emas
     # (backend/services/plans.py LOCAL_UPLOAD_QUEUE izohiga qarang).
-    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing,video_processing_local} -c ${WORKER_CONCURRENCY:-4}
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing,video_processing_local} -c ${WORKER_CONCURRENCY:-2}
 
   # ──────────────────────────────
   # Self-hosted local Telegram Bot API server -- OPTIONAL, only actually used
@@ -180,7 +180,7 @@ services:
     # konteynerini ishga tushirmasligi kerak (mumkin bo'lgan token/sessiya
     # to'qnashuvi).
     ports:
-      - "${COMPOSE_HOST_IP:-172.31.27.238}:8081:8081"
+      - "${COMPOSE_HOST_IP:-127.0.0.1}:8081:8081"
     volumes:
       - telegram_bot_api_data:/var/lib/telegram-bot-api
 

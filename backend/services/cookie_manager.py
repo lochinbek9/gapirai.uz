@@ -22,37 +22,70 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from backend.config import get_settings
+
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 COOKIES_FILE = "/app/cookies.txt"
+COOKIES_UPLOAD_FILE = os.path.join(settings.UPLOAD_DIR, "cookies.txt")
 COOKIES_META_FILE = "/app/cookies_meta.json"
-REFRESH_INTERVAL_HOURS = 12  # Har 12 soatda yangilash (meta-fayl eski dizaynidan qolgan)
-# Freshness kuki: eng erta expires'dan shuncha kun oldin "eski" deb hisoblanadi.
-# YouTube sessiya kukilarining typik qiymati "expires=0" bo'ladi (sessiya) — ular
-# hisobga olinmaydi; faqat aniq sanali kukilar (SAPISID/SSID kabi) hisobga olinadi.
+REFRESH_INTERVAL_HOURS = 12
 COOKIE_FRESH_DAYS = 7
+
+
+def get_effective_cookies_path() -> str:
+    """Eng ustuvor va mavjud cookies fayli yo'lini qaytaradi:
+    1. YOUTUBE_COOKIES_PATH (agar o'rnatilgan bo'lsa va mavjud bo'lsa)
+    2. /app/uploads/cookies.txt (admin panel orqali yuklangan dinamik cookies)
+    3. Standart /app/cookies.txt
+    """
+    env_target = os.getenv("YOUTUBE_COOKIES_PATH")
+    if env_target and os.path.isfile(env_target) and os.path.getsize(env_target) >= 50:
+        return env_target
+    if os.path.isfile(COOKIES_UPLOAD_FILE) and os.path.getsize(COOKIES_UPLOAD_FILE) >= 50:
+        return COOKIES_UPLOAD_FILE
+    return COOKIES_FILE
 
 
 def min_cookie_expiry() -> float:
     """Eng erta (minimal) expires qiymatini qaytaradi (epoch seconds).
-    Fayl yo'q yoki sanali kuки yo'q bo'lsa 0 qaytaradi."""
-    target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_FILE)
+    Asosiy YouTube/Google auth kuki-lari (LOGIN_INFO, SID, va h.k.) muddati olinadi.
+    Eski o'tgan bir martalik tokenlar (masalan ST-*, SOCS) sababli noto'g'ri eskirgan
+    deb ko'rsatilishining oldi olingan."""
+    target = get_effective_cookies_path()
     if not os.path.exists(target):
         return 0.0
-    expires_vals = []
+
+    AUTH_COOKIE_NAMES = {"LOGIN_INFO", "SID", "__Secure-1PSID", "__Secure-3PSID", "SSID", "HSID"}
+    auth_expires = []
+    future_expires = []
+    all_expires = []
+    now = time.time()
+
     try:
-        with open(target) as f:
+        with open(target, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 if line.startswith("#") or not line.strip():
                     continue
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) >= 5 and parts[4].isdigit():
+                if len(parts) >= 6 and parts[4].isdigit():
                     val = int(parts[4])
+                    name = parts[5].strip()
                     if val > 0:
-                        expires_vals.append(val)
+                        all_expires.append(val)
+                        if val > now:
+                            future_expires.append(val)
+                            if name in AUTH_COOKIE_NAMES:
+                                auth_expires.append(val)
     except Exception:
         return 0.0
-    return float(min(expires_vals)) if expires_vals else 0.0
+
+    if auth_expires:
+        return float(min(auth_expires))
+    if future_expires:
+        return float(min(future_expires))
+    return float(min(all_expires)) if all_expires else 0.0
 
 
 def cookies_are_fresh() -> bool:
@@ -77,7 +110,7 @@ def check_cookie_health() -> dict:
         'is_fresh': bool
     }
     """
-    target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_FILE)
+    target = get_effective_cookies_path()
     if not os.path.exists(target):
         return {
             "exists": False,
@@ -86,21 +119,77 @@ def check_cookie_health() -> dict:
             "min_expiry": 0.0,
             "days_remaining": 0.0,
             "is_fresh": False,
+            "updated_at": None,
+            "cookie_count": 0,
         }
 
     size = os.path.getsize(target)
     expiry = min_cookie_expiry()
     now = time.time()
     days_remaining = (expiry - now) / 86400.0 if expiry > now else 0.0
+    mtime = os.path.getmtime(target)
+    updated_at = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Cookie qatorlari soni
+    cookie_count = 0
+    try:
+        with open(target, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    cookie_count += 1
+    except Exception:
+        pass
 
     return {
-        "exists": size > 100,
+        "exists": size > 50,
         "path": target,
         "size": size,
         "min_expiry": expiry,
         "days_remaining": round(days_remaining, 1),
         "is_fresh": days_remaining >= COOKIE_FRESH_DAYS,
+        "updated_at": updated_at,
+        "cookie_count": cookie_count,
     }
+
+
+def save_uploaded_cookies(content: str) -> dict:
+    """Foydalanuvchi/admin tomonidan yuklangan Netscape cookies.txt faylini
+    /app/uploads/cookies.txt ga xavfsiz va atomik yozadi."""
+    content = content.strip()
+    if len(content) < 30:
+        raise ValueError("Cookie fayli bo'sh yoki juda qisqa")
+
+    # YouTube yoki Google domenlariga oidligini tekshirish
+    if "youtube" not in content.lower() and "google" not in content.lower():
+        raise ValueError("Yuklangan cookies.txt faylida YouTube yoki Google sessiyalari topilmadi")
+
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    target_path = COOKIES_UPLOAD_FILE
+    tmp_path = target_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(content + "\n")
+    os.replace(tmp_path, target_path)
+
+    # Shuningdek, agar standart COOKIES_FILE ga ham yozish imkoni bo'lsa (masalan hostda)
+    try:
+        if os.path.exists(COOKIES_FILE) and os.access(COOKIES_FILE, os.W_OK):
+            with open(COOKIES_FILE, "w", encoding="utf-8") as f:
+                f.write(content + "\n")
+    except Exception as e:
+        logger.warning(f"Standart cookies fayliga nusxalab bo'lmadi (readonly mount): {e}")
+
+    return check_cookie_health()
+
+
+def delete_uploaded_cookies() -> bool:
+    """Yuklangan cookies faylini o'chiradi."""
+    if os.path.exists(COOKIES_UPLOAD_FILE):
+        try:
+            os.remove(COOKIES_UPLOAD_FILE)
+            return True
+        except Exception as e:
+            logger.error(f"Cookies faylini o'chirishda xatolik: {e}")
+    return False
 
 
 async def refresh_cookies(youtube_email: str, youtube_password: str) -> bool:

@@ -24,10 +24,14 @@ export function useAuth() {
     }
   }, [])
 
-  // login/register endi to'g'ridan-to'g'ri token bermaydi — email'ga
-  // tasdiqlash kodi yuboriladi, kirish faqat verifyCode orqali yakunlanadi.
   const login = useCallback(async (email: string, password: string) => {
-    return apiLogin(email, password)
+    const data = await apiLogin(email, password)
+    if (data.access_token) {
+      setToken(data.access_token)
+      setStoredUser(data.user)
+      setUser(data.user)
+    }
+    return data
   }, [])
 
   const register = useCallback(async (name: string, email: string, password: string) => {

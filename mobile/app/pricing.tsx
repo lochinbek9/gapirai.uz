@@ -61,7 +61,7 @@ function PlanCard({ plan, isCurrent }: { plan: PlanDef; isCurrent: boolean }) {
           {'✓'} {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}
         </ThemedText>
         <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : 'Standart ovoz (Edge)'}
+          {'✓'} {plan.tts_tier === 'premium' ? 'Premium ovoz (Gemini / ElevenLabs AI)' : 'Standart ovoz (Edge)'}
         </ThemedText>
         <ThemedText variant="secondary" style={styles.featureRow}>
           {'✓'} Video tahlil — cheklovsiz

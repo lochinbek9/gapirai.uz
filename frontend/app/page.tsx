@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
-import UrlInput from "@/components/UrlInput";
+import DubbingForm from "@/components/DubbingForm";
 import AnalysisUrlForm from "@/components/AnalysisUrlForm";
 import SubtitleForm from "@/components/SubtitleForm";
 import StepProgress from "@/components/StepProgress";
@@ -15,6 +15,7 @@ import VideoResult from "@/components/VideoResult";
 import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import DonateCTA from "@/components/DonateCTA";
+import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import { LayoutDashboard, LogIn, X, UserPlus } from "lucide-react";
 
 
@@ -65,23 +66,23 @@ function Logo() {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-3 text-center mb-6 sm:mb-8 px-2"
+      className="flex flex-col items-center gap-2 sm:gap-3 text-center mb-5 sm:mb-8 px-2"
     >
-      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/20 backdrop-blur-md shadow-sm">
-        <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-        <span className="text-[11px] font-black text-violet-600 dark:text-violet-400 tracking-wider uppercase">
+      <div className="inline-flex items-center gap-2 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/20 backdrop-blur-md shadow-sm">
+        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-violet-500 animate-pulse" />
+        <span className="text-[10px] sm:text-[11px] font-black text-violet-600 dark:text-violet-400 tracking-wider uppercase">
           AI Studio 2.0 • Avtomatik Dublyaj
         </span>
       </div>
 
-      <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
+      <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
         GapirAI<span className="text-violet-600 dark:text-violet-500">.uz</span>
       </h1>
-      <p className="text-base sm:text-xl font-bold text-slate-900 dark:text-white max-w-md leading-snug">
+      <p className="text-sm sm:text-xl font-bold text-slate-900 dark:text-white max-w-md leading-snug">
         Dunyodagi bilimlarni o'zbek tilida.
       </p>
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
-        YouTube, kurslar va ta'limiy videolarni o'zbek tilida tomosha qiling, tushuning va o'rganing.
+        YouTube havolasi yoki video faylingizni o'zbek tiliga sun'iy intellekt orqali avtomatik dublyaj qiling.
       </p>
       <h2 className="sr-only">
         Dunyodagi bilimlarni o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
@@ -90,25 +91,6 @@ function Logo() {
   );
 }
 
-/* ── Update Notice Banner (hero'da slayd bo'lib chiqadi) ── */
-function UpdateNoticeBanner() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-      className="w-full flex justify-center mb-4 sm:mb-6 px-2"
-    >
-      <div className="relative overflow-hidden flex items-center gap-2.5 px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl bg-amber-500/10 dark:bg-amber-500/10 border border-amber-500/30 backdrop-blur-md shadow-sm max-w-xl">
-        <span className="absolute inset-0 -translate-x-full animate-[shimmer_3s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-amber-400/20 to-transparent" />
-        <span className="relative w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-        <p className="relative text-[11px] sm:text-xs font-bold text-amber-700 dark:text-amber-400 leading-snug">
-          Hozirda platformada yangilanishlar ketyapti. Noqulayliklar uchun uzr so'raymiz.
-        </p>
-      </div>
-    </motion.div>
-  );
-}
 
 /* ── Welcome Modal (birinchi tashrif) ─────────────── */
 function WelcomeModal({ onClose }: { onClose: () => void }) {
@@ -194,7 +176,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [voiceGender, setVoiceGender] = useState("auto");
+  const [voiceGender, setVoiceGender] = useState("male");
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mode, setMode] = useState<"dub" | "subtitle" | "analyze">("dub");
@@ -355,43 +337,44 @@ export default function Home() {
     : "processing";
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-start pt-20 sm:pt-24 pb-20 px-4 sm:px-8 overflow-x-hidden transition-colors duration-300">
+    <main className="relative min-h-screen flex flex-col items-center justify-start pt-16 sm:pt-24 pb-16 px-3 sm:px-8 overflow-x-hidden transition-colors duration-300">
       <MeshBackground />
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
 
-      <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
+      <header className="absolute top-2.5 sm:top-6 left-2.5 sm:left-6 right-2.5 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
         {/* Left Logo */}
-        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-3 shrink-0">
           <Link href="/" className="flex items-center transition duration-300 hover:scale-105">
-            <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
+            <img src="/logo.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain dark:hidden drop-shadow-md" />
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain hidden dark:block drop-shadow-md" />
           </Link>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 backdrop-blur-md shadow-sm shrink-0">
-            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 backdrop-blur-md shadow-sm shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             <span className="text-[9px] sm:text-[11px] font-black text-amber-600 dark:text-amber-400 tracking-wider uppercase whitespace-nowrap">
-              Test rejimi
+              Test
             </span>
           </span>
         </div>
 
         {/* Right Controls */}
-        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-3 shrink-0">
           {isLoggedIn ? (
             <Link
               href="/dashboard"
-              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
-              Mening videolarim
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+              <span className="hidden sm:inline">Mening videolarim</span>
+              <span className="sm:hidden">Videolar</span>
             </Link>
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[11px] sm:text-xs font-bold rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95"
+              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
             >
-              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500" />
-              Kirish
+              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+              <span>Kirish</span>
             </Link>
           )}
           <ThemeToggle />
@@ -399,12 +382,11 @@ export default function Home() {
       </header>
 
       <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
-        <UpdateNoticeBanner />
         <Logo />
 
         <motion.div
           layout
-          className="glass-card rounded-[24px] sm:rounded-[32px] p-5 sm:p-8 md:p-10"
+          className="glass-card rounded-[22px] sm:rounded-[32px] p-4 sm:p-8 md:p-10"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
@@ -412,44 +394,47 @@ export default function Home() {
           <AnimatePresence mode="wait">
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <div className="flex gap-2 p-1 mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                <div className="flex gap-1 sm:gap-2 p-1 mb-5 sm:mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                   <button
                     type="button"
                     onClick={() => setMode("dub")}
-                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
                       mode === "dub"
                         ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     }`}
                   >
-                    Video dublaj qilish
+                    <span className="hidden sm:inline">Video dublaj qilish</span>
+                    <span className="sm:hidden">Dublyaj</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMode("subtitle")}
-                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
                       mode === "subtitle"
                         ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     }`}
                   >
-                    Subtitr yaratish
+                    <span className="hidden sm:inline">Subtitr yaratish</span>
+                    <span className="sm:hidden">Subtitr</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMode("analyze")}
-                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
                       mode === "analyze"
                         ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
                         : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     }`}
                   >
-                    Video tahlil qilish
+                    <span className="hidden sm:inline">Video tahlil qilish</span>
+                    <span className="sm:hidden">Tahlil</span>
                   </button>
                 </div>
 
                 {mode === "dub" ? (
-                  <UrlInput
+                  <DubbingForm
                     url={url}
                     videoInfo={videoInfo}
                     loading={loading}
@@ -519,6 +504,9 @@ export default function Home() {
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* ── Foydalanuvchilar Fikr va Takliflari (Telegram Kanalga avtomatik boradi) ── */}
+      <TelegramFeedbackSection />
 
       {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
       <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">

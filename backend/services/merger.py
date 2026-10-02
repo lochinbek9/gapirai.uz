@@ -62,8 +62,9 @@ def _build_audio_filtergraph() -> str:
         f"sidechaincompress=threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
         f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1"
     )
+    orig_vol = getattr(s, "ORIGINAL_AUDIO_VOLUME", 0.22)
     return (
-        f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo[orig];"
+        f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,volume={orig_vol}[orig];"
         f"[1:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
         f"asplit=3[dubsc1][dubsc2][dubdsp];"
         f"[orig][dubsc1]{duck_stage}[duck1];"
@@ -130,7 +131,7 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "-filter_complex", filter_complex,
             "-map", "[v]",
             "-map", "[final]",
-            "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "0",
+            "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "2",
             "-c:a", "aac", "-b:a", "192k",
             output_path,
         ]

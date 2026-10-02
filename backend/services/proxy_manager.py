@@ -157,10 +157,9 @@ def _build_chain() -> list[ProxyEndpoint]:
                 continue
             for url in _rotated(tier, _healthy(tier, pool)):
                 chain.append(ProxyEndpoint(tier, url))
-    if not chain:
-        # Nothing configured at all (PROXY_DIRECT_FIRST=False and no pools) --
-        # always leave at least one way to try, matching pre-proxy-manager
-        # behavior rather than failing before ever attempting a download.
+    if not any(ep.tier == ProxyTier.DIRECT for ep in chain):
+        # DIRECT har doim zaxira sifatida zanjir oxirida bo'lishi kerak --
+        # proksilar ishlamay qolsa ham to'g'ridan-to'g'ri urinish amalga oshadi.
         chain.append(ProxyEndpoint(ProxyTier.DIRECT, ""))
     return chain
 

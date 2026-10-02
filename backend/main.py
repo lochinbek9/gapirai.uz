@@ -42,6 +42,7 @@ from backend.api.push_routes import router as push_router
 from backend.api.billing_routes import router as billing_router
 from backend.api.tma_routes import router as tma_router
 from backend.api.donate_routes import router as donate_router
+from backend.api.feedback_routes import router as feedback_router
 
 settings = get_settings()
 
@@ -227,6 +228,32 @@ def recover_stuck_analyses(redis_conn=None):
         db.close()
 
 
+def cleanup_stale_unverified_users():
+    """24 soatdan ortiq vaqt davomida tasdiqlanmagan va hech qanday
+    aktivligi (job) bo'lmagan chala registratsiyalarni tozalaydi."""
+    from backend.models.database import SessionLocal, User
+    from datetime import timedelta
+    db = SessionLocal()
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        stale_users = db.query(User).filter(
+            User.is_verified.is_(False),
+            User.created_at < cutoff,
+        ).all()
+        count = 0
+        for u in stale_users:
+            if u.jobs.count() == 0:
+                db.delete(u)
+                count += 1
+        if count > 0:
+            db.commit()
+            print(f"[CLEANUP] {count} ta tasdiqlanmagan eski akkaunt tozalandi.")
+    except Exception as e:
+        print(f"[CLEANUP ERROR] Eski tasdiqlanmagan akkauntlarni tozalashda xatolik: {e}")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -261,6 +288,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[STARTUP ERROR] Could not clear Redis locks: {e}")
 
+    cleanup_stale_unverified_users()
     recover_stuck_jobs(r)
     recover_stuck_resolution_variants(r)
     recover_stuck_analyses(r)
@@ -343,6 +371,7 @@ app.include_router(push_router)
 app.include_router(billing_router)
 app.include_router(tma_router)
 app.include_router(donate_router)
+app.include_router(feedback_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")

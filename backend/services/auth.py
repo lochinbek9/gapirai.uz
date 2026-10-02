@@ -57,10 +57,15 @@ def verify_password(plain: str, hashed: str) -> bool:
     return _gate.run(lambda: _bcrypt.checkpw(plain.encode(), hashed.encode()))
 
 
-def create_access_token(user_id: str, email: str) -> str:
+def create_access_token(user_id: str | dict, email: str | None = None) -> str:
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    if isinstance(user_id, dict):
+        payload = dict(user_id)
+        if "exp" not in payload:
+            payload["exp"] = expire
+        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     return jwt.encode(
-        {"sub": user_id, "email": email, "exp": expire},
+        {"sub": str(user_id), "email": email or "", "exp": expire},
         SECRET_KEY,
         algorithm=ALGORITHM,
     )
@@ -71,6 +76,31 @@ def decode_token(token: str) -> Optional[dict]:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+
+def record_user_activity(db: Session, user: User) -> None:
+    """Foydalanuvchining faolligini (kirishi / harakati) DB ga xavfsiz qayd qiladi.
+    DB ga ortiqcha yuk tushmasligi uchun 10 daqiqada maksimum 1 marta yangilanadi."""
+    now = datetime.utcnow()
+    last_act = getattr(user, "last_active_at", None)
+    if not last_act or (now - last_act).total_seconds() > 600:
+        try:
+            user.last_active_at = now
+            today = now.date()
+            from sqlalchemy import text
+            db.execute(
+                text("""
+                    INSERT INTO user_daily_visits (user_id, visit_date, first_seen_at, last_seen_at, actions_count)
+                    VALUES (:uid, :vdate, :now, :now, 1)
+                    ON CONFLICT (user_id, visit_date)
+                    DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at, actions_count = user_daily_visits.actions_count + 1
+                """),
+                {"uid": str(user.id), "vdate": today, "now": now},
+            )
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.debug(f"User activity recording ignored: {e}")
 
 
 def get_current_user(
@@ -85,6 +115,9 @@ def get_current_user(
     user = db.query(User).filter(User.id == payload["sub"]).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Foydalanuvchi topilmadi.")
+    if getattr(user, "is_verified", True) is False:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hisob tasdiqlanmagan. Iltimos, emailingizni tasdiqlang.")
+    record_user_activity(db, user)
     return user
 
 
@@ -113,7 +146,10 @@ def get_optional_user(
     payload = decode_token(credentials.credentials)
     if not payload:
         return None
-    return db.query(User).filter(User.id == payload["sub"]).first()
+    user = db.query(User).filter(User.id == payload["sub"]).first()
+    if not user or not user.is_active or getattr(user, "is_verified", True) is False:
+        return None
+    return user
 
 
 def get_optional_user_id(

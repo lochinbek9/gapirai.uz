@@ -20,6 +20,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from backend.models.database import Subscription, PlanTier
+from backend.config import get_settings
+
+settings = get_settings()
 
 QUOTA_RESET_DAYS = 30  # oylik daqiqa kvotasi har doim shuncha kunda qayta boshlanadi
 
@@ -90,21 +93,19 @@ def get_max_resolution_for_job(db, job) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
-def get_tts_provider_for_job(db, job) -> str | None:
+def get_tts_provider_for_job(db, job) -> str:
     """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini
-    aniqlaydi (PlanDef.tts_tier). "premium" (Pro) -> None qaytaradi, ya'ni
-    global settings.TTS_PROVIDER (Azure/ElevenLabs) ishlatiladi. "edge"
-    (Free/Standard) -> "edge" qaytaradi (bepul, xarajatsiz).
-
-    Sabab: 1-2 soatlik videolar Azure S0'da ~$2/dona turadi -- buni faqat
-    Pro obunachilar uchun ajratamiz; Free/Standard bepul edge-tts oladi
-    (bir xil uz-UZ-SardorNeural/MadinaNeural ovozlari, sifat biroz pastroq).
+    aniqlaydi (PlanDef.tts_tier).
+    - "premium" (Pro / Pro Yearly): settings.TTS_PREMIUM_PROVIDER (Gemini yoki ElevenLabs)
+    - "edge" (Free / Standard): "edge" (bepul Edge-TTS)
     Login qilmagan / egasiz job -> "edge"."""
     if job.user_id is None:
-        return "edge"
+        return getattr(settings, "TTS_PROVIDER", "edge") or "edge"
     sub = get_or_create_subscription(db, job.user_id)
     tier = PLANS[sub.plan.value].tts_tier
-    return None if tier == "premium" else "edge"
+    if tier == "premium":
+        return getattr(settings, "TTS_PREMIUM_PROVIDER", "uzbekvoice") or "uzbekvoice"
+    return getattr(settings, "TTS_PROVIDER", "edge") or "edge"
 
 
 def get_max_resolution_for_user(db, user_id) -> str:
@@ -116,13 +117,18 @@ def get_max_resolution_for_user(db, user_id) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
-def get_or_create_subscription(db, user_id) -> Subscription:
-    sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+def get_or_create_subscription(db, user_id, for_update: bool = False) -> Subscription:
+    query = db.query(Subscription).filter(Subscription.user_id == user_id)
+    if for_update:
+        query = query.with_for_update()
+    sub = query.first()
     if sub is None:
         sub = Subscription(user_id=user_id, plan=PlanTier.FREE, period_started_at=datetime.utcnow())
         db.add(sub)
         db.commit()
         db.refresh(sub)
+        if for_update:
+            sub = db.query(Subscription).filter(Subscription.id == sub.id).with_for_update().first()
         return sub
 
     # Muddati o'tgan pullik obuna -> FREE'ga qaytadi, davr qayta boshlanadi.
@@ -195,10 +201,39 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
     return False, math.ceil(duration_minutes - bal["total_available"])
 
 
+def check_and_consume_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
+    """Kvota tekshiruvi va sarfini bitta atomik tranzaksiyada (SELECT FOR UPDATE)
+    xavfsiz bajaradi. Bir vaqtda kelgan parallel so'rovlar orasidagi poyga
+    holatini (race condition) oldini oladi.
+
+    Returns: (covered, shortfall_minutes)
+    """
+    sub = get_or_create_subscription(db, user_id, for_update=True)
+    plan = PLANS[sub.plan.value]
+    used = sub.monthly_minutes_used or 0.0
+    purchased = sub.purchased_minutes or 0.0
+    monthly_remaining = max(0.0, plan.monthly_minutes - used)
+    total_available = monthly_remaining + purchased
+
+    if duration_minutes > total_available + 1e-6:
+        db.rollback()
+        return False, math.ceil(duration_minutes - total_available)
+
+    from_monthly = min(duration_minutes, monthly_remaining)
+    from_purchased = max(0.0, duration_minutes - from_monthly)
+
+    sub.monthly_minutes_used = used + from_monthly
+    if from_purchased > 0:
+        sub.purchased_minutes = max(0.0, purchased - from_purchased)
+    db.commit()
+    return True, 0
+
+
 def consume_quota(db, user_id, duration_minutes: float) -> None:
     """Video navbatga qo'yilganda chaqiriladi -- avval oylik byudjetdan,
-    yetmasa sotib olingan daqiqalardan yechadi."""
-    sub = get_or_create_subscription(db, user_id)
+    yetmasa sotib olingan daqiqalardan yechadi. Poyga xavfsizligi uchun
+    for_update bilan qatorni qulflaydi."""
+    sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
     monthly_remaining = max(0.0, plan.monthly_minutes - used)

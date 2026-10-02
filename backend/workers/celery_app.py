@@ -32,6 +32,7 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=1, # Bir vaqtda bitta vazifa
+    worker_max_tasks_per_child=2, # Har 2 ta taskdan keyin bolani yangilash (RAM tozalanishi uchun)
     task_time_limit=8000,         # Max 8000 seconds execution time limit (8K)
     task_soft_time_limit=7800,    # Soft time limit to clean up gracefully
     # 2026-08-26 audit: ilgari sozlanmagan edi -- Kombu/Redis'ning

@@ -186,7 +186,7 @@ def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[
 
 
 async def create_dubbing_job(
-    db: Session, user: User, youtube_url: str, voice_gender: str = "auto", subtitle_only: bool = False,
+    db: Session, user: User, youtube_url: str, voice_gender: str = "male", subtitle_only: bool = False,
     source_language: str | None = None,
 ) -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
@@ -267,7 +267,11 @@ async def create_dubbing_job(
             blocked=True,
         ))
         db.commit()
-        return JobCreationResult(outcome="blocked", video_title=title)
+        return JobCreationResult(
+            outcome="blocked",
+            video_title=title,
+            error_detail=safety.reason or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+        )
     metadata_flagged = bool(safety.category)
     if safety.category:
         db.add(ContentViolation(
@@ -349,7 +353,7 @@ def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
 
 
 def create_job_from_local_video_file_sync(
-    db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
+    db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "male",
     subtitle_only: bool = False, video_title: str | None = None, source_language: str | None = None,
 ) -> JobCreationResult:
     """Diskda allaqachon mavjud video fayldan (YouTube havolasisiz) yangi job

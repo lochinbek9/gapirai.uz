@@ -723,3 +723,18 @@ export function clearAnalysisId() {
   if (typeof window === "undefined") return
   localStorage.removeItem(ANALYSIS_KEY)
 }
+
+export interface TelegramFeedbackPayload {
+  name?: string
+  contact?: string
+  comment: string
+  rating?: number
+  page_url?: string
+}
+
+export async function sendTelegramFeedback(payload: TelegramFeedbackPayload): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post('/feedback', payload)
+  return res.data
+}
+
+

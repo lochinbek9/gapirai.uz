@@ -128,10 +128,11 @@ tarjima qiling.
 4. Barcha raqamlarni, foizlarni va ramzlarni so'z bilan yozing (masalan: "100%" -> "yuz foiz", "58 sec" -> "ellik sakkiz soniya", "2025" -> "ikki ming yigirma beshinchi yil").
 5. Ismlar va brendlarni o'zbekcha talaffuzga mos yozing (masalan: "YouTube" -> "Yutub", "Google" -> "Gugl").
 
-━━━ VAQTGA MOSLIK ━━━
-   • Kalta gap → kalta tarjima (so'z qo'shmang)
-   • Uzun gap  → uzun, ammo ortiqchasiz
-   • "va", "ham", "esa" larni kerak bo'lsa tashlab keting
+━━━ VAQTGA VA TALAFFUZGA MOSLIK (IXCHAMLIK VA DUB TALAFFUZI) ━━━
+   • Har bir segment video vaqtiga mos ixcham, aniq va londa bo'lishi SHART.
+   • Ortiqcha so'zlar, keraksiz kirish iboralari ("ma'lumki", "aytish joizki") va cho'zishlarni qo'shmang.
+   • Barcha raqamlarni, yillarni va foizlarni og'zaki so'z bilan yozing (masalan: "100%" -> "yuz foiz", "2026" -> "ikki ming yigirma oltinchi yil").
+   • Texnologiya va brend nomlarini o'qilishi bo'yicha yozing (masalan: "AI" -> "Ey Ay", "API" -> "Ey Pi Ay", "ChatGPT" -> "Chat Ji Pi Ti", "YouTube" -> "Yutub").
 
 JSON formatida qaytaring. Faqat "text" maydonini tarjima qiling."""
 
@@ -149,20 +150,12 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     if not segments:
         return []
 
-    # FREE_MODE (2026-08-04, Gemini integratsiyasidan OLDIN qo'shilgan)
-    # tarjimani _translate_chunk'ga umuman yetkazmasdan xom Google
-    # Translate'ga (SYSTEM_PROMPT'dagi dublyaj sifati qoidalarisiz, so'zma-so'z
-    # mashina tarjimasi) yo'naltirardi -- Gemini kaliti bo'lsa ham. Gemini
-    # kaliti mavjud bo'lganda endi pastdagi LLM yo'liga (TRANSLATE_PROVIDER
-    # orqali Gemini) o'tkaziladi -- u ham bepul, lekin sifat ancha yaxshi.
-    # Xom Google Translate endi faqat Gemini kaliti UMUMAN yo'q bo'lgandagi
-    # oxirgi chora sifatida qoladi.
     if settings.FREE_MODE and not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
         logger.info("FREE_MODE (Gemini kaliti yo'q): Translating segments using free Google Translate API...")
         with ThreadPoolExecutor(max_workers=5) as executor:
             return list(executor.map(_translate_segment_free, segments))
 
-    chunk_size = 30
+    chunk_size = 45
     chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
     if not chunks:
         return []
@@ -170,7 +163,7 @@ def translate_segments(segments: list[dict]) -> list[dict]:
     if len(chunks) == 1:
         return _translate_chunk(chunks[0])
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         chunk_results = list(executor.map(_translate_chunk, chunks))
 
     translated = []

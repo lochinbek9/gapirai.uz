@@ -13,9 +13,9 @@ CACHE_DIR=${CACHE_DIR:-/var/cache/nginx/gapirai_jobs}
 BAK=$BACKUP_ROOT/nginx-$(date +%Y%m%d-%H%M%S)
 
 mkdir -p "$BAK/sites-available" "$BAK/conf.d"
-cp -a "$ROOT/nginx.conf" "$BAK/"
-cp -a "$ROOT/sites-available/gapirai.uz" "$ROOT/sites-available/admin.gapirai.uz" "$BAK/sites-available/"
-cp -a "$ROOT/conf.d/." "$BAK/conf.d/"
+cp -a "$ROOT/nginx.conf" "$BAK/" 2>/dev/null || true
+cp -a "$ROOT/sites-available/gapirai.uz" "$ROOT/sites-available/admin.gapirai.uz" "$BAK/sites-available/" 2>/dev/null || true
+cp -a "$ROOT/conf.d/." "$BAK/conf.d/" 2>/dev/null || true
 echo "zaxira: $BAK"
 
 restore() {

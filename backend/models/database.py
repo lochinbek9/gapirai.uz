@@ -64,6 +64,7 @@ class User(Base):
     auth_provider = Column(String(20), nullable=False, default="password")  # "password" | "google" | "phone"
     role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_active_at = Column(DateTime, default=datetime.utcnow)
 
     jobs = relationship("DubbingJob", back_populates="user", lazy="dynamic")
 
@@ -450,6 +451,48 @@ class ContentViolation(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class UserDailyVisit(Base):
+    """Kunlik foydalanuvchilar faolligi va qaytishi (Retention) tahlili uchun jadval.
+    Har bir foydalanuvchining har bir tashrif kuni bo'yicha yozuv."""
+    __tablename__ = "user_daily_visits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    visit_date = Column(DateTime, nullable=False, index=True)
+    first_seen_at = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    actions_count = Column(Integer, default=1)
+
+    __table_args__ = (UniqueConstraint("user_id", "visit_date"),)
+    user = relationship("User")
+
+
+class BroadcastCampaign(Base):
+    """Admin orqali ommaviy xabarnomalar yuborish tarixi (Email, Telegram bot yoki ikkalasi)."""
+    __tablename__ = "broadcast_campaigns"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    channel = Column(String(20), nullable=False, default="both")  # "telegram", "email", "both"
+    target_filter = Column(String(30), nullable=False, default="all")  # "all", "telegram_users", "email_users", "paid_users", "free_users"
+    button_text = Column(String(100), nullable=True)
+    button_url = Column(String(500), nullable=True)
+    status = Column(String(20), nullable=False, default="pending")  # "pending", "sending", "completed", "failed"
+    total_recipients = Column(Integer, default=0)
+    email_sent = Column(Integer, default=0)
+    email_failed = Column(Integer, default=0)
+    telegram_sent = Column(Integer, default=0)
+    telegram_failed = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    admin = relationship("User")
+
 
 
 def get_db():

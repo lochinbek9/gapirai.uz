@@ -95,10 +95,11 @@ class Settings(BaseSettings):
     # IKKI marta ketma-ket qo'llaniladi (har biri shu RATIO/THRESHOLD bilan) —
     # ffmpeg'ning bitta filtrdagi [1,20] chegarasini buzmasdan, effektiv
     # bosishni chuqurlashtiradi.
-    DUCKING_THRESHOLD: float = 0.012
+    ORIGINAL_AUDIO_VOLUME: float = 0.22  # Original fon ovozining bazaviy balandligi (dublyaj ostida shovqin qilmasligi uchun)
+    DUCKING_THRESHOLD: float = 0.005
     DUCKING_RATIO: float = 20.0
     DUCKING_ATTACK_MS: int = 5
-    DUCKING_RELEASE_MS: int = 400
+    DUCKING_RELEASE_MS: int = 350
     # Dub trekining o'zini ham baland qilish (fonni pasaytirish bilan bir
     # qatorda) — limiterdan OLDIN qo'llaniladi, shunda hosil bo'lgan
     # cho'qqilarni limiter xavfsiz ushlab qoladi (clipping bo'lmaydi).
@@ -193,11 +194,13 @@ class Settings(BaseSettings):
     # small = 500MB RAM, 100% accuracy, ~4s per 8s audio on CPU
     # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
     WHISPER_MODEL: str = "small"
+    # STT (Speech-to-Text) provayderi: "gemini" | "openai".
+    # Gemini (Google AI Studio) o'zbek tili va ko'p tilli audio transkripsiyasi uchun
+    # OpenAI Whisper'dan ancha yuqori sifat beradi (Whisper o'zbek tilini yaxshi tushunmaydi
+    # va tez-tez turkcha chiqaradi).
+    STT_PROVIDER: str = "gemini"
     # O'zbekcha nutqni (subtitr rejimi, tarjimasiz) matnga aylantirishda AVVAL qaysi provayder
-    # sinaladi: "gemini" (o'zbek matni yaxshiroq, vaqtlari taxminiy; standart) yoki "openai"
-    # (Whisper: so'z vaqtlari aniq, lekin o'zbek tilida zaif va tilni faqat avto-aniqlaydi, ba'zan
-    # turkcha chiqaradi). Gemini kaliti/Vertex sozlanmagan bo'lsa doim OpenAI; birinchisi xato
-    # bersa yoki matn turkchaga o'xshasa ikkinchisiga o'tiladi (transcriber._transcribe_via_api).
+    # sinaladi: "gemini" (o'zbek matni ancha aniq, oʻ/gʻ to'g'ri; standart) yoki "openai".
     STT_UZ_PRIMARY: str = "gemini"
     # Nutq optimallashtirish (raqam/ohang moslashtirish), jins aniqlash,
     # xavfsizlik klassifikatori va Video tahlil (Learning Workspace) kabi
@@ -213,11 +216,8 @@ class Settings(BaseSettings):
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
-    # 2026-09-05: Google endi "gemini-3.5-flash" VA "gemini-2.5-flash"ni yangi
-    # hisoblarga bermaydi ("404 NOT_FOUND ... no longer available to new
-    # users. Please update ... to use models/gemini-3.6-flash" -- productionda
-    # AI Studio kaliti bilan tasdiqlangan). .env override qilishi mumkin.
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_STT_MODEL: str = "gemini-2.0-flash"
 
     # Tarjima provayderi: "openai" | "gemini". 2026-09-11 OpenAI krediti
     # tugagani sababli vaqtincha "gemini"ga o'tkazilgan edi, lekin
@@ -249,9 +249,8 @@ class Settings(BaseSettings):
     # OpenAI (Whisper/GPT) krediti tugagan holatda transkripsiya va tarjima
     # uchun ishlatiladigan matn modeli — GEMINI_MODEL'dan alohida saqlanadi
     # (transcriber._transcribe_chunk_gemini buni Vertex/AI Studio ikkalasida
-    # ham ishlatadi). 2026-09-05: "gemini-2.5-flash" yangi hisoblarga
-    # berilmaydi (404), shuning uchun GEMINI_MODEL bilan bir xil default.
-    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-3.6-flash"
+    # ham ishlatadi).
+    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-2.0-flash"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
@@ -272,6 +271,9 @@ class Settings(BaseSettings):
     # TTS Provider abstraction
     # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | "uzbekvoice"
     TTS_PROVIDER: str = "edge"
+    # Premium tarif (Pro / Pro Yearly) uchun yuqori sifatli ovoz provayderi: "uzbekvoice" | "elevenlabs" | "gemini"
+    # Free va Standart tariflar bepul Edge-TTS ("edge") yoki belgilangan TTS_PROVIDER dan foydalanadi.
+    TTS_PREMIUM_PROVIDER: str = "uzbekvoice"
     # Asosiy provider muvaqqat xatolik bilan (timeout/429/5xx) ishlamasa shu
     # providerga o'tiladi. Doimiy xatolikda (noto'g'ri kalit/kirish) fallback
     # ishlatilmaydi — backend/services/tts/base.py: PermanentTTSError.
@@ -302,6 +304,16 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
+
+    # SMTP sozlamalari (Admin Gmail yoki maxsus SMTP server orqali xat jo'natish uchun)
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "GapirAI.uz"
+    SMTP_USE_TLS: bool = True
 
     # Web Push (PWA bildirishnomalari) — VAPID kalitlari. Bo'sh bo'lsa push
     # butunlay o'chiq (frontend tugmani ko'rsatmaydi, backend jimgina
@@ -481,6 +493,8 @@ class Settings(BaseSettings):
     # (dublyaj uchun) hamon yt-dlp orqali, chunki Data API video oqimini
     # bermaydi (2026-08-20, rezident proksi balansi tugagach qo'shildi).
     YOUTUBE_DATA_API_KEY: str = ""
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_FEEDBACK_CHANNEL_ID: str = "-1003979697686"
 
     class Config:
         env_file = ".env"

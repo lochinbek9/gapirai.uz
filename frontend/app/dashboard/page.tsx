@@ -20,8 +20,8 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
 
   return (
-    <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner flex items-center justify-between gap-4 mb-6 flex-wrap">
-      <div className="flex items-center gap-3">
+    <div className="glass-card rounded-2xl p-4 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
           <Crown className="w-5 h-5" />
         </div>
@@ -29,7 +29,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
           <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
         </div>
-        <div className="ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+        <div className="sm:ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 w-full sm:w-auto">
           {sub.minutes && (
             <>
               <p>
@@ -53,7 +53,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
       <Link
         href="/pricing"
         onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
-        className="flex items-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md"
+        className="flex items-center justify-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md w-full sm:w-auto"
       >
         {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
         {sub.plan === 'free' ? "Tarifni oshirish" : expiresSoon ? 'Yangilash' : 'Tariflarni ko\'rish'}
@@ -229,48 +229,48 @@ export default function DashboardPage() {
 
       {/* Header */}
       <header className="border-b border-black/5 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl sticky top-0 z-10 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2">
-          <Link href="/" className="flex items-center gap-3 group">
-            <img src="/logo.webp" alt="GapirAI.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)" }} />
-            <img src="/logodark.webp" alt="GapirAI.uz" width={120} height={32} className="h-9 sm:h-12 md:h-16 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" style={{ maxWidth: "calc(100vw - 160px)" }} />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-4 flex items-center justify-between gap-2">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
+            <img src="/logo.webp" alt="GapirAI.uz" width={120} height={32} className="h-8 sm:h-12 md:h-16 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" />
+            <img src="/logodark.webp" alt="GapirAI.uz" width={120} height={32} className="h-8 sm:h-12 md:h-16 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" />
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
-              <User2 className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold">{user.name}</span>
+          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
+            <div className="hidden md:flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
+              <User2 className="w-4 h-4 text-blue-500 shrink-0" />
+              <span className="text-xs font-bold truncate max-w-[120px]">{user.name}</span>
             </div>
             <Link
               href="/"
-              className="flex items-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md"
+              className="flex items-center gap-1.5 sm:gap-2 btn-premium text-xs font-bold px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl shadow-md whitespace-nowrap"
             >
-              <Plus className="w-4 h-4" />
-              Yangi video
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">Yangi video</span>
             </Link>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-bold transition px-3 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
+              className="flex items-center gap-1.5 sm:gap-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-bold transition px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 whitespace-nowrap"
             >
-              <LogOut className="w-4 h-4" />
-              Chiqish
+              <LogOut className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">Chiqish</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
+      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-6 sm:py-8 flex-1">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-8">
-          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Jami</p>
-            <p className="text-3xl font-black text-gray-900 dark:text-white">{jobs.length}</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-6 sm:mb-8">
+          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Jami</p>
+            <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-white">{jobs.length}</p>
           </div>
-          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Tayyor</p>
-            <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{completedCount}</p>
+          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Tayyor</p>
+            <p className="text-xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">{completedCount}</p>
           </div>
-          <div className="glass-card rounded-2xl p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Jarayonda</p>
-            <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{processingCount}</p>
+          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
+            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Jarayonda</p>
+            <p className="text-xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">{processingCount}</p>
           </div>
         </div>
 

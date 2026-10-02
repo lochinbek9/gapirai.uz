@@ -9,6 +9,9 @@ sababli, gapirai.uz domenida SPF/DKIM tasdiqlangan Resend'ga o'tkazildi.
 import random
 import logging
 import httpx
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from backend.config import get_settings
 
@@ -17,6 +20,44 @@ settings = get_settings()
 
 CODE_TTL_MINUTES = 10
 RESEND_API_URL = "https://api.resend.com/emails"
+
+
+def _send_smtp_email(
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> bool:
+    """SMTP (masalan Admin Gmail yoki boshqa SMTP server) orqali email yuborish."""
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        logger.warning("SMTP_USER yoki SMTP_PASSWORD sozlanmagan — xat yuborilmadi.")
+        return False
+
+    try:
+        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER
+        from_name = settings.SMTP_FROM_NAME or "GapirAI.uz"
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"{from_name} <{from_email}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        if settings.SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
+        else:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
+            if settings.SMTP_USE_TLS:
+                server.starttls()
+
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.sendmail(from_email, [to_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        logger.error(f"SMTP orqali email yuborishda xatolik ({to_email}): {e}")
+        return False
 
 
 # Kirish/ro'yxat/parol tiklash kodlari so'rov ICHIDA yuboriladi (auth_routes.py):
@@ -244,3 +285,81 @@ def send_billing_email(to_email: str, name: str, subject: str, body_lines: list[
     except Exception as e:
         logger.error(f"Billing email yuborishda xatolik ({to_email}): {e}")
         return False
+
+
+def send_broadcast_email(
+    to_email: str,
+    name: str,
+    subject: str,
+    message_text: str,
+    button_text: str | None = None,
+    button_url: str | None = None,
+) -> bool:
+    """Admin ommaviy xabarnomalarini (broadcast) foydalanuvchiga yuborish.
+    Agar SMTP_ENABLED bo'lsa yoki SMTP_USER va SMTP_PASSWORD berilgan bo'lsa (masalan Admin Gmail),
+    to'g'ridan-to'g'ri SMTP orqali jo'natadi. Aks holda Resend API orqali jo'natadi."""
+    import html as html_lib
+
+    greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
+    safe_message = html_lib.escape(message_text).replace("\n", "<br/>")
+
+    button_html = ""
+    if button_text and button_url:
+        button_html = f"""
+        <div style="margin:28px 0 16px;">
+          <a href="{html_lib.escape(button_url)}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:12px;box-shadow:0 4px 12px rgba(124,58,237,0.25);">{html_lib.escape(button_text)}</a>
+        </div>
+        """
+
+    html_body = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:540px;margin:0 auto;padding:32px 24px;background-color:#ffffff;border-radius:16px;border:1px solid #e2e8f0;">
+      <div style="margin-bottom:20px;">
+        <h2 style="color:#0f172a;margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;">GapirAI<span style="color:#7c3aed;">.uz</span></h2>
+      </div>
+      <p style="color:#334155;font-size:15px;line-height:1.6;margin:0 0 16px;font-weight:600;">{html_lib.escape(greeting)}</p>
+      <div style="color:#1e293b;font-size:15px;line-height:1.7;margin:16px 0;">
+        {safe_message}
+      </div>
+      {button_html}
+      <hr style="border:none;border-top:1px solid #f1f5f9;margin:28px 0 16px 0;" />
+      <p style="color:#94a3b8;font-size:11px;margin:0;line-height:1.5;">Ushbu xabar GapirAI.uz platformasi foydalanuvchilariga yuborildi. Savollaringiz bo'lsa, @gapirai_support botiga murojaat qiling.</p>
+    </div>
+    """
+
+    text_body = f"{greeting}\n\n{message_text}"
+    if button_text and button_url:
+        text_body += f"\n\n{button_text}: {button_url}"
+    text_body += "\n\nGapirAI.uz jamoasi"
+
+    # 1. Agar SMTP sozlangan bo'lsa (masalan Admin Gmail)
+    if settings.SMTP_ENABLED or (settings.SMTP_USER and settings.SMTP_PASSWORD):
+        return _send_smtp_email(to_email, subject, text_body, html_body)
+
+    # 2. Resend API orqali
+    if not settings.RESEND_API_KEY:
+        logger.warning("Na SMTP, na RESEND_API_KEY sozlanmagan — broadcast email yuborilmadi.")
+        return False
+
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_body,
+        "text": text_body,
+    }
+
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend broadcast xatosi ({to_email}): {response.status_code} {response.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Broadcast email yuborishda xatolik ({to_email}): {e}")
+        return False
+

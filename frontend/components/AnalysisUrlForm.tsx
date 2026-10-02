@@ -61,10 +61,10 @@ export default function AnalysisUrlForm() {
           <button
             type="button"
             onClick={handlePaste}
-            className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
+            className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
           >
             <ClipboardPaste size={13} />
-            <span className="inline">Nusxani qo'yish</span>
+            <span className="hidden xs:inline">Nusxani </span><span>qo'yish</span>
           </button>
         </div>
       </div>

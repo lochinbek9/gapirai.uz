@@ -1,4 +1,5 @@
 import os
+import html
 import shutil
 import time
 from pathlib import Path
@@ -70,11 +71,19 @@ def segments_source_for_cues(job) -> list:
     return job.transcript_segments or []
 
 
+def _clean_sub_text(raw: str) -> str:
+    if not raw:
+        return ""
+    t = html.unescape(raw).strip()
+    t = t.replace("&quot;", '"').replace("&#39;", "'").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return t.replace("`", "'").replace("ʻ", "'").replace("ʼ", "'")
+
+
 def _segments_to_vtt(segments: list[dict]) -> str:
     """Tarjima qilingan segmentlardan WebVTT subtitr yaratish."""
     lines = ["WEBVTT", ""]
     for i, seg in enumerate(segments, 1):
-        text = seg.get("text", "").strip()
+        text = _clean_sub_text(seg.get("text", ""))
         if not text:
             continue
         start = _sec_to_vtt_time(seg["start"])
@@ -103,7 +112,7 @@ def _segments_to_srt(segments: list[dict]) -> str:
     lines = []
     counter = 0
     for seg in segments:
-        text = seg.get("text", "").strip()
+        text = _clean_sub_text(seg.get("text", ""))
         if not text:
             continue
         counter += 1
@@ -195,7 +204,7 @@ def _detect_gender(transcript_text: str) -> str:
             **light_model_kwargs(temperature=0, max_tokens=5),
         )
         result = (resp.choices[0].message.content or "").strip().lower()
-        return "female" if "female" in result else "male"
+        return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
     except Exception as e:
         if settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX:
             try:
@@ -209,7 +218,7 @@ def _detect_gender(transcript_text: str) -> str:
                     model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
                 )
                 result = (response.text or "").strip().lower()
-                return "female" if "female" in result else "male"
+                return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
             except Exception as e2:
                 logger.debug(f"_detect_gender: Gemini ham ishlamadi ({e2}), 'male'ga tushirildi.")
                 return "male"
@@ -444,25 +453,52 @@ def process_video(self: Task, job_id: str) -> dict:
             transcript_text = job.transcript_text or ""
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
+            # Subtitr rejimi yoki uzbek_source uchun STT doim Gemini (Google AI Studio) bo'ladi.
+            # OpenAI Whisper o'zbek tilini yaxshi tushunmaydi va tez-tez turkcha/xato chiqaradi.
+            stt_primary = "gemini" if (job.subtitle_only or uzbek_source or settings.STT_PROVIDER == "gemini") else "openai"
             try:
                 transcript = transcriber.transcribe_audio(
                     audio_path,
-                    language="uz" if uzbek_source else "en",
-                    primary=settings.STT_UZ_PRIMARY if uzbek_source else "openai",
+                    language="uz" if uzbek_source else None,
+                    primary=stt_primary,
                 )
             except transcriber.WrongLanguageError as exc:
-                _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
-                raise PermanentError(
-                    "Nutqni o'zbekcha matnga aylantirib bo'lmadi: xizmat boshqa tilda (turkcha) matn qaytardi. "
-                    "Video haqiqatan o'zbekcha ekanini tekshiring yoki birozdan so'ng qayta urinib ko'ring.",
-                    code="STT_WRONG_LANGUAGE",
-                ) from exc
+                if uzbek_source:
+                    logger.warning(
+                        f"[JOB {job_id}] Video 'uz' deb belgilangan, ammo o'zbekcha emas "
+                        f"(turkcha/chet tili aniqlandi). Avtomatik tarjima rejimiga o'tkazilmoqda..."
+                    )
+                    uzbek_source = False
+                    job.source_language = "auto"
+                    db.commit()
+                    _update_job(db, job, JobStatus.TRANSCRIBING, 25.0, "Chet tili aniqlandi, qayta matnga aylantirilmoqda...")
+                    transcript = transcriber.transcribe_audio(
+                        audio_path,
+                        language=None,
+                        primary=stt_primary,
+                    )
+                else:
+                    _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
+                    raise PermanentError(
+                        "Nutqni matnga aylantirib bo'lmadi: til mos kelmadi. "
+                        "Birozdan so'ng qayta urinib ko'ring.",
+                        code="STT_WRONG_LANGUAGE",
+                    ) from exc
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
+
+            # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
+            # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)
+            detected_lang = transcript.get("language")
+            if detected_lang == "uz" and not uzbek_source and job.subtitle_only:
+                logger.info(f"[JOB {job_id}] Subtitr rejimi: STT tilni o'zbekcha ('uz') deb aniqladi. To'g'ridan-to'g'ri o'zbekcha subtitrga o'tkazilmoqda.")
+                uzbek_source = True
+                job.source_language = "uz"
+
             db.commit()
             segments = transcript["segments"]
             transcript_text = transcript["text"]
@@ -490,7 +526,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 ))
                 db.commit()
             raise PermanentError(
-                "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+                safety.reason or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
                 code="CONTENT_BLOCKED",
             )
         if safety.category and job.user_id is not None:
@@ -520,7 +556,7 @@ def process_video(self: Task, job_id: str) -> dict:
             gender = job.speaker_gender
             _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped")
         else:
-            setting = job.voice_gender_setting or "auto"
+            setting = job.voice_gender_setting or "male"
             if setting in ("male", "female"):
                 gender = setting
             elif job.subtitle_only:
