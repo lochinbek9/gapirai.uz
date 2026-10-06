@@ -209,7 +209,8 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
         "extractor_args": {
             "youtube": {
                 # Zamonaviy yt-dlp va bgutil pot-provider bilan ishlaydigan mijozlar
-                "player_client": ["web", "mweb", "tv_downgraded", "visionos"],
+                "player_client": ["mweb", "web", "tv", "tv_downgraded", "android", "ios"],
+                "fetch_pot": ["always"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
             # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini

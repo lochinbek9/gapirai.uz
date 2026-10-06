@@ -53,6 +53,16 @@ async def pipe_pair(reader1: asyncio.StreamReader, writer1: asyncio.StreamWriter
 
 
 async def handle_client(client_reader: asyncio.StreamReader, client_writer: asyncio.StreamWriter):
+    peer = client_writer.get_extra_info("peername")
+    peer_ip = str(peer[0]) if peer else ""
+    # Faqat localhost va Docker containerlaridan so'rovlarni qabul qilish
+    if not (peer_ip.startswith("127.") or peer_ip.startswith("172.") or peer_ip == "::1"):
+        try:
+            client_writer.close()
+        except Exception:
+            pass
+        return
+
     remote_writer = None
     try:
         line = await asyncio.wait_for(client_reader.readline(), timeout=15.0)
@@ -118,10 +128,21 @@ async def handle_client(client_reader: asyncio.StreamReader, client_writer: asyn
 
 
 async def main():
-    server = await asyncio.start_server(handle_client, "0.0.0.0", PORT)
-    print(f"IPv6 Rotating Proxy running on 0.0.0.0:{PORT} (pool: {SUBNET_PREFIX}{IP_MIN}-{IP_MAX})", flush=True)
-    async with server:
-        await server.serve_forever()
+    bind_hosts = ["127.0.0.1", "172.18.0.1"]
+    servers = []
+    for host in bind_hosts:
+        try:
+            s = await asyncio.start_server(handle_client, host, PORT)
+            servers.append(s)
+            print(f"IPv6 Rotating Proxy listening on {host}:{PORT}", flush=True)
+        except Exception as e:
+            print(f"Failed to bind {host}:{PORT}: {e}", flush=True)
+
+    if not servers:
+        s = await asyncio.start_server(handle_client, "127.0.0.1", PORT)
+        servers.append(s)
+
+    await asyncio.gather(*(s.serve_forever() for s in servers))
 
 
 if __name__ == "__main__":
