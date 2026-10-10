@@ -182,6 +182,7 @@ class Settings(BaseSettings):
     # telegram_bot konteyneridan telegram-bot-api konteyneriga ichki compose
     # tarmog'i orqali manzil, masalan "http://telegram-bot-api:8081".
     TELEGRAM_LOCAL_API_URL: str = ""
+    ADMIN_TG_IDS: str = ""
     # Telegram Mini App manzili (bot menu tugmasi + /app buyrug'i shu yerni
     # ochadi). Bo'sh bo'lsa FRONTEND_URL + "/tma" ishlatiladi. Telegram faqat
     # HTTPS qabul qiladi -- HTTPS bo'lmasa menu tugmasi qo'yilmaydi.
