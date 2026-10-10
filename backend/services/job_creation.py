@@ -401,7 +401,9 @@ def create_job_from_local_video_file_sync(
             outcome="insufficient_minutes", duration_minutes=duration_minutes, minutes_short=minutes_short,
         )
 
-    audio_path = video_path.parent / "audio.wav"
+    audio_dir = video_path.parent.parent / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    audio_path = audio_dir / "audio.wav"
     if not _extract_audio_wav(video_path, audio_path):
         video_path.unlink(missing_ok=True)
         return JobCreationResult(outcome="bad_file")

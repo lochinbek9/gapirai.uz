@@ -379,7 +379,7 @@ async def upload_job_file(
     if rejection:
         _raise_for_outcome(rejection)
 
-    upload_root = Path(settings.UPLOAD_DIR)
+    upload_root = Path(settings.OUTPUT_DIR)
     upload_root.mkdir(parents=True, exist_ok=True)
     reserve = int(settings.UPLOAD_MIN_FREE_DISK_GB * 1024 ** 3)
     if shutil.disk_usage(upload_root).free < content_length + reserve:
@@ -391,8 +391,9 @@ async def upload_job_file(
 
     job_id = str(uuid.uuid4())
     job_dir = upload_root / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-    video_path = job_dir / f"video{_CONTENT_TYPE_TO_EXT[content_type]}"
+    video_dir = job_dir / "video"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    video_path = video_dir / f"video{_CONTENT_TYPE_TO_EXT[content_type]}"
 
     size = 0
     buffer = bytearray()
@@ -571,12 +572,13 @@ async def upload_video_fallback(
     if file.content_type not in _ALLOWED_UPLOAD_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Faqat MP4, MOV, MKV yoki WebM formatlar qabul qilinadi.")
 
-    job_dir = Path(settings.UPLOAD_DIR) / str(job_id)
-    job_dir.mkdir(parents=True, exist_ok=True)
+    job_dir = Path(settings.OUTPUT_DIR) / str(job_id)
+    video_dir = job_dir / "video"
+    video_dir.mkdir(parents=True, exist_ok=True)
     # job_dir "video" bazaviy nomi va job_id (UUID, FastAPI tomonidan
     # tekshirilgan) qat'iy belgilangan -- fayl nomi umuman ishlatilmaydi,
     # shuning uchun path traversal imkonsiz.
-    video_path = job_dir / f"video{_CONTENT_TYPE_TO_EXT[file.content_type]}"
+    video_path = video_dir / f"video{_CONTENT_TYPE_TO_EXT[file.content_type]}"
 
     size = 0
     try:

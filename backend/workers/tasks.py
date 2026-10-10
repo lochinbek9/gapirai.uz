@@ -684,7 +684,7 @@ def process_video(self: Task, job_id: str) -> dict:
             voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
-            tts_dir = str(output_dir / "tts_segments")
+            tts_dir = str(output_dir / "audio" / "tts_segments")
             # Jonli progress: TTS eng uzun bosqich (uzun videoda daqiqalab) --
             # har segment tugagach SYNTHESIZING oynasi (60..82) ichida
             # progress bar siljiydi (backend/services/job_progress.py).
@@ -727,8 +727,9 @@ def process_video(self: Task, job_id: str) -> dict:
             final_output = job.output_video_path
         else:
             _update_job(db, job, JobStatus.MERGING, 85.0, "Video birlashtirilmoqda...")
-            final_output = str(output_dir / "dubbed_final.mp4")
-            output_dir.mkdir(parents=True, exist_ok=True)
+            final_output_dir = output_dir / "video"
+            final_output_dir.mkdir(parents=True, exist_ok=True)
+            final_output = str(final_output_dir / "dubbed_final.mp4")
 
             merger.merge_video_audio(
                 video_path=video_path,
@@ -737,7 +738,7 @@ def process_video(self: Task, job_id: str) -> dict:
             )
 
             job.output_video_path = final_output
-            job.output_video_url = f"/outputs/{job_id}/dubbed_final.mp4"
+            job.output_video_url = f"/outputs/{job_id}/video/dubbed_final.mp4"
             db.commit()
             save_checkpoint(job_id, "dubbed_final.mp4", final_output)
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "ok")

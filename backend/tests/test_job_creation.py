@@ -28,7 +28,7 @@ def _make_completed_job(**overrides) -> DubbingJob:
         translated_text="",
         srt_content="",
         uzbek_srt_content="",
-        output_video_path="/outputs/some-job/dubbed_final.mp4",
+        output_video_path="/outputs/some-job/video/dubbed_final.mp4",
     )
     defaults.update(overrides)
     return DubbingJob(**defaults)
@@ -61,7 +61,7 @@ class TestCachedJobFilesExist(unittest.TestCase):
         mock_get_settings.return_value = MagicMock(AWS_BUCKET_NAME="")
         with patch("backend.services.job_creation.Path") as mock_path_cls:
             mock_path_cls.return_value.exists.return_value = True
-            job = _make_completed_job(output_video_path="/outputs/x/dubbed_final.mp4")
+            job = _make_completed_job(output_video_path="/outputs/x/video/dubbed_final.mp4")
 
             self.assertTrue(job_creation._cached_job_files_exist(job))
 
@@ -70,7 +70,7 @@ class TestCachedJobFilesExist(unittest.TestCase):
         mock_get_settings.return_value = MagicMock(AWS_BUCKET_NAME="")
         with patch("backend.services.job_creation.Path") as mock_path_cls:
             mock_path_cls.return_value.exists.return_value = False
-            job = _make_completed_job(output_video_path="/outputs/x/dubbed_final.mp4")
+            job = _make_completed_job(output_video_path="/outputs/x/video/dubbed_final.mp4")
 
             self.assertFalse(job_creation._cached_job_files_exist(job))
 

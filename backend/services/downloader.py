@@ -436,10 +436,11 @@ def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict
 
 
 def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
-    job_dir = Path(settings.UPLOAD_DIR) / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-
-    video_tpl = str(job_dir / "video.%(ext)s")
+    job_dir = Path(settings.OUTPUT_DIR) / job_id
+    video_dir = job_dir / "video"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    
+    video_tpl = str(video_dir / "video.%(ext)s")
 
     # Jonli yuklab olish foizi -- DOWNLOADING bosqichi progress oynasiga
     # (5..18) moslanadi; set_subprogress o'zi vaqt/qiymat bo'yicha cheklaydi,
