@@ -7,7 +7,7 @@ import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2, CreditCard, AlertTriangle
+  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -44,6 +44,7 @@ export default function VideoPage() {
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const [isCopied, setIsCopied] = useState(false)
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
@@ -418,8 +419,6 @@ export default function VideoPage() {
                     initialRating={job.rating}
                     initialComment={job.feedback_comment}
                   />
-
-                  <DonateCTA variant="line" className="pt-2" />
                 </div>
               )}
 
@@ -431,7 +430,21 @@ export default function VideoPage() {
                     className="w-full flex items-center justify-between px-5 py-4 text-white font-medium hover:bg-white/5 transition"
                   >
                     <span>O'zbek tilidagi matn</span>
-                    {showTranscript ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div className="flex items-center gap-3">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(job.translated_text || '')
+                          setIsCopied(true)
+                          setTimeout(() => setIsCopied(false), 2000)
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
+                        title="Nusxa olish"
+                      >
+                        {isCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                      </div>
+                      {showTranscript ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
                   </button>
                   {showTranscript && (
                     <div className="px-5 pb-5">
@@ -439,6 +452,11 @@ export default function VideoPage() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Donate CTA */}
+              {job.status === 'completed' && (
+                <DonateCTA variant="line" className="pt-2" />
               )}
 
               {/* Sidebar info shown below in theater mode */}
