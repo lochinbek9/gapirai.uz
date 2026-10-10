@@ -409,7 +409,7 @@ export default function VideoPage() {
               {job.status === 'completed' && (
                 <div className="space-y-6 pt-1">
                   <div>
-                    <ResolutionDownloadButtons jobId={id} />
+                    <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
                   </div>
 
                   {/* Feedback rating component */}

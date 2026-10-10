@@ -7,20 +7,21 @@ import { getJobResolutions, requestResolution, ResolutionOption } from '@/lib/ap
 
 interface ResolutionDownloadButtonsProps {
   jobId: string
+  videoTitle?: string
 }
 
 const POLL_INTERVAL_MS = 4000
 
-function triggerDownload(url: string) {
+function triggerDownload(url: string, filename?: string) {
   const a = document.createElement('a')
   a.href = url
-  a.download = ''
+  a.download = filename || ''
   document.body.appendChild(a)
   a.click()
   a.remove()
 }
 
-export default function ResolutionDownloadButtons({ jobId }: ResolutionDownloadButtonsProps) {
+export default function ResolutionDownloadButtons({ jobId, videoTitle }: ResolutionDownloadButtonsProps) {
   const [resolutions, setResolutions] = useState<ResolutionOption[] | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
   const pollTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({})
@@ -62,7 +63,13 @@ export default function ResolutionDownloadButtons({ jobId }: ResolutionDownloadB
     try {
       const res = await requestResolution(jobId, opt.resolution)
       if (res.status === 'ready' && res.download_url) {
-        triggerDownload(res.download_url)
+        let filename = ''
+        if (videoTitle) {
+          const ext = res.download_url.split('.').pop() || 'mp4'
+          const cleanTitle = videoTitle.replace(/[\\/:*?"<>|]/g, '_')
+          filename = `${cleanTitle} - ${opt.resolution}.${ext}`
+        }
+        triggerDownload(res.download_url, filename)
         setBusy((b) => ({ ...b, [opt.resolution]: false }))
         refresh()
       } else {
