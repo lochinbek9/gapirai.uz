@@ -317,10 +317,15 @@ def synthesize_segments(
         if not text:
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
+        engine = "unknown"
         if seg["id"] in pre_synthesized:
             engine = get_provider(provider_name).name
         else:
-            engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+            try:
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+            except Exception as exc:
+                logger.warning(f"Segment {seg['id']}: dastlabki sintezda xatolik: {exc}")
+                engine = get_provider(provider_name).name
 
         # Bounded per-segment validation/retry -- see _validate_wav_file's
         # docstring. Only THIS segment is ever re-synthesized; the other
