@@ -33,13 +33,16 @@ settings = get_settings()
 def generate_360p(job) -> str:
     job_id = job.storage_id
     master_key = f"dubber/{job_id}/dubbed_final.mp4"
-    if not s3_object_exists(master_key):
-        raise RuntimeError("Master video S3'da topilmadi (saqlash muddati tugagan bo'lishi mumkin).")
-    master_url = generate_presigned_download_url(master_key)
-    if not master_url:
-        raise RuntimeError("Master video S3'da topilmadi.")
+    if settings.AWS_BUCKET_NAME:
+        if not s3_object_exists(master_key):
+            raise RuntimeError("Master video S3'da topilmadi (saqlash muddati tugagan bo'lishi mumkin).")
+        master_url = generate_presigned_download_url(master_key)
+        if not master_url:
+            raise RuntimeError("Master video S3'da topilmadi.")
+    else:
+        master_url = job.output_video_path
 
-    out_dir = Path(settings.OUTPUT_DIR) / job_id
+    out_dir = Path(settings.OUTPUT_DIR) / job_id / "video"
     out_dir.mkdir(parents=True, exist_ok=True)
     local_out = str(out_dir / "dubbed_360p.mp4")
 
@@ -56,15 +59,16 @@ def generate_360p(job) -> str:
         raise RuntimeError(f"360p kichraytirishda ffmpeg xatoligi:\n{result.stderr[-1500:]}")
 
     s3_key = f"dubber/{job_id}/dubbed_360p.mp4"
-    if not upload_file_to_s3(local_out, s3_key):
-        raise RuntimeError("360p versiyani S3'ga yuklab bo'lmadi.")
-
-    try:
-        os.remove(local_out)
-    except Exception:
-        pass
-
-    return s3_key
+    if settings.AWS_BUCKET_NAME:
+        if not upload_file_to_s3(local_out, s3_key):
+            raise RuntimeError("360p versiyani S3'ga yuklab bo'lmadi.")
+        try:
+            os.remove(local_out)
+        except Exception:
+            pass
+        return s3_key
+    else:
+        return f"/outputs/{job_id}/video/dubbed_360p.mp4"
 
 
 def generate_1080p(job) -> str:
@@ -73,16 +77,21 @@ def generate_1080p(job) -> str:
     tmp_dir = Path(settings.UPLOAD_DIR) / tmp_job_id
 
     try:
-        audio_s3_key = f"dubber/{job_id}/dubbed_audio.wav"
-        local_audio = str(tmp_dir / "dubbed_audio.wav")
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-        if not download_file_from_s3(audio_s3_key, local_audio):
-            raise RuntimeError("Dublyaj audiosi S3'da topilmadi.")
+        if settings.AWS_BUCKET_NAME:
+            audio_s3_key = f"dubber/{job_id}/dubbed_audio.wav"
+            local_audio = str(tmp_dir / "dubbed_audio.wav")
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            if not download_file_from_s3(audio_s3_key, local_audio):
+                raise RuntimeError("Dublyaj audiosi S3'da topilmadi.")
+        else:
+            local_audio = str(Path(settings.OUTPUT_DIR) / job_id / "audio" / "dubbed_audio.wav")
+            if not os.path.exists(local_audio):
+                raise RuntimeError("Dublyaj audiosi lokal diskda topilmadi.")
 
         download_result = downloader.download_video(job.youtube_url, tmp_job_id, max_height=1080)
         video_path = download_result["video_path"]
 
-        out_dir = Path(settings.OUTPUT_DIR) / job_id
+        out_dir = Path(settings.OUTPUT_DIR) / job_id / "video"
         out_dir.mkdir(parents=True, exist_ok=True)
         local_out = str(out_dir / "dubbed_1080p.mp4")
 
@@ -93,15 +102,16 @@ def generate_1080p(job) -> str:
         )
 
         s3_key = f"dubber/{job_id}/dubbed_1080p.mp4"
-        if not upload_file_to_s3(local_out, s3_key):
-            raise RuntimeError("1080p versiyani S3'ga yuklab bo'lmadi.")
-
-        try:
-            os.remove(local_out)
-        except Exception:
-            pass
-
-        return s3_key
+        if settings.AWS_BUCKET_NAME:
+            if not upload_file_to_s3(local_out, s3_key):
+                raise RuntimeError("1080p versiyani S3'ga yuklab bo'lmadi.")
+            try:
+                os.remove(local_out)
+            except Exception:
+                pass
+            return s3_key
+        else:
+            return f"/outputs/{job_id}/video/dubbed_1080p.mp4"
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -172,15 +182,14 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
         db.refresh(variant)
 
     if variant.status == "ready" and variant.s3_key:
-        # Variant masterdan KEYINROQ yuklangan bo'lishi mumkin (foydalanuvchi
-        # uni ancha vaqt o'tib birinchi so'ragan bo'lsa) -- shuning uchun
-        # o'zining alohida, masterdan farqli muddati bo'ladi va u ham
-        # mustaqil ravishda muddati tugagan bo'lishi mumkin.
-        if s3_object_exists(variant.s3_key):
-            presigned_url = generate_presigned_download_url(variant.s3_key)
-            if presigned_url:
-                return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
-        variant.status = "pending"  # s3_key ishlamay qoldi -- qayta yaratamiz
+        if settings.AWS_BUCKET_NAME:
+            if s3_object_exists(variant.s3_key):
+                presigned_url = generate_presigned_download_url(variant.s3_key)
+                if presigned_url:
+                    return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
+            variant.status = "pending"  # s3_key ishlamay qoldi -- qayta yaratamiz
+        else:
+            return ResolutionRequestResult(outcome="ready", download_url=variant.s3_key)
 
     if variant.status != "processing":
         variant.status = "processing"
