@@ -486,14 +486,14 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
         raise RuntimeError(f"Video yuklashda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
 
     video_file = None
-    for f in job_dir.iterdir():
+    for f in video_dir.iterdir():
         if f.is_file() and f.stem == "video":
             video_file = f
             break
     if not video_file:
-        files = [f for f in job_dir.iterdir() if f.is_file()]
+        files = [f for f in video_dir.iterdir() if f.is_file()]
         if not files:
-            raise RuntimeError(f"Yuklangan video topilmadi: {job_dir}")
+            raise RuntimeError(f"Yuklangan video topilmadi: {video_dir}")
         video_file = files[0]
 
     # Kutilganidan ancha katta fayl (masalan noto'g'ri format tanlandi yoki
