@@ -838,6 +838,11 @@ def process_video(self: Task, job_id: str) -> dict:
 
 
     except PermanentError as exc:
+        try:
+            from backend.services.telegram_notify import send_error_to_admins
+            send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Type: PermanentError")
+        except Exception:
+            pass
         # Qayta urinish ma'nosiz — har safar bir xil natija chiqadi.
         # Status-o'tkazish endi mustaqil, yangi sessiya bilan (_mark_job_failed) —
         # eski `db` sessiyasi shu paytda qanday holatda bo'lishidan qat'i nazar.
@@ -856,6 +861,11 @@ def process_video(self: Task, job_id: str) -> dict:
         raise exc
 
     except Exception as exc:
+        try:
+            from backend.services.telegram_notify import send_error_to_admins
+            send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Retry: {self.request.retries}/{self.max_retries}")
+        except Exception:
+            pass
         error_code = _error_code_for(exc, current_stage)
         # AUTH_ERROR (va boshqa should_retry()=False toifalar) uchun BLIND
         # RETRY yo'q (2026-08-26 audit, Priority 5) -- eskirgan/bloklangan

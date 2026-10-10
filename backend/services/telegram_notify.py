@@ -40,3 +40,32 @@ def send_telegram_message(chat_id: str, text: str, reply_markup: dict | None = N
     except Exception as e:
         logger.error(f"Telegram xabar yuborishda xato (chat_id={chat_id}): {e}")
         return False
+
+
+def send_error_to_admins(exc: Exception, context_msg: str = "") -> None:
+    import traceback
+    settings = get_settings()
+    if not settings.ADMIN_TG_IDS:
+        return
+    
+    admin_ids = [id.strip() for id in settings.ADMIN_TG_IDS.split(",") if id.strip()]
+    if not admin_ids:
+        return
+        
+    tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    
+    # HTML tag escape
+    import html
+    tb_str = html.escape(tb_str)
+    exc_name = html.escape(type(exc).__name__)
+    exc_msg = html.escape(str(exc))
+    context_msg = html.escape(context_msg)
+    
+    text = f"🚨 <b>Xatolik yuz berdi!</b>\n\n"
+    if context_msg:
+        text += f"<b>Context:</b> {context_msg}\n\n"
+    text += f"<b>Exception:</b> {exc_name}: {exc_msg}\n\n"
+    text += f"<b>Traceback:</b>\n<pre>{tb_str[:3000]}</pre>"
+    
+    for admin_id in admin_ids:
+        send_telegram_message(admin_id, text)

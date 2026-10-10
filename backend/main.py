@@ -346,6 +346,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     + shu ID qaytariladi."""
     error_id = uuid.uuid4().hex[:8]
     logger.exception(f"[{error_id}] Ushlanmagan xatolik: {request.method} {request.url.path}")
+    try:
+        from backend.services.telegram_notify import send_error_to_admins
+        send_error_to_admins(exc, context_msg=f"FastAPI: {request.method} {request.url.path} | Error ID: {error_id}")
+    except Exception:
+        pass
     return JSONResponse(
         status_code=500,
         content={"detail": f"Kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring. (Xato ID: {error_id})"},
