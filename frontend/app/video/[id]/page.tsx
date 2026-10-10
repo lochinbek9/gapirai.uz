@@ -45,6 +45,7 @@ export default function VideoPage() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [isCopied, setIsCopied] = useState(false)
+  const [isEnCopied, setIsEnCopied] = useState(false)
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
@@ -475,8 +476,22 @@ export default function VideoPage() {
                   </div>
                   {job.transcript_text && (
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                      <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Inglizcha matn</p>
-                      <p className="text-slate-300 text-sm leading-relaxed line-clamp-6">{job.transcript_text}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-slate-400 text-xs uppercase tracking-wider">Inglizcha matn</p>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigator.clipboard.writeText(job.transcript_text || '')
+                        setIsEnCopied(true)
+                        setTimeout(() => setIsEnCopied(false), 2000)
+                      }}
+                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/10 transition cursor-pointer"
+                      title="Nusxa olish"
+                    >
+                      {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </div>
+                  </div>
+                  <p className="text-slate-300 text-sm leading-relaxed line-clamp-6">{job.transcript_text}</p>
                     </div>
                   )}
                 </div>
@@ -504,7 +519,21 @@ export default function VideoPage() {
 
               {job.transcript_text && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                  <p className="text-slate-400 text-xs uppercase tracking-wider mb-2">Inglizcha matn</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-slate-400 text-xs uppercase tracking-wider">Inglizcha matn</p>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigator.clipboard.writeText(job.transcript_text || '')
+                        setIsEnCopied(true)
+                        setTimeout(() => setIsEnCopied(false), 2000)
+                      }}
+                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/10 transition cursor-pointer"
+                      title="Nusxa olish"
+                    >
+                      {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </div>
+                  </div>
                   <p className="text-slate-300 text-sm leading-relaxed line-clamp-6">{job.transcript_text}</p>
                 </div>
               )}
