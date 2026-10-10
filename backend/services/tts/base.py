@@ -88,4 +88,4 @@ class TTSProvider(ABC):
         """voice_name orqali gender aniqlash yordamchi metodi."""
         if not voice_name:
             return False
-        return any(kw in voice_name for kw in ("Madina", "female", "nova", "shimmer", "Aoede", "Kore"))
+        return any(kw in voice_name for kw in ("Madina", "female", "nova", "shimmer", "Aoede", "Kore", "Autonoe"))

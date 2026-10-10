@@ -55,87 +55,21 @@ def initiate_payment(
             status_code=402,
             detail=f"Bu video uchun {minutes_short} daqiqa yetishmayapti. Qo'shimcha daqiqa paketini sotib oling.",
         )
-    amount = 0
-
-    if amount == 0:
-        if covered_by_quota:
-            consume_quota(db, current_user.id, duration_minutes)
-            job.quota_consumed = True
-        if job.status == JobStatus.AWAITING_PAYMENT:
-            if job.source_job_id:
-                from datetime import datetime
-                job.status = JobStatus.COMPLETED
-                job.status_message = "Dublyaj tayyor!"
-                job.completed_at = datetime.utcnow()
-                db.commit()
-            else:
-                job.status = JobStatus.PENDING
-                job.status_message = "Navbatga qo'shildi"
-                db.commit()
-                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
-        return {"success": True, "message": "Bepul video. Ishlov berish boshlandi.", "amount": 0}
-
-    # Check if already paid
-    existing_approved = db.query(Payment).filter(
-        Payment.job_id == job.id,
-        Payment.status == PaymentStatus.APPROVED
-    ).first()
-    if existing_approved:
-        return {"success": True, "message": "To'lov allaqachon amalga oshirilgan.", "amount": 0}
-
-    # Find or create pending payment
-    payment = db.query(Payment).filter(
-        Payment.job_id == job.id,
-        Payment.status == PaymentStatus.PENDING
-    ).first()
-
-    if not payment:
-        payment = Payment(
-            user_id=current_user.id,
-            job_id=job.id,
-            amount=amount,
-            provider=PaymentProvider.CLICK,
-            status=PaymentStatus.PENDING,
-            click_create_time=int(time.time())
-        )
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
-    elif normalize_uzs_amount(payment.amount) != amount:
-        payment.amount = amount
-        payment.click_create_time = int(time.time())
-        db.commit()
-        db.refresh(payment)
-
-    merchant_id = settings.CLICK_MERCHANT_ID or "56653"
-    service_id = settings.CLICK_SERVICE_ID or "108780"
-    merchant_user_id = getattr(settings, "CLICK_MERCHANT_USER_ID", "") or "89102"
-    
-    origin_header = request.headers.get("origin") or request.headers.get("referer")
-    if origin_header:
-        from urllib.parse import urlparse
-        parsed = urlparse(origin_header)
-        base_origin = f"{parsed.scheme}://{parsed.netloc}"
-        return_url = f"{base_origin}/video/{job.id}"
-    else:
-        frontend_url = settings.FRONTEND_URL or "https://gapirai.uz"
-        return_url = f"{frontend_url.rstrip('/')}/video/{job.id}"
-
-    payment_url = generate_payment_url(
-        merchant_id=merchant_id,
-        service_id=service_id,
-        transaction_param=str(payment.id),
-        amount=amount,
-        return_url=return_url,
-        merchant_user_id=merchant_user_id,
-    )
-
-    return {
-        "success": True,
-        "payment_url": payment_url,
-        "payment_id": str(payment.id),
-        "amount": amount
-    }
+    consume_quota(db, current_user.id, duration_minutes)
+    job.quota_consumed = True
+    if job.status == JobStatus.AWAITING_PAYMENT:
+        if job.source_job_id:
+            from datetime import datetime
+            job.status = JobStatus.COMPLETED
+            job.status_message = "Dublyaj tayyor!"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+        else:
+            job.status = JobStatus.PENDING
+            job.status_message = "Navbatga qo'shildi"
+            db.commit()
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
+    return {"success": True, "message": "Video ishlov berish navbatiga qo'shildi.", "amount": 0}
 
 @router.post("/prepare")
 async def click_prepare(request: Request, db: Session = Depends(get_db)):

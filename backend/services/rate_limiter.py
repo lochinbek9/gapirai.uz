@@ -31,10 +31,20 @@ def _get_redis() -> Redis:
 
 
 def _client_ip(request: Request) -> str:
-    """Nginx orqasida ishlaganda haqiqiy IP'ni X-Forwarded-For'dan olamiz."""
+    """Haqiqiy mijoz IP manzilini xavfsiz aniqlash.
+
+    Nginx orqasida ishlaganda X-Real-IP to'g'ridan-to'g'ri $remote_addr bilan
+    o'rnatiladi, mijoz uni soxtalashtira olmaydi. Agar u bo'lmasa,
+    X-Forwarded-For ning eng oxirgi (ishonchli proksi qo'shgan) qismini olamiz.
+    """
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()
+        parts = [p.strip() for p in fwd.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 

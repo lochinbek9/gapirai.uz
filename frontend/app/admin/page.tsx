@@ -11,6 +11,10 @@ import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, B
 import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers, RefundsNeededReport, apiAdminRefundsNeeded } from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
+import AdminUsersManager from '@/components/AdminUsersManager'
+import AdminCookiesManager from '@/components/AdminCookiesManager'
+import AdminRetentionManager from '@/components/AdminRetentionManager'
+import AdminBroadcastManager from '@/components/AdminBroadcastManager'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -441,6 +445,18 @@ export default function AdminPage() {
             <Card label="So'nggi 24 soat" value={stats.users.last_24h} icon={<Users className="w-5 h-5" />} />
           </div>
         </section>
+
+        {/* YouTube Cookies Management */}
+        <AdminCookiesManager token={getToken() || ''} />
+
+        {/* User Retention & Activity Analytics */}
+        <AdminRetentionManager token={getToken() || ''} />
+
+        {/* Users & Plans Management */}
+        <AdminUsersManager />
+
+        {/* Broadcast Notifications: Email & Telegram */}
+        <AdminBroadcastManager token={getToken() || ''} />
 
         {/* Jobs */}
         <section className="space-y-3">

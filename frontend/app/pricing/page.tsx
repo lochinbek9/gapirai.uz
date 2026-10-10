@@ -226,7 +226,7 @@ export default function PricingPage() {
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> dublyaj</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> 1 video — maksimal 120 daqiqa</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz sifati' : "Standart ovoz (Edge)"}</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.tts_tier === 'premium' ? 'Premium ovoz (Gemini / ElevenLabs AI)' : "Standart ovoz (Edge)"}</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Yuklab olish sifati: {plan.max_resolution} gacha</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
                   </ul>
@@ -245,25 +245,25 @@ export default function PricingPage() {
                     ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? "Hozirgi tarif" : 'Click orqali tanlash'}
                   </button>
                   {plan.id !== 'free' && !isCurrent && (
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       <button
                         onClick={() => handleSubscribe(plan.id, 'payme')}
                         disabled={subscribing === plan.id}
-                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                        className="py-2 sm:py-2.5 px-1 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                       >
                         Payme
                       </button>
                       <button
                         onClick={() => handleSubscribe(plan.id, 'uzum')}
                         disabled={subscribing === plan.id}
-                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                        className="py-2 sm:py-2.5 px-1 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                       >
                         Uzum
                       </button>
                       <button
                         onClick={() => handleSubscribe(plan.id, 'paynet')}
                         disabled={subscribing === plan.id}
-                        className="flex-1 py-2.5 rounded-2xl font-bold text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                        className="py-2 sm:py-2.5 px-1 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                       >
                         Paynet
                       </button>
@@ -285,36 +285,36 @@ export default function PricingPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {packs.map((p) => (
-              <div key={p.minutes} className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-4 flex flex-col items-center gap-2 text-center">
-                <span className="text-2xl font-black text-gray-900 dark:text-white">+{p.minutes}</span>
-                <span className="text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500">daqiqa</span>
-                <span className="text-sm font-bold text-violet-600 dark:text-violet-400">{p.price.toLocaleString('uz-UZ')} so'm</span>
+              <div key={p.minutes} className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center">
+                <span className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">+{p.minutes}</span>
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500">daqiqa</span>
+                <span className="text-xs sm:text-sm font-bold text-violet-600 dark:text-violet-400">{p.price.toLocaleString('uz-UZ')} so'm</span>
                 <button
                   onClick={() => handleBuyPack(p.minutes, 'click')}
                   disabled={buyingPack === p.minutes}
-                  className="mt-1 w-full py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="mt-1 w-full py-2 rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   {buyingPack === p.minutes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Sotib olish'}
                 </button>
-                <div className="flex w-full gap-1.5">
+                <div className="grid grid-cols-3 w-full gap-1">
                   <button
                     onClick={() => handleBuyPack(p.minutes, 'payme')}
                     disabled={buyingPack === p.minutes}
-                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                   >
                     Payme
                   </button>
                   <button
                     onClick={() => handleBuyPack(p.minutes, 'uzum')}
                     disabled={buyingPack === p.minutes}
-                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                   >
                     Uzum
                   </button>
                   <button
                     onClick={() => handleBuyPack(p.minutes, 'paynet')}
                     disabled={buyingPack === p.minutes}
-                    className="flex-1 py-1.5 rounded-xl text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition"
+                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
                   >
                     Paynet
                   </button>

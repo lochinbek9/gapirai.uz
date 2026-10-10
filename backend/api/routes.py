@@ -223,9 +223,10 @@ def _raise_for_outcome(result: JobCreationResult) -> None:
             detail="Video faylini o'qib bo'lmadi — fayl buzilgan yoki qo'llab-quvvatlanmaydigan bo'lishi mumkin.",
         )
     if result.outcome == "blocked":
+        detail = result.error_detail or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi."
         raise HTTPException(
             status_code=403,
-            detail="Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+            detail=detail,
         )
     if result.outcome == "too_long":
         raise HTTPException(

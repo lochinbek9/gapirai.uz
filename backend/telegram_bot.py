@@ -18,6 +18,7 @@ telegram_bot), long-polling rejimida.
 """
 import logging
 import re
+import shutil
 import uuid
 from pathlib import Path
 
@@ -138,7 +139,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     button = KeyboardButton("📱 Telefon raqamimni ulashish", request_contact=True)
     await update.message.reply_text(
         "Assalomu alaykum! GapirAI.uz botiga xush kelibsiz. 🎬\n\n"
-        "YouTube videolarni o'zbek tiliga avtomatik dublyaj qilib beraman.\n\n"
+        "Videolarni (YouTube havolasi yoki video fayl) sun'iy intellekt yordamida o'zbek tiliga avtomatik dublyaj qilib beraman.\n\n"
         "Boshlash uchun telefon raqamingizni ulashing (agar saytda ro'yxatdan o'tgan bo'lsangiz, "
         "hisobingiz avtomatik tanilib, obuna/kvotangiz shu yerda ham ishlaydi):",
         reply_markup=ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True),
@@ -190,14 +191,13 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if action == "dub":
         context.user_data["mode"] = "dub"
         await query.message.reply_text(
-            "🎬 YouTube havolasini yoki video faylni yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
-            "Video tayyor bo'lganda shu yerga xabar yuboraman."
+            "🎬 Video fayl (MP4, MOV, MKV) yoki YouTube havolasini yuboring — o'zbek tiliga dublyaj qilib beraman.\n\n"
+            "Video tayyor bo'lganda shu yerga yuklab olish havolasini yuboraman."
         )
     elif action == "subtitle":
         context.user_data["mode"] = "subtitle"
         await query.message.reply_text(
-            "📝 YouTube havolasini yuboring — o'zbekcha subtitr (.srt/.vtt) tayyorlab beraman. "
-            "Dublyaj audiosi yaratilmaydi, shuning uchun tezroq.\n\n"
+            "📝 Video fayl yoki YouTube havolasini yuboring — o'zbekcha subtitr (.srt/.vtt) tayyorlab beraman.\n\n"
             "Tayyor bo'lganda shu yerga havola yuboraman."
         )
     elif action == "learn":
@@ -304,6 +304,8 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.text:
+        return
     chat_id = str(update.effective_chat.id)
     text = (update.message.text or "").strip()
 
@@ -320,7 +322,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     url = _looks_like_youtube_url(text)
     if not url:
         await update.message.reply_text(
-            "Iltimos, YouTube video havolasini yoki video faylni yuboring.",
+            "Iltimos, video fayl (MP4, MOV, MKV) yoki YouTube havolasini yuboring.",
             reply_markup=_main_menu_markup(),
         )
         return
@@ -329,27 +331,73 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # tashqari Learning Workspace tahlili ham yaratiladi.
     mode = context.user_data.pop("mode", "dub")
 
-    await update.message.reply_text("⏳ Video tekshirilmoqda...")
+    if mode == "subtitle":
+        await update.message.reply_text("⏳ Video tekshirilmoqda...")
+        await _execute_dubbing_job_flow(update.message, chat_id, url, voice_gender="male", mode=mode)
+    else:
+        context.user_data["pending_url"] = url
+        context.user_data["pending_mode"] = mode
+        markup = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👨 Erkak (Sardor)", callback_data="vg:male"),
+                InlineKeyboardButton("👩 Ayol (Madina)", callback_data="vg:female"),
+            ],
+            [
+                InlineKeyboardButton("🤖 Avtomatik", callback_data="vg:auto"),
+            ]
+        ])
+        await update.message.reply_text(
+            "🎙 Ovoz jinsini tanlang:",
+            reply_markup=markup,
+        )
 
+
+async def handle_gender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    chat_id = str(update.effective_chat.id)
+    gender = (query.data or "").split(":", 1)[-1]
+    url = context.user_data.pop("pending_url", None)
+    mode = context.user_data.pop("pending_mode", "dub")
+
+    if not url:
+        await query.message.reply_text("Havola topilmadi yoki eskirgan. Iltimos, YouTube havolasini qaytadan yuboring.")
+        return
+
+    gender_label = "👨 Erkak (Sardor)" if gender == "male" else "👩 Ayol (Madina)" if gender == "female" else "🤖 Avtomatik"
+    await query.message.edit_text(f"Tanlandi: {gender_label}\n\n⏳ Video tekshirilmoqda...")
+    await _execute_dubbing_job_flow(query.message, chat_id, url, voice_gender=gender, mode=mode)
+
+
+async def _execute_dubbing_job_flow(
+    target_message, chat_id: str | int, url: str, voice_gender: str = "male", mode: str = "dub"
+) -> None:
+    chat_id_str = str(chat_id)
     db = SessionLocal()
     try:
-        # DB user'ni shu sessiyada qayta olish kerak -- yuqoridagi `user`
-        # boshqa (yopilgan) sessiyaga bog'langan edi.
-        user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
-        result = await create_dubbing_job(db, user, url, voice_gender="auto", subtitle_only=(mode == "subtitle"))
+        user = db.query(User).filter(User.telegram_chat_id == chat_id_str).first()
+        if not user:
+            await target_message.reply_text("Avval /start buyrug'ini yuborib, profilingizni faollashtiring.")
+            return
+
+        result = await create_dubbing_job(
+            db, user, url, voice_gender=voice_gender, subtitle_only=(mode == "subtitle")
+        )
 
         frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
 
         if result.outcome == "invalid_url":
-            await update.message.reply_text("Bu YouTube havolasi noto'g'ri ko'rinadi.")
+            await target_message.reply_text("Bu YouTube havolasi noto'g'ri ko'rinadi.")
         elif result.outcome == "fetch_error":
-            await update.message.reply_text(f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
+            await target_message.reply_text(f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
         elif result.outcome == "blocked":
-            await update.message.reply_text(
-                "🚫 Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi."
+            reason = result.error_detail or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi."
+            await target_message.reply_text(
+                f"🚫 <b>Dublaj rad etildi</b>\n\n{reason}",
+                parse_mode="HTML"
             )
         elif result.outcome == "too_long":
-            await update.message.reply_text(
+            await target_message.reply_text(
                 f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). "
                 "Maksimal ruxsat etilgan davomiylik bilan qayta urinib ko'ring."
             )
@@ -367,52 +415,173 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
             if analysis_url:
                 verb = "tahlil qilinmoqda" if result.outcome == "queued" else "tayyor"
-                await update.message.reply_text(
+                await target_message.reply_text(
                     f"✅ \"{result.video_title}\" {verb}.\n\n"
                     f"Konspekt, xulosa, test va AI ustoz:\n{analysis_url}"
                 )
             elif mode == "subtitle":
-                # Subtitr rejimi TTS/audio kutmaydi, tez tayyor bo'ladi va
-                # process_video() bu holatda telegram bildirishnomasini
-                # yubormaydi (backend/workers/tasks.py) -- shuning uchun
-                # havolani navbatga qo'shilgan zahoti beramiz, sahifaning
-                # o'zi progressni ko'rsatib turadi (frontend/app/subtitles/[id]).
                 verb = "tayyorlanmoqda" if result.outcome == "queued" else "tayyor"
-                await update.message.reply_text(
+                await target_message.reply_text(
                     f"📝 \"{result.video_title}\" subtitri {verb}.\n\n{frontend_url}/subtitles/{result.job_id}"
                 )
             elif result.outcome == "queued":
-                await update.message.reply_text(
+                await target_message.reply_text(
                     f"✅ \"{result.video_title}\" navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
                 )
             else:
-                await update.message.reply_text(
+                await target_message.reply_text(
                     f"✅ \"{result.video_title}\" allaqachon tayyor!\n\n{frontend_url}/video/{result.job_id}"
                 )
         elif result.outcome == "insufficient_minutes":
-            await update.message.reply_text(
+            await target_message.reply_text(
                 f"\"{result.video_title}\" ({result.duration_minutes:.0f} daqiqa) uchun "
                 f"{result.minutes_short} daqiqa yetishmayapti.\n\n"
                 f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
             )
         elif result.outcome == "daily_limit":
-            await update.message.reply_text(
+            await target_message.reply_text(
                 f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
                 "Ertaga qaytadan urinib ko'ring."
             )
         elif result.outcome in ("active_limit", "queue_full"):
-            await update.message.reply_text(queue_rejection_message(result))
+            await target_message.reply_text(queue_rejection_message(result))
+    except Exception as e:
+        logger.exception(f"_execute_dubbing_job_flow xatolik: {e}")
+        await target_message.reply_text(f"Video ma'lumotlarini olishda xatolik yuz berdi. Iltimos, boshqa havola bilan sinab ko'ring yoki birozdan so'ng urinib ko'ring.")
+    finally:
+        db.close()
+
+
+async def handle_file_gender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Video fayl yuborilganda foydalanuvchi ovoz jinsini tanlaganida ishga tushadi."""
+    query = update.callback_query
+    await query.answer()
+    chat_id = str(update.effective_chat.id)
+    gender = (query.data or "").split(":", 1)[-1]
+    pending = context.user_data.pop("pending_video", None)
+
+    if not pending:
+        await query.message.reply_text("Video ma'lumotlari topilmadi yoki eskirgan. Iltimos, videoni qaytadan yuboring.")
+        return
+
+    gender_label = "👨 Erkak (Jasur)" if gender == "male" else "👩 Ayol (Kamola)" if gender == "female" else "🤖 Avtomatik (AI)"
+    await query.message.edit_text(f"Tanlandi: {gender_label}\n\n⏳ Video qabul qilinmoqda va navbatga qo'shilmoqda...")
+    await _process_video_file_job(
+        query.message,
+        context.bot,
+        chat_id,
+        pending["media"],
+        pending["ext"],
+        pending["video_title"],
+        voice_gender=gender,
+        subtitle_only=pending.get("subtitle_only", False),
+    )
+
+
+async def _process_video_file_job(
+    target_message,
+    bot,
+    chat_id: str | int,
+    media,
+    ext: str,
+    video_title: str,
+    voice_gender: str = "auto",
+    subtitle_only: bool = False,
+) -> None:
+    chat_id_str = str(chat_id)
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_chat_id == chat_id_str).first()
+        if not user:
+            await target_message.reply_text("Avval /start buyrug'ini yuborib, profilingizni faollashtiring.")
+            return
+
+        rejection = check_queue_capacity(db, user.id)
+        if rejection:
+            await target_message.reply_text(queue_rejection_message(rejection))
+            return
+    finally:
+        db.close()
+
+    job_id = str(uuid.uuid4())
+    job_dir = Path(settings.UPLOAD_DIR) / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    video_path = job_dir / f"video{ext}"
+
+    try:
+        tg_file = await bot.get_file(media.file_id)
+        await tg_file.download_to_drive(custom_path=str(video_path))
+        # Mahalliy Bot API server (--local) faylni O'Z diskida saqlaydi va
+        # download_to_drive local rejimda uni KO'CHIRMAY, NUSXALAYDI --
+        # nusxa olingach asl faylni o'chiramiz, aks holda telegram_bot_api_data
+        # volume'i vaqt o'tib to'lib ketadi.
+        src = getattr(tg_file, "file_path", "") or ""
+        if src.startswith("/"):
+            try:
+                Path(src).unlink(missing_ok=True)
+            except OSError:
+                pass
+    except Exception:
+        logger.exception(f"Telegram fayl yuklashda xato: job={job_id}")
+        shutil.rmtree(job_dir, ignore_errors=True)
+        await target_message.reply_text("Video faylini olishda xatolik yuz berdi. Qaytadan urinib ko'ring.")
+        return
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_chat_id == chat_id_str).first()
+        result = await create_job_from_local_video_file(
+            db, user, job_id, video_path,
+            source_url=f"telegram://file/{media.file_unique_id}",
+            voice_gender=voice_gender,
+            subtitle_only=subtitle_only,
+            video_title=video_title,
+        )
+
+        frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
+
+        if result.outcome == "bad_file":
+            await target_message.reply_text(
+                "Video faylini o'qib bo'lmadi — fayl buzilgan yoki qo'llab-quvvatlanmaydigan bo'lishi mumkin."
+            )
+        elif result.outcome == "too_long":
+            await target_message.reply_text(
+                f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). "
+                "Maksimal ruxsat etilgan davomiylik bilan qayta urinib ko'ring."
+            )
+        elif result.outcome == "insufficient_minutes":
+            await target_message.reply_text(
+                f"Bu video ({result.duration_minutes:.0f} daqiqa) uchun {result.minutes_short} daqiqa yetishmayapti.\n\n"
+                f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
+            )
+        elif result.outcome == "daily_limit":
+            await target_message.reply_text(
+                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
+                "Ertaga qaytadan urinib ko'ring."
+            )
+        elif result.outcome in ("active_limit", "queue_full"):
+            await target_message.reply_text(queue_rejection_message(result))
+        elif result.outcome == "queued" and subtitle_only:
+            # Subtitr job'lari tugaganda bildirishnoma yubormaydi (tasks.py),
+            # shuning uchun havolani darhol beramiz -- sahifa progressni o'zi
+            # ko'rsatadi va .srt/.vtt/.txt yuklab olish tugmalari shu yerda.
+            await target_message.reply_text(
+                f"📝 Subtitr tayyorlanmoqda.\n\n{frontend_url}/subtitles/{result.job_id}"
+            )
+        elif result.outcome == "queued":
+            await target_message.reply_text(
+                f"✅ \"{video_title}\" navbatga qo'shildi!\n\nTayyor bo'lganda shu yerga xabar yuboraman."
+            )
     finally:
         db.close()
 
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Foydalanuvchi video faylni to'g'ridan-to'g'ri yuborsa -- YouTube
-    havolasisiz, faylning o'zidan job yaratadi
-    (backend/services/job_creation.py:create_job_from_local_video_file).
-    Faqat mahalliy Telegram Bot API server sozlangan bo'lsa ishlaydi
-    (settings.TELEGRAM_LOCAL_API_URL) -- aks holda YouTube-havola oqimi
-    o'zgarishsiz, bu funksiya faqat aniq xabar bilan rad etadi."""
+    havolasisiz, faylning o'zidan job yaratadi."""
+    if not update.message:
+        return
+
     chat_id = str(update.effective_chat.id)
     db = SessionLocal()
     try:
@@ -430,18 +599,27 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    media = update.message.video or update.message.document
+    media = update.message.video or update.message.document or update.message.video_note or update.message.animation
     if media is None:
         return
 
-    # Menyudan "Subtitr yaratish" tanlangan bo'lsa, fayl ham subtitrga ketadi
-    # (2026-09-20). Rejim bir martalik -- fayl muvaffaqiyatli olingach o'chiriladi;
-    # yaroqsiz fayl yuborilsa rejim saqlanib qoladi.
-    subtitle_only = context.user_data.get("mode") == "subtitle"
+    raw_name = getattr(media, "file_name", None) or ""
+    mime = (getattr(media, "mime_type", None) or "").lower()
 
-    ext = _ALLOWED_VIDEO_MIME_TO_EXT.get(getattr(media, "mime_type", None) or "")
+    ext = _ALLOWED_VIDEO_MIME_TO_EXT.get(mime)
+    if not ext and raw_name:
+        for allowed_ext in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"):
+            if raw_name.lower().endswith(allowed_ext):
+                ext = allowed_ext if allowed_ext != ".m4v" else ".mp4"
+                break
+    if not ext and (update.message.video or update.message.video_note):
+        ext = ".mp4"
+
     if not ext:
-        await update.message.reply_text("Faqat MP4, MOV, MKV yoki WebM formatidagi video fayllar qabul qilinadi.")
+        if update.message.document:
+            await update.message.reply_text(
+                "Faqat video fayllar (MP4, MOV, MKV yoki WebM) qabul qilinadi. Iltimos, video faylni yuboring."
+            )
         return
 
     if media.file_size and media.file_size > TELEGRAM_MAX_VIDEO_BYTES:
@@ -450,8 +628,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    # Navbat to'la / faol job chegarasi bo'lsa, faylni (2GB gacha) yuklab
-    # olishdan OLDIN rad etamiz -- yuk ostida bekorga disk/tarmoq sarflamaslik.
     db = SessionLocal()
     try:
         rejection = check_queue_capacity(db, user.id)
@@ -461,82 +637,36 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(queue_rejection_message(rejection))
         return
 
-    await update.message.reply_text("⏳ Video qabul qilinmoqda, biroz kuting...")
+    subtitle_only = context.user_data.pop("mode", None) == "subtitle"
+    clean_title = raw_name.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").strip() if raw_name else ""
+    video_title = clean_title[:120] if clean_title else "Video fayl"
 
-    job_id = str(uuid.uuid4())
-    job_dir = Path(settings.UPLOAD_DIR) / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-    video_path = job_dir / f"video{ext}"
-
-    try:
-        tg_file = await context.bot.get_file(media.file_id)
-        await tg_file.download_to_drive(custom_path=str(video_path))
-        # Mahalliy Bot API server (--local) faylni O'Z diskida saqlaydi va
-        # download_to_drive local rejimda uni KO'CHIRMAY, NUSXALAYDI --
-        # nusxa olingach asl faylni o'chiramiz, aks holda telegram_bot_api_data
-        # volume'i vaqt o'tib to'lib ketadi.
-        src = getattr(tg_file, "file_path", "") or ""
-        if src.startswith("/"):
-            try:
-                Path(src).unlink(missing_ok=True)
-            except OSError:
-                pass
-    except Exception:
-        logger.exception(f"Telegram fayl yuklashda xato: job={job_id}")
-        video_path.unlink(missing_ok=True)
-        await update.message.reply_text("Video faylini olishda xatolik yuz berdi. Qaytadan urinib ko'ring.")
-        return
-
-    db = SessionLocal()
-    try:
-        # DB user'ni shu sessiyada qayta olish kerak -- yuqoridagi `user`
-        # boshqa (yopilgan) sessiyaga bog'langan edi (handle_text bilan bir xil naqsh).
-        user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
-        context.user_data.pop("mode", None)
-        file_name = getattr(media, "file_name", None) or ""
-        result = await create_job_from_local_video_file(
-            db, user, job_id, video_path,
-            source_url=f"telegram://file/{media.file_unique_id}",
-            subtitle_only=subtitle_only,
-            video_title=(file_name.rsplit(".", 1)[0][:120] or None) if subtitle_only else None,
+    if subtitle_only:
+        await update.message.reply_text(f"⏳ \"{video_title}\" qabul qilinmoqda...")
+        await _process_video_file_job(
+            update.message, context.bot, chat_id, media, ext, video_title, voice_gender="auto", subtitle_only=True
         )
-
-        if result.outcome == "bad_file":
-            await update.message.reply_text(
-                "Video faylini o'qib bo'lmadi — fayl buzilgan yoki qo'llab-quvvatlanmaydigan bo'lishi mumkin."
-            )
-        elif result.outcome == "too_long":
-            await update.message.reply_text(
-                f"Video juda uzun ({result.duration_minutes:.0f} daqiqa). "
-                "Maksimal ruxsat etilgan davomiylik bilan qayta urinib ko'ring."
-            )
-        elif result.outcome == "insufficient_minutes":
-            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
-            await update.message.reply_text(
-                f"Bu video ({result.duration_minutes:.0f} daqiqa) uchun {result.minutes_short} daqiqa yetishmayapti.\n\n"
-                f"Qo'shimcha daqiqa sotib oling yoki tarifni yangilang:\n{frontend_url}/pricing"
-            )
-        elif result.outcome == "daily_limit":
-            await update.message.reply_text(
-                f"Kunlik dublyaj chegarasiga yetdingiz (24 soatda {result.daily_limit} ta). "
-                "Ertaga qaytadan urinib ko'ring."
-            )
-        elif result.outcome in ("active_limit", "queue_full"):
-            await update.message.reply_text(queue_rejection_message(result))
-        elif result.outcome == "queued" and subtitle_only:
-            # Subtitr job'lari tugaganda bildirishnoma yubormaydi (tasks.py),
-            # shuning uchun havolani darhol beramiz -- sahifa progressni o'zi
-            # ko'rsatadi va .srt/.vtt/.txt yuklab olish tugmalari shu yerda.
-            frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
-            await update.message.reply_text(
-                f"📝 Subtitr tayyorlanmoqda.\n\n{frontend_url}/subtitles/{result.job_id}"
-            )
-        elif result.outcome == "queued":
-            await update.message.reply_text(
-                "✅ Video navbatga qo'shildi.\n\nTayyor bo'lganda shu yerga xabar yuboraman."
-            )
-    finally:
-        db.close()
+    else:
+        context.user_data["pending_video"] = {
+            "media": media,
+            "ext": ext,
+            "video_title": video_title,
+            "subtitle_only": False,
+        }
+        markup = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👨 Erkak (Jasur)", callback_data="vg_file:male"),
+                InlineKeyboardButton("👩 Ayol (Kamola)", callback_data="vg_file:female"),
+            ],
+            [
+                InlineKeyboardButton("🤖 Avtomatik (AI)", callback_data="vg_file:auto"),
+            ]
+        ])
+        await update.message.reply_text(
+            f"🎬 <b>{video_title}</b> qabul qilindi!\n\n🎙 Ovoz jinsini tanlang:",
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
 
 
 async def handle_resolution_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -599,9 +729,11 @@ def main() -> None:
     app.add_handler(CommandHandler("app", app_command))
     app.add_handler(CommandHandler("donate", donate_command))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
+    app.add_handler(MessageHandler(filters.VIDEO | filters.VIDEO_NOTE | filters.Document.ALL | filters.ANIMATION, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern=r"^menu:"))
+    app.add_handler(CallbackQueryHandler(handle_gender_callback, pattern=r"^vg:"))
+    app.add_handler(CallbackQueryHandler(handle_file_gender_callback, pattern=r"^vg_file:"))
     app.add_handler(CallbackQueryHandler(handle_resolution_callback, pattern=r"^res:"))
 
     logger.info("Telegram bot ishga tushdi (long polling).")

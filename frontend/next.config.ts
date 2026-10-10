@@ -4,6 +4,12 @@ import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
+  env: {
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID:
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      process.env.GOOGLE_CLIENT_ID ||
+      "235172384103-ppm31k0mdn5co7fanr9ed4hcqb8u00qt.apps.googleusercontent.com",
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "img.youtube.com" },

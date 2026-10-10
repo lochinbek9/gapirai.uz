@@ -122,16 +122,95 @@ def _issue_phone_code(user: User, db: Session) -> str:
     return code
 
 
+MAX_OTP_ATTEMPTS = 5
+
+
+def _check_and_increment_otp_attempt(key: str, user: User, db: Session, is_phone: bool = False) -> None:
+    """OTP kod noto'g'ri kiritilganda urinishlar sonini oshiradi.
+    5 marta xato kiritilsa, kodni xavfsizlik yuzasidan bekor qiladi."""
+    r = None
+    try:
+        from backend.services.rate_limiter import _get_redis
+        r = _get_redis()
+    except Exception:
+        pass
+
+    attempts = 1
+    if r:
+        try:
+            attempts = r.incr(key)
+            r.expire(key, 600)
+        except Exception:
+            pass
+
+    if attempts >= MAX_OTP_ATTEMPTS:
+        if is_phone:
+            user.phone_verification_code = None
+            user.phone_verification_code_expires_at = None
+        else:
+            user.verification_code = None
+            user.verification_code_expires_at = None
+        db.commit()
+        if r:
+            try:
+                r.delete(key)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=400,
+            detail="Juda ko'p noto'g'ri urinish. Xavfsizlik yuzasidan kod bekor qilindi. Yangi kod so'rang.",
+        )
+    remaining = max(0, MAX_OTP_ATTEMPTS - attempts)
+    raise HTTPException(status_code=400, detail=f"Kod noto'g'ri. Qolgan urinishlar: {remaining} ta.")
+
+
+def _clear_otp_attempts(key: str) -> None:
+    try:
+        from backend.services.rate_limiter import _get_redis
+        _get_redis().delete(key)
+    except Exception:
+        pass
+
+
 @router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", 5, 600))])
 def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
-    if db.query(User).filter(User.email == req.email.lower()).first():
-        raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
+    if len(req.password) > 128:
+        raise HTTPException(status_code=400, detail="Parol 128 ta belgidan oshmasligi kerak.")
+
+    email = req.email.lower().strip()
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        # Agar bu email tasdiqlangan foydalanuvchiga tegishli bo'lsa -> ro'yxatdan o'tish rad etiladi
+        if getattr(existing, "is_verified", True) is True:
+            raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
+
+        # Agar foydalanuvchi avval ro'yxatdan o'tishga uringan, lekin emailni tasdiqlamagan bo'lsa:
+        # uni bloklamaymiz, ma'lumotlarni yangilab, yangi tasdiqlash kodi yuboramiz.
+        db.rollback()
+        name = req.name.strip()
+        password_hash = hash_password(req.password)
+        existing.name = name
+        existing.password_hash = password_hash
+        existing.verification_code = None
+        existing.verification_code_expires_at = None
+        user = existing
+        db.commit()
+        db.refresh(user)
+
+        code = _issue_code(user, db)
+        db.close()
+        if not send_verification_email(email, code, name):
+            raise HTTPException(
+                status_code=500,
+                detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.",
+            )
+        return PendingVerificationResponse(email=email, message="Tasdiqlash kodi emailingizga yuborildi.")
+
     # bcrypt (~230ms CPU) ochiq tranzaksiya ichida ishlamasin -- ulanish hovuzga
     # qaytadi. Shu sabab oddiy qiymatlarni oldindan olamiz.
     db.rollback()
-    email = req.email.lower().strip()
     name = req.name.strip()
     password_hash = hash_password(req.password)
 
@@ -145,41 +224,54 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVeri
     # Resend hovuzni tugatib, butun API'ni to'xtatib qo'ymasligi kerak.
     db.close()
     if not send_verification_email(email, code, name):
-        raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
+        raise HTTPException(
+            status_code=500,
+            detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.",
+        )
 
     return PendingVerificationResponse(email=email, message="Tasdiqlash kodi emailingizga yuborildi.")
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", 10, 600))])
-def login(req: LoginRequest, db: Session = Depends(get_db)) -> PendingVerificationResponse:
-    user = db.query(User).filter(User.email == req.email.lower()).first()
+def login(req: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    user = db.query(User).filter(User.email == req.email.lower().strip()).first()
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ro'yxatdan o'tmagan.")
-    # bcrypt ochiq tranzaksiyada ishlamasin (register'dagi kabi), va parolsiz
-    # (faqat Google) akkaunt uchun 500 emas 401 qaytsin.
-    password_hash, email, name = user.password_hash, user.email, user.name
-    db.rollback()
-    if not password_hash or not verify_password(req.password, password_hash):
+
+    if not user.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="Ushbu hisob Google orqali ochilgan. Iltimos, 'Google bilan kirish' tugmasidan foydalaning.",
+        )
+
+    if not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Parol noto'g'ri.")
 
-    code = _issue_code(user, db)
-    db.close()  # Resend chaqiruvi paytida ulanish band turmasin
-    if not send_verification_email(email, code, name):
-        raise HTTPException(status_code=500, detail="Tasdiqlash kodini yuborishda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
+    if not getattr(user, "is_verified", False):
+        user.is_verified = True
+        db.commit()
 
-    return PendingVerificationResponse(email=email, message="Tasdiqlash kodi emailingizga yuborildi.")
+    token = create_access_token(str(user.id), user.email)
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user={"id": str(user.id), "name": user.name, "email": user.email, "role": getattr(user, "role", "user")},
+    )
 
 
 @router.post("/verify-code", dependencies=[Depends(rate_limit("verify_code", 10, 600))])
 def verify_code(req: VerifyCodeRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    user = db.query(User).filter(User.email == req.email.lower()).first()
+    email = req.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
     if not user or not user.verification_code:
         raise HTTPException(status_code=400, detail="Kod topilmadi. Qaytadan urinib ko'ring.")
     if not user.verification_code_expires_at or user.verification_code_expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
-    if user.verification_code != req.code.strip():
-        raise HTTPException(status_code=400, detail="Kod noto'g'ri.")
 
+    if user.verification_code != req.code.strip():
+        _check_and_increment_otp_attempt(f"auth:failed_code:{email}", user, db)
+
+    _clear_otp_attempts(f"auth:failed_code:{email}")
     user.is_verified = True
     user.verification_code = None
     user.verification_code_expires_at = None
@@ -209,6 +301,11 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthRe
         user = db.query(User).filter(User.email == info["email"]).first()
         if user:
             user.google_id = info["sub"]
+            # Xavfsizlik: agar profil tasdiqlanmagan holda parolli bo'lgan bo'lsa,
+            # begonaning paroli bilan kirish xavfini bartaraf etish uchun
+            # parolni tozalaymiz (chunki Google orqali haqiqiy egasi tasdiqlandi).
+            if not getattr(user, "is_verified", False):
+                user.password_hash = None
             if info["email_verified"]:
                 user.is_verified = True
             db.commit()
@@ -265,8 +362,9 @@ def phone_verify_code(req: PhoneVerifyCodeRequest, db: Session = Depends(get_db)
     if not user.phone_verification_code_expires_at or user.phone_verification_code_expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
     if user.phone_verification_code != req.code.strip():
-        raise HTTPException(status_code=400, detail="Kod noto'g'ri.")
+        _check_and_increment_otp_attempt(f"auth:failed_phone_code:{phone}", user, db, is_phone=True)
 
+    _clear_otp_attempts(f"auth:failed_phone_code:{phone}")
     user.is_verified = True
     user.phone_verification_code = None
     user.phone_verification_code_expires_at = None
@@ -313,15 +411,19 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> AuthResponse:
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="Parol kamida 6 ta belgidan iborat bo'lishi kerak.")
+    if len(req.new_password) > 128:
+        raise HTTPException(status_code=400, detail="Parol 128 ta belgidan oshmasligi kerak.")
 
-    user = db.query(User).filter(User.email == req.email.lower()).first()
+    email = req.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
     if not user or not user.verification_code:
         raise HTTPException(status_code=400, detail="Kod topilmadi. Qaytadan urinib ko'ring.")
     if not user.verification_code_expires_at or user.verification_code_expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
     if user.verification_code != req.code.strip():
-        raise HTTPException(status_code=400, detail="Kod noto'g'ri.")
+        _check_and_increment_otp_attempt(f"auth:failed_reset_code:{email}", user, db)
 
+    _clear_otp_attempts(f"auth:failed_reset_code:{email}")
     user.password_hash = hash_password(req.new_password)
     user.is_verified = True
     user.verification_code = None

@@ -79,55 +79,47 @@ def _db(user, calls):
 class TestLoginFlow(unittest.TestCase):
     def setUp(self):
         self.calls = []
-        self.user = SimpleNamespace(password_hash="HASH", email="a@b.co", name="Ali")
+        self.user = SimpleNamespace(id="u1", password_hash="HASH", email="a@b.co", name="Ali", is_verified=True)
 
-    def _patches(self, verify=True, email_ok=True):
+    def _patches(self, verify=True):
         c = self.calls
         return (
             patch.object(auth_routes, "verify_password", side_effect=lambda p, h: c.append("bcrypt") or verify),
-            patch.object(auth_routes, "_issue_code", side_effect=lambda u, d: c.append("issue") or "123456"),
-            patch.object(auth_routes, "send_verification_email",
-                         side_effect=lambda e, code, n: c.append(f"email:{e}:{code}:{n}") or email_ok),
+            patch.object(auth_routes, "create_access_token", side_effect=lambda data: c.append("jwt") or "TOKEN123"),
         )
 
     def _login(self, user=None, **kw):
         db = _db(self.user if user is None else user, self.calls)
-        p1, p2, p3 = self._patches(**kw)
-        with p1, p2, p3:
+        p1, p2 = self._patches(**kw)
+        with p1, p2:
             return auth_routes.login(auth_routes.LoginRequest(email="A@B.co", password="secret"), db)
 
-    def test_connection_released_before_bcrypt_and_before_email(self):
+    def test_direct_login_returns_token_without_email_code(self):
         r = self._login()
-        self.assertEqual(self.calls, ["rollback", "bcrypt", "issue", "close", "email:a@b.co:123456:Ali"])
-        self.assertEqual(r.email, "a@b.co")
+        self.assertEqual(self.calls, ["rollback", "bcrypt", "jwt"])
+        self.assertEqual(r.access_token, "TOKEN123")
+        self.assertEqual(r.user["email"], "a@b.co")
 
     def test_unknown_user_404_without_bcrypt(self):
         db = _db(None, self.calls)
-        p1, p2, p3 = self._patches()
-        with p1, p2, p3, self.assertRaises(HTTPException) as cm:
+        p1, p2 = self._patches()
+        with p1, p2, self.assertRaises(HTTPException) as cm:
             auth_routes.login(auth_routes.LoginRequest(email="x@y.z", password="p"), db)
         self.assertEqual(cm.exception.status_code, 404)
         self.assertNotIn("bcrypt", self.calls)
 
-    def test_wrong_password_401_and_no_email(self):
+    def test_wrong_password_401(self):
         with self.assertRaises(HTTPException) as cm:
             self._login(verify=False)
         self.assertEqual(cm.exception.status_code, 401)
-        self.assertNotIn("issue", self.calls)
-        self.assertFalse(any(c.startswith("email") for c in self.calls))
+        self.assertNotIn("jwt", self.calls)
 
     def test_google_only_account_without_password_is_401_not_a_crash(self):
-        google_only = SimpleNamespace(password_hash=None, email="g@b.co", name="G")
+        google_only = SimpleNamespace(id="g1", password_hash=None, email="g@b.co", name="G", is_verified=True)
         with self.assertRaises(HTTPException) as cm:
             self._login(user=google_only)
         self.assertEqual(cm.exception.status_code, 401)
-        self.assertNotIn("bcrypt", self.calls)  # None xeshga bcrypt chaqirilmaydi
-
-    def test_email_failure_is_500_but_connection_was_already_released(self):
-        with self.assertRaises(HTTPException) as cm:
-            self._login(email_ok=False)
-        self.assertEqual(cm.exception.status_code, 500)
-        self.assertLess(self.calls.index("close"), self.calls.index("email:a@b.co:123456:Ali"))
+        self.assertNotIn("bcrypt", self.calls)
 
 
 class TestRegisterAndResend(unittest.TestCase):

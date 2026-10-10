@@ -111,7 +111,7 @@ export default function RegisterPage() {
         <div className="glass-card rounded-[32px] p-8 sm:p-10">
           {step === 'form' && (
             <div className="space-y-6 mb-6">
-              <GoogleSignInButton onCredential={handleGoogleCredential} />
+              <GoogleSignInButton onCredential={handleGoogleCredential} text="signup_with" />
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">yoki</span>

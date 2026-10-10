@@ -32,10 +32,24 @@ server {
 
     # 2026-09-20: login qilinmagan (anonim) GET /api/jobs/<uuid> uchun 10s kesh --
     # ommaviy ulashilgan havola minglab marta ochilsa backend'ga bir necha marta boradi.
-    # Authorization bor so'rov keshni butunlay chetlab o'tadi va SAQLANMAYDI (egasining
-    # to'liq javobi begonaga berilmasligi uchun). Kalitga Origin qo'shilgan: backend
-    # access-control-allow-origin'ga so'rovning Origin'ini aynan qaytaradi.
     location ~ "^/api/jobs/[0-9a-fA-F-]{36}$" {
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+            add_header 'Access-Control-Max-Age' 86400;
+            add_header 'Content-Length' 0;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            return 204;
+        }
+
+        add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+        add_header X-Cache-Status $upstream_cache_status always;
+
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -54,7 +68,6 @@ server {
         proxy_cache_lock_timeout 5s;
         proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
         proxy_cache_background_update on;
-        add_header X-Cache-Status $upstream_cache_status always;
 
         gzip on;
         gzip_types application/json;
@@ -64,12 +77,23 @@ server {
     }
 
     # 2026-09-20: video fayl yuklash (POST /api/jobs/upload, "Subtitr" rejimi).
-    # Standart client_max_body_size 1 MB -- shu yo'l uchun kattalashtiriladi
-    # (backend WEB_UPLOAD_MAX_MB=1024 dan biroz katta, haqiqiy chegarani backend qo'yadi).
-    # proxy_request_buffering off: fayl nginx diskida oraliq saqlanmay, to'g'ridan-to'g'ri
-    # backend'ga oqadi (1 GB uchun disk ikki baravar band bo'lmaydi).
-    # Timeout'lar sekin mobil aloqada uzoq yuklash uchun.
     location = /api/jobs/upload {
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+            add_header 'Access-Control-Max-Age' 86400;
+            add_header 'Content-Length' 0;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            return 204;
+        }
+
+        add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+
         client_max_body_size 1100m;
         client_body_timeout 300s;
         proxy_request_buffering off;
@@ -83,7 +107,32 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Universal CORS headers across all endpoints and error pages (502, 504, etc.)
+    proxy_hide_header Access-Control-Allow-Origin;
+    proxy_hide_header Access-Control-Allow-Credentials;
+    proxy_hide_header Access-Control-Allow-Methods;
+    proxy_hide_header Access-Control-Allow-Headers;
+
     location / {
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+            add_header 'Access-Control-Max-Age' 86400;
+            add_header 'Content-Length' 0;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            return 204;
+        }
+
+        add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since,X-File-Name' always;
+
+        proxy_read_timeout 180s;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 180s;
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

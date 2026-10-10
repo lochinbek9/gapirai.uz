@@ -4,7 +4,7 @@ from datetime import datetime
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
-
+from concurrent.futures import ThreadPoolExecutor
 from backend.workers.celery_app import celery_app
 from backend.workers.tasks import _record_stage, _log_pipeline_summary, _error_code_for, _safe_persisted_error, _cleanup_upload_dir
 from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
@@ -199,10 +199,21 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 70.0, "AI tahlil qilinmoqda...")
-            analysis.summary = _service.generate_summary(segments, analysis.language)
-            analysis.key_points = _service.generate_key_points(segments, analysis.language)
-            analysis.chapters = _service.generate_chapters(segments, analysis.video_duration or 0.0, analysis.language)
-            analysis.five_minute_summary = _service.generate_five_minute_summary(segments, analysis.video_duration or 0.0, analysis.language)
+            lang = analysis.language
+            dur = analysis.video_duration or 0.0
+
+            # To'rtta mustaqil LLM chaqiruvi parallel; DB'ga faqat asosiy oqimda yoziladi.
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                f_summary = pool.submit(_service.generate_summary, segments, lang)
+                f_points = pool.submit(_service.generate_key_points, segments, lang)
+                f_chapters = pool.submit(_service.generate_chapters, segments, dur, lang)
+                f_five = pool.submit(_service.generate_five_minute_summary, segments, dur, lang)
+
+                analysis.summary = f_summary.result()
+                analysis.key_points = f_points.result()
+                analysis.chapters = f_chapters.result()
+                analysis.five_minute_summary = f_five.result()
+
             db.commit()
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "ok")
 

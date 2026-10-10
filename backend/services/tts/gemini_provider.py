@@ -52,11 +52,10 @@ def _config_for(voice: str):
 
 
 def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
-    """Bitta so'rovni (bitta yoki birlashtirilgan matn bilan) qayta urinish
-    bilan yuboradi. Vertex AI kvotasi DAQIQALIK bo'lgani uchun kutish vaqti
-    bir daqiqalik oynani qamrab olishi uchun yetarlicha uzun."""
+    """Bitta so'rovni yuboradi. Rate limit bo'lsa darhol fallbackga imkon berish
+    uchun uzoq kutmasdan tezkor javob qaytaradi (job 60% da qotib qolmasligi uchun)."""
     config = _config_for(voice)
-    max_attempts = 5
+    max_attempts = 2
     for attempt in range(max_attempts):
         try:
             response = _get_client().models.generate_content(
@@ -64,14 +63,21 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                 contents=contents,
                 config=config,
             )
-            return response.candidates[0].content.parts[0].inline_data.data
+            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    inline_data = getattr(part, "inline_data", None)
+                    if inline_data and getattr(inline_data, "data", None):
+                        raw_data = inline_data.data
+                        if isinstance(raw_data, str):
+                            import base64
+                            raw_data = base64.b64decode(raw_data)
+                        return raw_data
         except Exception as e:
             is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
             if attempt == max_attempts - 1 or not is_rate_limit:
-                raise
-            backoff = min(60, (2 ** attempt) * 3) + random.uniform(0.1, 2.0)
-            logger.warning(f"Gemini TTS RateLimit — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts})")
-            time.sleep(backoff)
+                logger.warning(f"Gemini TTS xato: {e}")
+                return None
+            time.sleep(1.0)
     return None
 
 
@@ -138,18 +144,10 @@ class GeminiProvider(TTSProvider):
         output_dir: str,
         voice_name: str | None = None,
     ) -> dict[int, str]:
-        """
-        Bir nechta segmentni BITTA so'rovda birlashtirib yuboradi (pauza
-        ko'rsatmasi bilan), keyin natijani jimlik (silence) orqali qayta
-        segmentlarga ajratadi. Bu daqiqalik so'rov-soni limitini segment
-        sonidan ~_BATCH_SIZE marta kamaytiradi.
-
-        Kutilmagan pauza soni chiqsa yoki xatolik bo'lsa, o'sha bo'lak
-        xavfsiz tarzda bitta-bitta (synthesize()) usuliga qaytadi —
-        hech qachon noto'g'ri joydan kesilgan audio ishlatilmaydi.
-        """
-        if not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
-            return {}
+        # Silence-based batching is not reliable for preview TTS models.
+        # Returning {} delegates synthesis to the individual segment worker pool
+        # which has live progress tracking and automatic fallback.
+        return {}
 
         from concurrent.futures import ThreadPoolExecutor
 

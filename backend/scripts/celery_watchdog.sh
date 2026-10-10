@@ -7,9 +7,10 @@
 # qayta ishga tushiradi. Cron orqali har 5 daqiqada ishga tushiriladi.
 set -euo pipefail
 
-LOG="/home/ubuntu/celery_watchdog.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_DIR="${COMPOSE_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+LOG="${LOG:-$HOME/celery_watchdog.log}"
 CONTAINER="dubber_worker"
-COMPOSE_DIR="/home/ubuntu/ai-dubber"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $1" >> "$LOG"; }
 

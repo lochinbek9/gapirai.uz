@@ -61,7 +61,7 @@ def _get_client() -> OpenAI:
     return client
 
 
-def _chunk_audio(audio_path: str, chunk_dir: Path) -> list[Path]:
+def _chunk_audio(audio_path: str, chunk_dir: Path, chunk_seconds: int = _CHUNK_DURATION_SECONDS) -> list[Path]:
     output_pattern = chunk_dir / "chunk_%03d.mp3"
     proc = subprocess.run(
         [
@@ -74,7 +74,7 @@ def _chunk_audio(audio_path: str, chunk_dir: Path) -> list[Path]:
             "-f",
             "segment",
             "-segment_time",
-            str(_CHUNK_DURATION_SECONDS),
+            str(chunk_seconds),
             "-reset_timestamps",
             "1",
             "-ac",
@@ -205,7 +205,7 @@ def looks_turkish(text: str | None) -> bool:
     return sum(c in _TURKISH_LETTERS for c in letters) / len(letters) >= 0.03
 
 
-def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | None = "en") -> tuple[list[dict], str, str]:
+def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
     # OpenAI'ning "language" parametri faqat cheklangan ISO-639-1 ro'yxatini
     # qabul qiladi — "uz" o'sha ro'yxatda YO'Q va 400 xato bilan rad etiladi
     # (2026-08-12 productionda tasdiqlangan). Shuning uchun qo'llab-
@@ -277,27 +277,46 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | N
 _TRANSCRIBE_LANGUAGE_NAMES = {"en": "English", "uz": "Uzbek"}
 
 
+def _get_gemini_stt_model_name() -> str:
+    if settings.GEMINI_USE_VERTEX:
+        return settings.GEMINI_VERTEX_TEXT_MODEL
+    model = getattr(settings, "GEMINI_STT_MODEL", None) or settings.GEMINI_MODEL
+    if "3.6" in model:
+        return "gemini-2.0-flash"
+    return model
+
+
 def _build_transcribe_prompt(language: str | None) -> str:
-    lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language) if language else "whatever language is spoken"
     if language == "uz":
-        lang_name = ("Uzbek (the language is Uzbek, NOT Turkish; write it in the Uzbek Latin alphabet "
-                     "with oʻ and gʻ)")
+        lang_instruction = (
+            "The audio language is Uzbek. Transcribe it verbatim in the official Uzbek Latin alphabet "
+            "(the language is Uzbek, NOT Turkish; using oʻ and gʻ, do NOT use Turkish letters like ç, ğ, ı, ö, ş, ü). "
+            "Do NOT translate into English, Turkish or Russian; write the exact Uzbek words spoken."
+        )
+    elif language:
+        lang_name = _TRANSCRIBE_LANGUAGE_NAMES.get(language, language)
+        lang_instruction = f"Transcribe the audio verbatim in {lang_name}, exactly as spoken."
+    else:
+        lang_instruction = (
+            "Detect the spoken language and transcribe the audio verbatim, exactly as spoken in that language. "
+            "CRITICAL: If the language spoken is Uzbek, write in official Uzbek Latin alphabet (with oʻ and gʻ). "
+            "Never confuse Uzbek with Turkish. Do NOT translate into another language."
+        )
+
     return (
-        f"Transcribe this audio clip verbatim in {lang_name}, exactly as spoken. "
-        "Split the transcription into short natural subtitle-style segments "
-        "(roughly one sentence or clause each). For each segment, give its "
-        "start and end time in seconds, measured from the very start of THIS "
-        "audio clip (0.0 = beginning of the clip). Silent/music-only clips "
-        "should return an empty segments list.\n\n"
-        'Respond with ONLY this JSON shape, no other text:\n'
-        '{"segments": [{"start": 0.0, "end": 2.4, "text": "..."}, ...]}'
+        f"{lang_instruction}\n\n"
+        "Instructions:\n"
+        "1. Split the transcription into short natural subtitle-style segments (roughly one sentence or clause each, around 2-6 seconds each).\n"
+        "2. For each segment, give its exact start and end time in seconds, measured from the start of THIS audio clip (0.0 = clip start).\n"
+        "3. Exclude non-speech background music or noise. If the audio is silent or music-only, return an empty segments list.\n\n"
+        'Respond with ONLY valid JSON in this exact shape, no other text:\n'
+        '{"language": "uz", "segments": [{"start": 0.0, "end": 2.4, "text": "transcribed text..."}, ...]}'
     )
 
 
-def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = "en") -> tuple[list[dict], str, str]:
-    """OpenAI muqobili sifatida — Vertex AI orqali Gemini bilan transkripsiya.
-    Whisper'ning audio-alignment aniqligiga teng emas, lekin OpenAI krediti
-    tugagan holatlarda navbatni to'xtatib qo'ymaslik uchun yetarli."""
+def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
+    """Google AI Studio / Vertex AI orqali Gemini bilan audio STT transkripsiya.
+    O'zbek tilidagi audio uchun OpenAI Whisper'dan ancha yuqori aniqlik beradi."""
     from google.genai import types
 
     audio_bytes = chunk_path.read_bytes()
@@ -310,16 +329,30 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
         _build_transcribe_prompt(language),
     ]
 
+    model_name = _get_gemini_stt_model_name()
     max_attempts = 5
     for attempt in range(max_attempts):
         try:
             response = _get_gemini_transcribe_client().models.generate_content(
-                model=settings.GEMINI_VERTEX_TEXT_MODEL,
+                model=model_name,
                 contents=contents,
                 config=config,
             )
-            result = json.loads(response.text)
-            raw_segments = result.get("segments", []) if isinstance(result, dict) else result
+            raw_text = (response.text or "").strip()
+            if raw_text.startswith("```"):
+                raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
+                raw_text = re.sub(r"\s*```$", "", raw_text)
+            raw_text = raw_text.strip()
+            result = json.loads(raw_text)
+
+            detected_lang = language
+            if isinstance(result, dict):
+                raw_segments = result.get("segments") or result.get("subtitles") or []
+                detected_lang = result.get("language") or language or "uz"
+            elif isinstance(result, list):
+                raw_segments = result
+            else:
+                raw_segments = []
 
             segments = []
             text_parts = []
@@ -335,29 +368,27 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
                     "end": round(float(end) + offset_seconds, 3),
                     "text": text,
                 })
-            return segments, " ".join(text_parts), language
+            return segments, " ".join(text_parts), detected_lang or "uz"
         except Exception as e:
             is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
             is_bad_json = isinstance(e, json.JSONDecodeError)
             if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
                 raise
             backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
-            logger.warning(f"Gemini transkripsiya xato — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts}): {e}")
+            logger.warning(f"Gemini transkripsiya xato ({model_name}) — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts}): {e}")
             time.sleep(backoff)
-    return [], "", language
+    return [], "", language or "uz"
 
 
-def transcribe_audio(audio_path: str, language: str | None = "en", primary: str = "openai") -> dict:
+def transcribe_audio(audio_path: str, language: str | None = None, primary: str | None = None) -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
     language: audio'da qaysi til gapirilishi kutilmoqda ("en" — original
-    video, dublyaj pipeline'ining standart holati; "uz" — dublyaj qilingan
-    audio'ni QA orqali qayta tekshirishda, backend/services/audio_qa.py).
-    Bu OpenAI/Gemini'ga qaysi tilni tinglashini aytadi — noto'g'ri til
-    berilsa, masalan o'zbekcha audio "en" bilan so'ralsa, Whisper uni
-    inglizchaga zo'rlab talqin qilib, butunlay boshqa (yaroqsiz) matn
-    qaytaradi (2026-08-12 productionda tasdiqlangan xato).
+    video, dublyaj pipeline'ining standart holati; "uz" — o'zbekcha subtitr
+    yoki dublyaj qilingan audio'ni QA orqali qayta tekshirish).
+    primary: "gemini" (Google AI Studio) yoki "openai" (Whisper). Standart
+    holatda settings.STT_PROVIDER ("gemini") ishlatiladi.
     Returns:
         dict: {
             "text": str,           # To'liq matn
@@ -366,6 +397,9 @@ def transcribe_audio(audio_path: str, language: str | None = "en", primary: str 
             "language": str,       # Aniqlangan til
         }
     """
+    if primary is None:
+        primary = settings.STT_UZ_PRIMARY if language == "uz" else settings.STT_PROVIDER
+
     if settings.FREE_MODE and language != "uz":
         result = _transcribe_local_whisper(audio_path, language)
         if result is not None:
@@ -397,6 +431,21 @@ def transcribe_audio(audio_path: str, language: str | None = "en", primary: str 
         raise
 
 
+_local_whisper_model = None
+_whisper_lock = threading.Lock()
+
+
+def _get_local_whisper_model():
+    global _local_whisper_model
+    if _local_whisper_model is None:
+        with _whisper_lock:
+            if _local_whisper_model is None:
+                from faster_whisper import WhisperModel
+                logger.info(f"Loading local faster-whisper model ({settings.WHISPER_MODEL}) into CPU memory...")
+                _local_whisper_model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
+    return _local_whisper_model
+
+
 def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | None:
     """Lokal faster-whisper (CPU, hech qanday API/kredit shart emas).
     Muvaffaqiyatsiz bo'lsa None qaytaradi (xato logga yoziladi) -- xato
@@ -404,10 +453,8 @@ def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | N
     o'zi, yoki OpenAI+Gemini ikkalasi ham ishlamagandagi oxirgi chora)
     keyingi qadamga (OpenAI yoki `raise`) o'zi qaror qiladi."""
     try:
-        from faster_whisper import WhisperModel
-        logger.info("Running local faster-whisper transcription (small model on CPU)...")
-
-        model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
+        model = _get_local_whisper_model()
+        logger.info("Running local faster-whisper transcription (cached model on CPU)...")
         segments, info = model.transcribe(audio_path, beam_size=5, language=language)
 
         segments_list = []
@@ -452,10 +499,9 @@ def _transcribe_provider_order(primary: str) -> list[str]:
 
 
 def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "openai") -> dict:
-    """OpenAI Whisper API -> (Gemini kaliti bo'lsa) Gemini zaxirasi bilan
-    audio'ni bo'lak-bo'lak transkripsiya qiladi. Ikkalasi ham ishlamasa
-    chaqiruvchiga (transcribe_audio) ko'tarib beradi -- u yerda lokal
-    Whisper oxirgi chora sifatida sinaladi."""
+    """STT API (Gemini / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
+    transkripsiya qiladi. Gemini (Google AI Studio) asosiy provayder sifatida
+    o'zbek tili va xalqaro videolarda yuqori sifatli subtitr beradi."""
     segments_list = []
     full_text_parts = []
     detected_language = language
@@ -474,8 +520,10 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
                 logger.warning(f"{name} transkripsiya muvaffaqiyatsiz ({e}) — keyingi provayderga o'tilmoqda.")
         raise last_error  # type: ignore[misc]  (order har doim kamida bitta provayderni o'z ichiga oladi)
 
-    with tempfile.TemporaryDirectory(prefix="openai-stt-") as temp_dir:
-        chunk_paths = _chunk_audio(audio_path, Path(temp_dir))
+    # Gemini uchun 3 daqiqa (180s) optimal -- token chegarasidan oshmaydi va aniq vaqt beradi
+    chunk_seconds = 180 if primary == "gemini" else _CHUNK_DURATION_SECONDS
+    with tempfile.TemporaryDirectory(prefix="stt-") as temp_dir:
+        chunk_paths = _chunk_audio(audio_path, Path(temp_dir), chunk_seconds=chunk_seconds)
 
         if len(chunk_paths) == 1:
             chunk_results = [
@@ -484,7 +532,7 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
         else:
             def _process_chunk(args):
                 idx, cpath = args
-                return idx, _transcribe_chunk_with_fallback(cpath, idx * _CHUNK_DURATION_SECONDS)
+                return idx, _transcribe_chunk_with_fallback(cpath, idx * chunk_seconds)
 
             with ThreadPoolExecutor(max_workers=min(len(chunk_paths), 4)) as executor:
                 chunk_results = list(executor.map(_process_chunk, enumerate(chunk_paths)))

@@ -44,6 +44,8 @@ MIN_PAUSE_SECONDS = 0.25                # bundan uzun pauzada subtitr yo'qoladi
 MIN_PART_CHARS = 6
 _WORD_TIME_TOLERANCE = 1.0              # so'z vaqti segmentdan shuncha chetga chiqsa ishonilmaydi
 
+import html
+
 _WS = re.compile(r"\s+")
 _SENTENCE_END = ".!?…"
 _CLAUSE_END = ",;:—–"
@@ -51,7 +53,12 @@ _PENALTY_SENTENCE, _PENALTY_CLAUSE, _PENALTY_SPACE = 0, 6, 14
 
 
 def _clean(text: str | None) -> str:
-    return _WS.sub(" ", text or "").strip()
+    if not text:
+        return ""
+    t = html.unescape(text)
+    t = t.replace("&quot;", '"').replace("&#39;", "'").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    t = t.replace("`", "'").replace("ʻ", "'").replace("ʼ", "'")
+    return _WS.sub(" ", t).strip()
 
 
 # ── manba (Whisper) vaqtlarini aniqlashtirish ────────────────────────────
@@ -305,12 +312,14 @@ def _ts(seconds: float, sep: str) -> str:
 def cues_to_vtt(cues: list[dict]) -> str:
     lines = ["WEBVTT", ""]
     for i, c in enumerate(cues, 1):
-        lines += [str(i), f"{_ts(c['start'], '.')} --> {_ts(c['end'], '.')}", c["text"], ""]
+        txt = _clean(c.get("text", ""))
+        lines += [str(i), f"{_ts(c['start'], '.')} --> {_ts(c['end'], '.')}", txt, ""]
     return "\n".join(lines)
 
 
 def cues_to_srt(cues: list[dict]) -> str:
     lines = []
     for i, c in enumerate(cues, 1):
-        lines += [str(i), f"{_ts(c['start'], ',')} --> {_ts(c['end'], ',')}", c["text"], ""]
+        txt = _clean(c.get("text", ""))
+        lines += [str(i), f"{_ts(c['start'], ',')} --> {_ts(c['end'], ',')}", txt, ""]
     return "\n".join(lines)

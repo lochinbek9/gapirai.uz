@@ -38,7 +38,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: dubber_worker
     restart: unless-stopped
-    mem_limit: ${WORKER_MEM_LIMIT:-6.5g}
+    mem_limit: ${WORKER_MEM_LIMIT:-3.5g}
     stop_grace_period: 120s
     env_file:
       - .env
@@ -52,7 +52,7 @@ services:
     depends_on:
       pot-provider:
         condition: service_started
-    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing} -c ${WORKER_CONCURRENCY:-4}
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing} -c ${WORKER_CONCURRENCY:-2}
 
 volumes:
   oauth_cache:

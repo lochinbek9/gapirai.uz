@@ -6,22 +6,25 @@ Ikki bosqichda ishlaydi:
    umuman yaratilmaydi.
 2. Transkript bosqichi — transkripsiyadan keyin, dublaj (tarjima/TTS)
    boshlanishidan OLDIN (tasks.py: process_video), videoning haqiqiy
-   nutqi asosida chuqurroq tekshiruv. Sarlavha zararsiz ko'ringan, lekin
+   nutqi asosida tekshiruv. Sarlavha zararsiz ko'ringan, lekin
    videoning o'zi siyosatga zid bo'lgan holatlarni shu yerda ushlaydi.
 
-Standart zararli kontent (jinsiy, zo'ravonlik, o'z joniga qasd va h.k.)
-OpenAI moderation endpoint orqali tekshiriladi. GapirAI'ning o'ziga xos
-biznes siyosati (diniy kontent, terrorizm targ'iboti, noqonuniy faoliyat)
-esa alohida GPT klassifikatori orqali — moderation endpoint bu
-kategoriyalarni tanimaydi, chunki ular umumiy "zararli kontent" emas,
-balki GapirAI'ning o'z biznes qarori.
+TAQIQLANGAN KATEGORIYALAR (Qat'iy bloklanadi - allowed=False):
+- religious_content: Diniy ma'ruza, va'z, xutba, amri-ma'ruf, da'vat, namoz/ibodat qoidalari, fatvolar, mazhablararo bahslar.
+- sexual_explicit: Pornografiya, ochiq jinsiy aloqa, erotika, 18+ behayo sahnalar.
+- sexual_violence: Zo'rlash, jinsiy tajovuz, voyaga yetmaganlarga nisbatan jinsiy ekspluatatsiya (CSAM).
+- graphic_violence: Shafqatsiz qotilliklar, qonli qiynoqlar, terrorizm/ekstremizm targ'iboti, o'z joniga qasd qilish.
 
-OpenAI kaliti yo'q yoki xato bersa (masalan krediti tugagan, 2026-09
-holati) — Gemini'ga o'tiladi (`_gemini_safety_check`, ikkala tekshiruvni
-bitta chaqiruvga birlashtiradi). Ikkalasi ham ishlamasa — FAIL OPEN: video
-bloklanmaydi. Sabab: moderatsiya qo'shimcha xavfsizlik qatlami, asosiy
-xizmat emas — vaqtinchalik provayder nosozligi butun saytni to'xtatib
-qo'ymasligi kerak.
+RUXSAT BERILGAN KONTENTLAR (Hech qachon bloklanmaydi - allowed=True):
+- Gaming (o'yinlar: PUBG, GTA, CS:GO, Minecraft va b.)
+- Anime, multfilm va kino sharhlari (Tokyo Ghoul, fantastika, jangari kinolar)
+- Ko'ngilochar shoular va chellenjlar (MrBeast va b.)
+- Tarixiy hujjatli filmlar (urushlar, sarkardalar tarixi)
+- IT, dasturlash, texnologiya, ilm-fan, ta'lim, sport (UFC, futbol), avtomobillar.
+
+OpenAI (gpt-4o-mini) asosiy tekshiruvchi sifatida ishlatiladi.
+Agar OpenAI ishlamasa — Gemini (gemini-flash-latest) zaxira sifatida ishlatiladi.
+Ikkalasi ham ishlamasa — FAIL OPEN (video bloklanmaydi).
 """
 from dataclasses import dataclass
 import json
@@ -46,17 +49,26 @@ def _get_client() -> OpenAI:
 
 # category kodi -> admin panelda ko'rsatiladigan o'zbekcha nom
 CATEGORY_LABELS: dict[str, str] = {
-    "sexual_explicit": "Pornografik / 18+ kontent",
-    "sexual_minors": "Voyaga yetmaganlar ishtirokidagi jinsiy kontent",
-    "sexual_violence": "Zo'rlash yoki jinsiy zo'ravonlik",
-    "terrorism_extremism": "Terroristik / ekstremistik targ'ibot",
-    "graphic_violence": "Haddan tashqari grafik zo'ravonlik",
-    "hate_violent_extremism": "Nafrat yoki zo'ravonlikni qo'zg'atish",
-    "self_harm": "O'ziga zarar yetkazishni targ'ib qilish",
-    "illegal_activity": "Noqonuniy faoliyatni targ'ib qilish/o'rgatish",
     "religious_content": "Diniy kontent",
-    "policy_violation": "Kontent siyosatini buzish (aniqlanmagan toifa)",
+    "sexual_explicit": "Pornografik / 18+ kontent",
+    "sexual_violence": "Zo'rlash yoki jinsiy zo'ravonlik",
+    "graphic_violence": "Haddan tashqari zo'ravonlik / qotillik",
+    "terrorism_extremism": "Terroristik / ekstremistik targ'ibot",
+    "sexual_minors": "Voyaga yetmaganlar ishtirokidagi noqobil kontent",
+    "policy_violation": "Kontent siyosatini buzish",
 }
+
+CATEGORY_DEFAULT_REASONS: dict[str, str] = {
+    "religious_content": "Platforma qoidalariga ko'ra diniy ma'ruzalar, va'zlar va diniy ta'limotlar dublaj qilinmaydi.",
+    "sexual_explicit": "Platforma qoidalariga ko'ra 18+ behayo va pornografik kontentlar dublaj qilinmaydi.",
+    "sexual_violence": "Platforma qoidalariga ko'ra jinsiy tajovuz, zo'rlash va shunga o'xshash zo'ravonlik mavzulari dublaj qilinmaydi.",
+    "graphic_violence": "Platforma qoidalariga ko'ra shafqatsiz zo'ravonlik, terrorizm va qotillik mavzulari dublaj qilinmaydi.",
+    "terrorism_extremism": "Platforma qoidalariga ko'ra terrorizm va ekstremistik targ'ibot dublaj qilinmaydi.",
+    "sexual_minors": "Voyaga yetmaganlar xavfsizligi siyosatiga zid bo'lgan kontent aniqlandi.",
+    "policy_violation": "Ushbu video platforma xavfsizlik siyosatiga mos kelmaydi.",
+}
+
+PROHIBITED_CATEGORIES = set(CATEGORY_DEFAULT_REASONS.keys())
 
 
 @dataclass
@@ -66,151 +78,135 @@ class SafetyResult:
     reason: str | None = None
 
 
-def _moderation_check(text: str) -> SafetyResult:
-    """OpenAI moderation endpoint — standart zararli kategoriyalar uchun
-    (jinsiy, zo'ravonlik, o'z joniga qasd, nafrat).
+_CONTENT_SAFETY_SYSTEM_PROMPT = """Siz video kontent moderatsiyasi bo'yicha yuqori malakali sun'iy intellektsiz.
+Vazifangiz: Berilgan video sarlavhasi, tavsifi yoki transkriptini chuqur tahlil qilib, u GapirAI platformasida DUBLAJ QILISH TAQIQLANGAN kategoriyalarga kirishini aniqlash.
 
-    FAQAT bolalarga nisbatan jinsiy ekspluatatsiya (sexual_minors) qat'iy
-    BLOKLANADI -- bu chegara biznes qaroriga bog'liq emas. Qolgan barcha
-    kategoriyalar 2026-08-16'dan boshlab endi bloklamaydi, faqat
-    OGOHLANTIRISH sifatida qayd etiladi (admin panelda ko'rish uchun) --
-    sabab: soxta signal muammosi (masalan oddiy drama dialogi "harassment"
-    deb belgilanishi) va foydalanuvchining aniq qarori."""
+MUHIM QOIDA: Oddiy, qonuniy va xavfsiz videolarni ADASHIB TAQIQLAMANG (soxta signal - false positive bo'lmasligi shart!). Kontekstni, janrni va maqsadni to'g'ri baholang.
+
+⛔ TAQIQLANGAN KATEGORIYALAR (is_prohibited: true):
+1. religious_content:
+   - Diniy ma'ruza, xutba, va'z, amri-ma'ruf, da'vat.
+   - Namoz, tahorat, ro'za, zakot, haj va boshqa ibodat qoidalari, fiqhiy hukmlar.
+   - Diniy aqida, fatvolar, mazhablararo bahslar, diniy targ'ibot va missionerlik.
+   - Diniy kitoblar (Qur'on, Hadis, Injil, Tavrot) tafsiri va diniy ta'limotlar.
+2. sexual_explicit:
+   - Pornografiya, ochiq jinsiy aloqa, erotika, 18+ behayo shahvoniy sahnalar, intim xizmatlar.
+3. sexual_violence:
+   - Zo'rlash (rape), jinsiy tajovuz, jinsiy zo'ravonlik, voyaga yetmaganlarga nisbatan har qanday jinsiy mavzular yoki ekspluatatsiya (CSAM).
+4. graphic_violence:
+   - Haqiqiy hayotdagi shafqatsiz qotilliklar, qonli qiynoqlar, qurolli qirg'inlar.
+   - Terrorizm, diniy ekstremizm, terroristik guruhlar (IShID, Al-Qoida va h.k.) targ'iboti va chaqiriqlari.
+   - O'z joniga qasd qilish (suicide/self-harm)ni targ'ib qilish yoki o'rgatish.
+
+✅ QAT'IYAN RUXSAT BERILGAN KONTENTLAR (is_prohibited: false):
+- O'yinlar (Gaming): PUBG, GTA, CS:GO, Call of Duty, Minecraft va barcha kompyuter o'yinlari (o'yindagi otishmalar va janglar zo'ravonlik EMAS!).
+- Anime, multfilm va kino sharhlari: Tokyo Ghoul, Attack on Titan, Naruto, kinolar tahlili, jangari filmlar sharhi, fantastika (fentezi/anime syujetlari va personajlar taqiqlanmaydi!).
+- Ko'ngilochar shoular va chellenjlar: MrBeast, omon qolish (survival) chellenjlari, pranki, vloglar, sarguzashtlar.
+- Tarixiy hujjatli filmlar: Dunyo tarixi, urushlar tarixi (masalan, 2-jahon urushi, Stalingrad jangi, sarkardalar tarixi).
+- IT, dasturlash, texnologiya, ilm-fan, ta'lim, tibbiyot, sport (UFC, boks, futbol) va yangiliklar.
+
+Qat'iy quyidagi JSON formatda javob bering:
+{
+  "reasoning": "1 jumlada nima uchun ruxsat berilgani yoki taqiqlangani sababi",
+  "is_prohibited": true yoki false,
+  "category": "religious_content" | "sexual_explicit" | "sexual_violence" | "graphic_violence" | null,
+  "reason_uz": "O'zbek tilida foydalanuvchiga ko'rsatiladigan muloyim va aniq tushuntirish (agar is_prohibited true bo'lsa) yoki null"
+}"""
+
+
+def _ai_classify(text: str) -> SafetyResult:
+    """OpenAI orqali aniq va kontekstni tushunuvchi moderatsiya tekshiruvi."""
     client = _get_client()
-    resp = client.moderations.create(model="omni-moderation-latest", input=text)
-    result = resp.results[0]
-    if not result.flagged:
-        return SafetyResult(allowed=True)
+    model = settings.OPENAI_MODEL or "gpt-4o-mini"
+    response = client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        temperature=0.0,
+        max_tokens=300,
+        messages=[
+            {"role": "system", "content": _CONTENT_SAFETY_SYSTEM_PROMPT},
+            {"role": "user", "content": text[:8000]},
+        ],
+    )
+    data = json.loads(response.choices[0].message.content)
+    is_prohibited = bool(data.get("is_prohibited"))
+    category = data.get("category")
+    reason_uz = data.get("reason_uz")
 
-    cats = result.categories
-    if getattr(cats, "sexual_minors", False):
-        return SafetyResult(False, "sexual_minors", "Voyaga yetmaganlar ishtirokidagi jinsiy kontent aniqlandi.")
-
-    # Qolgan kategoriyalar -- endi faqat ogohlantirish, video bloklanmaydi.
-    if getattr(cats, "sexual", False):
-        return SafetyResult(True, "sexual_explicit", "Jinsiy (18+) kontent aniqlandi.")
-    if getattr(cats, "violence_graphic", False):
-        return SafetyResult(True, "graphic_violence", "Haddan tashqari grafik zo'ravonlik aniqlandi.")
-    if getattr(cats, "hate_threatening", False) or getattr(cats, "harassment_threatening", False):
-        return SafetyResult(True, "hate_violent_extremism", "Nafrat yoki zo'ravonlikni qo'zg'atuvchi kontent aniqlandi.")
-    if getattr(cats, "self_harm", False):
-        return SafetyResult(True, "self_harm", "O'ziga zarar yetkazishni targ'ib qiluvchi kontent aniqlandi.")
+    if is_prohibited:
+        cat_key = category if category in PROHIBITED_CATEGORIES else "policy_violation"
+        fallback_reason = CATEGORY_DEFAULT_REASONS.get(cat_key, "Ushbu video kontent siyosatiga to'g'ri kelmaydi.")
+        return SafetyResult(
+            allowed=False,
+            category=cat_key,
+            reason=reason_uz or fallback_reason,
+        )
     return SafetyResult(allowed=True)
 
 
-_GEMINI_SAFETY_PROMPT = (
-    "Siz video kontent moderatori. Berilgan matn (sarlavha/tavsif/transkript) "
-    "quyidagi kategoriyalardan biriga tegishlimi tekshiring:\n"
-    "- sexual_minors: voyaga yetmaganlar ishtirokidagi jinsiy kontent (ENG JIDDIY toifa)\n"
-    "- sexual_explicit: pornografik/18+ kontent\n"
-    "- graphic_violence: haddan tashqari grafik zo'ravonlik\n"
-    "- hate_violent_extremism: nafrat yoki zo'ravonlikni qo'zg'atuvchi kontent\n"
-    "- self_harm: o'ziga zarar yetkazishni targ'ib qilish\n"
-    "- religious_content: diniy kontent (targ'ibot, va'z, diniy ta'lim, diniy tarix hikoyasi)\n"
-    "- terrorism_extremism: terroristik/ekstremistik targ'ibot, rekrutlash yoki ulug'lash\n"
-    "- illegal_activity: aniq noqonuniy faoliyatni o'rgatish yoki targ'ib qilish\n\n"
-    "Oddiy tarix, ilm-fan, texnologiya, biznes, sport, ta'lim, yangiliklar kontenti "
-    "BLOKLANMAYDI — hatto diniy urush yoki jinoyat haqida BEZARARLI tarixiy/hujjatli "
-    "tarzda gapirsa ham, agar bu targ'ibot yoki instruksiya bo'lmasa.\n\n"
-    'Faqat shu JSON formatda javob bering: '
-    '{"category": string yoki null, "reason": string yoki null}\n'
-    'Hech biriga to\'g\'ri kelmasa: {"category": null, "reason": null}'
-)
-
-
 def _gemini_safety_check(text: str) -> SafetyResult:
-    """OpenAI moderation + _policy_classify'ning Gemini muqobili -- ikkalasi
-    bitta chaqiruvga birlashtirilgan (Gemini bepul tarif so'rov limitini
-    tejash uchun). OpenAI mavjud bo'lmaganda yoki xato bersa ishlatiladi."""
+    """OpenAI mavjud bo'lmaganda yoki xato berganda Gemini zaxira tekshiruvi."""
     from google.genai import types
-    from backend.services.translator import _get_gemini_client, _gemini_text_model
+    from backend.services.translator import _get_gemini_client
 
     config = types.GenerateContentConfig(
-        system_instruction=_GEMINI_SAFETY_PROMPT,
+        system_instruction=_CONTENT_SAFETY_SYSTEM_PROMPT,
         temperature=0.0,
         response_mime_type="application/json",
     )
-    response = _get_gemini_client().models.generate_content(
-        model=_gemini_text_model(), contents=text[:6000], config=config,
-    )
-    result = json.loads(response.text)
-    category = result.get("category") if isinstance(result, dict) else None
-    if not category:
-        return SafetyResult(allowed=True)
-    if category == "sexual_minors":
-        return SafetyResult(False, "sexual_minors", result.get("reason") or "Voyaga yetmaganlar ishtirokidagi jinsiy kontent aniqlandi.")
-    # Qolgan barcha kategoriyalar -- endi faqat ogohlantirish (2026-08-16 qarori,
-    # _moderation_check/_policy_classify bilan bir xil siyosat).
-    return SafetyResult(True, category, result.get("reason") or "")
+    client = _get_gemini_client()
 
+    # Avval eng barqaror faol model bilan urinib ko'ramiz
+    model_name = "gemini-flash-latest"
+    try:
+        response = client.models.generate_content(
+            model=model_name, contents=text[:8000], config=config
+        )
+    except Exception:
+        # Fallback model
+        model_name = "gemini-2.5-flash"
+        response = client.models.generate_content(
+            model=model_name, contents=text[:8000], config=config
+        )
 
-_POLICY_SYSTEM_PROMPT = (
-    "Siz video kontent moderatori. Berilgan matn (sarlavha/tavsif/transkript) "
-    "quyidagi kategoriyalardan biriga tegishlimi tekshiring:\n"
-    "- religious_content: diniy kontent (targ'ibot, va'z, diniy ta'lim, diniy tarix hikoyasi)\n"
-    "- terrorism_extremism: terroristik/ekstremistik targ'ibot, rekrutlash yoki ulug'lash\n"
-    "- illegal_activity: aniq noqonuniy faoliyatni o'rgatish yoki targ'ib qilish\n\n"
-    "Oddiy tarix, ilm-fan, texnologiya, biznes, sport, ta'lim, yangiliklar kontenti "
-    "BLOKLANMAYDI — hatto diniy urush yoki jinoyat haqida BEZARARLI tarixiy/hujjatli "
-    "tarzda gapirsa ham, agar bu targ'ibot yoki instruksiya bo'lmasa.\n\n"
-    'Faqat shu JSON formatda javob bering: '
-    '{"blocked": bool, "category": string yoki null, "reason": string yoki null}'
-)
+    data = json.loads(response.text)
+    is_prohibited = bool(data.get("is_prohibited"))
+    category = data.get("category")
+    reason_uz = data.get("reason_uz")
 
-
-def _policy_classify(text: str) -> SafetyResult:
-    """GapirAI'ning o'ziga xos biznes kategoriyalari uchun GPT klassifikatori.
-    Bu yerda temperature/max_tokens berilmagani uchun gpt-5 oilasi (masalan
-    OPENAI_LIGHT_MODEL=gpt-5-nano) bilan ham o'zgarishsiz mos keladi --
-    backend/services/openai_compat.py'ga hojat yo'q."""
-    client = _get_client()
-    response = client.chat.completions.create(
-        model=settings.OPENAI_LIGHT_MODEL,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": _POLICY_SYSTEM_PROMPT},
-            {"role": "user", "content": text[:6000]},
-        ],
-    )
-    result = json.loads(response.choices[0].message.content)
-    if result.get("blocked"):
-        # Diniy/terrorizm/noqonuniy faoliyat -- endi faqat ogohlantirish,
-        # bloklanmaydi (2026-08-16, foydalanuvchi qarori).
-        return SafetyResult(True, result.get("category") or "policy_violation", result.get("reason") or "")
+    if is_prohibited:
+        cat_key = category if category in PROHIBITED_CATEGORIES else "policy_violation"
+        fallback_reason = CATEGORY_DEFAULT_REASONS.get(cat_key, "Ushbu video kontent siyosatiga to'g'ri kelmaydi.")
+        return SafetyResult(
+            allowed=False,
+            category=cat_key,
+            reason=reason_uz or fallback_reason,
+        )
     return SafetyResult(allowed=True)
 
 
 def check_safety(text: str) -> SafetyResult:
-    """Matnni (metadata yoki transkript) ikkala tekshiruvdan ham o'tkazadi.
+    """Matnni (metadata yoki transkript) xavfsizlik tekshiruvidan o'tkazadi.
     Bo'sh matn yoki xizmat o'chirilgan bo'lsa — avtomatik ruxsat.
 
-    Faqat sexual_minors (CSAM) hali ham allowed=False qaytaradi -- bu
-    yagona qat'iy blok. Qolgan barcha topilgan kategoriyalar allowed=True
-    bilan birga category/reason'ni ham qaytaradi (ogohlantirish, chaqiruvchi
-    -- job_creation.py/tasks.py -- buni ContentViolation'ga blocked=False
-    bilan yozib qo'yadi, lekin jarayonni to'xtatmaydi)."""
+    Taqiqlangan kontent (diniy, 18+, zo'ravonlik, zo'rlash) aniqlansa:
+    allowed=False va o'zbekcha tushunarli sabab qaytaradi.
+    """
     if not settings.CONTENT_SAFETY_ENABLED or not text.strip():
         return SafetyResult(allowed=True)
+
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     try:
         if not settings.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY not set")
-        moderation_result = _moderation_check(text)
-        if not moderation_result.allowed:
-            return moderation_result  # faqat CSAM shu yerda to'xtaydi
-        policy_result = _policy_classify(text)
-        # Ikkalasi ham endi faqat ogohlantirish qaytaradi -- birinchi
-        # topilgan ogohlantirish qaytariladi (moderatsiya ustuvor).
-        if moderation_result.category:
-            return moderation_result
-        return policy_result
+            raise RuntimeError("OPENAI_API_KEY sozlanmagan")
+        return _ai_classify(text)
     except Exception as e:
+        logger.warning(f"OpenAI kontent xavfsizligi tekshiruvida xatolik ({e}) — Gemini'ga o'tilmoqda.")
         if gemini_available:
             try:
-                logger.info(f"OpenAI kontent xavfsizligi ishlamadi ({e}) — Gemini'ga o'tilmoqda.")
                 return _gemini_safety_check(text)
             except Exception as e2:
-                logger.error(f"Kontent xavfsizligi: Gemini ham ishlamadi (fail-open, bloklanmadi): {e2}")
+                logger.error(f"Gemini kontent xavfsizligi ham ishlamadi (fail-open, ruxsat berildi): {e2}")
                 return SafetyResult(allowed=True)
-        logger.error(f"Kontent xavfsizligi tekshiruvida xato (fail-open, bloklanmadi): {e}")
+        logger.error(f"Kontent xavfsizligi tekshiruvi amalga oshmadi (fail-open, ruxsat berildi): {e}")
         return SafetyResult(allowed=True)

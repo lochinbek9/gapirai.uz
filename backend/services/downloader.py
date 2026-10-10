@@ -1,516 +1,409 @@
-"""
-Downloader — yt-dlp with cookies auth, iOS fallback, and Redis-based rate limiting.
-Single-IP safe: prevents hammering YouTube even under concurrent job requests.
-"""
 import os
 import re
-import time
-import random
-import logging
-import subprocess
-import tempfile
 import shutil
-from contextlib import contextmanager
+import subprocess
+import uuid
+from typing import Any, Dict, Optional
+
 import requests
 import yt_dlp
-from pathlib import Path
-from redis import Redis
+
+COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH")
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/app/outputs")
+
+# FastSaver sozlamalari (.env orqali o'zgartirish mumkin)
+FASTSAVER_DEFAULT_BASE = "https://api.fastsaver.io/v1"
+# DIQQAT: yuklash endpointi nomini FastSaver hujjatidan tekshiring!
+FASTSAVER_INFO_PATH = os.getenv("FASTSAVER_INFO_PATH", "/youtube/info")
+FASTSAVER_DOWNLOAD_PATH = os.getenv("FASTSAVER_DOWNLOAD_PATH", "/youtube/download")
+
+URL_KEYS = ("download_url", "url", "link", "file_url", "video_url", "direct_url")
 
 
-from backend.config import get_settings
-from backend.services.errors import PermanentError
-from backend.services import error_classification as errcls
-from backend.services import proxy_manager
-
-logger = logging.getLogger(__name__)
-settings = get_settings()
-
-COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
-
-# Video haqiqiy fayli hech qachon foydalanuvchiga ko'rsatilmaydigan hajmdan
-# oshib ketmasligi uchun (disk to'lib qolishining oldini olish).
-MAX_DOWNLOAD_SIZE_BYTES = 3 * 1024 * 1024 * 1024  # 3 GB
+# ----------------------------------------------------------------------
+# Yordamchi funksiyalar
+# ----------------------------------------------------------------------
+def _extract_video_id(url: str) -> Optional[str]:
+    m = re.search(
+        r"(?:v=|youtu\.be/|shorts/|embed/|live/)([A-Za-z0-9_-]{11})", url
+    )
+    return m.group(1) if m else None
 
 
-def _is_permanent_download_error(err_str: str) -> bool:
-    return errcls.classify_text(err_str) == errcls.VIDEO_UNAVAILABLE
+def _normalize_youtube_url(url: str) -> str:
+    """&t=1s kabi qo'shimcha parametrlarni olib tashlaydi."""
+    vid = _extract_video_id(url)
+    return f"https://www.youtube.com/watch?v={vid}" if vid else url
 
 
-class YoutubeRateLimiter:
-    """Redis-backed lock ensuring only one download at a time with cooldown."""
-
-    MIN_COOLDOWN = 30       # minimum seconds between download starts
-    MAX_COOLDOWN = 300      # cap exponential backoff at 5 minutes
-    MAX_CONCURRENT = 1
-    ACQUIRE_TIMEOUT = 8000   # max wait for a slot (10 minutes)
-    POLL_INTERVAL = 1.5     # sleep between slot checks
-
-    def __init__(self, redis_url: str):
-        self._redis: Redis | None = None
-        self._redis_url = redis_url
-
-    @property
-    def redis(self) -> Redis:
-        if self._redis is None:
-            self._redis = Redis.from_url(self._redis_url, decode_responses=True)
-        return self._redis
-
-    def acquire(self, timeout: int = ACQUIRE_TIMEOUT) -> None:
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            current = int(self.redis.get("yt_dl:concurrent") or 0)
-            if current >= self.MAX_CONCURRENT:
-                time.sleep(self.POLL_INTERVAL)
-                continue
-
-            last = self.redis.get("yt_dl:last_start")
-            if last:
-                elapsed = time.time() - float(last)
-                if elapsed < self.MIN_COOLDOWN:
-                    time.sleep(min(self.POLL_INTERVAL, self.MIN_COOLDOWN - elapsed + 0.5))
-                    continue
-
-            pipe = self.redis.pipeline()
-            pipe.incr("yt_dl:concurrent")
-            pipe.expire("yt_dl:concurrent", 180)
-            pipe.set("yt_dl:last_start", time.time())
-            pipe.expire("yt_dl:last_start", 3600)
-            results = pipe.execute()
-
-            if results[0] == 1:
-                return
-            time.sleep(0.5)
-
-        raise RuntimeError("YouTube download slot not available — too many requests")
-
-    def release(self) -> None:
-        pipe = self.redis.pipeline()
-        pipe.decr("yt_dl:concurrent")
-        pipe.set("yt_dl:last_start", time.time())
-        pipe.expire("yt_dl:last_start", 3600)
-        pipe.execute()
-
-    def mark_failure(self) -> None:
-        fails = self.redis.incr("yt_dl:fails")
-        self.redis.expire("yt_dl:fails", 3600)
-        backoff = min(self.MAX_COOLDOWN, self.MIN_COOLDOWN * (2 ** fails))
-        jitter = random.uniform(0, backoff * 0.3)
-        self.redis.set("yt_dl:last_start", time.time() + backoff + jitter)
-
-    def mark_success(self) -> None:
-        self.redis.delete("yt_dl:fails")
+def _fastsaver_config() -> tuple:
+    api_key = os.getenv("FASTSAVER_API_KEY")
+    base_url = (os.getenv("FASTSAVER_BASE_URL") or FASTSAVER_DEFAULT_BASE).rstrip("/")
+    return api_key, base_url
 
 
-_rate_limiter = YoutubeRateLimiter(settings.REDIS_URL)
+def _pick_quality(formats: list, max_height: int) -> str:
+    """Formatlar ro'yxatidan max_height dan oshmagan eng yaxshi sifatni tanlaydi."""
+    heights = []
+    for f in formats or []:
+        if f.get("type") != "video":
+            continue
+        m = re.match(r"(\d+)p", str(f.get("format", "")))
+        if m:
+            heights.append(int(m.group(1)))
+    if not heights:
+        return f"{min(max_height, 720)}p"
+    allowed = [h for h in heights if h <= max_height]
+    return f"{max(allowed) if allowed else min(heights)}p"
 
 
-# Cookie freshness -- makes cookie availability EXPLICIT rather than
-# blindly trusting whatever file happens to be mounted at COOKIES_PATH.
-# cookies.txt here is a manually-maintained, manually-refreshed export
-# (see backend/services/README or the ingestion audit) -- there is no
-# automated refresh, and there must not be one (no personal-account login
-# automation in this codebase). A file older than the threshold is more
-# likely to trigger a wasted, bot-check-flavored request than to succeed,
-# so it is treated as absent: the existing cookie-less fallback path runs
-# instead, and this is logged (server-side only) as a clear diagnostic
-# rather than failing silently or blindly attempting stale credentials.
-YOUTUBE_COOKIES_MAX_AGE_HOURS = float(os.getenv("YOUTUBE_COOKIES_MAX_AGE_HOURS", "96"))
+def _find_download_url(data: Any) -> Optional[str]:
+    """Javob ichidan (ichma-ich bo'lsa ham) yuklab olish havolasini qidiradi."""
+    if isinstance(data, dict):
+        for key in URL_KEYS:
+            val = data.get(key)
+            if isinstance(val, str) and val.startswith("http"):
+                return val
+        for val in data.values():
+            found = _find_download_url(val)
+            if found:
+                return found
+    elif isinstance(data, list):
+        for item in data:
+            found = _find_download_url(item)
+            if found:
+                return found
+    return None
 
 
-def _cookies_are_stale(path: str) -> bool:
-    try:
-        age_hours = (time.time() - os.path.getmtime(path)) / 3600
-    except OSError:
-        return True
-    if age_hours > YOUTUBE_COOKIES_MAX_AGE_HOURS:
-        logger.warning(
-            f"YouTube cookies file is {age_hours:.0f}h old (max {YOUTUBE_COOKIES_MAX_AGE_HOURS:.0f}h) "
-            "-- treating as absent and proceeding without cookies. No cookie contents logged."
-        )
-        return True
-    return False
+def _save_stream(response: requests.Response, out_path: str) -> None:
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                f.write(chunk)
 
 
-def cookie_status() -> dict:
-    """Explicit, inspectable cookie state -- present/absent, fresh/stale,
-    age in hours. No cookie contents, ever. Intended for operator-facing
-    diagnostics (e.g. an admin/health endpoint), not end-user output."""
-    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
-    if not os.path.isfile(cookies_target):
-        return {"present": False, "fresh": False, "age_hours": None}
-    age_hours = (time.time() - os.path.getmtime(cookies_target)) / 3600
-    return {
-        "present": True,
-        "fresh": age_hours <= YOUTUBE_COOKIES_MAX_AGE_HOURS,
-        "age_hours": round(age_hours, 1),
-    }
+def _is_binary_response(response: requests.Response) -> bool:
+    ctype = response.headers.get("Content-Type", "").lower()
+    return ctype.startswith("video/") or "octet-stream" in ctype
 
 
-class _CookieSessionLogger:
-    """Routes yt-dlp's own internal warnings through this project's logger
-    instead of letting them vanish into quiet/no_warnings suppression --
-    specifically to surface ONE distinct, previously-invisible signal:
-    yt-dlp's own detection that the loaded cookie SESSION is server-side
-    invalid. This is NOT the same thing as file-age staleness (that's
-    _cookies_are_stale(), checked entirely separately) -- a cookie file can
-    be fresh by age and still session-invalid, exactly as confirmed live in
-    the 2026-08-27 isolated-path reliability experiment (this warning fired
-    on effectively every attempt, success or failure alike).
-
-    2026-08-27 audit: logged as its own distinct, greppable marker
-    (COOKIE_SESSION_INVALID) rather than folded into the existing AUTH_ERROR
-    classification -- the experiment showed this signal does NOT reliably
-    predict failure (mweb succeeds via PO-token regardless of it), so it
-    must not change retry/success decisions, only add visibility for
-    diagnosing WHY a failure happened when one does. Everything else is
-    silently dropped, matching the prior quiet/no_warnings behavior exactly
-    -- and this never logs cookie contents, only yt-dlp's own fixed
-    warning text (scrubbed defensively anyway)."""
-
-    def debug(self, msg):
-        pass
-
-    def info(self, msg):
-        pass
-
-    def warning(self, msg):
-        if "cookies are no longer valid" in msg or "have likely been rotated" in msg:
-            logger.warning(
-                f"[COOKIE_SESSION_INVALID] yt-dlp cookie sessiyasini tekshirishda: "
-                f"sessiya haqiqiy emas deb aniqlandi (fayl yangi bo'lsa ham -- bu "
-                f"fayl yoshi emas, sessiya haqiqiyligi muammosi): {errcls.scrub_secrets(msg)}"
-            )
-
-    def error(self, msg):
-        pass
-
-
-def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_url: str | None = None) -> tuple[dict, str | None]:
-    """yt-dlp options tuned for single-IP anti-blocking.
-
-    Auth: cookies.txt (optional). Falls back to unauthenticated iOS/Android client if cookies missing or disabled.
-    Copies cookies.txt to a temporary file so yt-dlp can write session cookies without failing
-    if COOKIES_PATH is on a read-only filesystem mount.
+# ----------------------------------------------------------------------
+# FastSaver
+# ----------------------------------------------------------------------
+def fetch_via_fastsaver(video_url: str, job_id: str, max_height: int = 1080) -> Dict[str, Any]:
     """
-    opts: dict = {
+    1) /youtube/info  -> sarlavha, davomiylik, formatlar
+    2) /youtube/download -> fayl yoki havola
+    Muvaffaqiyatli bo'lsa faylni OUTPUT_DIR ga saqlaydi.
+    """
+    api_key, base_url = _fastsaver_config()
+    if not api_key:
+        return {"success": False, "error": "FASTSAVER_API_KEY .env da topilmadi"}
+
+    headers = {"X-Api-Key": api_key}
+    clean_url = _normalize_youtube_url(video_url)
+
+    try:
+        # --- 1. Info ---
+        r = requests.get(
+            f"{base_url}{FASTSAVER_INFO_PATH}",
+            headers=headers,
+            params={"url": clean_url},
+            timeout=30,
+        )
+        try:
+            info = r.json()
+        except ValueError:
+            info = {}
+        if not r.ok or info.get("ok") is False:
+            return {
+                "success": False,
+                "error": info.get("detail") or r.text[:300],
+                "status": r.status_code,
+                "stage": "info",
+            }
+
+        quality = _pick_quality(info.get("formats", []), max_height)
+        title = info.get("title", "Unknown")
+        duration = info.get("duration")
+        out_path = os.path.join(OUTPUT_DIR, f"{job_id}.mp4")
+
+        # --- 2. Download ---
+        with requests.post(
+            f"{base_url}{FASTSAVER_DOWNLOAD_PATH}",
+            headers=headers,
+            json={"url": clean_url, "format": quality},
+            timeout=60,
+            stream=True,
+        ) as dr:
+            if not dr.ok:
+                try:
+                    detail = dr.json().get("detail")
+                except ValueError:
+                    detail = dr.text[:300]
+                return {
+                    "success": False,
+                    "error": detail,
+                    "status": dr.status_code,
+                    "stage": "download",
+                }
+
+            # Agar to'g'ridan-to'g'ri video fayl qaytsa
+            if _is_binary_response(dr):
+                _save_stream(dr, out_path)
+                return {
+                    "success": True,
+                    "title": title,
+                    "duration": duration,
+                    "filepath": out_path,
+                    "quality": quality,
+                }
+
+            # Aks holda JSON ichida havola qidiramiz
+            try:
+                data = dr.json()
+            except ValueError:
+                return {"success": False, "error": "Noma'lum javob formati", "stage": "download"}
+
+        if data.get("ok") is False:
+            return {"success": False, "error": data.get("detail"), "stage": "download"}
+
+        file_url = _find_download_url(data)
+        if not file_url:
+            return {
+                "success": False,
+                "error": "Javobda yuklab olish havolasi topilmadi",
+                "raw": data,
+                "stage": "download",
+            }
+
+        with requests.get(file_url, stream=True, timeout=120) as fr:
+            fr.raise_for_status()
+            _save_stream(fr, out_path)
+
+        return {
+            "success": True,
+            "title": title,
+            "duration": duration,
+            "filepath": out_path,
+            "quality": quality,
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ----------------------------------------------------------------------
+# yt-dlp (zaxira yo'l)
+# ----------------------------------------------------------------------
+def _get_ydl_opts(job_id: str, max_height: int = 1080) -> tuple:
+    temp_cookie_path = None
+
+    if COOKIES_PATH and os.path.exists(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 0:
+        temp_cookie_path = f"/tmp/ytdlp_cookies_{job_id}.txt"
+        try:
+            shutil.copy2(COOKIES_PATH, temp_cookie_path)
+            os.chmod(temp_cookie_path, 0o666)
+        except Exception as e:
+            print(f"⚠️ Cookie nusxalashda xato: {e}")
+            temp_cookie_path = None
+
+    opts = {
         "quiet": True,
         "no_warnings": True,
-        "logger": _CookieSessionLogger(),
-        "force_ipv4": True,
-        "socket_timeout": 30,
-        "retries": 5,
-        "fragment_retries": 5,
-        "retry_sleep_functions": {
-            "http": lambda n: min(60, 5 * (2 ** n)),
-            "fragment": lambda n: min(30, 2 * (2 ** n)),
-        },
+        "socket_timeout": 15,
+        "retries": 3,
+        "fragment_retries": 3,
+        "outtmpl": f"{OUTPUT_DIR}/{job_id}.%(ext)s",
+        "format": f"best[height<={max_height}]/best",
         "extractor_args": {
             "youtube": {
-                # "web" client ataylab CHIQARIB TASHLANGAN — cookies bilan
-                # ishlatilganda deyarli har doim "Requested format is not
-                # available" xatosiga olib kelardi (2026-08-13, real
-                # foydalanuvchi joblarida tasdiqlangan: xuddi shu video "web"
-                # bilan muvaffaqiyatsiz, faqat ios/android/mweb bilan
-                # muvaffaqiyatli bo'ldi).
-                #
-                # 2026-08-27 audit: mweb ENDI BIRINCHI — YouTube'ning "GVS PO
-                # Token'ni video ID'ga bog'lash" tajribasi (yt-dlp o'zi
-                # aniqlagan, o'zgartirib bo'lmaydi) haqiqiy, ishlaydigan PO
-                # token'ni FAQAT mweb mijoziga beradi. Ilgari ios birinchi
-                # bo'lgani uchun yt-dlp har safar avval ios formatlarini
-                # so'rar, PO token yo'qligini aniqlab ularni tashlab yuborar
-                # ("...may yield HTTP Error 403", productionda tasdiqlangan),
-                # va faqat SHUNDAN KEYIN mweb'ga o'tardi — bekorchi so'rov va
-                # kechikish, hech qanday foyda bermasdan. mweb birinchi bo'lsa,
-                # ishlaydigan PO token'li javob DARHOL kelib, ios/android'ga
-                # umuman ehtiyoj qolmaydi (ular hali ham zaxira sifatida
-                # qoladi -- agar mweb muvaffaqiyatsiz bo'lsa).
-                "player_client": ["mweb", "ios", "android"],
+                "player_client": ["web", "android", "ios"],
+                "fetch_pot": ["always"],
             },
-            # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
-            # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
-            # yengish uchun ishlatiladi. Avval faqat CLI konfiguratsiya faylida
-            # (backend/Dockerfile: ~/.config/yt-dlp/config) berilgan edi — bu
-            # FAQAT `yt-dlp` buyruq qatoridan chaqirilganda o'qiladi, biz esa
-            # Python API (yt_dlp.YoutubeDL) orqali ishlatamiz, u CLI config
-            # faylini o'qimaydi. Natijada PO token provider hech qachon
-            # haqiqatda ishlatilmagan edi — bu productionda ko'plab haqiqiy
-            # "cookielari eskirgan"/bot-bloklash xatolarining asosiy sababi
-            # bo'lgan (2026-08-13, real job orqali tasdiqlangan: xuddi shu
-            # video PO token'siz muvaffaqiyatsiz, PO token bilan muvaffaqiyatli
-            # bo'ldi). Shuning uchun endi bu yerda, Python opts ichida ham
-            # aniq beriladi.
-            "youtubepot-bgutilhttp": {"base_url": ["http://pot-provider:4416"]},
+            "youtubepot-bgutilhttp": {
+                "base_url": ["http://pot-provider:4416"]
+            },
         },
-        # Deno-backed JS interpreter + the EJS remote component, for
-        # decoding YouTube's obfuscated signature/n-parameter scheme --
-        # the same thing a real browser's own JS engine does natively.
-        # This is required extraction machinery, not an anti-bot bypass:
-        # yt-dlp cannot resolve some signed media URLs at all without it,
-        # independent of any bot-check. The backend Docker image already
-        # installs Deno specifically for this (see Dockerfile) and wrote
-        # it into a yt-dlp CLI config file that this Python API path never
-        # reads -- the same class of dead-config bug the PO-token base_url
-        # above already fixed once (2026-08-13). Wiring it in here closes
-        # that gap for the js_runtimes/remote_components half too
-        # (2026-08-26 ingestion audit).
-        # NOTE: js_runtimes takes a {runtime: config} dict in the Python
-        # API, NOT the list the --js-runtimes CLI flag accepts -- verified
-        # directly against yt-dlp's own option-parsing source. The value
-        # must be an actual dict, not None: yt-dlp's own live production
-        # verification (2026-08-26) caught `config.get('path')` being
-        # called unconditionally on this value inside YoutubeDL._js_runtimes
-        # -- None crashes with AttributeError, even though the validator
-        # that runs at YoutubeDL() construction time accepts None.
         "js_runtimes": {"deno": {}},
         "remote_components": ["ejs:github"],
     }
 
-    if proxy_url is not None:
-        if proxy_url:
-            opts["proxy"] = proxy_url
-    elif settings.YOUTUBE_PROXY_ENABLED and settings.YOUTUBE_PROXY_URL:
-        opts["proxy"] = settings.YOUTUBE_PROXY_URL
+    if temp_cookie_path and os.path.exists(temp_cookie_path):
+        opts["cookiefile"] = temp_cookie_path
 
-    temp_cookie_path = None
-    cookies_target = os.getenv("YOUTUBE_COOKIES_PATH", COOKIES_PATH)
-    if use_cookies and os.path.isfile(cookies_target) and not _cookies_are_stale(cookies_target):
-        try:
-            tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
-            shutil.copyfile(cookies_target, tmp.name)
-            tmp.close()
-            temp_cookie_path = tmp.name
-            opts["cookiefile"] = temp_cookie_path
-        except Exception as e:
-            logger.warning(f"Could not copy cookies file from {cookies_target}: {e}")
-            opts["cookiefile"] = cookies_target
-    if extra:
-        opts.update(extra)
     return opts, temp_cookie_path
 
 
-@contextmanager
-def get_yt_dlp(extra: dict | None = None, use_cookies: bool = True, proxy_url: str | None = None):
-    """Context manager for YoutubeDL instance ensuring temporary cookie files are cleaned up."""
-    opts, temp_cookie_path = _build_yt_opts(extra, use_cookies=use_cookies, proxy_url=proxy_url)
+def _do_download(youtube_url: str, job_id: str, max_height: int = 1080) -> Dict[str, Any]:
+    opts, temp_cookie_path = _get_ydl_opts(job_id, max_height)
+
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
-            yield ydl
+            print(f"[yt-dlp] Video ma'lumotlari olinmoqda: {youtube_url}")
+            info = ydl.extract_info(youtube_url, download=True)
+
+            if info:
+                print(f"✅ Video muvaffaqiyatli yuklandi: {info.get('title')}")
+                return {
+                    "status": "success",
+                    "method": "yt-dlp",
+                    "title": info.get("title"),
+                    "duration": info.get("duration"),
+                    "filepath": ydl.prepare_filename(info),
+                }
+            raise Exception("Video ma'lumotlari olinmadi")
+
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if "not a bot" in error_msg or "cookie" in error_msg.lower():
+            raise RuntimeError(
+                f"AUTH_ERROR: YouTube cookie yaroqsiz. Iltimos, admin paneldan yangi cookie yuklang. ({error_msg})"
+            )
+        raise RuntimeError(f"DOWNLOAD_ERROR: {error_msg}")
+    except Exception as e:
+        raise RuntimeError(f"UNKNOWN_ERROR: {str(e)}")
     finally:
         if temp_cookie_path and os.path.exists(temp_cookie_path):
             try:
                 os.remove(temp_cookie_path)
-            except Exception as e:
-                logger.warning(f"Could not remove temp cookie file {temp_cookie_path}: {e}")
+            except Exception:
+                pass
 
 
-# 2026-08-27 audit found datacenter proxies gave zero measurable benefit
-# over a direct connection for YouTube's bot-check, and residential was the
-# only tier that actually helped -- see backend/services/proxy_manager.py's
-# module docstring for the full experiment writeup. That single-tier,
-# single-URL logic (formerly `_residential_attempt` here) has been replaced
-# by proxy_manager.run_with_proxy_chain(), a configurable multi-endpoint
-# chain (direct -> datacenter pool -> residential pool) driven by .env —
-# 2026-09-04, added once a single static residential URL was no longer
-# enough (needed rotation across several proxies + per-proxy health
-# tracking, not just one path with one fallback).
+# ----------------------------------------------------------------------
+# Asosiy funksiya
+# ----------------------------------------------------------------------
+def _download_media(youtube_url: str, job_id: str, max_height: int = 1080) -> Dict[str, Any]:
+    print(f"[DOWNLOAD] FastSaver API orqali urinilmoqda: {youtube_url}")
+    fs = fetch_via_fastsaver(youtube_url, job_id, max_height=max_height)
 
-
-def _extract_info_dict(ydl, youtube_url: str) -> dict:
-    info = ydl.extract_info(youtube_url, download=False)
-    return {
-        "title": info.get("title", "Unknown"),
-        "duration": info.get("duration", 0),
-        "thumbnail": info.get("thumbnail", ""),
-        "uploader": info.get("uploader", ""),
-        "description": info.get("description", ""),
-    }
-
-
-_YT_VIDEO_ID_RE = re.compile(
-    r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|embed/)|music\.youtube\.com/watch\?v=)"
-    r"([A-Za-z0-9_-]{11})"
-)
-
-_ISO8601_DURATION_RE = re.compile(
-    r"P(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?"
-)
-
-
-def _parse_iso8601_duration(duration: str) -> int:
-    """YouTube Data API "PT4M13S" formatidagi davomiylikni sekundga o'giradi."""
-    m = _ISO8601_DURATION_RE.match(duration or "")
-    if not m:
-        return 0
-    hours, minutes, seconds = (int(g) if g else 0 for g in m.groups())
-    return hours * 3600 + minutes * 60 + seconds
-
-
-def _get_video_info_via_api(youtube_url: str) -> dict | None:
-    """YouTube Data API v3 orqali metadata olish -- yt-dlp skrapping talab
-    qilmagani uchun bot-check xavfi umuman yo'q. API kalit sozlanmagan yoki
-    video ID ajratilmasa None qaytadi (chaqiruvchi yt-dlp'ga tushadi)."""
-    if not settings.YOUTUBE_DATA_API_KEY:
-        return None
-    m = _YT_VIDEO_ID_RE.search(youtube_url or "")
-    if not m:
-        return None
-    video_id = m.group(1)
-    try:
-        resp = requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={
-                "part": "snippet,contentDetails",
-                "id": video_id,
-                "key": settings.YOUTUBE_DATA_API_KEY,
-            },
-            timeout=10,
-        )
-        resp.raise_for_status()
-        items = resp.json().get("items", [])
-        if not items:
-            return None
-        snippet = items[0].get("snippet", {})
-        content_details = items[0].get("contentDetails", {})
-        thumbnails = snippet.get("thumbnails", {})
-        thumbnail = (
-            thumbnails.get("maxres")
-            or thumbnails.get("high")
-            or thumbnails.get("medium")
-            or thumbnails.get("default")
-            or {}
-        ).get("url", "")
+    if fs.get("success"):
+        print(f"✅ FastSaver muvaffaqiyatli ({fs.get('quality')}): {fs.get('title')}")
         return {
-            "title": snippet.get("title", "Unknown"),
-            "duration": _parse_iso8601_duration(content_details.get("duration", "")),
-            "thumbnail": thumbnail,
-            "uploader": snippet.get("channelTitle", ""),
-            "description": snippet.get("description", ""),
+            "status": "success",
+            "method": "fastsaver",
+            "title": fs.get("title"),
+            "duration": fs.get("duration"),
+            "filepath": fs.get("filepath"),
         }
-    except Exception as e:
-        logger.warning(f"YouTube Data API orqali metadata olishda xatolik ({e}) — yt-dlp'ga tushilmoqda.")
-        return None
+
+    print(
+        f"⚠️ FastSaver xatosi [{fs.get('stage', '-')}]: {fs.get('error')} "
+        f"(status={fs.get('status')}) raw={fs.get('raw')}"
+    )
+    print("⚠️ Standart yt-dlp rejimiga o'tilmoqda...")
+    return _do_download(youtube_url, job_id, max_height=max_height)
 
 
-def get_video_info(youtube_url: str) -> dict:
-    api_result = _get_video_info_via_api(youtube_url)
-    if api_result is not None:
-        return api_result
-
-    try:
-        return proxy_manager.run_with_proxy_chain(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
-    except Exception as e2:
-        code = errcls.classify_text(str(e2))
-        if code == errcls.VIDEO_UNAVAILABLE:
-            raise PermanentError(
-                "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                code=errcls.VIDEO_UNAVAILABLE,
-            ) from e2
-        # Texnik xabar -- faqat server logi uchun (bu funksiya to'g'ridan-to'g'ri
-        # job_creation.py'dan chaqiriladi, u o'zining xavfsiz umumiy xabarini
-        # qaytaradi va bu matnni foydalanuvchiga hech qachon ko'rsatmaydi).
-        raise RuntimeError(f"Video ma'lumot olishda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
-
-
-def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
-    _rate_limiter.acquire()
-    try:
-        return _do_download(youtube_url, job_id, max_height=max_height)
-    except Exception:
-        _rate_limiter.mark_failure()
-        raise
-    else:
-        _rate_limiter.mark_success()
-    finally:
-        _rate_limiter.release()
-
-
-def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
-    job_dir = Path(settings.UPLOAD_DIR) / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-
-    video_tpl = str(job_dir / "video.%(ext)s")
-
-    # Jonli yuklab olish foizi -- DOWNLOADING bosqichi progress oynasiga
-    # (5..18) moslanadi; set_subprogress o'zi vaqt/qiymat bo'yicha cheklaydi,
-    # shuning uchun yt-dlp hook'ini sekundiga bir necha marta chaqirsa ham
-    # xavfsiz (backend/services/job_progress.py).
-    from backend.services.job_progress import set_subprogress
-
-    def _dl_progress_hook(d: dict) -> None:
-        try:
-            if d.get("status") == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate")
-                if total:
-                    frac = min(1.0, (d.get("downloaded_bytes") or 0) / total)
-                    set_subprogress(job_id, 5.0 + frac * 13.0)
-            elif d.get("status") == "finished":
-                set_subprogress(job_id, 18.0)
-        except Exception:
-            pass
-
-    extra_opts = {
-        "outtmpl": video_tpl,
-        "format": f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "merge_output_format": "mp4",
-        "progress_hooks": [_dl_progress_hook],
-    }
-
-    def _do_extract(ydl):
-        info = ydl.extract_info(youtube_url, download=True)
-        return info.get("title", "Unknown"), float(info.get("duration", 0) or 0)
-
-    try:
-        title, duration = proxy_manager.run_with_proxy_chain(_do_extract, extra=extra_opts, use_cookies=True)
-    except Exception as e2:
-        code = errcls.classify_text(str(e2))
-        if code == errcls.VIDEO_UNAVAILABLE:
-            raise PermanentError(
-                "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
-                code=errcls.VIDEO_UNAVAILABLE,
-            ) from e2
-        # Texnik xabar -- job.error_message'ga yozilmasdan oldin
-        # backend/workers/tasks.py markazlashgan klassifikatsiya +
-        # xavfsiz foydalanuvchi xabariga aylantiradi (Priority 1/6).
-        raise RuntimeError(f"Video yuklashda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
-
-    video_file = None
-    for f in job_dir.iterdir():
-        if f.is_file() and f.stem == "video":
-            video_file = f
-            break
-    if not video_file:
-        files = [f for f in job_dir.iterdir() if f.is_file()]
-        if not files:
-            raise RuntimeError(f"Yuklangan video topilmadi: {job_dir}")
-        video_file = files[0]
-
-    # Kutilganidan ancha katta fayl (masalan noto'g'ri format tanlandi yoki
-    # metadata xato) diskni to'ldirib qo'ymasligi uchun darhol o'chiriladi.
-    file_size = video_file.stat().st_size
-    if file_size > MAX_DOWNLOAD_SIZE_BYTES:
-        try:
-            video_file.unlink()
-        except Exception:
-            pass
-        raise PermanentError(
-            f"Video hajmi ruxsat etilgan chegaradan katta ({file_size / (1024**3):.1f} GB > "
-            f"{MAX_DOWNLOAD_SIZE_BYTES / (1024**3):.0f} GB).",
-            code="FILE_TOO_LARGE",
-        )
-
-    audio_file = job_dir / "audio.wav"
-    ffmpeg_cmd = [
-        "ffmpeg", "-y", "-i", str(video_file),
-        "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_file),
+# ----------------------------------------------------------------------
+# Audio ajratish (analysis_tasks.py "audio_path" kalitini kutadi)
+# ----------------------------------------------------------------------
+def _extract_audio(video_path: str, audio_path: str) -> str:
+    """Videodan 16 kHz mono WAV ajratadi (transkripsiya uchun)."""
+    os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+        audio_path,
     ]
-    proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Audio ajratishda xatolik: {proc.stderr[-500:]}")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    except FileNotFoundError:
+        raise RuntimeError("AUDIO_ERROR: ffmpeg topilmadi (konteynerga o'rnating)")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("AUDIO_ERROR: audio ajratish vaqti tugadi")
 
-    return {
-        "video_path": str(video_file),
-        "audio_path": str(audio_file),
-        "title": title,
-        "duration": duration,
-    }
+    if proc.returncode != 0 or not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
+        tail = (proc.stderr or "")[-400:]
+        raise RuntimeError(f"AUDIO_ERROR: audio ajratib bo'lmadi (ovoz yo'q bo'lishi mumkin). {tail}")
+    return audio_path
+
+
+def download_video(youtube_url: str, job_id: str, max_height: int = 1080) -> Dict[str, Any]:
+    """
+    Videoni yuklaydi (FastSaver -> yt-dlp zaxira) va audio ajratadi.
+    Qaytaradi: status, method, title, duration, filepath, video_path, audio_path
+    """
+    result = _download_media(youtube_url, job_id, max_height=max_height)
+
+    video_path = result.get("filepath")
+    if not video_path or not os.path.exists(video_path):
+        raise RuntimeError(f"DOWNLOAD_ERROR: yuklangan fayl topilmadi: {video_path}")
+
+    audio_path = os.path.join(OUTPUT_DIR, f"{job_id}_audio.wav")
+    result["video_path"] = video_path
+    result["audio_path"] = _extract_audio(video_path, audio_path)
+    return result
+
+
+# ----------------------------------------------------------------------
+# Video metama'lumotlari (routes.py, video_analysis_routes.py, job_creation.py)
+# ----------------------------------------------------------------------
+def get_video_info(url: str) -> Dict[str, Any]:
+    """
+    Video haqida ma'lumot (yuklamasdan). Bloklovchi funksiya:
+    chaqiruvchilar uni asyncio.to_thread orqali ishlatadi.
+    Xato bo'lsa RuntimeError ko'taradi.
+    """
+    clean_url = _normalize_youtube_url(url)
+
+    # 1) FastSaver /youtube/info
+    api_key, base_url = _fastsaver_config()
+    if api_key:
+        try:
+            r = requests.get(
+                f"{base_url}{FASTSAVER_INFO_PATH}",
+                headers={"X-Api-Key": api_key},
+                params={"url": clean_url},
+                timeout=20,
+            )
+            data = r.json()
+            if r.ok and data.get("ok") is not False and data.get("title"):
+                vid = data.get("video_id") or _extract_video_id(clean_url)
+                return {
+                    "id": vid,
+                    "video_id": vid,
+                    "title": data.get("title") or "Unknown",
+                    "duration": data.get("duration") or 0,
+                    "thumbnail": data.get("thumbnail") or "",
+                    "description": "",
+                    "uploader": data.get("author") or "",
+                    "channel": data.get("author"),
+                    "webpage_url": clean_url,
+                    "source": "fastsaver",
+                }
+            print(f"⚠️ get_video_info FastSaver: {data.get('detail') or r.text[:200]}")
+        except Exception as e:
+            print(f"⚠️ get_video_info FastSaver xatosi: {e}")
+
+    # 2) yt-dlp (faqat metama'lumot)
+    opts, temp_cookie_path = _get_ydl_opts(f"info_{uuid.uuid4().hex[:8]}")
+    opts["skip_download"] = True
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(clean_url, download=False)
+        if not info:
+            raise RuntimeError("Video ma'lumotlari olinmadi")
+        return {
+            "id": info.get("id"),
+            "video_id": info.get("id"),
+            "title": info.get("title") or "Unknown",
+            "duration": info.get("duration") or 0,
+            "thumbnail": info.get("thumbnail") or "",
+            "description": info.get("description") or "",
+            "uploader": info.get("uploader") or "",
+            "channel": info.get("channel") or info.get("uploader"),
+            "webpage_url": info.get("webpage_url") or clean_url,
+            "source": "yt-dlp",
+        }
+    except yt_dlp.utils.DownloadError as e:
+        raise RuntimeError(f"INFO_ERROR: {e}")
+    finally:
+        if temp_cookie_path and os.path.exists(temp_cookie_path):
+            try:
+                os.remove(temp_cookie_path)
+            except Exception:
+                pass

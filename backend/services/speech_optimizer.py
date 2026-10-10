@@ -386,34 +386,29 @@ def _chunked_optimize(segments: list[dict], chunk_fn) -> list[dict]:
 # ─────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────
-def optimize_segments(segments: list[dict]) -> list[dict]:
+def optimize_segments(segments: list[dict], use_llm: bool = False) -> list[dict]:
     """
     Tarjima qilingan segmentlarni TTS uchun optimallashtiradi.
-
-    Natija faqat synthesizer.synthesize_segments() ga beriladi — subtitr
-    matni bunga tegmaydi, chunki qisqartmalarning og'zaki yozilishi
-    ("Jey Vi Ti") yozma subtitrda g'alati ko'rinadi.
+    Tezkor qoidaviy qatlam (lug'at, raqamlar, qisqartmalar) har doim ishlaydi (0 ms).
+    use_llm=True bo'lgandagina qo'shimcha LLM chaqiruvi qilinadi.
     """
     if not segments:
         return []
 
     overrides = _load_memory_overrides()
     rule_based = [
-        {**seg, "text": _rule_based_optimize(seg.get("text", ""), overrides)}
+        {**seg, "text": normalize_apostrophes(_rule_based_optimize(seg.get("text", ""), overrides))}
         for seg in segments
     ]
+
+    if not use_llm:
+        return rule_based
 
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     use_openai = _client and not settings.FREE_MODE
     if not use_openai and not gemini_available:
-        logger.info("OpenAI (pullik rejim) yoki Gemini kaliti yo'q: faqat qoidaviy speech optimization qo'llanildi.")
         return rule_based
 
-    # FREE_MODE'da OpenAI'ni ataylab chetlab o'tamiz (xarajatni oldini olish
-    # uchun kiritilgan bayroq), lekin Gemini bepul tarifi bo'lsa undan
-    # foydalanishni davom ettiramiz -- sifat yaxshi bo'lishi bepulga tushadi.
     logger.info(f"LLM speech optimization ishlamoqda ({'OpenAI' if use_openai else 'Gemini'})...")
     optimized = _chunked_optimize(rule_based, _llm_optimize_chunk if use_openai else _gemini_optimize_chunk)
-    # LLM o'z chiqishida boshqa apostrof shaklini ishlatgan bo'lishi mumkin —
-    # yakuniy o'tishda yana kanonik shaklga keltiramiz.
     return [{**seg, "text": normalize_apostrophes(seg.get("text", ""))} for seg in optimized]

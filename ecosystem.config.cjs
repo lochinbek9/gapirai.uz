@@ -53,6 +53,8 @@ module.exports = {
       exec_mode: "fork",
       autorestart: true,
       max_restarts: 10,
+      min_uptime: "10s",
+      restart_delay: 5000,
       kill_timeout: 10000,
       env: {
         ...process.env,
@@ -69,6 +71,8 @@ module.exports = {
       exec_mode: "fork",
       autorestart: true,
       max_restarts: 10,
+      min_uptime: "10s",
+      restart_delay: 5000,
       kill_timeout: 10000,
       env: {
         ...process.env,
