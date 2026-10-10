@@ -105,7 +105,7 @@ class EdgeProvider(TTSProvider):
                         )
                         logger.info(f"Edge TTS: voice={chosen_voice}, chars={len(clean_text)}")
                         return True
-                    return False
+                    raise RuntimeError(f"Edge TTS fail: Saved mp3 file is empty or missing: {tmp_mp3}")
                 finally:
                     if os.path.exists(tmp_mp3):
                         try:
@@ -130,5 +130,5 @@ class EdgeProvider(TTSProvider):
                 return loop.run_until_complete(_run())
 
         except Exception as exc:
-            logger.warning(f"Edge TTS xato: {exc}")
-            return False
+            logger.error(f"Edge TTS xato: {exc}", exc_info=True)
+            raise RuntimeError(f"Edge TTS xato: {exc}") from exc
