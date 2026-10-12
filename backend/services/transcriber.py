@@ -284,10 +284,14 @@ def _get_gemini_candidate_models(primary: str) -> list[str]:
     order = [
         primary,
         "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-transcribe",
+        "gemini-3.5-flash-lite",
         "gemini-flash-latest",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash-lite",
     ]
     seen = set()
     return [m for m in order if m and not (m in seen or seen.add(m))]
@@ -393,9 +397,16 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
                 if not (is_rate_limit or is_server_error or is_bad_json):
                     logger.warning(f"Gemini STT ({model_name}) doimiy xato: {e} — keyingi modelga o'tilmoqda.")
                     break
-                backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
-                logger.warning(f"Gemini STT ({model_name}) xato, qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
-                time.sleep(backoff)
+
+                if is_rate_limit:
+                    m = re.search(r"retry in ([\d\.]+)s", err_str) or re.search(r"retryDelay['\"]:\s*['\"](\d+)s", err_str)
+                    delay = float(m.group(1)) + 1.0 if m else max(15.0, (attempt + 1) * 12.0)
+                    logger.warning(f"Gemini STT ({model_name}) 429 quota chegarasi — {delay:.1f}s kutilmoqda ({attempt + 1}/3)")
+                    time.sleep(delay)
+                else:
+                    backoff = (2 ** attempt) + random.uniform(1.0, 3.0)
+                    logger.warning(f"Gemini STT ({model_name}) xato, qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
+                    time.sleep(backoff)
 
     raise last_error or RuntimeError("Barcha Gemini STT modellari muvaffaqiyatsiz bo'ldi")
 
@@ -556,7 +567,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
                 idx, cpath = args
                 return idx, _transcribe_chunk_with_fallback(cpath, idx * chunk_seconds)
 
-            with ThreadPoolExecutor(max_workers=min(len(chunk_paths), 4)) as executor:
+            max_workers = 2 if primary == "gemini" else min(len(chunk_paths), 4)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 chunk_results = list(executor.map(_process_chunk, enumerate(chunk_paths)))
 
         chunk_results.sort(key=lambda x: x[0])
