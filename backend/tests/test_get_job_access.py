@@ -34,7 +34,9 @@ class TestGetJobAccess(unittest.TestCase):
         self.other_tok = create_access_token(str(self.other.id), self.other.email)
 
     def tearDown(self):
+        from backend.models.database import Subscription
         self.db.query(DubbingJob).filter(DubbingJob.user_id.in_([self.owner.id, self.other.id])).delete(synchronize_session=False)
+        self.db.query(Subscription).filter(Subscription.user_id.in_([self.owner.id, self.other.id])).delete(synchronize_session=False)
         self.db.query(User).filter(User.id.in_([self.owner.id, self.other.id])).delete(synchronize_session=False)
         self.db.commit()
         self.db.close()

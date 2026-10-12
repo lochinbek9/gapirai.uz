@@ -360,6 +360,8 @@ def process_video(self: Task, job_id: str) -> dict:
         if not job:
             raise ValueError(f"Job topilmadi: {job_id}")
 
+        is_recovery_job = bool(job.completed_at is not None or job.translated_segments)
+
         # 2026-08-26 audit: bir xil task_id ikki worker'da bir vaqtda faol
         # bo'lishi productionda LIVE kuzatilgan (Celery/Redis qayta
         # yetkazib berishi VA recover_stuck_jobs() bir xil job'ni mustaqil
@@ -791,10 +793,32 @@ def process_video(self: Task, job_id: str) -> dict:
         job.completed_at = datetime.utcnow()
         db.commit()
 
-        # Anonim (login qilmagan) joblar uchun email yo'q — jim o'tkazib
-        # yuboriladi. Email yuborish muvaffaqiyatsiz bo'lsa ham job
-        # COMPLETED holatida qoladi (bildirishnoma ikkinchi darajali).
-        if job.user_id and job.user and job.user.email:
+        # On-demand tiklash Redis lock'ini tozalash
+        try:
+            from redis import Redis
+            Redis.from_url(settings.REDIS_URL).delete(f"ondemand_recovery:{job_id}")
+        except Exception:
+            pass
+
+        # Duplicate joblar (source_job_id == job_id bo'lgan boshqa joblar)ni ham COMPLETED qilish
+        try:
+            db.query(DubbingJob).filter(
+                DubbingJob.source_job_id == job_id,
+                DubbingJob.id != job_id,
+            ).update({
+                "status": JobStatus.COMPLETED,
+                "progress": 100.0,
+                "status_message": "Dublyaj tayyor!",
+                "output_video_path": final_output,
+                "output_video_url": f"/outputs/{job_id}/video/dubbed_final.mp4",
+                "dubbed_audio_path": dubbed_audio_path,
+            }, synchronize_session=False)
+            db.commit()
+        except Exception as dup_err:
+            logger.warning(f"Duplicate joblarni yangilashda xatolik: {dup_err}")
+
+        # Anonim joblar yoki qayta tiklangan eski joblar uchun qayta email yuborilmaydi
+        if job.user_id and job.user and job.user.email and not is_recovery_job:
             try:
                 send_dubbing_complete_email(job.user.email, job.user.name or "", job.video_title or "Video", job_id)
             except Exception as email_err:
@@ -950,7 +974,7 @@ def process_video(self: Task, job_id: str) -> dict:
         refund_db = None
         try:
             refund_db = SessionLocal()
-            if job.quota_consumed and job.user_id:
+            if job.quota_consumed and job.user_id and not is_recovery_job:
                 from backend.services.plans import refund_quota
                 refund_quota(refund_db, job.user_id, (job.video_duration or 0.0) / 60.0)
                 refund_db.query(DubbingJob).filter(DubbingJob.id == job_id).update({"quota_consumed": False})

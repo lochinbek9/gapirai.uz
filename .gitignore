@@ -23,6 +23,7 @@ build/
 # ── Upload / Output (runtime data) ───────────────────
 uploads/
 outputs/
+datasets/
 
 # ── Next.js ──────────────────────────────────────────
 frontend/.next/

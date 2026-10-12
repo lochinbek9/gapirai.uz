@@ -148,7 +148,11 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         video_title=job.video_title,
         video_duration=job.video_duration,
         video_thumbnail=job.video_thumbnail,
-        output_video_url=job.output_video_url,
+        output_video_url=job.output_video_url or (
+            f"/outputs/{job.storage_id}/video/dubbed_final.mp4"
+            if job.status == JobStatus.COMPLETED
+            else None
+        ),
         transcript_text=None if redact else job.transcript_text,
         translated_text=job.translated_text,
         error_message=None if redact else job.error_message,
@@ -464,9 +468,30 @@ def get_job(
     if current_user_id is not None and not is_owner:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
+    # On-demand video recovery tekshiruvi:
+    # Agar job ilgari tugallangan bo'lsa va video fayli diskda yo'q bo'lsa, avtomatik qayta tiklaymiz
+    from backend.services.job_recovery import is_output_video_missing, trigger_ondemand_recovery, can_recover_job
+    video_missing = is_output_video_missing(job)
+
+    if not video_missing:
+        if job.status != JobStatus.COMPLETED and can_recover_job(job) and (job.completed_at is not None or job.status_message == "Video serverda qayta tiklanmoqda..."):
+            job.status = JobStatus.COMPLETED
+            job.progress = 100.0
+            job.status_message = "Dublyaj tayyor!"
+            db.commit()
+    else:
+        if can_recover_job(job) and (job.completed_at is not None or job.status == JobStatus.COMPLETED):
+            trigger_ondemand_recovery(db, job)
+
+    is_recovering = (
+        (job.completed_at is not None or job.status_message == "Video serverda qayta tiklanmoqda...")
+        and can_recover_job(job)
+        and (job.status in (JobStatus.DOWNLOADING, JobStatus.SYNTHESIZING, JobStatus.MERGING, JobStatus.PENDING))
+    )
+
     if not is_owner:
         raw_status = job.status.value if hasattr(job.status, "value") else job.status
-        if str(raw_status).upper() != "COMPLETED":
+        if str(raw_status).upper() != "COMPLETED" and not is_recovering:
             raise HTTPException(status_code=404, detail="Job topilmadi.")
         return _job_to_response(job, redact=True)
 
@@ -749,8 +774,8 @@ def get_subtitles_txt(job_id: uuid.UUID, db: Session = Depends(get_db)):
 def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """Dublyaj qilingan audioni WAV formatida yuklab olish."""
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-    if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Audio hali tayyor emas.")
+    if not job:
+        raise HTTPException(status_code=404, detail="Audio topilmadi.")
 
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
@@ -764,7 +789,19 @@ def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
     audio_path = job.dubbed_audio_path
     if not audio_path or not Path(audio_path).exists():
-        raise HTTPException(status_code=404, detail="Audio fayl topilmadi.")
+        candidate = Path(f"outputs/{job.storage_id}/audio/dubbed_audio.wav")
+        if candidate.exists():
+            audio_path = str(candidate)
+        else:
+            from backend.services.job_recovery import can_recover_job, trigger_ondemand_recovery
+            if can_recover_job(job):
+                trigger_ondemand_recovery(db, job)
+                raise HTTPException(
+                    status_code=503,
+                    detail="Audio serverda qayta tiklanmoqda. Iltimos, 1-2 daqiqadan so'ng sahifani yangilang.",
+                    headers={"Retry-After": "60"},
+                )
+            raise HTTPException(status_code=404, detail="Audio fayl topilmadi.")
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"{safe_title or job_id}_audio.wav"
     return FileResponse(path=audio_path, media_type="audio/wav", filename=filename)
@@ -773,8 +810,8 @@ def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.get("/outputs/{job_id}/video")
 def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
-    if not job or job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=404, detail="Video hali tayyor emas.")
+    if not job:
+        raise HTTPException(status_code=404, detail="Video topilmadi.")
 
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
@@ -788,7 +825,19 @@ def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
     video_path = job.output_video_path
     if not video_path or not Path(video_path).exists():
-        raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
+        candidate = Path(f"outputs/{job.storage_id}/video/dubbed_final.mp4")
+        if candidate.exists():
+            video_path = str(candidate)
+        else:
+            from backend.services.job_recovery import can_recover_job, trigger_ondemand_recovery
+            if can_recover_job(job):
+                trigger_ondemand_recovery(db, job)
+                raise HTTPException(
+                    status_code=503,
+                    detail="Video serverda qayta tiklanmoqda. Iltimos, 1-2 daqiqadan so'ng sahifani yangilang.",
+                    headers={"Retry-After": "60"},
+                )
+            raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     filename = f"dubbed_{safe_title or job_id}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
