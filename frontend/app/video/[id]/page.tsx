@@ -219,6 +219,7 @@ export default function VideoPage() {
             {job.status === 'completed' ? (
               <VideoPlayer
                 src={videoSrc}
+                jobId={id}
                 subtitlesContent={job.uzbek_srt_content}
                 audioDownloadUrl={audioUrl}
                 theaterMode={theaterMode}

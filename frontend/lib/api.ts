@@ -437,11 +437,14 @@ export async function purchaseMinutesPaynet(pack: number): Promise<{ success: bo
   return res.data
 }
 
-export function getVideoUrl(jobId: string): string {
+export function getVideoUrl(jobId: string, resolution?: string): string {
   // /api/outputs/{id}/video (routes.py) S3'da bo'lsa presigned URL'ga
   // yo'naltiradi, mavjud bo'lmasa lokal faylga tushadi — statik
   // /outputs/{id}/... mount'idan farqli, S3'ga yuklangandan keyin lokal
   // nusxa o'chirilgan videolar uchun ham ishlaydi.
+  if (resolution && resolution !== "720p") {
+    return `${API_URL}/api/outputs/${jobId}/video?resolution=${resolution}`
+  }
   return `${API_URL}/api/outputs/${jobId}/video`
 }
 

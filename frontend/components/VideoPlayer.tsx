@@ -5,8 +5,9 @@ import {
 } from "react";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-  Settings, RectangleHorizontal, Rows3
+  Settings, RectangleHorizontal, Rows3, Check, Loader2, Sparkles, Lock
 } from "lucide-react";
+import { getJobResolutions, requestResolution, ResolutionOption, getVideoUrl } from "@/lib/api";
 
 /* ── VTT ──────────────────────────────────────────── */
 interface Cue { start: number; end: number; text: string }
@@ -169,6 +170,8 @@ function SubPanel({
 /* ── Props ────────────────────────────────────────── */
 export interface VideoPlayerProps {
   src: string;
+  jobId?: string;
+  initialQuality?: string;
   subtitlesContent?: string;
   audioDownloadUrl?: string;
   className?: string;
@@ -186,7 +189,7 @@ export interface VideoPlayerHandle {
 
 /* ── VideoPlayer ──────────────────────────────────── */
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
-  src, subtitlesContent, audioDownloadUrl,
+  src, jobId, initialQuality, subtitlesContent, audioDownloadUrl,
   className = "", theaterMode = false, onTheaterToggle,
 }, ref) => {
   const videoRef     = useRef<HTMLVideoElement>(null);
@@ -202,17 +205,140 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     },
   }));
 
-  const [playing,      setPlaying]      = useState(false);
-  const [muted,        setMuted]        = useState(false);
-  const [volume,       setVolume]       = useState(1);
-  const [progress,     setProgress]     = useState(0);
-  const [duration,     setDuration]     = useState(0);
-  const [buffered,     setBuffered]     = useState(0);
-  const [fullscreen,   setFullscreen]   = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showSubs,     setShowSubs]     = useState(true);
-  const [showPanel,    setShowPanel]    = useState(false);
-  const [subSettings,  setSubSettings]  = useState<SubSettings>(loadSubSettings);
+  const [playing,          setPlaying]          = useState(false);
+  const [muted,            setMuted]            = useState(false);
+  const [volume,           setVolume]           = useState(1);
+  const [progress,         setProgress]         = useState(0);
+  const [duration,         setDuration]         = useState(0);
+  const [buffered,         setBuffered]         = useState(0);
+  const [fullscreen,       setFullscreen]       = useState(false);
+  const [showControls,     setShowControls]     = useState(true);
+  const [showSubs,         setShowSubs]         = useState(true);
+  const [showPanel,        setShowPanel]        = useState(false);
+  const [subSettings,      setSubSettings]      = useState<SubSettings>(loadSubSettings);
+
+  /* ── Resolution / Quality State ──────────────── */
+  const [currentQuality,   setCurrentQuality]   = useState<string>(initialQuality || "720p");
+  const [resolutions,      setResolutions]      = useState<ResolutionOption[]>([]);
+  const [showQualityMenu,  setShowQualityMenu]  = useState(false);
+  const [qualityToast,     setQualityToast]     = useState<string | null>(null);
+  const [requestingRes,    setRequestingRes]    = useState<string | null>(null);
+  const savedTimeRef   = useRef<number | null>(null);
+  const wasPlayingRef  = useRef<boolean>(false);
+  const toastTimerRef  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pollTimerRef   = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(toastTimerRef.current);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!jobId) return;
+    getJobResolutions(jobId)
+      .then(res => {
+        if (res?.resolutions) {
+          setResolutions(res.resolutions);
+        }
+      })
+      .catch(() => {});
+  }, [jobId]);
+
+  const showToast = useCallback((msg: string) => {
+    clearTimeout(toastTimerRef.current);
+    setQualityToast(msg);
+    toastTimerRef.current = setTimeout(() => {
+      setQualityToast(null);
+    }, 2800);
+  }, []);
+
+  const doSwitchQuality = useCallback((targetRes: string) => {
+    const v = videoRef.current;
+    if (v) {
+      savedTimeRef.current = v.currentTime;
+      wasPlayingRef.current = !v.paused;
+    }
+    setCurrentQuality(targetRes);
+    setShowQualityMenu(false);
+    const label = targetRes === "1080p" ? "1080p (Full HD)" : targetRes === "720p" ? "720p (HD)" : "360p (SD)";
+    showToast(`${label} ga o'tkazildi`);
+  }, [showToast]);
+
+  const handleSelectQuality = useCallback(async (targetRes: string) => {
+    if (targetRes === currentQuality) {
+      setShowQualityMenu(false);
+      return;
+    }
+
+    const opt = resolutions.find(r => r.resolution === targetRes);
+    if (opt && !opt.available) {
+      showToast(`${targetRes} faqat yuqoriroq tarifda mavjud`);
+      return;
+    }
+
+    if (opt && opt.status !== "ready" && targetRes !== "720p" && jobId) {
+      setRequestingRes(targetRes);
+      showToast(`${targetRes} tayyorlanmoqda, iltimos kuting...`);
+      try {
+        const res = await requestResolution(jobId, targetRes);
+        if (res.status === "ready") {
+          setRequestingRes(null);
+          doSwitchQuality(targetRes);
+          return;
+        }
+
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        pollTimerRef.current = setInterval(async () => {
+          try {
+            const fresh = await getJobResolutions(jobId);
+            if (fresh?.resolutions) {
+              setResolutions(fresh.resolutions);
+              const found = fresh.resolutions.find(r => r.resolution === targetRes);
+              if (found?.status === "ready") {
+                if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                setRequestingRes(null);
+                doSwitchQuality(targetRes);
+              } else if (found?.status === "failed") {
+                if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                setRequestingRes(null);
+                showToast(`${targetRes} tayyorlashda xatolik yuz berdi`);
+              }
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 3000);
+      } catch {
+        setRequestingRes(null);
+        showToast(`${targetRes} so'rovida xatolik yuz berdi`);
+      }
+      return;
+    }
+
+    doSwitchQuality(targetRes);
+  }, [currentQuality, resolutions, jobId, doSwitchQuality, showToast]);
+
+  const handleLoadedMetadata = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setDuration(v.duration);
+    if (savedTimeRef.current !== null) {
+      v.currentTime = savedTimeRef.current;
+      if (wasPlayingRef.current) {
+        v.play().catch(() => {});
+      }
+      savedTimeRef.current = null;
+    }
+  };
+
+  const effectiveSrc = useMemo(() => {
+    if (jobId) {
+      return getVideoUrl(jobId, currentQuality);
+    }
+    return src;
+  }, [jobId, currentQuality, src]);
 
   /* ── Cues ─────────────────────────────────────── */
   const cues = useMemo<Cue[]>(() => {
@@ -323,11 +449,20 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     >
       <video
         ref={videoRef}
-        src={src}
+        src={effectiveSrc}
         className="w-full h-full object-contain"
         onClick={togglePlay}
         onDoubleClick={toggleFS}
+        onLoadedMetadata={handleLoadedMetadata}
       />
+
+      {/* Floating quality change toast */}
+      {qualityToast && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-slate-950/90 text-white border border-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-none">
+          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+          <span>{qualityToast}</span>
+        </div>
+      )}
 
       {/* Subtitle overlay */}
       {showSubs && currentCue && (
@@ -426,13 +561,97 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             {/* Subtitle settings gear */}
             {hasSubs && (
               <button
-                onClick={() => setShowPanel(p => !p)}
+                onClick={() => { setShowPanel(p => !p); setShowQualityMenu(false); }}
                 title="Subtitr sozlamalari"
                 className={`flex-shrink-0 transition ${showPanel ? "text-blue-400" : "text-white/50 hover:text-white"}`}
               >
                 <Settings className="w-4 h-4" />
               </button>
             )}
+
+            {/* Quality selector */}
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowQualityMenu(q => !q);
+                  setShowPanel(false);
+                }}
+                title="Video sifati (360p, 720p, 1080p)"
+                className={`h-7 px-2.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1.5 select-none ${
+                  showQualityMenu
+                    ? "bg-blue-600 text-white border-blue-400 shadow-sm"
+                    : "bg-white/10 hover:bg-white/20 text-white/90 border-white/20"
+                }`}
+              >
+                <span>{currentQuality}</span>
+                {currentQuality === "1080p" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </button>
+
+              {/* Quality popover */}
+              {showQualityMenu && (
+                <div
+                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 backdrop-blur-md border border-white/15 rounded-xl p-2 w-48 shadow-2xl text-white text-xs"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/10">
+                    <span className="font-bold text-[10px] text-white/50 uppercase tracking-wider">Video sifati</span>
+                    <button
+                      onClick={() => setShowQualityMenu(false)}
+                      className="text-white/40 hover:text-white transition text-xs leading-none"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="space-y-0.5">
+                    {(resolutions.length > 0
+                      ? resolutions
+                      : [
+                          { resolution: "1080p", available: true, status: "ready" },
+                          { resolution: "720p", available: true, status: "ready" },
+                          { resolution: "360p", available: true, status: "ready" },
+                        ]
+                    ).map(opt => {
+                      const isCurrent = currentQuality === opt.resolution;
+                      const isBusy = requestingRes === opt.resolution;
+                      const label =
+                        opt.resolution === "1080p"
+                          ? "Full HD"
+                          : opt.resolution === "720p"
+                          ? "HD (Standart)"
+                          : "SD (Tejamkor)";
+                      return (
+                        <button
+                          key={opt.resolution}
+                          onClick={() => handleSelectQuality(opt.resolution)}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition ${
+                            isCurrent
+                              ? "bg-blue-600/30 text-blue-300 font-semibold border border-blue-500/30"
+                              : "hover:bg-white/10 text-white/80"
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-bold leading-tight">{opt.resolution}</span>
+                            <span className="text-[10px] text-white/50">{label}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {isBusy ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                            ) : !opt.available ? (
+                              <Lock className="w-3.5 h-3.5 text-white/40" />
+                            ) : isCurrent ? (
+                              <Check className="w-4 h-4 text-blue-400" />
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Audio download */}
             {audioDownloadUrl && (

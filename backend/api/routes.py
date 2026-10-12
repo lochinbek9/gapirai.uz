@@ -808,27 +808,50 @@ def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/outputs/{job_id}/video")
-def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def download_video(
+    job_id: uuid.UUID,
+    resolution: Optional[str] = Query(None, description="Video rezolyutsiyasi: 360p, 720p, 1080p"),
+    db: Session = Depends(get_db),
+):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Video topilmadi.")
 
+    suffix = "_360p" if resolution == "360p" else "_1080p" if resolution == "1080p" else "_final"
+    variant_name = f"dubbed{suffix}.mp4"
+
     settings = get_settings()
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import generate_presigned_download_url, s3_object_exists
-        s3_key = f"dubber/{job.storage_id}/dubbed_final.mp4"
+        s3_key = f"dubber/{job.storage_id}/{variant_name}"
         if not s3_object_exists(s3_key):
             raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
         presigned_url = generate_presigned_download_url(s3_key)
         if presigned_url:
             return Response(status_code=307, headers={"Location": presigned_url})
 
-    video_path = job.output_video_path
-    if not video_path or not Path(video_path).exists():
-        candidate = Path(f"outputs/{job.storage_id}/video/dubbed_final.mp4")
+    video_path = None
+    if resolution in ("360p", "1080p"):
+        candidate = Path(f"outputs/{job.storage_id}/video/{variant_name}")
         if candidate.exists():
             video_path = str(candidate)
         else:
+            direct_candidate = Path(f"outputs/{job_id}/video/{variant_name}")
+            if direct_candidate.exists():
+                video_path = str(direct_candidate)
+    else:
+        video_path = job.output_video_path
+        if not video_path or not Path(video_path).exists():
+            candidate = Path(f"outputs/{job.storage_id}/video/dubbed_final.mp4")
+            if candidate.exists():
+                video_path = str(candidate)
+            else:
+                direct_candidate = Path(f"outputs/{job_id}/video/dubbed_final.mp4")
+                if direct_candidate.exists():
+                    video_path = str(direct_candidate)
+
+    if not video_path or not Path(video_path).exists():
+        if resolution not in ("360p", "1080p"):
             from backend.services.job_recovery import can_recover_job, trigger_ondemand_recovery
             if can_recover_job(job):
                 trigger_ondemand_recovery(db, job)
@@ -837,9 +860,11 @@ def download_video(job_id: uuid.UUID, db: Session = Depends(get_db)):
                     detail="Video serverda qayta tiklanmoqda. Iltimos, 1-2 daqiqadan so'ng sahifani yangilang.",
                     headers={"Retry-After": "60"},
                 )
-            raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
+        raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
+
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
-    filename = f"dubbed_{safe_title or job_id}.mp4"
+    res_label = f"_{resolution}" if resolution in ("360p", "1080p") else ""
+    filename = f"dubbed_{safe_title or job_id}{res_label}.mp4"
     return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
 
 

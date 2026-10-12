@@ -40,3 +40,5 @@ frontend/tsconfig.tsbuildinfo
 .claude/
 .codex/
 ai-dubber-backup/
+*.tar.gz
+*.zip
