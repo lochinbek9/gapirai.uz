@@ -20,9 +20,10 @@ build/
 # ── Logs ─────────────────────────────────────────────
 *.log
 
-# ── Upload / Output (runtime data) ───────────────────
+# ── Upload / Output / Sources (runtime data) ───────────
 uploads/
 outputs/
+sources/
 datasets/
 
 # ── Next.js ──────────────────────────────────────────

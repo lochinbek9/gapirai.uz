@@ -69,6 +69,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./sources:/app/sources
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro
@@ -125,6 +126,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./sources:/app/sources
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro
@@ -206,6 +208,7 @@ services:
       - ./backend:/app/backend
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
+      - ./sources:/app/sources
       - ./cookies.txt:/app/cookies.txt:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro

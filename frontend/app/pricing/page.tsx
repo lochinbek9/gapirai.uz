@@ -242,7 +242,7 @@ export default function PricingPage() {
                   >
                     {subscribing === plan.id ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Kutilmoqda...</>
-                    ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? "Hozirgi tarif" : 'Click orqali tanlash'}
+                    ) : isCurrent ? 'Joriy tarif' : plan.id === 'free' ? 'Bepul tarif' : 'Click orqali tanlash'}
                   </button>
                   {plan.id !== 'free' && !isCurrent && (
                     <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
