@@ -315,7 +315,7 @@ def _optimize_instruction(segments: list[dict]) -> str:
 def _gemini_optimize_chunk(segments: list[dict]) -> list[dict]:
     """_llm_optimize_chunk bilan bir xil vazifa, Gemini orqali -- OpenAI
     krediti tugaganda yoki FREE_MODE'da ham ishlaydi (Gemini bepul tarifi
-    bor), video_analysis.py'dagi _gemini_json bilan bir xil naqsh."""
+    bor), model ro'yxati asosida ketma-ket sinaydi."""
     from google.genai import types
     from backend.services.translator import _get_gemini_client, _gemini_text_model
 
@@ -324,26 +324,70 @@ def _gemini_optimize_chunk(segments: list[dict]) -> list[dict]:
         temperature=0.3,
         response_mime_type="application/json",
     )
-    try:
-        response = _get_gemini_client().models.generate_content(
-            model=_gemini_text_model(), contents=_optimize_instruction(segments), config=config,
-        )
-        result = json.loads(response.text)
-        reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)
-        if reconciled is not None:
-            return reconciled
-    except Exception as e:
-        logger.warning(f"Gemini speech optimization chunk failed, falling back to rule-based output only: {e}")
+    candidate_models = [
+        _gemini_text_model(),
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    seen = set()
+    candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+
+    instruction = _optimize_instruction(segments)
+    for model_name in candidate_models:
+        for attempt in range(2):
+            try:
+                response = _get_gemini_client().models.generate_content(
+                    model=model_name, contents=instruction, config=config,
+                )
+                result = json.loads(response.text)
+                reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)
+                if reconciled is not None:
+                    return reconciled
+            except Exception as e:
+                err_str = str(e)
+                is_transient = "429" in err_str or "503" in err_str or "high demand" in err_str.lower()
+                if not is_transient:
+                    logger.debug(f"Gemini speech optimizer ({model_name}) error: {e}")
+                    break
+                time.sleep(1.0)
     return segments
 
 
+
 def _llm_optimize_chunk(segments: list[dict]) -> list[dict]:
-    """OpenAI orqali optimallashtiradi; kalit yo'q yoki xato bo'lsa (masalan
-    krediti tugagan) Gemini'ga o'tadi -- aks holda faqat qoidaviy natija
-    qoladi."""
+    """TRANSLATE_PROVIDER='gemini' bo'lsa Gemini birinchi; aks holda OpenAI birinchi."""
     from backend.services.openai_compat import light_model_kwargs
 
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+
+    if prefer_gemini and gemini_available:
+        try:
+            return _gemini_optimize_chunk(segments)
+        except Exception as e:
+            logger.warning(f"Gemini speech optimization xato ({e}) — OpenAI'ga o'tilmoqda.")
+            if _client:
+                try:
+                    response = _get_client().chat.completions.create(
+                        model=settings.OPENAI_LIGHT_MODEL,
+                        messages=[
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": _optimize_instruction(segments)},
+                        ],
+                        response_format={"type": "json_object"},
+                        **light_model_kwargs(temperature=0.3),
+                    )
+                    result = json.loads(response.choices[0].message.content)
+                    reconciled = _reconcile(segments, result.get("segments") if isinstance(result, dict) else result)
+                    if reconciled is not None:
+                        return reconciled
+                except Exception as e2:
+                    logger.warning(f"OpenAI speech optimization ham xato: {e2}")
+            return segments
+
     if not _client:
         return _gemini_optimize_chunk(segments) if gemini_available else segments
     try:

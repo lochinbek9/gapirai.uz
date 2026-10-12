@@ -39,7 +39,10 @@ def _get_gemini_transcribe_client():
                 location=settings.GCP_LOCATION,
             )
         else:
-            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+            if not api_key:
+                raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
+            _gemini_local.client = genai.Client(api_key=api_key)
     return _gemini_local.client
 
 # Whisper faqat cholg'u ohangini "♪♪" yoki "[Music]"/"(applause)" kabi
@@ -277,13 +280,23 @@ def _transcribe_chunk(chunk_path: Path, offset_seconds: float, language: str | N
 _TRANSCRIBE_LANGUAGE_NAMES = {"en": "English", "uz": "Uzbek"}
 
 
+def _get_gemini_candidate_models(primary: str) -> list[str]:
+    order = [
+        primary,
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    seen = set()
+    return [m for m in order if m and not (m in seen or seen.add(m))]
+
+
 def _get_gemini_stt_model_name() -> str:
     if settings.GEMINI_USE_VERTEX:
         return settings.GEMINI_VERTEX_TEXT_MODEL
-    model = getattr(settings, "GEMINI_STT_MODEL", None) or settings.GEMINI_MODEL
-    if "3.6" in model:
-        return "gemini-2.0-flash"
-    return model
+    return getattr(settings, "GEMINI_STT_MODEL", None) or settings.GEMINI_MODEL or "gemini-3.8-flash"
 
 
 def _build_transcribe_prompt(language: str | None) -> str:
@@ -316,7 +329,7 @@ def _build_transcribe_prompt(language: str | None) -> str:
 
 def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
     """Google AI Studio / Vertex AI orqali Gemini bilan audio STT transkripsiya.
-    O'zbek tilidagi audio uchun OpenAI Whisper'dan ancha yuqori aniqlik beradi."""
+    Model ro'yxati (3.8 Flash High -> soddaroq modellar) asosida ketma-ket sinaydi."""
     from google.genai import types
 
     audio_bytes = chunk_path.read_bytes()
@@ -329,55 +342,62 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
         _build_transcribe_prompt(language),
     ]
 
-    model_name = _get_gemini_stt_model_name()
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            response = _get_gemini_transcribe_client().models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config,
-            )
-            raw_text = (response.text or "").strip()
-            if raw_text.startswith("```"):
-                raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
-                raw_text = re.sub(r"\s*```$", "", raw_text)
-            raw_text = raw_text.strip()
-            result = json.loads(raw_text)
+    candidate_models = _get_gemini_candidate_models(_get_gemini_stt_model_name())
+    last_error = None
 
-            detected_lang = language
-            if isinstance(result, dict):
-                raw_segments = result.get("segments") or result.get("subtitles") or []
-                detected_lang = result.get("language") or language or "uz"
-            elif isinstance(result, list):
-                raw_segments = result
-            else:
-                raw_segments = []
+    for model_name in candidate_models:
+        for attempt in range(3):
+            try:
+                response = _get_gemini_transcribe_client().models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+                raw_text = (response.text or "").strip()
+                if raw_text.startswith("```"):
+                    raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
+                    raw_text = re.sub(r"\s*```$", "", raw_text)
+                raw_text = raw_text.strip()
+                result = json.loads(raw_text)
 
-            segments = []
-            text_parts = []
-            for seg in raw_segments or []:
-                text = (seg.get("text") or "").strip()
-                start = seg.get("start")
-                end = seg.get("end")
-                if not text or start is None or end is None:
-                    continue
-                text_parts.append(text)
-                segments.append({
-                    "start": round(float(start) + offset_seconds, 3),
-                    "end": round(float(end) + offset_seconds, 3),
-                    "text": text,
-                })
-            return segments, " ".join(text_parts), detected_lang or "uz"
-        except Exception as e:
-            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
-            is_bad_json = isinstance(e, json.JSONDecodeError)
-            if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
-                raise
-            backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
-            logger.warning(f"Gemini transkripsiya xato ({model_name}) — qayta urinish {backoff:.2f}s ({attempt + 1}/{max_attempts}): {e}")
-            time.sleep(backoff)
-    return [], "", language or "uz"
+                detected_lang = language
+                if isinstance(result, dict):
+                    raw_segments = result.get("segments") or result.get("subtitles") or []
+                    detected_lang = result.get("language") or language or "uz"
+                elif isinstance(result, list):
+                    raw_segments = result
+                else:
+                    raw_segments = []
+
+                segments = []
+                text_parts = []
+                for seg in raw_segments or []:
+                    text = (seg.get("text") or "").strip()
+                    start = seg.get("start")
+                    end = seg.get("end")
+                    if not text or start is None or end is None:
+                        continue
+                    text_parts.append(text)
+                    segments.append({
+                        "start": round(float(start) + offset_seconds, 3),
+                        "end": round(float(end) + offset_seconds, 3),
+                        "text": text,
+                    })
+                return segments, " ".join(text_parts), detected_lang or "uz"
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
+                is_bad_json = isinstance(e, json.JSONDecodeError)
+                if not (is_rate_limit or is_server_error or is_bad_json):
+                    logger.warning(f"Gemini STT ({model_name}) doimiy xato: {e} — keyingi modelga o'tilmoqda.")
+                    break
+                backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
+                logger.warning(f"Gemini STT ({model_name}) xato, qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
+                time.sleep(backoff)
+
+    raise last_error or RuntimeError("Barcha Gemini STT modellari muvaffaqiyatsiz bo'ldi")
 
 
 def transcribe_audio(audio_path: str, language: str | None = None, primary: str | None = None) -> dict:
@@ -490,12 +510,14 @@ def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | N
 
 
 def _transcribe_provider_order(primary: str) -> list[str]:
-    """API provayderlar tartibi: primary="gemini" va Gemini sozlangan bo'lsa Gemini -> OpenAI,
-    aks holda (standart) OpenAI -> Gemini (Gemini sozlangan bo'lsa). Sozlanmagan provayder
-    ro'yxatda umuman bo'lmaydi."""
+    """API provayderlar tartibi: primary='gemini' yoki TRANSLATE_PROVIDER='gemini' bo'lsa
+    Gemini birinchi bo'ladi. OpenAI krediti yo'q bo'lganda faqat Gemini ishlatiladi."""
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-    order = ["gemini", "openai"] if (primary == "gemini" and gemini_ok) else ["openai", "gemini"]
-    return [name for name in order if name == "openai" or gemini_ok]
+    prefer_gemini = primary == "gemini" or settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+    if prefer_gemini and gemini_ok:
+        return ["gemini"]
+    order = ["openai", "gemini"]
+    return [name for name in order if (name == "gemini" and gemini_ok) or (name == "openai" and bool(settings.OPENAI_API_KEY))]
 
 
 def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "openai") -> dict:

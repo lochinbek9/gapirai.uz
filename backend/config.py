@@ -217,21 +217,13 @@ class Settings(BaseSettings):
 
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    GEMINI_STT_MODEL: str = "gemini-2.0-flash"
+    GOOGLE_GENERATIVE_AI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+    GEMINI_STT_MODEL: str = "gemini-3.8-flash"
 
-    # Tarjima provayderi: "openai" | "gemini". 2026-09-11 OpenAI krediti
-    # tugagani sababli vaqtincha "gemini"ga o'tkazilgan edi, lekin
-    # 2026-09-12 aniqlandiki, Gemini bepul tarifi yangi hisoblarni FAQAT
-    # gemini-3.6-flash'ga majburlaydi va bu modelning bepul kvotasi kuniga
-    # 20 ta so'rov bilan cheklangan (yangi kalit ham, boshqa modelga
-    # o'tish ham yordam bermadi -- ikkalasi ham sinovdan o'tkazilgan).
-    # OpenAI krediti to'ldirilgach "openai"ga qaytarildi -- narx taqqoslash
-    # (2026-09-12) GPT-4o-mini'ni ($0.15/$0.60 1M token) Gemini'ning har
-    # qanday variantidan (bepul yoki pullik) amaliyroq qildi. Gemini kodi
-    # o'chirilmadi -- OpenAI xato bersa (yana krediti tugasa) avtomatik
-    # Gemini'ga o'tish hamon ishlaydi (translator.py/_call_json naqshlari).
-    TRANSLATE_PROVIDER: str = "openai"
+    # Tarjima provayderi: "openai" | "gemini". OpenAI krediti tugaganda
+    # yoki Gemini'dan foydalanish kerak bo'lganda "gemini" qilib sozlanadi.
+    TRANSLATE_PROVIDER: str = "gemini"
 
     # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
     GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
@@ -251,7 +243,7 @@ class Settings(BaseSettings):
     # uchun ishlatiladigan matn modeli — GEMINI_MODEL'dan alohida saqlanadi
     # (transcriber._transcribe_chunk_gemini buni Vertex/AI Studio ikkalasida
     # ham ishlatadi).
-    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-2.0-flash"
+    GEMINI_VERTEX_TEXT_MODEL: str = "gemini-3.8-flash"
 
     # Azure TTS
     AZURE_SPEECH_KEY: str = ""
@@ -500,6 +492,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "ignore"
+
+    def __init__(self, **values):
+        super().__init__(**values)
+        if not self.GEMINI_API_KEY and self.GOOGLE_GENERATIVE_AI_API_KEY:
+            self.GEMINI_API_KEY = self.GOOGLE_GENERATIVE_AI_API_KEY
+        elif not self.GOOGLE_GENERATIVE_AI_API_KEY and self.GEMINI_API_KEY:
+            self.GOOGLE_GENERATIVE_AI_API_KEY = self.GEMINI_API_KEY
 
 
 @lru_cache()

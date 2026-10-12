@@ -156,18 +156,19 @@ def _gemini_safety_check(text: str) -> SafetyResult:
     )
     client = _get_gemini_client()
 
-    # Avval eng barqaror faol model bilan urinib ko'ramiz
-    model_name = "gemini-flash-latest"
-    try:
-        response = client.models.generate_content(
-            model=model_name, contents=text[:8000], config=config
-        )
-    except Exception:
-        # Fallback model
-        model_name = "gemini-2.5-flash"
-        response = client.models.generate_content(
-            model=model_name, contents=text[:8000], config=config
-        )
+    candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+    response = None
+    for m in candidate_models:
+        try:
+            response = client.models.generate_content(
+                model=m, contents=text[:8000], config=config
+            )
+            if response and response.text:
+                break
+        except Exception:
+            continue
+    if not response or not response.text:
+        raise RuntimeError("Gemini content safety failed on all candidate models")
 
     data = json.loads(response.text)
     is_prohibited = bool(data.get("is_prohibited"))
@@ -196,6 +197,20 @@ def check_safety(text: str) -> SafetyResult:
         return SafetyResult(allowed=True)
 
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+
+    if prefer_gemini and gemini_available:
+        try:
+            return _gemini_safety_check(text)
+        except Exception as e:
+            logger.warning(f"Gemini kontent xavfsizligi tekshiruvida xatolik ({e}) — OpenAI'ga o'tilmoqda.")
+            if settings.OPENAI_API_KEY:
+                try:
+                    return _ai_classify(text)
+                except Exception as e2:
+                    logger.error(f"OpenAI ham ishlamadi (fail-open, ruxsat berildi): {e2}")
+            return SafetyResult(allowed=True)
+
     try:
         if not settings.OPENAI_API_KEY:
             raise RuntimeError("OPENAI_API_KEY sozlanmagan")

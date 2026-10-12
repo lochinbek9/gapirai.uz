@@ -37,15 +37,17 @@ def _get_gemini_client():
                 project=settings.GCP_PROJECT_ID,
                 location=settings.GCP_LOCATION,
             )
-        elif settings.GEMINI_API_KEY:
-            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         else:
-            raise RuntimeError("GEMINI_API_KEY yoki GEMINI_USE_VERTEX sozlanmagan")
+            api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+            if not api_key:
+                raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
+            _gemini_local.client = genai.Client(api_key=api_key)
     return _gemini_local.client
 
 
 def _gemini_text_model() -> str:
-    return settings.GEMINI_VERTEX_TEXT_MODEL if settings.GEMINI_USE_VERTEX else settings.GEMINI_MODEL
+    model = settings.GEMINI_VERTEX_TEXT_MODEL if settings.GEMINI_USE_VERTEX else settings.GEMINI_MODEL
+    return model or "gemini-3.8-flash"
 
 
 def _translate_mymemory(text: str, source_lang: str = "en", target_lang: str = "uz") -> str:
@@ -313,25 +315,42 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
         response_mime_type="application/json",
     )
 
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            response = _get_gemini_client().models.generate_content(
-                model=_gemini_text_model(),
-                contents=instruction,
-                config=config,
-            )
-            result = json.loads(response.text)
-            return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
-        except Exception as e:
-            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
-            is_bad_json = isinstance(e, json.JSONDecodeError)
-            if attempt == max_attempts - 1 or not (is_rate_limit or is_bad_json):
-                raise
-            backoff = (2 ** attempt) + random.uniform(0.1, 1.0) if is_rate_limit else random.uniform(0.3, 1.2)
-            reason = "RateLimit" if is_rate_limit else "noto'g'ri/kesilgan JSON"
-            logger.warning(f"Gemini {reason} — qayta urinish {backoff:.2f}s dan so'ng (Urinish {attempt + 1}/{max_attempts}). Xato: {e}")
-            time.sleep(backoff)
+    candidate_models = [
+        _gemini_text_model(),
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    seen = set()
+    candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+
+    last_error = None
+    for model_name in candidate_models:
+        for attempt in range(3):
+            try:
+                response = _get_gemini_client().models.generate_content(
+                    model=model_name,
+                    contents=instruction,
+                    config=config,
+                )
+                result = json.loads(response.text)
+                return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
+                is_bad_json = isinstance(e, json.JSONDecodeError)
+                if not (is_rate_limit or is_server_error or is_bad_json):
+                    logger.warning(f"Gemini tarjima ({model_name}) doimiy xato: {e} — keyingi modelga o'tilmoqda.")
+                    break
+                backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
+                logger.warning(f"Gemini tarjima ({model_name}) xato, qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
+                time.sleep(backoff)
+
+    raise last_error or RuntimeError("Barcha Gemini tarjima modellari muvaffaqiyatsiz bo'ldi")
 
 
 def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:

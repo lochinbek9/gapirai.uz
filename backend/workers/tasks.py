@@ -186,12 +186,28 @@ _GENDER_SYSTEM_PROMPT = (
 
 
 def _detect_gender(transcript_text: str) -> str:
-    """Detect speaker gender -- OpenAI birinchi, kaliti yo'q/xato bo'lsa
-    Gemini (bepul tarif), ikkalasi ham ishlamasa 'male'ga tushiriladi."""
+    """Detect speaker gender -- TRANSLATE_PROVIDER='gemini' bo'lsa Gemini birinchi,
+    aks holda OpenAI birinchi, ikkalasi ham ishlamasa 'male'ga tushiriladi."""
     from backend.services.openai_compat import light_model_kwargs
 
     snippet = transcript_text[:1000]
-    try:
+    gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+
+    def _call_gemini():
+        from google.genai import types
+        from backend.services.translator import _get_gemini_client, _gemini_text_model
+
+        config = types.GenerateContentConfig(
+            system_instruction=_GENDER_SYSTEM_PROMPT, temperature=0, max_output_tokens=5,
+        )
+        response = _get_gemini_client().models.generate_content(
+            model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
+        )
+        result = (response.text or "").strip().lower()
+        return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
+
+    def _call_openai():
         if not settings.OPENAI_API_KEY:
             raise RuntimeError("OPENAI_API_KEY not set")
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -205,20 +221,24 @@ def _detect_gender(transcript_text: str) -> str:
         )
         result = (resp.choices[0].message.content or "").strip().lower()
         return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
-    except Exception as e:
-        if settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX:
-            try:
-                from google.genai import types
-                from backend.services.translator import _get_gemini_client, _gemini_text_model
 
-                config = types.GenerateContentConfig(
-                    system_instruction=_GENDER_SYSTEM_PROMPT, temperature=0, max_output_tokens=5,
-                )
-                response = _get_gemini_client().models.generate_content(
-                    model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
-                )
-                result = (response.text or "").strip().lower()
-                return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
+    if prefer_gemini and gemini_available:
+        try:
+            return _call_gemini()
+        except Exception as e:
+            logger.debug(f"_detect_gender: Gemini xato ({e}), OpenAI'ga o'tilmoqda.")
+            try:
+                return _call_openai()
+            except Exception as e2:
+                logger.debug(f"_detect_gender: OpenAI ham xato ({e2}), 'male'ga tushirildi.")
+                return "male"
+
+    try:
+        return _call_openai()
+    except Exception as e:
+        if gemini_available:
+            try:
+                return _call_gemini()
             except Exception as e2:
                 logger.debug(f"_detect_gender: Gemini ham ishlamadi ({e2}), 'male'ga tushirildi.")
                 return "male"
