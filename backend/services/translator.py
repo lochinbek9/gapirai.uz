@@ -352,12 +352,18 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
 
                 if is_rate_limit:
                     m = re.search(r"retry in ([\d\.]+)s", err_str) or re.search(r"retryDelay['\"]:\s*['\"](\d+)s", err_str)
-                    delay = float(m.group(1)) + 1.0 if m else max(15.0, (attempt + 1) * 12.0)
-                    logger.warning(f"Gemini tarjima ({model_name}) 429 quota chegarasi — {delay:.1f}s kutilmoqda ({attempt + 1}/3)")
-                    time.sleep(delay)
+                    delay = float(m.group(1)) if m else 30.0
+                    if delay > 20.0:
+                        logger.warning(f"Gemini tarjima ({model_name}) kvotasi uzoq muddatga band ({delay:.1f}s) — darhol keyingi soddaroq modelga o'tilmoqda.")
+                        break
+                    logger.warning(f"Gemini tarjima ({model_name}) qisqa 429 kutish — {delay + 1.0:.1f}s ({attempt + 1}/3)")
+                    time.sleep(delay + 1.0)
+                elif is_server_error:
+                    logger.warning(f"Gemini tarjima ({model_name}) server band (503) — keyingi soddaroq modelga o'tilmoqda: {e}")
+                    break
                 else:
-                    backoff = (2 ** attempt) + random.uniform(1.0, 3.0)
-                    logger.warning(f"Gemini tarjima ({model_name}) xato, qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
+                    backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
+                    logger.warning(f"Gemini tarjima ({model_name}) JSON/qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
                     time.sleep(backoff)
 
     raise last_error or RuntimeError("Barcha Gemini tarjima modellari muvaffaqiyatsiz bo'ldi")
