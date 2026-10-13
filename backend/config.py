@@ -487,7 +487,7 @@ class Settings(BaseSettings):
     # bermaydi (2026-08-20, rezident proksi balansi tugagach qo'shildi).
     YOUTUBE_DATA_API_KEY: str = ""
     TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_FEEDBACK_CHANNEL_ID: str = "-1003979697686"
+    TELEGRAM_FEEDBACK_CHANNEL_ID: str = "-1004431243067"
 
     class Config:
         env_file = ".env"

@@ -32,7 +32,7 @@ def send_telegram_feedback(
     Dublyaj bahosi va fikrini Telegram bot orqali guruh/kanal/admin chatiga yuboradi.
     """
     token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "")
-    target_chat = chat_id or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "")
+    target_chat = chat_id or settings.TELEGRAM_FEEDBACK_CHANNEL_ID or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "") or "-1004431243067"
 
     if not token:
         logger.warning("TELEGRAM_BOT_TOKEN sozlanmagan.")
@@ -95,7 +95,7 @@ def send_telegram_platform_feedback(
     formasi orqali kelgan xabarni Telegram guruh/kanal/admin chatiga yuboradi.
     """
     token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "")
-    target_chat = settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "")
+    target_chat = settings.TELEGRAM_FEEDBACK_CHANNEL_ID or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "") or "-1004431243067"
 
     if not token or not target_chat:
         logger.warning("TELEGRAM_BOT_TOKEN yoki TELEGRAM_CHAT_ID sozlanmagan — platforma fikri yuborilmadi.")

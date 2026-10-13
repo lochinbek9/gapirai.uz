@@ -144,7 +144,7 @@ export default function TelegramFeedbackSection() {
                   type="text"
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
-                  placeholder="Telegram @username yoki telefon"
+                  placeholder="Telegram @username yoki telefon (ixtiyoriy)"
                   className="px-3.5 py-2 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition"
                 />
               </div>

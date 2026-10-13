@@ -45,20 +45,22 @@ async def submit_feedback(
     """Foydalanuvchi fikr-mulohazasi va takliflarini qabul qilib,
     Telegram kanaliga avtomatik yuboradi."""
     bot_token = settings.TELEGRAM_BOT_TOKEN
-    channel_id = settings.TELEGRAM_FEEDBACK_CHANNEL_ID
+    channel_id = settings.TELEGRAM_FEEDBACK_CHANNEL_ID or settings.TELEGRAM_CHAT_ID or "-1004431243067"
 
     if not bot_token or not channel_id:
         logger.error("Telegram bot token yoki feedback channel ID sozlanmagan")
         raise HTTPException(status_code=500, detail="Fikr yuborish tizimi vaqtincha sozlanmagan.")
 
+    import html
+
     # Ma'lumotlarni to'ldirish
     sender_name = req.name or (user.name if user and user.name else "Anonim foydalanuvchi")
-    if req.contact:
-        sender_contact = req.contact
+    if req.contact and req.contact.strip():
+        sender_contact = req.contact.strip()
     elif user:
         sender_contact = getattr(user, "phone", None) or getattr(user, "email", None) or "Mavjud emas"
     else:
-        sender_contact = "Ko'rsatilmagan"
+        sender_contact = "Ko'rsatilmagan (ixtiyoriy)"
 
     rating_str = ""
     if req.rating:
@@ -66,18 +68,18 @@ async def submit_feedback(
         rating_str = f"⭐ <b>Baho:</b> {stars} ({req.rating}/5)\n"
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M (UTC)")
-    page_str = f"🌐 <b>Sahifa:</b> {req.page_url}\n" if req.page_url else ""
+    page_str = f"🌐 <b>Sahifa:</b> {html.escape(req.page_url)}\n" if req.page_url else ""
 
     # Telegram xabar matni (HTML formati)
     message_text = (
         f"💬 <b>Yangi Fikr-Mulohaza / Taklif:</b>\n\n"
         f"{rating_str}"
-        f"👤 <b>Ism:</b> {sender_name}\n"
-        f"📞 <b>Aloqa:</b> {sender_contact}\n"
+        f"👤 <b>Ism:</b> {html.escape(sender_name)}\n"
+        f"📞 <b>Aloqa:</b> {html.escape(sender_contact)}\n"
         f"{page_str}"
         f"🕒 <b>Sana:</b> {now_str}\n\n"
         f"📝 <b>Fikr / Taklif:</b>\n"
-        f"<i>{req.comment.strip()}</i>"
+        f"<i>{html.escape(req.comment.strip())}</i>"
     )
 
     api_base = telegram_api_base()
