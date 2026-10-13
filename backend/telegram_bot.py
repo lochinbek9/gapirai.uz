@@ -505,8 +505,9 @@ async def _process_video_file_job(
 
     job_id = str(uuid.uuid4())
     job_dir = Path(settings.UPLOAD_DIR) / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-    video_path = job_dir / f"video{ext}"
+    video_dir = job_dir / "video"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    video_path = video_dir / f"video{ext}"
 
     try:
         tg_file = await bot.get_file(media.file_id)

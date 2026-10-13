@@ -117,6 +117,7 @@ class TestCreateDubbingJobCacheReuse(unittest.IsolatedAsyncioTestCase):
 
     def _mock_cache_query(self, cached_job_or_none):
         chain = self.db.query.return_value.filter.return_value
+        chain.filter.return_value = chain
         chain.order_by.return_value.first.return_value = cached_job_or_none
 
     @patch("backend.services.job_creation.process_video")

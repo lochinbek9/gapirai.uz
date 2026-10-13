@@ -84,7 +84,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await googleAuth(credential)
-      router.push('/dashboard')
+      router.push('/')
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
     } finally {

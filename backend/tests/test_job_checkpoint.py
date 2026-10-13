@@ -309,6 +309,32 @@ class TestCrossHostCheckpointResume(unittest.TestCase):
         self.assertEqual(row.status, JobStatus.FAILED)
         self.assertEqual(row.error_code, "UPLOADED_SOURCE_MISSING")
 
+    def test_telegram_upload_job_with_existing_video_succeeds_without_ytdlp(self):
+        """A Telegram-uploaded video job with local video present on disk
+        must NOT fail at DOWNLOAD stage, must NOT invoke yt-dlp, and should
+        proceed to transcription cleanly even if audio.wav needs extraction."""
+        video_path = self._dummy_file(b"fake-video-content")
+        self._make_job(
+            status=JobStatus.PENDING,
+            youtube_url="telegram://file/AgADBg0000fake",
+            original_video_path=video_path,
+        )
+
+        def fail_if_called(*a, **kw):
+            raise AssertionError("a telegram:// job must never reach the YouTube downloader")
+
+        def fake_extract(v_path, a_path):
+            Path(a_path).write_bytes(b"fake-wav-content")
+            return True
+
+        with patch("backend.workers.tasks.downloader.download_video", side_effect=fail_if_called), \
+             patch("backend.services.job_creation._extract_audio_wav", side_effect=fake_extract), \
+             patch("backend.workers.tasks.transcriber.transcribe_audio", side_effect=PermanentError("stop", code="TEST_STOP")):
+            with self.assertRaises(PermanentError) as cm:
+                process_video.run(str(self.job_id))
+
+        self.assertEqual(cm.exception.code, "TEST_STOP")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -423,18 +423,53 @@ def process_video(self: Task, job_id: str) -> dict:
         # tiklashga urinadi (backend/services/job_checkpoint.py).
         current_stage = "DOWNLOAD"
         stage_t0 = time.monotonic()
-        audio_path = str(job_dir / "audio.wav")
-        video_restored = bool(job.original_video_path) and restore_checkpoint(job_id, "video.mp4", job.original_video_path)
-        audio_restored = bool(job.original_video_path) and restore_checkpoint(job_id, "audio.wav", audio_path)
-        if video_restored and audio_restored and Path(job.original_video_path).exists() and Path(audio_path).exists():
-            _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
+        # Check if original video is already available (locally or via S3 checkpoint)
+        has_video = False
+        if job.original_video_path:
+            if Path(job.original_video_path).exists():
+                has_video = True
+            elif restore_checkpoint(job_id, "video.mp4", job.original_video_path) and Path(job.original_video_path).exists():
+                has_video = True
+
+        if has_video:
             video_path = job.original_video_path
+            audio_candidates = [
+                job_dir / "audio.wav",
+                output_dir / "audio.wav",
+                output_dir / "audio" / "audio.wav",
+                Path(video_path).parent / "audio.wav",
+                Path(video_path).parent.parent / "audio.wav",
+                Path(video_path).parent.parent / "audio" / "audio.wav",
+            ]
+            found_audio = None
+            for cand in audio_candidates:
+                if cand.exists() and cand.is_file() and cand.stat().st_size > 0:
+                    found_audio = str(cand)
+                    break
+
+            if not found_audio:
+                target_audio = job_dir / "audio.wav"
+                if restore_checkpoint(job_id, "audio.wav", str(target_audio)) and target_audio.exists():
+                    found_audio = str(target_audio)
+                else:
+                    target_audio.parent.mkdir(parents=True, exist_ok=True)
+                    from backend.services.job_creation import _extract_audio_wav
+                    if not _extract_audio_wav(Path(video_path), target_audio):
+                        raise PermanentError(
+                            "Video faylidan audio ajratib bo'lmadi.",
+                            code="AUDIO_EXTRACTION_FAILED",
+                        )
+                    found_audio = str(target_audio)
+                    save_checkpoint(job_id, "audio.wav", found_audio)
+
+            audio_path = found_audio
+            _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
         else:
             # Telegram bot orqali yuborilgan video fayl job'ining youtube_url'i
             # sintetik ("telegram://file/..."), haqiqiy YouTube havolasi emas.
             # Odatda lokal audio.wav/video hali joyida bo'lgani uchun yuqoridagi
             # checkpoint bu bosqichni o'tkazib yuboradi -- lekin fayllar
-            # tozalanганdan keyin bu job qayta bu yerga tushsa (masalan qayta
+            # tozalangandan keyin bu job qayta bu yerga tushsa (masalan qayta
             # navbatga qo'yilsa, yoki checkpoint S3'da yo'q bo'lsa), synthetic
             # URL'ni yt-dlp'ga berish mantiqsiz ("Unsupported url scheme:
             # telegram") va 5 marta behuda retry qilinadi. Qayta yuklab olish
