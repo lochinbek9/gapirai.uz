@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { listJobs, deleteJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
+import { listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
 import PushOptIn from '@/components/PushOptIn'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
-  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown
+  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw
 } from 'lucide-react'
 
 const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
@@ -78,10 +78,21 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void }) {
+function VideoCard({
+  job,
+  onDelete,
+  onRetry,
+  isRetrying,
+}: {
+  job: Job
+  onDelete: (id: string) => void
+  onRetry: (id: string) => void
+  isRetrying: boolean
+}) {
   const thumbnail = job.video_thumbnail || `https://img.youtube.com/vi/${job.job_id}/mqdefault.jpg`
   const duration = job.video_duration ? formatDuration(job.video_duration) : '--:--'
   const isReady = job.status === 'completed'
+  const isFailed = job.status === 'failed'
 
   return (
     <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
@@ -122,7 +133,7 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
         </h3>
         <div className="flex items-center justify-between">
           <StatusBadge status={job.status} />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {isReady && (
               <Link
                 href={`/video/${job.job_id}`}
@@ -131,9 +142,20 @@ function VideoCard({ job, onDelete }: { job: Job; onDelete: (id: string) => void
                 Ko'rish →
               </Link>
             )}
+            {isFailed && (
+              <button
+                onClick={() => onRetry(job.job_id)}
+                disabled={isRetrying}
+                title="Qayta urinish (regenerate)"
+                className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+              >
+                <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+            )}
             <button
               onClick={() => onDelete(job.job_id)}
               className="text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl"
+              title="O'chirish"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -201,10 +223,25 @@ export default function DashboardPage() {
     }
   }
 
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+
   async function handleDelete(id: string) {
     if (!confirm("Bu videoni o'chirishni tasdiqlaysizmi?")) return
     await deleteJob(id)
     setJobs((prev) => prev.filter((j) => j.job_id !== id))
+  }
+
+  async function handleRetry(id: string) {
+    setRetryingId(id)
+    try {
+      await retryJob(id)
+      const updated = await listJobs()
+      setJobs(updated)
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
+    } finally {
+      setRetryingId(null)
+    }
   }
 
   function handleLogout() {
@@ -297,7 +334,13 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {jobs.map((job) => (
-              <VideoCard key={job.job_id} job={job} onDelete={handleDelete} />
+              <VideoCard
+                key={job.job_id}
+                job={job}
+                onDelete={handleDelete}
+                onRetry={handleRetry}
+                isRetrying={retryingId === job.job_id}
+              />
             ))}
           </div>
         )}

@@ -677,6 +677,40 @@ def delete_job(
     db.commit()
 
 
+@router.post("/jobs/{job_id}/retry")
+def retry_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Xatolik yuz bergan (failed) job'ni qayta ishga tushirish (regenerate)."""
+    job = db.query(DubbingJob).filter(
+        DubbingJob.id == job_id,
+        DubbingJob.user_id == current_user.id,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job topilmadi.")
+
+    if job.status != JobStatus.FAILED:
+        raise HTTPException(status_code=400, detail="Faqat xatolik yuz bergan videolarni qayta ishga tushirish mumkin.")
+
+    job.status = JobStatus.PENDING
+    job.progress = 0.0
+    job.status_message = "Qayta navbatga qo'yildi..."
+    job.error_message = None
+    job.recovery_attempt_count = 0
+    job.processing_claim_token = None
+    job.processing_lease_expires_at = None
+    db.commit()
+
+    from backend.workers.tasks import process_video
+    from backend.services.plans import get_job_queue
+    queue = get_job_queue(db, current_user.id)
+    process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=queue)
+
+    return {"success": True, "message": "Video qayta navbatga qo'yildi."}
+
+
 def _subtitle_cues_for(job) -> list | None:
     """Faqat "Subtitr" rejimidagi job'lar uchun: tarjima gaplarini qisqa, o'qib
     bo'ladigan kuelarga aylantiradi (backend/services/subtitle_cues.py). So'rov

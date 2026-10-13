@@ -2,12 +2,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check
+  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -43,6 +43,7 @@ export default function VideoPage() {
   const [showTranscript, setShowTranscript] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [retryLoading, setRetryLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [isCopied, setIsCopied] = useState(false)
   const [isEnCopied, setIsEnCopied] = useState(false)
@@ -55,6 +56,18 @@ export default function VideoPage() {
   const handleGoHome = () => {
     clearJobId()
     router.push('/')
+  }
+
+  const handleRetry = async () => {
+    if (!id || retryLoading) return
+    setRetryLoading(true)
+    try {
+      await retryJob(id)
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
+    } finally {
+      setRetryLoading(false)
+    }
   }
 
   const handleCancel = async () => {
@@ -315,6 +328,14 @@ export default function VideoPage() {
                   </div>
                   {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
                   <div className="pt-2 flex justify-center gap-3">
+                    <button
+                      onClick={handleRetry}
+                      disabled={retryLoading}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition duration-200 disabled:opacity-50"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                      Qayta urinish
+                    </button>
                     <button
                       onClick={handleGoHome}
                       className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition duration-200"
