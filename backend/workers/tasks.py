@@ -9,12 +9,11 @@ from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
-from backend.models.database import SessionLocal, DubbingJob, JobStatus
+from backend.models.database import SessionLocal, DubbingJob, JobStatus, ContentViolation, User
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
 from backend.services.errors import PermanentError
 from backend.services import error_classification
 from backend.services.content_safety import check_safety
-from backend.models.database import ContentViolation
 from backend.services.email_service import send_dubbing_complete_email
 from backend.services.telegram_notify import send_telegram_message
 from backend.services.job_claim import try_claim, release_claim
@@ -582,6 +581,24 @@ def process_video(self: Task, job_id: str) -> dict:
                     blocked=True,
                 ))
                 db.commit()
+
+            try:
+                from backend.services.telegram_notify import send_content_blocked_to_admins
+                user = db.query(User).filter(User.id == job.user_id).first() if job.user_id else None
+                send_content_blocked_to_admins(
+                    video_url=job.youtube_url or (f"Fayl: {job.original_video_path}" if job.original_video_path else None),
+                    video_title=job.video_title,
+                    category=safety.category,
+                    reason=safety.reason,
+                    stage="transcript",
+                    user_id=str(job.user_id) if job.user_id else None,
+                    user_name=user.name if user else None,
+                    user_email_or_phone=user.email or user.phone if user else None,
+                    job_id=str(job.id),
+                )
+            except Exception as e:
+                logger.error(f"[JOB {job_id}] Moderatsiya admin xabarini yuborishda xatolik: {e}")
+
             raise PermanentError(
                 safety.reason or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
                 code="CONTENT_BLOCKED",
@@ -918,8 +935,9 @@ def process_video(self: Task, job_id: str) -> dict:
 
     except PermanentError as exc:
         try:
-            from backend.services.telegram_notify import send_error_to_admins
-            send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Type: PermanentError")
+            if getattr(exc, "code", None) != "CONTENT_BLOCKED":
+                from backend.services.telegram_notify import send_error_to_admins
+                send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Type: PermanentError")
         except Exception:
             pass
         # Qayta urinish ma'nosiz — har safar bir xil natija chiqadi.

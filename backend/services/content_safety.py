@@ -85,12 +85,12 @@ MUHIM QOIDA: Oddiy, qonuniy va xavfsiz videolarni ADASHIB TAQIQLAMANG (soxta sig
 
 ⛔ TAQIQLANGAN KATEGORIYALAR (is_prohibited: true):
 1. religious_content:
-   - Diniy ma'ruza, xutba, va'z, amri-ma'ruf, da'vat.
-   - Namoz, tahorat, ro'za, zakot, haj va boshqa ibodat qoidalari, fiqhiy hukmlar.
-   - Diniy aqida, fatvolar, mazhablararo bahslar, diniy targ'ibot va missionerlik.
-   - Diniy kitoblar (Qur'on, Hadis, Injil, Tavrot) tafsiri va diniy ta'limotlar.
+   - FAQAT va FAQAT sof diniy xutba, juma ma'ruzasi, amri-ma'ruf, masjiddagi yoki cherkovdagi va'zlar, diniy da'vatlar.
+   - Namoz, tahorat, ro'za, zakot, haj kabi diniy ibodat/marosim qoidalarini o'rgatish, fiqhiy hukmlar va diniy fatvolar.
+   - Diniy aqida, mazhablararo bahslar, diniy missionerlik va sof diniy targ'ibot.
+   - Diniy muqaddas kitoblar (Qur'on, Hadis, Injil, Tavrot) tafsiri va sof diniy ta'limotlar.
 2. sexual_explicit:
-   - Pornografiya, ochiq jinsiy aloqa, erotika, 18+ behayo shahvoniy sahnalar, intim xizmatlar.
+   - Ochiq pornografiya, bevosita jinsiy aloqa, erotika, 18+ behayo va shahvoniy sahnalar, intim xizmatlar.
 3. sexual_violence:
    - Zo'rlash (rape), jinsiy tajovuz, jinsiy zo'ravonlik, voyaga yetmaganlarga nisbatan har qanday jinsiy mavzular yoki ekspluatatsiya (CSAM).
 4. graphic_violence:
@@ -99,11 +99,17 @@ MUHIM QOIDA: Oddiy, qonuniy va xavfsiz videolarni ADASHIB TAQIQLAMANG (soxta sig
    - O'z joniga qasd qilish (suicide/self-harm)ni targ'ib qilish yoki o'rgatish.
 
 ✅ QAT'IYAN RUXSAT BERILGAN KONTENTLAR (is_prohibited: false):
+- Kundalik nutq va iboralar: "Xudo xohlasa", "Allohga shukr", "InshaAlloh", "Subhanalloh", "Assalomu alaykum", "Bismillah", "Oh my God", "Thank God", "God bless" kabi so'zlar va iboralar ishlatilgan oddiy videolar (vloglar, suhbatlar, podkastlar) diniy kontent EMAS!
+- Motivatsiya, psixologiya, shaxsiy rivojlanish, biznes, hayotiy saboqlar, falsafa, oilaviy munosabatlar va axloqiy o'gitlar diniy kontent EMAS!
+- Tarix, arxitektura, sayohat, madaniyat (masjidlar, cherkovlar, ibodatxonalar yoki tarixiy obidalar haqidagi hujjatli filmlar) diniy kontent EMAS!
+- Kinolar, seriallar, romantik filmlar, sevgi, qo'shiqlar, hazillar, memlar, plyajdagi suzish kiyimidagi sahnalar yoki tibbiy/biologik tushuntirishlar 18+ pornografiya EMAS!
 - O'yinlar (Gaming): PUBG, GTA, CS:GO, Call of Duty, Minecraft va barcha kompyuter o'yinlari (o'yindagi otishmalar va janglar zo'ravonlik EMAS!).
 - Anime, multfilm va kino sharhlari: Tokyo Ghoul, Attack on Titan, Naruto, kinolar tahlili, jangari filmlar sharhi, fantastika (fentezi/anime syujetlari va personajlar taqiqlanmaydi!).
 - Ko'ngilochar shoular va chellenjlar: MrBeast, omon qolish (survival) chellenjlari, pranki, vloglar, sarguzashtlar.
 - Tarixiy hujjatli filmlar: Dunyo tarixi, urushlar tarixi (masalan, 2-jahon urushi, Stalingrad jangi, sarkardalar tarixi).
 - IT, dasturlash, texnologiya, ilm-fan, ta'lim, tibbiyot, sport (UFC, boks, futbol) va yangiliklar.
+
+MUHIM QOIDA: Agar video aniq va 100% yuqoridagi 4 ta taqiqlangan kategoriyaga kirmasa yoki ikkilanish bo'lsa, HAR DOIM RUXSAT BERING (is_prohibited: false)!
 
 Qat'iy quyidagi JSON formatda javob bering:
 {

@@ -267,6 +267,20 @@ async def create_dubbing_job(
             blocked=True,
         ))
         db.commit()
+        try:
+            from backend.services.telegram_notify import send_content_blocked_to_admins
+            send_content_blocked_to_admins(
+                video_url=youtube_url,
+                video_title=title,
+                category=safety.category,
+                reason=safety.reason,
+                stage="metadata",
+                user_id=str(user.id) if user else None,
+                user_name=user.name if user else None,
+                user_email_or_phone=user.email or user.phone if user else None,
+            )
+        except Exception as e:
+            logger.error(f"Moderatsiya admin xabarini yuborishda xatolik: {e}")
         return JobCreationResult(
             outcome="blocked",
             video_title=title,
