@@ -241,10 +241,17 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       .then(res => {
         if (res?.resolutions) {
           setResolutions(res.resolutions);
+          const curOpt = res.resolutions.find(r => r.resolution === (initialQuality || "720p"));
+          if (curOpt && !curOpt.available) {
+            const fallback = [...res.resolutions].reverse().find(r => r.available);
+            if (fallback) {
+              setCurrentQuality(fallback.resolution);
+            }
+          }
         }
       })
       .catch(() => {});
-  }, [jobId]);
+  }, [jobId, initialQuality]);
 
   const showToast = useCallback((msg: string) => {
     clearTimeout(toastTimerRef.current);
