@@ -119,8 +119,12 @@ YOUTUBE_COOKIES_MAX_AGE_HOURS = float(os.getenv("YOUTUBE_COOKIES_MAX_AGE_HOURS",
 
 def _cookies_are_stale(path: str) -> bool:
     try:
-        if not os.path.isfile(path) or os.path.getsize(path) < 50:
-            return True
+        from backend.services.cookie_manager import min_cookie_expiry
+        expiry = min_cookie_expiry(path)
+        if expiry > time.time():
+            return False
+        if YOUTUBE_COOKIES_MAX_AGE_HOURS <= 0:
+            return False
         age_hours = (time.time() - os.path.getmtime(path)) / 3600
     except OSError:
         return True
@@ -137,14 +141,18 @@ def cookie_status() -> dict:
     """Explicit, inspectable cookie state -- present/absent, fresh/stale,
     age in hours. No cookie contents, ever. Intended for operator-facing
     diagnostics (e.g. an admin/health endpoint), not end-user output."""
-    from backend.services.cookie_manager import get_effective_cookies_path
+    from backend.services.cookie_manager import get_effective_cookies_path, min_cookie_expiry
     cookies_target = get_effective_cookies_path()
     if not os.path.isfile(cookies_target):
         return {"present": False, "fresh": False, "age_hours": None}
+    expiry = min_cookie_expiry()
+    is_fresh = (expiry > time.time()) if expiry > 0 else True
     age_hours = (time.time() - os.path.getmtime(cookies_target)) / 3600
+    if expiry <= 0 and YOUTUBE_COOKIES_MAX_AGE_HOURS > 0:
+        is_fresh = age_hours <= YOUTUBE_COOKIES_MAX_AGE_HOURS
     return {
         "present": True,
-        "fresh": age_hours <= YOUTUBE_COOKIES_MAX_AGE_HOURS,
+        "fresh": is_fresh,
         "age_hours": round(age_hours, 1),
     }
 
@@ -260,7 +268,7 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
     temp_cookie_path = None
     from backend.services.cookie_manager import get_effective_cookies_path
     cookies_target = get_effective_cookies_path()
-    if use_cookies and os.path.isfile(cookies_target) and os.path.getsize(cookies_target) >= 50 and not _cookies_are_stale(cookies_target):
+    if use_cookies and os.path.isfile(cookies_target) and os.path.getsize(cookies_target) >= 20 and not _cookies_are_stale(cookies_target):
         try:
             tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
             shutil.copyfile(cookies_target, tmp.name)

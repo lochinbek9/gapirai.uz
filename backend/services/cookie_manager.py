@@ -36,24 +36,30 @@ COOKIE_FRESH_DAYS = 7
 
 def get_effective_cookies_path() -> str:
     """Eng ustuvor va mavjud cookies fayli yo'lini qaytaradi:
-    1. YOUTUBE_COOKIES_PATH (agar o'rnatilgan bo'lsa va mavjud bo'lsa)
+    1. YOUTUBE_COOKIES_PATH (agar o'rnatilgan bo'lsa)
     2. /app/uploads/cookies.txt (admin panel orqali yuklangan dinamik cookies)
     3. Standart /app/cookies.txt
+    4. /app/secrets/cookies.txt (doimiy tashqi secrets papkasi)
     """
     env_target = os.getenv("YOUTUBE_COOKIES_PATH")
-    if env_target and os.path.isfile(env_target) and os.path.getsize(env_target) >= 50:
+    if env_target:
         return env_target
-    if os.path.isfile(COOKIES_UPLOAD_FILE) and os.path.getsize(COOKIES_UPLOAD_FILE) >= 50:
+    if os.path.isfile(COOKIES_UPLOAD_FILE) and os.path.getsize(COOKIES_UPLOAD_FILE) >= 20:
         return COOKIES_UPLOAD_FILE
+    if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) >= 20:
+        return COOKIES_FILE
+    secrets_target = "/app/secrets/cookies.txt"
+    if os.path.isfile(secrets_target) and os.path.getsize(secrets_target) >= 20:
+        return secrets_target
     return COOKIES_FILE
 
 
-def min_cookie_expiry() -> float:
+def min_cookie_expiry(target_path: str | None = None) -> float:
     """Eng erta (minimal) expires qiymatini qaytaradi (epoch seconds).
     Asosiy YouTube/Google auth kuki-lari (LOGIN_INFO, SID, va h.k.) muddati olinadi.
     Eski o'tgan bir martalik tokenlar (masalan ST-*, SOCS) sababli noto'g'ri eskirgan
     deb ko'rsatilishining oldi olingan."""
-    target = get_effective_cookies_path()
+    target = target_path or get_effective_cookies_path()
     if not os.path.exists(target):
         return 0.0
 
