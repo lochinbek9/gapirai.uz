@@ -72,9 +72,9 @@ class PlanDef:
 
 
 PLANS: dict[str, PlanDef] = {
-    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="360p"),
-    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p"),
-    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="720p",  period_days=365),
+    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="1080p"),
+    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="1080p"),
+    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="1080p", period_days=365),
     "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p"),
     "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
 }
@@ -88,7 +88,7 @@ def get_max_resolution_for_job(db, job) -> str:
     ochiladi (mavjud /outputs endpointlari auth talab qilmaydi), shuning
     uchun REQUESTER emas, JOB EGASI tarifi tekshiriladi."""
     if job.user_id is None:
-        return "360p"
+        return "1080p"
     sub = get_or_create_subscription(db, job.user_id)
     return PLANS[sub.plan.value].max_resolution
 

@@ -41,6 +41,12 @@ def generate_360p(job) -> str:
             raise RuntimeError("Master video S3'da topilmadi.")
     else:
         master_url = job.output_video_path
+        if not master_url or not os.path.exists(master_url):
+            fallback_master = str(Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4")
+            if os.path.exists(fallback_master):
+                master_url = fallback_master
+            else:
+                raise RuntimeError("Master video lokal diskda topilmadi.")
 
     out_dir = Path(settings.OUTPUT_DIR) / job_id / "video"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -77,16 +83,46 @@ def generate_1080p(job) -> str:
     tmp_dir = Path(settings.UPLOAD_DIR) / tmp_job_id
 
     try:
+        local_audio = None
         if settings.AWS_BUCKET_NAME:
             audio_s3_key = f"dubber/{job_id}/dubbed_audio.wav"
-            local_audio = str(tmp_dir / "dubbed_audio.wav")
             tmp_dir.mkdir(parents=True, exist_ok=True)
-            if not download_file_from_s3(audio_s3_key, local_audio):
-                raise RuntimeError("Dublyaj audiosi S3'da topilmadi.")
-        else:
-            local_audio = str(Path(settings.OUTPUT_DIR) / job_id / "audio" / "dubbed_audio.wav")
-            if not os.path.exists(local_audio):
-                raise RuntimeError("Dublyaj audiosi lokal diskda topilmadi.")
+            cand_s3_audio = str(tmp_dir / "dubbed_audio.wav")
+            if download_file_from_s3(audio_s3_key, cand_s3_audio):
+                local_audio = cand_s3_audio
+
+        if not local_audio or not os.path.exists(local_audio):
+            candidate_paths = [
+                getattr(job, "dubbed_audio_path", None),
+                str(Path(settings.OUTPUT_DIR) / job_id / "audio" / "tts_segments" / "dubbed_audio.wav"),
+                str(Path(settings.OUTPUT_DIR) / job_id / "audio" / "dubbed_audio.wav"),
+            ]
+            for p in candidate_paths:
+                if p and os.path.exists(p):
+                    local_audio = p
+                    break
+
+        # Fallback: extract dubbed audio from master video
+        if not local_audio or not os.path.exists(local_audio):
+            master_video = getattr(job, "output_video_path", None)
+            if not master_video or not os.path.exists(master_video):
+                cand_master = str(Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4")
+                if os.path.exists(cand_master):
+                    master_video = cand_master
+
+            if master_video and os.path.exists(master_video):
+                tmp_dir.mkdir(parents=True, exist_ok=True)
+                extracted_audio = str(tmp_dir / "dubbed_audio.wav")
+                cmd = ["ffmpeg", "-y", "-i", master_video, "-vn", "-c:a", "pcm_s16le", extracted_audio]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if res.returncode == 0 and os.path.exists(extracted_audio):
+                    local_audio = extracted_audio
+
+        if not local_audio or not os.path.exists(local_audio):
+            raise RuntimeError("Dublyaj audiosi lokal diskda topilmadi.")
+
+        if not getattr(job, "youtube_url", None):
+            raise RuntimeError("1080p sifat faqat YouTube videolari uchun mavjud.")
 
         download_result = downloader.download_video(job.youtube_url, tmp_job_id, max_height=1080)
         video_path = download_result["video_path"]
