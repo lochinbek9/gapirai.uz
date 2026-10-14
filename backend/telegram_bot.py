@@ -122,6 +122,16 @@ def _looks_like_youtube_url(text: str) -> str | None:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_chat.type != "private":
+        chat = update.effective_chat
+        await update.message.reply_text(
+            f"🎬 <b>GapirAI Dublyaj Boti</b>\n\n"
+            f"Ushbu chat ID raqami: <code>{chat.id}</code>\n"
+            f"Nomi: <b>{chat.title or ''}</b>",
+            parse_mode="HTML",
+        )
+        return
+
     chat_id = str(update.effective_chat.id)
     db = SessionLocal()
     try:
@@ -143,6 +153,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Boshlash uchun telefon raqamingizni ulashing (agar saytda ro'yxatdan o'tgan bo'lsangiz, "
         "hisobingiz avtomatik tanilib, obuna/kvotangiz shu yerda ham ishlaydi):",
         reply_markup=ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True),
+    )
+
+
+async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    await update.message.reply_text(
+        f"🆔 Ushbu chat ID raqami: <code>{chat.id}</code>\n"
+        f"Nomi: <b>{chat.title or chat.first_name or ''}</b>",
+        parse_mode="HTML",
     )
 
 
@@ -726,6 +745,7 @@ def main() -> None:
         logger.info(f"Telegram bot mahalliy Bot API server orqali ishga tushmoqda: {base}")
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("menu", menu_command))
     app.add_handler(CommandHandler("app", app_command))
     app.add_handler(CommandHandler("donate", donate_command))

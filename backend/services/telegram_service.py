@@ -73,12 +73,19 @@ def send_telegram_feedback(
         "disable_web_page_preview": True,
     }
 
+    fallback_chat = "-1003827197120"
     try:
         res = httpx.post(url, json=payload, timeout=10.0)
         if res.status_code == 200:
             logger.info(f"Telegram feedback notification sent for job {job_id}")
             return True
         logger.warning(f"Telegram API response {res.status_code}: {res.text}")
+        if str(target_chat) != fallback_chat:
+            payload["chat_id"] = fallback_chat
+            fb_res = httpx.post(url, json=payload, timeout=10.0)
+            if fb_res.status_code == 200:
+                logger.info(f"Telegram feedback sent to fallback chat {fallback_chat} for job {job_id}")
+                return True
     except Exception as exc:
         logger.error(f"Failed to send Telegram notification: {exc}")
     return False
@@ -119,12 +126,19 @@ def send_telegram_platform_feedback(
         "disable_web_page_preview": True,
     }
 
+    fallback_chat = "-1003827197120"
     try:
         res = httpx.post(url, json=payload, timeout=10.0)
         if res.status_code == 200:
             logger.info("Telegram platform feedback notification sent")
             return True
         logger.warning(f"Telegram API response {res.status_code}: {res.text}")
+        if str(target_chat) != fallback_chat:
+            payload["chat_id"] = fallback_chat
+            fb_res = httpx.post(url, json=payload, timeout=10.0)
+            if fb_res.status_code == 200:
+                logger.info(f"Telegram platform feedback sent to fallback chat {fallback_chat}")
+                return True
     except Exception as exc:
         logger.error(f"Failed to send Telegram platform feedback notification: {exc}")
     return False
