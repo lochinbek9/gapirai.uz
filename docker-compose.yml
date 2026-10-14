@@ -15,10 +15,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dubber -d dubber_db"]
-      interval: 5s
+      test: ["CMD-SHELL", "bash -c 'cat /dev/null > /dev/tcp/localhost/5432' 2>/dev/null && echo ok || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ──────────────────────────────
   # Redis (Celery broker + cache)
@@ -31,10 +32,11 @@ services:
     ports:
       - "${COMPOSE_HOST_IP:-127.0.0.1}:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "0061f8931184fe1276650305600d5409df1a3af2692094d5", "--no-auth-warning", "ping"]
-      interval: 5s
+      test: ["CMD-SHELL", "bash -c 'cat /dev/null > /dev/tcp/localhost/6379' 2>/dev/null && echo ok || exit 1"]
+      interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 10s
 
   # ──────────────────────────────
   # yt-dlp PO Token Provider (bgutil) — without this, YouTube serves
