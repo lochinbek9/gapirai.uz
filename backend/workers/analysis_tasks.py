@@ -108,7 +108,7 @@ def _cleanup_analysis_dirs(analysis_id: str) -> None:
 @celery_app.task(
     bind=True,
     name="backend.workers.analysis_tasks.analyze_video_task",
-    max_retries=5,
+    max_retries=3,
     default_retry_delay=60,
     soft_time_limit=2400,  # 40 daqiqa
     time_limit=2700,       # 45 daqiqa
@@ -178,7 +178,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.TRANSCRIBING, 35.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(audio_path)
+            transcript = transcriber.transcribe_audio(audio_path, primary="gemini")
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")

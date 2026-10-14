@@ -1046,5 +1046,16 @@ def list_broadcast_campaigns(
         db.close()
 
 
+@router.get("/gemini-quota")
+def get_gemini_quota(current_admin: User = Depends(get_current_admin_user)):
+    """
+    Barcha Gemini API kalitlari va modellarining joriy kvota,
+    cooldown va so'rovlar holatini qaytaradi.
+    """
+    from backend.services.gemini_quota_manager import get_gemini_quota_status
+    return get_gemini_quota_status()
+
+
+
 
 
