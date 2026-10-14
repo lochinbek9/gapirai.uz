@@ -694,9 +694,110 @@ def retry_job(
     if job.status != JobStatus.FAILED:
         raise HTTPException(status_code=400, detail="Faqat xatolik yuz bergan videolarni qayta ishga tushirish mumkin.")
 
+    from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
+
+    # 1. Kesh tekshiruvi: Agar ushbu video allaqachon muvaffaqiyatli dublyaj qilingan bo'lsa
+    # (masalan, foydalanuvchining avvalgi tugallangan nusxasi yoki tizimdagi mavjud kesh)
+    video_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
+    if video_id and not getattr(job, "subtitle_only", False):
+        cache_query = db.query(DubbingJob).filter(
+            DubbingJob.youtube_video_id == video_id,
+            DubbingJob.status == JobStatus.COMPLETED,
+            DubbingJob.subtitle_only.is_(False),
+            DubbingJob.id != job.id,
+        )
+        if job.speaker_gender in ("male", "female"):
+            cache_query = cache_query.filter(DubbingJob.speaker_gender == job.speaker_gender)
+        elif getattr(job, "voice_gender_setting", None) in ("male", "female"):
+            cache_query = cache_query.filter(DubbingJob.speaker_gender == job.voice_gender_setting)
+
+        cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
+        if cached_job and _cached_job_files_exist(cached_job):
+            job.source_job_id = cached_job.storage_id
+            job.video_title = job.video_title or cached_job.video_title
+            job.video_duration = job.video_duration or cached_job.video_duration
+            job.video_thumbnail = job.video_thumbnail or cached_job.video_thumbnail
+            job.speaker_gender = cached_job.speaker_gender
+            job.transcript_text = cached_job.transcript_text
+            job.translated_text = cached_job.translated_text
+            job.transcript_segments = cached_job.transcript_segments
+            job.translated_segments = cached_job.translated_segments
+            job.srt_content = cached_job.srt_content
+            job.uzbek_srt_content = cached_job.uzbek_srt_content
+            job.output_video_path = cached_job.output_video_path or f"outputs/{cached_job.storage_id}/video/dubbed_final.mp4"
+            job.output_video_url = cached_job.output_video_url or f"/outputs/{cached_job.storage_id}/video/dubbed_final.mp4"
+            job.dubbed_audio_path = cached_job.dubbed_audio_path or f"outputs/{cached_job.storage_id}/audio/dubbed_audio.wav"
+            job.error_code = None
+            job.error_message = None
+            job.recovery_attempt_count = 0
+            job.processing_claim_token = None
+            job.processing_lease_expires_at = None
+            job.quota_consumed = True
+            job.status = JobStatus.COMPLETED
+            job.progress = 100.0
+            job.status_message = "Dublyaj tayyor!"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            return {"success": True, "message": "Video tayyor holatga keltirildi (keshdan)."}
+
+    elif video_id and getattr(job, "subtitle_only", False):
+        cache_query = db.query(DubbingJob).filter(
+            DubbingJob.youtube_video_id == video_id,
+            DubbingJob.status == JobStatus.COMPLETED,
+            DubbingJob.transcript_segments.isnot(None),
+            DubbingJob.translated_segments.isnot(None),
+            DubbingJob.id != job.id,
+        )
+        cached_sub_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
+        if cached_sub_job:
+            job.source_job_id = cached_sub_job.storage_id
+            job.video_title = job.video_title or cached_sub_job.video_title
+            job.video_duration = job.video_duration or cached_sub_job.video_duration
+            job.video_thumbnail = job.video_thumbnail or cached_sub_job.video_thumbnail
+            job.transcript_text = cached_sub_job.transcript_text
+            job.translated_text = cached_sub_job.translated_text
+            job.transcript_segments = cached_sub_job.transcript_segments
+            job.translated_segments = cached_sub_job.translated_segments
+            job.srt_content = cached_sub_job.srt_content
+            job.uzbek_srt_content = cached_sub_job.uzbek_srt_content
+            job.error_code = None
+            job.error_message = None
+            job.recovery_attempt_count = 0
+            job.processing_claim_token = None
+            job.processing_lease_expires_at = None
+            job.quota_consumed = True
+            job.status = JobStatus.COMPLETED
+            job.progress = 100.0
+            job.status_message = "Subtitr tayyor!"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            return {"success": True, "message": "Subtitr tayyor holatga keltirildi (keshdan)."}
+
+    # 2. Buzuq yoki 0-baytli fayllarni tozalaymiz
+    if job.original_video_path:
+        p_vid = Path(job.original_video_path)
+        if p_vid.exists() and p_vid.is_file() and p_vid.stat().st_size == 0:
+            try:
+                p_vid.unlink()
+            except Exception:
+                pass
+            job.original_video_path = None
+        elif not p_vid.exists():
+            job.original_video_path = None
+
+    if job.dubbed_audio_path:
+        p_aud = Path(job.dubbed_audio_path)
+        if p_aud.exists() and p_aud.is_file() and p_aud.stat().st_size == 0:
+            try:
+                p_aud.unlink()
+            except Exception:
+                pass
+            job.dubbed_audio_path = None
+
     job.status = JobStatus.PENDING
     job.progress = 0.0
     job.status_message = "Qayta navbatga qo'yildi..."
+    job.error_code = None
     job.error_message = None
     job.recovery_attempt_count = 0
     job.processing_claim_token = None

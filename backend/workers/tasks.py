@@ -425,10 +425,62 @@ def process_video(self: Task, job_id: str) -> dict:
         # Check if original video is already available (locally or via S3 checkpoint)
         has_video = False
         if job.original_video_path:
-            if Path(job.original_video_path).exists():
+            p_vid = Path(job.original_video_path)
+            if p_vid.exists() and p_vid.is_file() and p_vid.stat().st_size > 0:
                 has_video = True
-            elif restore_checkpoint(job_id, "video.mp4", job.original_video_path) and Path(job.original_video_path).exists():
+            elif restore_checkpoint(job_id, "video.mp4", job.original_video_path) and p_vid.exists() and p_vid.stat().st_size > 0:
                 has_video = True
+            else:
+                if p_vid.exists():
+                    try:
+                        p_vid.unlink()
+                    except Exception:
+                        pass
+                job.original_video_path = None
+
+        # Worker kesh himoyasi: agar video diskda yo'q bo'lsa, lekin u allaqachon boshqa job orqali
+        # muvaffaqiyatli dublyaj qilingan bo'lsa, YouTube'dan qayta yuklab o'tirmasdan keshdan olamiz.
+        if not has_video and not job.subtitle_only:
+            from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
+            v_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
+            if v_id:
+                cache_q = db.query(DubbingJob).filter(
+                    DubbingJob.youtube_video_id == v_id,
+                    DubbingJob.status == JobStatus.COMPLETED,
+                    DubbingJob.subtitle_only.is_(False),
+                    DubbingJob.id != job.id,
+                )
+                if job.speaker_gender in ("male", "female"):
+                    cache_q = cache_q.filter(DubbingJob.speaker_gender == job.speaker_gender)
+                elif getattr(job, "voice_gender_setting", None) in ("male", "female"):
+                    cache_q = cache_q.filter(DubbingJob.speaker_gender == job.voice_gender_setting)
+
+                cached_j = cache_q.order_by(DubbingJob.completed_at.desc()).first()
+                if cached_j and _cached_job_files_exist(cached_j):
+                    logger.info(f"[JOB {job_id}] Video {v_id} keshdan topildi (job {cached_j.id}) -- worker to'liq natijalarni ko'chirdi.")
+                    job.source_job_id = cached_j.storage_id
+                    job.video_title = job.video_title or cached_j.video_title
+                    job.video_duration = job.video_duration or cached_j.video_duration
+                    job.video_thumbnail = job.video_thumbnail or cached_j.video_thumbnail
+                    job.speaker_gender = cached_j.speaker_gender
+                    job.transcript_text = cached_j.transcript_text
+                    job.translated_text = cached_j.translated_text
+                    job.transcript_segments = cached_j.transcript_segments
+                    job.translated_segments = cached_j.translated_segments
+                    job.srt_content = cached_j.srt_content
+                    job.uzbek_srt_content = cached_j.uzbek_srt_content
+                    job.output_video_path = cached_j.output_video_path or f"outputs/{cached_j.storage_id}/video/dubbed_final.mp4"
+                    job.output_video_url = cached_j.output_video_url or f"/outputs/{cached_j.storage_id}/video/dubbed_final.mp4"
+                    job.dubbed_audio_path = cached_j.dubbed_audio_path or f"outputs/{cached_j.storage_id}/audio/dubbed_audio.wav"
+                    job.error_code = None
+                    job.error_message = None
+                    job.quota_consumed = True
+                    job.status = JobStatus.COMPLETED
+                    job.progress = 100.0
+                    job.status_message = "Dublyaj tayyor!"
+                    job.completed_at = datetime.utcnow()
+                    db.commit()
+                    return {"job_id": job_id, "status": "completed_from_cache"}
 
         if has_video:
             video_path = job.original_video_path
