@@ -63,12 +63,8 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
     try {
       const res = await requestResolution(jobId, opt.resolution)
       if (res.status === 'ready' && res.download_url) {
-        let filename = ''
-        if (videoTitle) {
-          const ext = res.download_url.split('.').pop() || 'mp4'
-          const cleanTitle = videoTitle.replace(/[\\/:*?"<>|]/g, '_')
-          filename = `${cleanTitle} - ${opt.resolution}.${ext}`
-        }
+        const cleanTitle = (videoTitle || jobId).replace(/[\\/:*?"<>|]/g, '_').trim()
+        const filename = `${cleanTitle} - ${opt.resolution}.mp4`
         triggerDownload(res.download_url, filename)
         setBusy((b) => ({ ...b, [opt.resolution]: false }))
         refresh()

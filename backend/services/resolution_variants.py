@@ -122,21 +122,51 @@ def generate_1080p(job) -> str:
         if not local_audio or not os.path.exists(local_audio):
             raise RuntimeError("Dublyaj audiosi lokal diskda topilmadi.")
 
-        if not getattr(job, "youtube_url", None):
-            raise RuntimeError("1080p sifat faqat YouTube videolari uchun mavjud.")
-
-        download_result = downloader.download_video(job.youtube_url, tmp_job_id, max_height=1080)
-        video_path = download_result["video_path"]
+        download_success = False
+        video_path = None
+        if getattr(job, "youtube_url", None):
+            try:
+                download_result = downloader.download_video(job.youtube_url, tmp_job_id, max_height=1080)
+                video_path = download_result.get("video_path")
+                if video_path and os.path.exists(video_path):
+                    download_success = True
+            except Exception as dl_err:
+                logger.warning(f"1080p manbasini YouTube'dan qayta yuklab bo'lmadi ({dl_err}) — master videodan upscale qilinadi.")
 
         out_dir = Path(settings.OUTPUT_DIR) / job_id / "video"
         out_dir.mkdir(parents=True, exist_ok=True)
         local_out = str(out_dir / "dubbed_1080p.mp4")
 
-        merger.merge_video_audio(
-            video_path=video_path,
-            dubbed_audio_path=local_audio,
-            output_path=local_out,
-        )
+        if download_success and video_path and os.path.exists(video_path):
+            merger.merge_video_audio(
+                video_path=video_path,
+                dubbed_audio_path=local_audio,
+                output_path=local_out,
+            )
+        else:
+            # YouTube'dan yuklab bo'lmaganda yoki manbada 1080p bo'lmaganda,
+            # mavjud master videoni 1080p ga upscale qilib tayyorlaymiz:
+            master_video = getattr(job, "output_video_path", None)
+            if not master_video or not os.path.exists(master_video):
+                cand_master = str(Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4")
+                if os.path.exists(cand_master):
+                    master_video = cand_master
+
+            if not master_video or not os.path.exists(master_video):
+                raise RuntimeError("Master video topilmadi, 1080p yaratib bo'lmaydi.")
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", master_video,
+                "-vf", "scale=-2:1080",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast",
+                "-c:a", "copy",
+                "-movflags", "+faststart",
+                local_out,
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            if res.returncode != 0:
+                raise RuntimeError(f"1080p yaratishda ffmpeg xatoligi:\n{res.stderr[-1500:]}")
 
         s3_key = f"dubber/{job_id}/dubbed_1080p.mp4"
         if settings.AWS_BUCKET_NAME:
@@ -205,7 +235,7 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
             presigned_url = generate_presigned_download_url(master_key)
             if presigned_url:
                 return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
-        return ResolutionRequestResult(outcome="ready", download_url=f"/api/outputs/{job_id}/video")
+        return ResolutionRequestResult(outcome="ready", download_url=f"/api/outputs/{job_id}/video?resolution=720p&download=1")
 
     variant = (
         db.query(ResolutionVariant)

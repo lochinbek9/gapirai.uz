@@ -1000,8 +1000,8 @@ def download_video(
         raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
 
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
-    res_label = f"_{resolution}" if resolution in ("360p", "1080p") else ""
-    filename = f"dubbed_{safe_title or job_id}{res_label}.mp4"
+    res_label = resolution if resolution in ("360p", "720p", "1080p") else "720p"
+    filename = f"{safe_title or job_id} - {res_label}.mp4"
     disp_type = "attachment" if download else "inline"
     return FileResponse(
         path=video_path,
