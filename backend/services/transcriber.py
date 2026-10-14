@@ -526,21 +526,149 @@ def _transcribe_local_whisper(audio_path: str, language: str | None) -> dict | N
         return None
 
 
+def _transcribe_chunk_azure(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
+    """Azure Speech-to-Text (Cognitive Services) orqali audio bo'lakni transkripsiya qilish (2-o'rindagi zaxira)."""
+    import azure.cognitiveservices.speech as speechsdk
+
+    key = settings.AZURE_SPEECH_KEY
+    if not key or key in ("", "your-azure-key"):
+        raise RuntimeError("AZURE_SPEECH_KEY sozlanmagan")
+
+    region = settings.AZURE_SPEECH_REGION or "eastus"
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
+        wav_file = tmp_wav.name
+
+    try:
+        conv_res = subprocess.run(
+            [
+                "ffmpeg", "-loglevel", "error", "-y", "-i", str(chunk_path),
+                "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav_file,
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if conv_res.returncode != 0:
+            raise RuntimeError(f"Audio konvertatsiyasida xatolik: {conv_res.stderr[-300:]}")
+
+        speech_config = speechsdk.SpeechConfig(subscription=key, region=region)
+        speech_config.request_word_level_timestamps()
+        speech_config.output_format = speechsdk.OutputFormat.Detailed
+
+        audio_config = speechsdk.audio.AudioConfig(filename=wav_file)
+
+        lang_map = {
+            "uz": "uz-UZ",
+            "en": "en-US",
+            "ru": "ru-RU",
+            "tr": "tr-TR",
+        }
+        target_lang = lang_map.get(language, language) if language else None
+
+        if target_lang:
+            speech_config.speech_recognition_language = target_lang
+            recognizer = speechsdk.SpeechRecognizer(
+                speech_config=speech_config, audio_config=audio_config
+            )
+        else:
+            auto_detect_config = speechsdk.languageconfig.AutoDetectSourceLanguageConfig(
+                languages=["uz-UZ", "en-US", "ru-RU", "tr-TR"]
+            )
+            recognizer = speechsdk.SpeechRecognizer(
+                speech_config=speech_config,
+                auto_detect_source_language_config=auto_detect_config,
+                audio_config=audio_config,
+            )
+
+        done = threading.Event()
+        segments = []
+        text_parts = []
+        detected_lang = language or "uz"
+        errors = []
+
+        def on_recognized(evt):
+            if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                text = (evt.result.text or "").strip()
+                if text:
+                    start_sec = (evt.result.offset / 10_000_000.0) + offset_seconds
+                    end_sec = start_sec + (evt.result.duration / 10_000_000.0)
+                    segments.append({
+                        "start": round(start_sec, 3),
+                        "end": round(end_sec, 3),
+                        "text": text,
+                    })
+                    text_parts.append(text)
+
+                    try:
+                        auto_lang = speechsdk.AutoDetectSourceLanguageResult(evt.result)
+                        if auto_lang and getattr(auto_lang, "language", None):
+                            nonlocal detected_lang
+                            detected_lang = auto_lang.language.split("-")[0]
+                    except Exception:
+                        pass
+
+        def on_canceled(evt):
+            cd = getattr(evt, "cancellation_details", None)
+            if cd and cd.reason == speechsdk.CancellationReason.Error:
+                errors.append(f"Azure STT xatosi: {cd.error_code} - {cd.error_details}")
+            done.set()
+
+        def on_session_stopped(evt):
+            done.set()
+
+        recognizer.recognized.connect(on_recognized)
+        recognizer.canceled.connect(on_canceled)
+        recognizer.session_stopped.connect(on_session_stopped)
+
+        recognizer.start_continuous_recognition()
+        done.wait(timeout=240)
+        recognizer.stop_continuous_recognition()
+
+        if errors and not segments:
+            raise RuntimeError(errors[0])
+
+        logger.info(f"Azure STT: {len(segments)} segment, {len(' '.join(text_parts))} belgi")
+        return segments, " ".join(text_parts), detected_lang
+
+    finally:
+        if os.path.exists(wav_file):
+            try:
+                os.remove(wav_file)
+            except Exception:
+                pass
+
+
 def _transcribe_provider_order(primary: str) -> list[str]:
-    """API provayderlar tartibi: primary='gemini' yoki TRANSLATE_PROVIDER='gemini' bo'lsa
-    Gemini birinchi bo'ladi. OpenAI krediti yo'q bo'lganda faqat Gemini ishlatiladi."""
+    """API provayderlar tartibi:
+    1-o'rin: Gemini STT (Google AI Studio / Vertex AI)
+    2-o'rin: Azure STT (Cognitive Services)
+    3-o'rin: OpenAI Whisper
+    """
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-    prefer_gemini = primary == "gemini" or settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
-    if prefer_gemini and gemini_ok:
-        return ["gemini"]
-    order = ["openai", "gemini"]
-    return [name for name in order if (name == "gemini" and gemini_ok) or (name == "openai" and bool(settings.OPENAI_API_KEY))]
+    azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
+    openai_ok = bool(settings.OPENAI_API_KEY)
+
+    if primary == "azure":
+        order = ["azure", "gemini", "openai"]
+    elif primary == "openai":
+        order = ["openai", "gemini", "azure"]
+    else:
+        # Standart: Gemini 1-o'rin, Azure 2-o'rinda
+        order = ["gemini", "azure", "openai"]
+
+    active = []
+    for name in order:
+        if name == "gemini" and gemini_ok:
+            active.append("gemini")
+        elif name == "azure" and azure_ok:
+            active.append("azure")
+        elif name == "openai" and openai_ok:
+            active.append("openai")
+    return active or ["gemini"]
 
 
-def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "openai") -> dict:
-    """STT API (Gemini / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
-    transkripsiya qiladi. Gemini (Google AI Studio) asosiy provayder sifatida
-    o'zbek tili va xalqaro videolarda yuqori sifatli subtitr beradi."""
+def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini") -> dict:
+    """STT API (Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
+    transkripsiya qiladi. Gemini 1-o'rinda, Azure 2-o'rindagi zaxira."""
     segments_list = []
     full_text_parts = []
     detected_language = language
@@ -548,7 +676,12 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
     def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str]:
         last_error: Exception | None = None
         for name in _transcribe_provider_order(primary):
-            fn = _transcribe_chunk_gemini if name == "gemini" else _transcribe_chunk
+            if name == "gemini":
+                fn = _transcribe_chunk_gemini
+            elif name == "azure":
+                fn = _transcribe_chunk_azure
+            else:
+                fn = _transcribe_chunk
             try:
                 segs, text, lang = fn(cpath, offset_seconds=offset, language=language)
                 if language == "uz" and looks_turkish(text):
@@ -557,7 +690,7 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "o
             except Exception as e:
                 last_error = e
                 logger.warning(f"{name} transkripsiya muvaffaqiyatsiz ({e}) — keyingi provayderga o'tilmoqda.")
-        raise last_error  # type: ignore[misc]  (order har doim kamida bitta provayderni o'z ichiga oladi)
+        raise last_error  # type: ignore[misc]
 
     # Gemini uchun 3 daqiqa (180s) optimal -- token chegarasidan oshmaydi va aniq vaqt beradi
     chunk_seconds = 180 if primary == "gemini" else _CHUNK_DURATION_SECONDS

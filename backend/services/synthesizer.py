@@ -180,20 +180,27 @@ def _synthesize_text(
         logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
         raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback {settings.TTS_FALLBACK_PROVIDER} ga o'tilmoqda.")
+    # --- Fallback: 2-o'rinda Azure, so'ng oxirgi chora Edge ---
+    fallback_name = getattr(settings, "TTS_FALLBACK_PROVIDER", "azure") or "azure"
+    logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback {fallback_name} (2-o'rin) ga o'tilmoqda.")
 
-    # --- Fallback: vaqtinchalik xatoliklar uchun ---
-    if settings.ELEVENLABS_FALLBACK_TO_EDGE:
-        fallback = get_fallback_provider()
-        if get_cached(text, voice_name, fallback.name, output_path):
-            log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
-            return fallback.name
+    fallback_chain = [fallback_name]
+    if "edge" not in fallback_chain:
+        fallback_chain.append("edge")
+
+    for fb_candidate in fallback_chain:
         try:
+            fallback = get_provider(fb_candidate)
+            if get_cached(text, voice_name, fallback.name, output_path):
+                log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
+                return fallback.name
             if fallback.synthesize(text, output_path, voice_name=voice_name):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
                 return fallback.name
         except PermanentTTSError as exc:
-            logger.error(f"{fallback.name} fallback ham doimiy xatolik: {exc}")
+            logger.error(f"{fb_candidate} fallback doimiy xatolik: {exc}")
+        except Exception as exc:
+            logger.warning(f"{fb_candidate} fallback muvaffaqiyatsiz: {exc}")
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 

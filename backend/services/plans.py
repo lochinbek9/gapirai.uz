@@ -83,11 +83,11 @@ class PlanDef:
 
 
 PLANS: dict[str, PlanDef] = {
-    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="edge",    tier=PlanTier.FREE,     max_resolution="360p"),
-    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="1080p"),
-    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="edge",    tier=PlanTier.STANDARD, max_resolution="1080p", period_days=365),
-    "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p"),
-    "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=400, priority=True,  tts_tier="premium", tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
+    "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="gemini",  tier=PlanTier.FREE,     max_resolution="360p"),
+    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p"),
+    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p", period_days=365),
+    "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p"),
+    "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=400, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
 }
 
 RESOLUTION_ORDER = ["360p", "720p", "1080p"]
@@ -107,20 +107,11 @@ def get_max_resolution_for_job(db, job) -> str:
 
 
 def get_tts_provider_for_job(db, job) -> str:
-    """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini
-    aniqlaydi (PlanDef.tts_tier).
-    - "premium" (Pro / Pro Yearly): settings.TTS_PREMIUM_PROVIDER (Gemini yoki ElevenLabs)
-    - "edge" (Free / Standard): "edge" (bepul Edge-TTS)
-    Login qilmagan / egasiz job -> "edge"."""
-    if job.user_id is None:
-        return getattr(settings, "TTS_PROVIDER", "edge") or "edge"
-    if is_user_admin(db, job.user_id):
-        return getattr(settings, "TTS_PREMIUM_PROVIDER", "uzbekvoice") or "uzbekvoice"
-    sub = get_or_create_subscription(db, job.user_id)
-    tier = PLANS[sub.plan.value].tts_tier
-    if tier == "premium":
-        return getattr(settings, "TTS_PREMIUM_PROVIDER", "uzbekvoice") or "uzbekvoice"
-    return getattr(settings, "TTS_PROVIDER", "edge") or "edge"
+    """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
+    Barcha tariflar uchun (Free, Standart, Pro) birlamchi provayder: Gemini TTS.
+    Azure esa 2-o'rindagi zaxira (fallback) sifatida ishlaydi.
+    """
+    return getattr(settings, "TTS_PROVIDER", "gemini") or "gemini"
 
 
 def get_max_resolution_for_user(db, user_id) -> str:

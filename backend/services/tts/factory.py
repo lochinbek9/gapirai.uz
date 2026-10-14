@@ -52,32 +52,32 @@ def get_provider(name: str | None = None) -> "TTSProvider":
     TTS provider instansini qaytaradi.
 
     Args:
-        name: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | None
+        name: "gemini" | "azure" | "edge" | "elevenlabs" | "openai" | None
               None bo'lsa settings.TTS_PROVIDER ishlatiladi.
     """
     registry = _load_registry()
-    chosen = (name or settings.TTS_PROVIDER or "elevenlabs").lower().strip()
+    chosen = (name or settings.TTS_PROVIDER or "gemini").lower().strip()
 
     if chosen not in registry:
         logger.warning(
             f"Noma'lum TTS_PROVIDER='{chosen}'. "
-            f"Mavjudlar: {list(registry.keys())}. Edge ga o'tildi."
+            f"Mavjudlar: {list(registry.keys())}. Gemini ga o'tildi."
         )
-        chosen = "edge"
+        chosen = "gemini"
 
     cls = registry[chosen]
     logger.debug(f"TTS provider: {chosen}")
     return cls()
 
 
-def get_fallback_provider() -> "TTSProvider":
+def get_fallback_provider(name: str | None = None) -> "TTSProvider":
     """Asosiy provider vaqtinchalik xatolik bilan ishlamasa ishlatiladi.
-    settings.TTS_FALLBACK_PROVIDER orqali sozlanadi (default: "edge" — bepul)."""
+    settings.TTS_FALLBACK_PROVIDER orqali sozlanadi (default: "azure" — 2-o'rindagi zaxira)."""
     registry = _load_registry()
-    chosen = (settings.TTS_FALLBACK_PROVIDER or "edge").lower().strip()
+    chosen = (name or settings.TTS_FALLBACK_PROVIDER or "azure").lower().strip()
     if chosen not in registry:
-        logger.warning(f"Noma'lum TTS_FALLBACK_PROVIDER='{chosen}'. Edge ga o'tildi.")
-        chosen = "edge"
+        logger.warning(f"Noma'lum TTS_FALLBACK_PROVIDER='{chosen}'. Azure ga o'tildi.")
+        chosen = "azure" if "azure" in registry else "edge"
     return registry[chosen]()
 
 

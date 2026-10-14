@@ -142,10 +142,10 @@ def queue_rejection_message(result: "JobCreationResult") -> str:
 
 
 def _daily_job_limit_reached(db: Session, user_id) -> bool:
-    if is_user_admin(db, user_id):
-        return False
     limit = get_settings().MAX_JOBS_PER_DAY
     if not limit or limit <= 0:
+        return False
+    if is_user_admin(db, user_id):
         return False
     from datetime import timedelta
     since = datetime.utcnow() - timedelta(hours=24)
@@ -208,6 +208,7 @@ async def create_dubbing_job(
     # ham subtitle_only bilan mos qilish kerak edi; V1'da soddalik uchun
     # har doim yangi (tez, TTS'siz) ishlov beriladi.
     video_id = extract_youtube_video_id(youtube_url)
+    donor_job = None
     if video_id and not subtitle_only:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
@@ -218,80 +219,106 @@ async def create_dubbing_job(
             DubbingJob.subtitle_only.is_(False),
         )
         if voice_gender in ("male", "female"):
-            cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
-        cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
+            exact_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
+            cached_job = exact_query.order_by(DubbingJob.completed_at.desc()).first()
+        else:
+            cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
+
         if cached_job and _cached_job_files_exist(cached_job):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
+
+    if video_id:
+        # Cross-gender yoki umumiy donor job qidirish:
+        # Ushbu video uchun allaqachon transkripsiya va tarjima qilingan segmentlar bormi?
+        # Agar bor bo'lsa, jinslar aro barcha matnlar 100% qayta ishlatiladi (resurs tejaladi).
+        donor_job = (
+            db.query(DubbingJob)
+            .filter(
+                DubbingJob.youtube_video_id == video_id,
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.translated_segments.isnot(None),
+            )
+            .order_by(DubbingJob.completed_at.desc())
+            .first()
+        )
 
     rejection = check_queue_capacity(db, user.id)
     if rejection:
         return rejection
 
-    try:
-        info = await asyncio.to_thread(get_video_info, youtube_url)
-    except Exception as e:
-        # Xom kutubxona xatosini (yt-dlp/YouTube API) foydalanuvchiga
-        # ko'rsatmaymiz -- faqat serverda log qilamiz, xavfsiz umumiy
-        # xabar qaytaramiz (backend/api/routes.py va telegram_bot.py
-        # ikkalasi ham shu error_detail'ni to'g'ridan-to'g'ri ko'rsatadi).
-        logger.exception(f"get_video_info xato: {youtube_url}")
-        return JobCreationResult(
-            outcome="fetch_error",
-            error_detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.",
-        )
-
-    title = info.get("title", "Unknown")
-    duration = info.get("duration", 0)
-    thumbnail = info.get("thumbnail")
-    duration_minutes = duration / 60.0
-
-    # Safety Gate -- 1-bosqich (metadata). Faqat CSAM (sexual_minors)
-    # hali ham bloklaydi -- qolgan kategoriyalar endi faqat ogohlantirish
-    # sifatida qayd etiladi (blocked=False), job yaratishni davom ettiradi.
-    metadata_text = f"{title}\n{info.get('description', '')}\nKanal: {info.get('uploader', '')}"
-    safety = check_safety(metadata_text)
-    if not safety.allowed:
-        db.add(ContentViolation(
-            user_id=user.id,
-            youtube_url=youtube_url,
-            video_title=title,
-            stage="metadata",
-            category=safety.category or "policy_violation",
-            reason=safety.reason or "",
-            blocked=True,
-        ))
-        db.commit()
+    if donor_job and donor_job.translated_segments and donor_job.video_title and donor_job.video_duration:
+        # YouTube'ga qayta so'rov yubormaymiz -- metadata va xavfsizlik allaqachon donor job'da mavjud
+        title = donor_job.video_title
+        duration = donor_job.video_duration
+        thumbnail = donor_job.video_thumbnail
+        duration_minutes = duration / 60.0
+        metadata_flagged = bool(donor_job.content_flagged)
+    else:
         try:
-            from backend.services.telegram_notify import send_content_blocked_to_admins
-            send_content_blocked_to_admins(
-                video_url=youtube_url,
-                video_title=title,
-                category=safety.category,
-                reason=safety.reason,
-                stage="metadata",
-                user_id=str(user.id) if user else None,
-                user_name=user.name if user else None,
-                user_email_or_phone=user.email or user.phone if user else None,
-            )
+            info = await asyncio.to_thread(get_video_info, youtube_url)
         except Exception as e:
-            logger.error(f"Moderatsiya admin xabarini yuborishda xatolik: {e}")
-        return JobCreationResult(
-            outcome="blocked",
-            video_title=title,
-            error_detail=safety.reason or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
-        )
-    metadata_flagged = bool(safety.category)
-    if safety.category:
-        db.add(ContentViolation(
-            user_id=user.id,
-            youtube_url=youtube_url,
-            video_title=title,
-            stage="metadata",
-            category=safety.category,
-            reason=safety.reason or "",
-            blocked=False,
-        ))
-        db.commit()
+            # Xom kutubxona xatosini (yt-dlp/YouTube API) foydalanuvchiga
+            # ko'rsatmaymiz -- faqat serverda log qilamiz, xavfsiz umumiy
+            # xabar qaytaramiz (backend/api/routes.py va telegram_bot.py
+            # ikkalasi ham shu error_detail'ni to'g'ridan-to'g'ri ko'rsatadi).
+            logger.exception(f"get_video_info xato: {youtube_url}")
+            return JobCreationResult(
+                outcome="fetch_error",
+                error_detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.",
+            )
+
+        title = info.get("title", "Unknown")
+        duration = info.get("duration", 0)
+        thumbnail = info.get("thumbnail")
+        duration_minutes = duration / 60.0
+
+        # Safety Gate -- 1-bosqich (metadata). Faqat CSAM (sexual_minors)
+        # hali ham bloklaydi -- qolgan kategoriyalar endi faqat ogohlantirish
+        # sifatida qayd etiladi (blocked=False), job yaratishni davom ettiradi.
+        metadata_text = f"{title}\n{info.get('description', '')}\nKanal: {info.get('uploader', '')}"
+        safety = check_safety(metadata_text)
+        if not safety.allowed:
+            db.add(ContentViolation(
+                user_id=user.id,
+                youtube_url=youtube_url,
+                video_title=title,
+                stage="metadata",
+                category=safety.category or "policy_violation",
+                reason=safety.reason or "",
+                blocked=True,
+            ))
+            db.commit()
+            try:
+                from backend.services.telegram_notify import send_content_blocked_to_admins
+                send_content_blocked_to_admins(
+                    video_url=youtube_url,
+                    video_title=title,
+                    category=safety.category,
+                    reason=safety.reason,
+                    stage="metadata",
+                    user_id=str(user.id) if user else None,
+                    user_name=user.name if user else None,
+                    user_email_or_phone=user.email or user.phone if user else None,
+                )
+            except Exception as e:
+                logger.error(f"Moderatsiya admin xabarini yuborishda xatolik: {e}")
+            return JobCreationResult(
+                outcome="blocked",
+                video_title=title,
+                error_detail=safety.reason or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi.",
+            )
+        metadata_flagged = bool(safety.category)
+        if safety.category:
+            db.add(ContentViolation(
+                user_id=user.id,
+                youtube_url=youtube_url,
+                video_title=title,
+                stage="metadata",
+                category=safety.category,
+                reason=safety.reason or "",
+                blocked=False,
+            ))
+            db.commit()
 
     if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
         return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
@@ -308,6 +335,13 @@ async def create_dubbing_job(
             minutes_short=minutes_short,
         )
 
+    # Original video fayl diskda mavjud bo'lsa, uni ham qayta ishlatamiz
+    reused_video_path = None
+    if donor_job and donor_job.original_video_path:
+        p_vid = Path(donor_job.original_video_path)
+        if p_vid.exists() and p_vid.is_file() and p_vid.stat().st_size > 0:
+            reused_video_path = donor_job.original_video_path
+
     job_id = str(uuid.uuid4())
     job = DubbingJob(
         id=job_id,
@@ -318,12 +352,22 @@ async def create_dubbing_job(
         video_duration=duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=voice_gender,
+        speaker_gender=voice_gender if voice_gender in ("male", "female") else (donor_job.speaker_gender if donor_job else None),
         status=JobStatus.PENDING,
         progress=0.0,
-        status_message="Navbatga qo'shildi",
+        status_message="Navbatga qo'shildi (tayyor matnlar asosida)" if donor_job else "Navbatga qo'shildi",
         content_flagged=metadata_flagged,
         subtitle_only=subtitle_only,
-        source_language="uz" if (subtitle_only and source_language == "uz") else None,
+        source_language="uz" if (subtitle_only and source_language == "uz") else (donor_job.source_language if donor_job else None),
+        original_video_path=reused_video_path,
+        # Jinslararo matnlarni qayta ishlatish (STT, tarjima va nutq segmentlari):
+        transcript_text=donor_job.transcript_text if donor_job else None,
+        transcript_segments=donor_job.transcript_segments if donor_job else None,
+        srt_content=donor_job.srt_content if donor_job else None,
+        translated_text=donor_job.translated_text if donor_job else None,
+        translated_segments=donor_job.translated_segments if donor_job else None,
+        uzbek_srt_content=donor_job.uzbek_srt_content if donor_job else None,
+        speech_segments=donor_job.speech_segments if donor_job else None,
     )
     db.add(job)
     db.commit()

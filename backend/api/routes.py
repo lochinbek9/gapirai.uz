@@ -774,6 +774,23 @@ def retry_job(
             db.commit()
             return {"success": True, "message": "Subtitr tayyor holatga keltirildi (keshdan)."}
 
+    # Boshqa jinsda tayyor bo'lgan dublyajdan matnlarni (STT, tarjima, nutq segmentlari) ko'chirish
+    if video_id and not job.translated_segments:
+        donor_job = db.query(DubbingJob).filter(
+            DubbingJob.youtube_video_id == video_id,
+            DubbingJob.status == JobStatus.COMPLETED,
+            DubbingJob.translated_segments.isnot(None),
+            DubbingJob.id != job.id,
+        ).order_by(DubbingJob.completed_at.desc()).first()
+        if donor_job:
+            job.transcript_text = job.transcript_text or donor_job.transcript_text
+            job.transcript_segments = job.transcript_segments or donor_job.transcript_segments
+            job.srt_content = job.srt_content or donor_job.srt_content
+            job.translated_text = job.translated_text or donor_job.translated_text
+            job.translated_segments = job.translated_segments or donor_job.translated_segments
+            job.uzbek_srt_content = job.uzbek_srt_content or donor_job.uzbek_srt_content
+            job.speech_segments = job.speech_segments or donor_job.speech_segments
+
     # 2. Buzuq yoki 0-baytli fayllarni tozalaymiz
     if job.original_video_path:
         p_vid = Path(job.original_video_path)

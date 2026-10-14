@@ -482,6 +482,52 @@ def process_video(self: Task, job_id: str) -> dict:
                     db.commit()
                     return {"job_id": job_id, "status": "completed_from_cache"}
 
+        # Cross-gender matn va resurslarni qayta ishlatish (Donor kesh):
+        # Agar video boshqa jinsda (yoki subtitrda) allaqachon dublyaj qilingan bo'lsa,
+        # transkripsiya, tarjima va nutq segmentlari 100% bir xil!
+        # Qayta resurs sarflamaslik va tarjimalar bir-biridan farqlanib qolmasligi uchun
+        # mavjud tugallangan job'dan matnlarni nusxalaymiz.
+        from backend.services.job_creation import extract_youtube_video_id
+        v_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
+        donor_j = None
+        if v_id and not job.translated_segments:
+            donor_q = db.query(DubbingJob).filter(
+                DubbingJob.youtube_video_id == v_id,
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.translated_segments.isnot(None),
+                DubbingJob.id != job.id,
+            )
+            donor_j = donor_q.order_by(DubbingJob.completed_at.desc()).first()
+            if donor_j:
+                logger.info(
+                    f"[JOB {job_id}] Video {v_id} uchun tayyor matnlar donor job {donor_j.id} dan olindi "
+                    f"(jinslararo matn keshidan qayta ishlatildi)."
+                )
+                job.video_title = job.video_title or donor_j.video_title
+                job.video_duration = job.video_duration or donor_j.video_duration
+                job.video_thumbnail = job.video_thumbnail or donor_j.video_thumbnail
+                job.transcript_text = job.transcript_text or donor_j.transcript_text
+                job.transcript_segments = job.transcript_segments or donor_j.transcript_segments
+                job.srt_content = job.srt_content or donor_j.srt_content
+                job.translated_text = job.translated_text or donor_j.translated_text
+                job.translated_segments = job.translated_segments or donor_j.translated_segments
+                job.uzbek_srt_content = job.uzbek_srt_content or donor_j.uzbek_srt_content
+                job.speech_segments = job.speech_segments or donor_j.speech_segments
+
+                # Agar original video diskda hali mavjud bo'lsa, qayta yuklashni ham chetlab o'tamiz
+                if not has_video:
+                    if donor_j.original_video_path:
+                        p_donor_vid = Path(donor_j.original_video_path)
+                        if p_donor_vid.exists() and p_donor_vid.is_file() and p_donor_vid.stat().st_size > 0:
+                            job.original_video_path = donor_j.original_video_path
+                            has_video = True
+                    if not has_video:
+                        target_vid = job_dir / "video" / "video.mp4"
+                        if restore_checkpoint(donor_j.storage_id, "video.mp4", str(target_vid)) and target_vid.exists() and target_vid.stat().st_size > 0:
+                            job.original_video_path = str(target_vid)
+                            has_video = True
+                db.commit()
+
         if has_video:
             video_path = job.original_video_path
             audio_candidates = [
@@ -689,6 +735,8 @@ def process_video(self: Task, job_id: str) -> dict:
                 # "Subtitr" rejimida ovoz yaratilmaydi -- jins hech qayerda
                 # ishlatilmaydi, shuning uchun bekorga LLM chaqirmaymiz.
                 gender = "male"
+            elif donor_j and donor_j.speaker_gender in ("male", "female"):
+                gender = donor_j.speaker_gender
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
                 gender = _detect_gender(transcript_text)

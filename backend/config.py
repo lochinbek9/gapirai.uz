@@ -195,13 +195,13 @@ class Settings(BaseSettings):
     # small = 500MB RAM, 100% accuracy, ~4s per 8s audio on CPU
     # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
     WHISPER_MODEL: str = "small"
-    # STT (Speech-to-Text) provayderi: "gemini" | "openai".
+    # STT (Speech-to-Text) provayderi: "gemini" | "azure" | "openai".
     # Gemini (Google AI Studio) o'zbek tili va ko'p tilli audio transkripsiyasi uchun
-    # OpenAI Whisper'dan ancha yuqori sifat beradi (Whisper o'zbek tilini yaxshi tushunmaydi
-    # va tez-tez turkcha chiqaradi).
+    # asosiy provayder. Azure esa 2-o'rindagi zaxira (fallback) hisoblanadi.
     STT_PROVIDER: str = "gemini"
+    STT_FALLBACK_PROVIDER: str = "azure"
     # O'zbekcha nutqni (subtitr rejimi, tarjimasiz) matnga aylantirishda AVVAL qaysi provayder
-    # sinaladi: "gemini" (o'zbek matni ancha aniq, oʻ/gʻ to'g'ri; standart) yoki "openai".
+    # sinaladi: "gemini" (o'zbek matni ancha aniq, oʻ/gʻ to'g'ri; standart) yoki "azure".
     STT_UZ_PRIMARY: str = "gemini"
     # Nutq optimallashtirish (raqam/ohang moslashtirish), jins aniqlash,
     # xavfsizlik klassifikatori va Video tahlil (Learning Workspace) kabi
@@ -262,15 +262,14 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "./outputs"
 
     # TTS Provider abstraction
-    # Qiymatlar: "elevenlabs" | "azure" | "edge" | "openai" | "gemini" | "uzbekvoice"
-    TTS_PROVIDER: str = "edge"
-    # Premium tarif (Pro / Pro Yearly) uchun yuqori sifatli ovoz provayderi: "uzbekvoice" | "elevenlabs" | "gemini"
-    # Free va Standart tariflar bepul Edge-TTS ("edge") yoki belgilangan TTS_PROVIDER dan foydalanadi.
-    TTS_PREMIUM_PROVIDER: str = "uzbekvoice"
+    # Barcha tariflar uchun asosiy TTS: "gemini"
+    # Qiymatlar: "gemini" | "azure" | "edge" | "elevenlabs" | "openai" | "uzbekvoice"
+    TTS_PROVIDER: str = "gemini"
+    # Premium tarif (Pro / Pro Yearly) uchun yuqori sifatli ovoz provayderi:
+    TTS_PREMIUM_PROVIDER: str = "gemini"
     # Asosiy provider muvaqqat xatolik bilan (timeout/429/5xx) ishlamasa shu
-    # providerga o'tiladi. Doimiy xatolikda (noto'g'ri kalit/kirish) fallback
-    # ishlatilmaydi — backend/services/tts/base.py: PermanentTTSError.
-    TTS_FALLBACK_PROVIDER: str = "edge"
+    # providerga o'tiladi (2-o'rinda Azure):
+    TTS_FALLBACK_PROVIDER: str = "azure"
 
     # UzbekVoiceAI TTS (https://uzbekvoice.ai/videos/api-docs/tts)
     UZBEKVOICE_API_KEY: str = ""

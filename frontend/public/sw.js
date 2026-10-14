@@ -4,7 +4,7 @@
  *  - sahifalar (navigatsiya): network-first, uzilganda /offline
  *  - push / notificationclick: 2-bosqich (backend push qo'shilganda faollashadi)
  */
-const VERSION = 'gapirai-v1';
+const VERSION = 'gapirai-v2';
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_URL = '/offline';
