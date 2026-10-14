@@ -43,7 +43,7 @@ _client: OpenAI | None = None
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        _client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=3)
+        _client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=1)
     return _client
 
 
@@ -163,6 +163,7 @@ def _gemini_safety_check(text: str) -> SafetyResult:
     client = _get_gemini_client()
 
     candidate_models = [
+        getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash"),
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",

@@ -31,7 +31,7 @@ from backend.config import get_settings
 
 # Bitta job uchun maksimal video davomiyligi -- plans.MAX_JOB_MINUTES bilan
 # bir xil (2026-08-31: 180 -> 120). routes.py bu qiymatni shu yerdan import qiladi.
-from backend.services.plans import MAX_JOB_MINUTES as MAX_VIDEO_DURATION_MINUTES
+from backend.services.plans import MAX_JOB_MINUTES as MAX_VIDEO_DURATION_MINUTES, is_user_admin
 
 # LEGACY (2026-08-31 gacha): kesh-hit uchun qat'iy narx. Endi kesh-hit ham
 # oddiy job kabi DAQIQA sarflaydi (alohida narx yo'q). Konstanta faqat eski
@@ -113,12 +113,8 @@ class JobCreationResult:
 
 
 def check_queue_capacity(db: Session, user_id) -> "JobCreationResult | None":
-    """Navbat himoyasi (backend/services/queue_load.py): foydalanuvchi bir
-    vaqtdagi faol job chegarasiga yetgan yoki navbat haddan tashqari uzun
-    bo'lsa rad natijasini, aks holda None qaytaradi. Chaqiruvchilar buni
-    keshdan KEYIN, lekin YouTube/Safety Gate/ffmpeg kabi qimmat ishlardan
-    OLDIN tekshiradi -- yuk ostida ortiqcha ish qilmaslik uchun. Kesh-hit
-    worker sarflamaydi, shuning uchun bu tekshiruvga tushmaydi."""
+    if is_user_admin(db, user_id):
+        return None
     from backend.services import queue_load
     limit = queue_load.active_limit_reached(db, user_id)
     if limit is not None:
@@ -146,10 +142,8 @@ def queue_rejection_message(result: "JobCreationResult") -> str:
 
 
 def _daily_job_limit_reached(db: Session, user_id) -> bool:
-    """settings.MAX_JOBS_PER_DAY -- bitta foydalanuvchi 24 soatда yaratgan
-    (FAILED bo'lmagan) joblar soni shu chegaraga yetган bo'lsa True. Tarif
-    daqiqa kvotasidan ALOHIDA to'siq: runaway sikl / abuse navbatni
-    to'ldirib qo'ymasligi uchun. 0 = o'chirilgan."""
+    if is_user_admin(db, user_id):
+        return False
     limit = get_settings().MAX_JOBS_PER_DAY
     if not limit or limit <= 0:
         return False

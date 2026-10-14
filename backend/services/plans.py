@@ -19,10 +19,21 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from backend.models.database import Subscription, PlanTier
+from backend.models.database import Subscription, PlanTier, User
 from backend.config import get_settings
 
 settings = get_settings()
+
+
+def is_user_admin(db, user_id) -> bool:
+    """Tekshiradi: agar foydalanuvchi admin bo'lsa (User.role == 'admin') True qaytaradi."""
+    if not user_id:
+        return False
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        return bool(user and getattr(user, "role", None) == "admin")
+    except Exception:
+        return False
 
 QUOTA_RESET_DAYS = 30  # oylik daqiqa kvotasi har doim shuncha kunda qayta boshlanadi
 
@@ -89,6 +100,8 @@ def get_max_resolution_for_job(db, job) -> str:
     uchun REQUESTER emas, JOB EGASI tarifi tekshiriladi."""
     if job.user_id is None:
         return "360p"
+    if is_user_admin(db, job.user_id):
+        return "1080p"
     sub = get_or_create_subscription(db, job.user_id)
     return PLANS[sub.plan.value].max_resolution
 
@@ -101,6 +114,8 @@ def get_tts_provider_for_job(db, job) -> str:
     Login qilmagan / egasiz job -> "edge"."""
     if job.user_id is None:
         return getattr(settings, "TTS_PROVIDER", "edge") or "edge"
+    if is_user_admin(db, job.user_id):
+        return getattr(settings, "TTS_PREMIUM_PROVIDER", "uzbekvoice") or "uzbekvoice"
     sub = get_or_create_subscription(db, job.user_id)
     tier = PLANS[sub.plan.value].tts_tier
     if tier == "premium":
@@ -113,6 +128,8 @@ def get_max_resolution_for_user(db, user_id) -> str:
     videolar kutubxonasida (2026-08-19) sifat cheklovi VIDEO EGASI emas,
     TOMOSHA QILAYOTGAN odamning tarifiga qarab belgilanishi kerak (login
     kutubxonada shart, shuning uchun requester har doim ma'lum)."""
+    if is_user_admin(db, user_id):
+        return "1080p"
     sub = get_or_create_subscription(db, user_id)
     return PLANS[sub.plan.value].max_resolution
 
@@ -172,6 +189,14 @@ def get_minute_balance(db, user_id) -> dict:
       "total_available": float,    # monthly_remaining + purchased
     }
     """
+    if is_user_admin(db, user_id):
+        return {
+            "monthly_cap": 999999.0,
+            "monthly_used": 0.0,
+            "monthly_remaining": 999999.0,
+            "purchased": 999999.0,
+            "total_available": 999999.0,
+        }
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -195,6 +220,8 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
     - covered=False -> shortfall_minutes = yetishmayotgan daqiqa (butun songa
       yaxlitlangan) -- frontend "Buy additional minutes" CTA'sida ko'rsatiladi
     """
+    if is_user_admin(db, user_id):
+        return True, 0
     bal = get_minute_balance(db, user_id)
     if duration_minutes <= bal["total_available"] + 1e-6:
         return True, 0
@@ -208,6 +235,8 @@ def check_and_consume_quota(db, user_id, duration_minutes: float) -> tuple[bool,
 
     Returns: (covered, shortfall_minutes)
     """
+    if is_user_admin(db, user_id):
+        return True, 0
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -233,6 +262,8 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
     """Video navbatga qo'yilganda chaqiriladi -- avval oylik byudjetdan,
     yetmasa sotib olingan daqiqalardan yechadi. Poyga xavfsizligi uchun
     for_update bilan qatorni qulflaydi."""
+    if is_user_admin(db, user_id):
+        return
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -309,6 +340,8 @@ def get_job_queue(db, user_id) -> str:
     NOT NULL bo'lgani uchun bazaga tegmasdan darhol DEFAULT_QUEUE."""
     if user_id is None:
         return DEFAULT_QUEUE
+    if is_user_admin(db, user_id):
+        return PRIORITY_QUEUE
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
     return PRIORITY_QUEUE if plan.priority else DEFAULT_QUEUE
