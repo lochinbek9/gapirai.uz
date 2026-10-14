@@ -989,7 +989,17 @@ def process_video(self: Task, job_id: str) -> dict:
         try:
             if getattr(exc, "code", None) != "CONTENT_BLOCKED":
                 from backend.services.telegram_notify import send_error_to_admins
-                send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Type: PermanentError")
+                u = getattr(job, "user", None)
+                send_error_to_admins(
+                    exc,
+                    context_msg=f"Job: {job_id} | Stage: {current_stage} | Type: PermanentError",
+                    job_id=job_id,
+                    user_name=getattr(u, "name", None) if u else None,
+                    user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
+                    video_title=getattr(job, "video_title", None),
+                    video_url=getattr(job, "youtube_url", None),
+                    stage=current_stage,
+                )
         except Exception:
             pass
         # Qayta urinish ma'nosiz — har safar bir xil natija chiqadi.
@@ -1012,7 +1022,17 @@ def process_video(self: Task, job_id: str) -> dict:
     except Exception as exc:
         try:
             from backend.services.telegram_notify import send_error_to_admins
-            send_error_to_admins(exc, context_msg=f"Job: {job_id} | Stage: {current_stage} | Retry: {self.request.retries}/{self.max_retries}")
+            u = getattr(job, "user", None)
+            send_error_to_admins(
+                exc,
+                context_msg=f"Job: {job_id} | Stage: {current_stage} | Retry: {self.request.retries}/{self.max_retries}",
+                job_id=job_id,
+                user_name=getattr(u, "name", None) if u else None,
+                user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
+                video_title=getattr(job, "video_title", None),
+                video_url=getattr(job, "youtube_url", None),
+                stage=current_stage,
+            )
         except Exception:
             pass
         error_code = _error_code_for(exc, current_stage)

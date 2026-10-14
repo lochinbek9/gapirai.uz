@@ -42,8 +42,21 @@ def send_telegram_message(chat_id: str, text: str, reply_markup: dict | None = N
         return False
 
 
-def send_error_to_admins(exc: Exception, context_msg: str = "") -> None:
+def send_error_to_admins(
+    exc: Exception,
+    context_msg: str = "",
+    *,
+    job_id: str | None = None,
+    user_name: str | None = None,
+    user_email_or_phone: str | None = None,
+    video_title: str | None = None,
+    video_url: str | None = None,
+    stage: str | None = None,
+) -> None:
     import traceback
+    import html
+    import re
+
     settings = get_settings()
     if not settings.ADMIN_TG_IDS:
         return
@@ -55,24 +68,71 @@ def send_error_to_admins(exc: Exception, context_msg: str = "") -> None:
     ]
     if not admin_ids:
         return
-        
+
+    # Extract job_id from context_msg if not explicitly provided
+    if not job_id and context_msg:
+        m = re.search(r"Job:\s*([0-9a-fA-F-]{36})", context_msg)
+        if m:
+            job_id = m.group(1)
+
+    # Auto-resolve metadata from DB if job_id is present and info is missing
+    if job_id and (not user_name or not video_title):
+        try:
+            from backend.models.database import SessionLocal, DubbingJob, User
+            db = SessionLocal()
+            try:
+                db_job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+                if db_job:
+                    if not video_title:
+                        video_title = db_job.video_title or "Video"
+                    if not video_url:
+                        video_url = db_job.youtube_url
+                    if not user_name and db_job.user_id:
+                        db_user = db.query(User).filter(User.id == db_job.user_id).first()
+                        if db_user:
+                            user_name = db_user.name
+                            if not user_email_or_phone:
+                                user_email_or_phone = db_user.phone or db_user.email
+            finally:
+                db.close()
+        except Exception:
+            pass
+
     tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    
-    # HTML tag escape
-    import html
     tb_str = html.escape(tb_str)
     exc_name = html.escape(type(exc).__name__)
     exc_msg = html.escape(str(exc))
-    context_msg = html.escape(context_msg)
-    
-    text = f"🚨 <b>Xatolik yuz berdi!</b>\n\n"
-    if context_msg:
-        text += f"<b>Context:</b> {context_msg}\n\n"
-    text += f"<b>Exception:</b> {exc_name}: {exc_msg}\n\n"
-    text += f"<b>Traceback:</b>\n<pre>{tb_str[:3000]}</pre>"
-    
+
+    lines = ["🚨 <b>Xatolik yuz berdi!</b>\n"]
+
+    if user_name or user_email_or_phone:
+        user_info = html.escape(user_name or "Noma'lum")
+        if user_email_or_phone:
+            user_info += f" (<code>{html.escape(user_email_or_phone)}</code>)"
+        lines.append(f"👤 <b>Foydalanuvchi:</b> {user_info}")
+
+    if video_title:
+        lines.append(f"🎬 <b>Video:</b> {html.escape(video_title)}")
+
+    if video_url:
+        if video_url.startswith("http://") or video_url.startswith("https://"):
+            lines.append(f"🔗 <b>Havola:</b> <a href=\"{html.escape(video_url)}\">{html.escape(video_url)}</a>")
+        else:
+            lines.append(f"📁 <b>Manba:</b> <code>{html.escape(video_url)}</code>")
+
+    if stage:
+        lines.append(f"📍 <b>Bosqich:</b> <code>{html.escape(stage)}</code>")
+    elif context_msg:
+        lines.append(f"<b>Context:</b> {html.escape(context_msg)}")
+
+    lines.append(f"⚠️ <b>Xatolik:</b> <code>{exc_name}</code>: {exc_msg}\n")
+    lines.append(f"<b>Traceback:</b>\n<pre>{tb_str[:2500]}</pre>")
+
+    text = "\n".join(lines)
+
     for admin_id in admin_ids:
         send_telegram_message(admin_id, text)
+
 
 
 def send_content_blocked_to_admins(
@@ -127,14 +187,18 @@ def send_content_blocked_to_admins(
     else:
         video_link_html = "<i>Fayl orqali yuklangan (havola mavjud emas)</i>"
 
+    default_title = "Noma'lum"
+    default_reason = "Ko'rsatilmagan"
+    safe_title = html.escape(video_title or default_title)
+    safe_reason = html.escape(reason or default_reason)
     lines = [
         "🛡 <b>Taqiqlangan kontent aniqlandi!</b>",
         "",
-        f"🎬 <b>Video:</b> {html.escape(video_title or 'Noma\'lum')}",
+        f"🎬 <b>Video:</b> {safe_title}",
         f"🔗 <b>Havola:</b> {video_link_html}",
         f"🏷 <b>Kategoriya:</b> {html.escape(cat_label)} (<code>{html.escape(category or '')}</code>)",
         f"📍 <b>Bosqich:</b> {html.escape(stage_label)}",
-        f"📝 <b>Sabab:</b> {html.escape(reason or 'Ko\'rsatilmagan')}",
+        f"📝 <b>Sabab:</b> {safe_reason}",
     ]
 
     if job_id:

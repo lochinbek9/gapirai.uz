@@ -89,6 +89,33 @@ class TestTelegramNotify(unittest.TestCase):
         )
         mock_send_msg.assert_not_called()
 
+    @patch("backend.services.telegram_notify.send_telegram_message")
+    @patch("backend.services.telegram_notify.get_settings")
+    def test_send_error_to_admins_with_metadata(self, mock_settings, mock_send_msg):
+        settings = MagicMock()
+        settings.ADMIN_TG_IDS = "557407324"
+        mock_settings.return_value = settings
+
+        err = ValueError("Bu videoda nutq topilmadi.")
+        send_error_to_admins(
+            err,
+            context_msg="Job: test-job-id | Stage: TRANSCRIBE",
+            job_id="test-job-id",
+            user_name="Muhabbat Manapova",
+            user_email_or_phone="muhabbatmanapova639@gmail.com",
+            video_title="Sample Video",
+            video_url="https://youtube.com/watch?v=abc",
+            stage="TRANSCRIBE",
+        )
+
+        mock_send_msg.assert_called_once()
+        sent_text = mock_send_msg.call_args[0][1]
+        self.assertIn("Muhabbat Manapova", sent_text)
+        self.assertIn("muhabbatmanapova639@gmail.com", sent_text)
+        self.assertIn("Sample Video", sent_text)
+        self.assertIn("TRANSCRIBE", sent_text)
+        self.assertIn("Bu videoda nutq topilmadi.", sent_text)
+
 
 if __name__ == "__main__":
     unittest.main()
