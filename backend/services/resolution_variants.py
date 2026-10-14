@@ -157,6 +157,7 @@ def generate_1080p(job) -> str:
 
             cmd = [
                 "ffmpeg", "-y",
+                "-threads", "0",
                 "-i", master_video,
                 "-vf", "scale=-2:1080",
                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast",

@@ -36,14 +36,6 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
     }
   }
 
-  useEffect(() => {
-    refresh()
-    return () => {
-      Object.values(pollTimers.current).forEach(clearInterval)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId])
-
   const startPolling = (resolution: string) => {
     if (pollTimers.current[resolution]) return
     pollTimers.current[resolution] = setInterval(async () => {
@@ -56,6 +48,22 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
       }
     }, POLL_INTERVAL_MS)
   }
+
+  useEffect(() => {
+    refresh().then((list) => {
+      if (list) {
+        list.forEach((opt) => {
+          if (opt.status === 'processing') {
+            startPolling(opt.resolution)
+          }
+        })
+      }
+    })
+    return () => {
+      Object.values(pollTimers.current).forEach(clearInterval)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId])
 
   const handleClick = async (opt: ResolutionOption) => {
     if (!opt.available) return

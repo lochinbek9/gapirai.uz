@@ -248,6 +248,18 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               setCurrentQuality(fallback.resolution);
             }
           }
+          if (res.resolutions.some(r => r.status === "processing")) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            pollTimerRef.current = setInterval(async () => {
+              const fresh = await getJobResolutions(jobId);
+              if (fresh?.resolutions) {
+                setResolutions(fresh.resolutions);
+                if (!fresh.resolutions.some(r => r.status === "processing")) {
+                  if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                }
+              }
+            }, 3000);
+          }
         }
       })
       .catch(() => {});
