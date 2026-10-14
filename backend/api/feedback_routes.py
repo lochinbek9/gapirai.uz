@@ -84,6 +84,7 @@ async def submit_feedback(
 
     api_base = telegram_api_base()
     send_url = f"{api_base}/bot{bot_token}/sendMessage"
+    fallback_chat = "-1003827197120"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -97,8 +98,18 @@ async def submit_feedback(
             )
             data = resp.json()
             if not data.get("ok"):
-                logger.error(f"Telegramga feedback yuborishda xatolik: {data}")
-                raise HTTPException(status_code=500, detail="Telegramga xabar yetkazilmadi.")
+                logger.warning(f"Telegramga feedback yuborishda xatolik: {data}. Fallback chatga yuborilmoqda...")
+                fb_resp = await client.post(
+                    send_url,
+                    json={
+                        "chat_id": fallback_chat,
+                        "text": message_text,
+                        "parse_mode": "HTML",
+                    },
+                )
+                if not fb_resp.json().get("ok"):
+                    logger.error(f"Fallback chatga ham feedback yuborilmadi: {fb_resp.text}")
+                    raise HTTPException(status_code=500, detail="Telegramga xabar yetkazilmadi.")
     except HTTPException:
         raise
     except Exception as e:

@@ -1204,6 +1204,10 @@ def submit_feedback(
             voice_ok=req.voice_ok,
             translation_ok=req.translation_ok,
             speed_ok=req.speed_ok,
+            user_name=current_user.name if current_user else None,
+            user_email=current_user.email if current_user else None,
+            user_phone=current_user.phone if current_user else None,
+            created_at_str=datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
         )
     except Exception as err:
         pass

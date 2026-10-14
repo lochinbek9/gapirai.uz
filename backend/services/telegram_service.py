@@ -19,20 +19,27 @@ def _format_ok(label: str, value: bool | None) -> str | None:
 
 
 def send_telegram_feedback(
-    job_id: str,
-    video_title: str,
-    rating: int,
+    job_id: str | None = None,
+    video_title: str | None = None,
+    rating: int | None = None,
     comment: str | None = None,
     chat_id: str | None = None,
     voice_ok: bool | None = None,
     translation_ok: bool | None = None,
     speed_ok: bool | None = None,
+    user_name: str | None = None,
+    user_email: str | None = None,
+    user_phone: str | None = None,
+    created_at_str: str | None = None,
 ) -> bool:
     """
-    Dublyaj bahosi va fikrini Telegram bot orqali guruh/kanal/admin chatiga yuboradi.
+    Dublyaj bahosi va foydalanuvchi fikrini Telegram bot orqali guruh/kanal/admin chatiga yuboradi.
+    Foydalanuvchi ma'lumotlari (ism, email/telefon) bilan birga yuboriladi (Job ID va havola chiqarilmaydi).
     """
+    import html
+
     token = settings.TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "")
-    target_chat = chat_id or settings.TELEGRAM_FEEDBACK_CHANNEL_ID or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "") or "-1004431243067"
+    target_chat = chat_id or settings.TELEGRAM_FEEDBACK_CHANNEL_ID or settings.TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "") or "-1003827197120"
 
     if not token:
         logger.warning("TELEGRAM_BOT_TOKEN sozlanmagan.")
@@ -42,9 +49,17 @@ def send_telegram_feedback(
         logger.warning("TELEGRAM_CHAT_ID sozlanmagan — xabar yuborilmadi.")
         return False
 
-    stars_str = "⭐" * rating
-    comment_clean = comment.strip() if comment and comment.strip() else "Fikr qoldirilmadi"
-    title_clean = video_title or "Noma'lum video"
+    name_clean = html.escape(user_name.strip()) if user_name and user_name.strip() else "Anonim foydalanuvchi"
+    user_lines = [f"👤 <b>Foydalanuvchi</b>: {name_clean}"]
+    if user_email and user_email.strip():
+        user_lines.append(f"📧 <b>Email</b>: {html.escape(user_email.strip())}")
+    if user_phone and user_phone.strip():
+        user_lines.append(f"📞 <b>Telefon</b>: {html.escape(user_phone.strip())}")
+    user_block = "\n".join(user_lines)
+
+    stars_str = ("⭐" * rating + f" ({rating} / 5)") if rating else "Baholanmagan"
+    comment_clean = html.escape(comment.strip()) if comment and comment.strip() else "Fikr qoldirilmadi"
+    title_clean = html.escape(video_title.strip()) if video_title and video_title.strip() else "Noma'lum video"
 
     detail_lines = [
         line for line in (
@@ -54,15 +69,16 @@ def send_telegram_feedback(
         ) if line
     ]
     details_block = ("\n" + "\n".join(detail_lines) + "\n") if detail_lines else ""
+    date_line = f"\n🕒 <b>Sana</b>: {html.escape(created_at_str)}" if created_at_str else ""
 
     text = (
         f"⭐️ <b>YANGI FIKR VA BAHOLASH (GapirAI.uz)</b> ⭐️\n\n"
+        f"{user_block}\n"
         f"📹 <b>Video</b>: {title_clean}\n"
-        f"⭐ <b>Baho</b>: {stars_str} ({rating} / 5)\n"
+        f"⭐ <b>Baho</b>: {stars_str}\n"
         f"{details_block}"
-        f"💬 <b>Fikr</b>: \"{comment_clean}\"\n\n"
-        f"🆔 <b>Job ID</b>: <code>{job_id}</code>\n"
-        f"🔗 <b>Havola</b>: https://gapirai.uz/video/{job_id}"
+        f"💬 <b>Fikr</b>: \"{comment_clean}\""
+        f"{date_line}"
     )
 
     url = f"{telegram_api_base()}/bot{token}/sendMessage"
@@ -77,14 +93,14 @@ def send_telegram_feedback(
     try:
         res = httpx.post(url, json=payload, timeout=10.0)
         if res.status_code == 200:
-            logger.info(f"Telegram feedback notification sent for job {job_id}")
+            logger.info(f"Telegram feedback notification sent for user {name_clean}")
             return True
         logger.warning(f"Telegram API response {res.status_code}: {res.text}")
         if str(target_chat) != fallback_chat:
             payload["chat_id"] = fallback_chat
             fb_res = httpx.post(url, json=payload, timeout=10.0)
             if fb_res.status_code == 200:
-                logger.info(f"Telegram feedback sent to fallback chat {fallback_chat} for job {job_id}")
+                logger.info(f"Telegram feedback sent to fallback chat {fallback_chat}")
                 return True
     except Exception as exc:
         logger.error(f"Failed to send Telegram notification: {exc}")
