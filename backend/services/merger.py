@@ -80,6 +80,24 @@ def _build_audio_filtergraph() -> str:
     )
 
 
+def _get_video_codec(file_path: str) -> str:
+    """FFprobe orqali video codec nomini olish (masalan 'h264', 'av1', 'vp9')."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=codec_name",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                file_path,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        return result.stdout.strip().lower()
+    except Exception:
+        return ""
+
+
 def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str) -> str:
     """
     Original video + O'zbekcha dublyaj → Tayyor video, kino-dublyaji uslubida
@@ -101,8 +119,22 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
 
     audio_filter = _build_audio_filtergraph()
 
+    # iOS Safari va barcha mobil qurilmalarda 100% ochilishi uchun:
+    # Agar video formati H.264 bo'lmasa (masalan AV1 yoki VP9 bo'lsa),
+    # uni libx264 (yuv420p) ga o'girish shart!
+    vcodec = _get_video_codec(video_path)
+    needs_transcode = vcodec not in ("h264", "avc1")
+
     if audio_dur <= video_dur:
         filter_complex = audio_filter
+        if needs_transcode:
+            video_codec_args = [
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-crf", "22", "-preset", "veryfast", "-threads", "2",
+            ]
+        else:
+            video_codec_args = ["-c:v", "copy"]
+
         cmd = [
             "ffmpeg", "-y",
             "-i", video_path,
@@ -110,8 +142,9 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "-filter_complex", filter_complex,
             "-map", "0:v:0",
             "-map", "[final]",
-            "-c:v", "copy",
-            "-c:a", "aac", "-b:a", "192k",
+            *video_codec_args,
+            "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
+            "-movflags", "+faststart",
             output_path,
         ]
     else:
@@ -131,8 +164,9 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
             "-filter_complex", filter_complex,
             "-map", "[v]",
             "-map", "[final]",
-            "-c:v", "libx264", "-crf", "22", "-preset", "ultrafast", "-tune", "zerolatency", "-threads", "2",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", "2",
+            "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
+            "-movflags", "+faststart",
             output_path,
         ]
 

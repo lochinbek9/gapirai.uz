@@ -942,10 +942,12 @@ def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
     return FileResponse(path=audio_path, media_type="audio/wav", filename=filename)
 
 
-@router.get("/outputs/{job_id}/video")
+@router.api_route("/outputs/{job_id}/video", methods=["GET", "HEAD"])
 def download_video(
+    request: Request,
     job_id: uuid.UUID,
     resolution: Optional[str] = Query(None, description="Video rezolyutsiyasi: 360p, 720p, 1080p"),
+    download: bool = Query(False, description="True bo'lsa yuklab olish uchun attachment, aks holda inline ko'rish"),
     db: Session = Depends(get_db),
 ):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -1000,7 +1002,14 @@ def download_video(
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
     res_label = f"_{resolution}" if resolution in ("360p", "1080p") else ""
     filename = f"dubbed_{safe_title or job_id}{res_label}.mp4"
-    return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+    disp_type = "attachment" if download else "inline"
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        filename=filename,
+        content_disposition_type=disp_type,
+        method=request.method,
+    )
 
 
 @router.get("/jobs/{job_id}/resolutions")

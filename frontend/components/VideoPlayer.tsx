@@ -362,21 +362,27 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onTime = () => setProgress(v.currentTime);
-    const onDur  = () => setDuration(v.duration);
-    const onBuf  = () => v.buffered.length > 0 && setBuffered(v.buffered.end(v.buffered.length - 1));
-    const onEnd  = () => setPlaying(false);
-    const onFS   = () => setFullscreen(!!document.fullscreenElement);
+    const onTime  = () => setProgress(v.currentTime);
+    const onDur   = () => setDuration(v.duration);
+    const onBuf   = () => v.buffered.length > 0 && setBuffered(v.buffered.end(v.buffered.length - 1));
+    const onEnd   = () => setPlaying(false);
+    const onPlay  = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onFS    = () => setFullscreen(!!document.fullscreenElement);
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("durationchange", onDur);
     v.addEventListener("progress", onBuf);
     v.addEventListener("ended", onEnd);
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
     document.addEventListener("fullscreenchange", onFS);
     return () => {
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("durationchange", onDur);
       v.removeEventListener("progress", onBuf);
       v.removeEventListener("ended", onEnd);
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
       document.removeEventListener("fullscreenchange", onFS);
     };
   }, []);
@@ -393,7 +399,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    v.paused ? (v.play(), setPlaying(true)) : (v.pause(), setPlaying(false));
+    if (v.paused) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
     resetHideTimer();
   };
 
@@ -461,6 +471,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         onClick={togglePlay}
         onDoubleClick={toggleFS}
         onLoadedMetadata={handleLoadedMetadata}
+        playsInline
+        preload="metadata"
       />
 
       {/* Floating quality change toast */}

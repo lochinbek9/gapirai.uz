@@ -470,7 +470,13 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
 
     extra_opts = {
         "outtmpl": video_tpl,
-        "format": f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": (
+            f"bestvideo[vcodec^=avc1][height<={max_height}]+bestaudio[ext=m4a]/"
+            f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/"
+            f"best[vcodec^=avc1][ext=mp4]/"
+            f"best[ext=mp4]/"
+            f"best"
+        ),
         "merge_output_format": "mp4",
         "progress_hooks": [_dl_progress_hook],
     }

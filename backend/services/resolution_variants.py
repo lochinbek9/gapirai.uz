@@ -56,8 +56,9 @@ def generate_360p(job) -> str:
         "ffmpeg", "-y",
         "-i", master_url,
         "-vf", "scale=-2:360",
-        "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", "-preset", "fast",
         "-c:a", "copy",
+        "-movflags", "+faststart",
         local_out,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
