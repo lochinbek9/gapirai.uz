@@ -94,6 +94,17 @@ def _mark_analysis_failed(analysis_id: str, error_code: str, error_message: str)
     )
 
 
+def _cleanup_analysis_dirs(analysis_id: str) -> None:
+    _cleanup_upload_dir(analysis_id)
+    out_dir = Path(settings.OUTPUT_DIR) / analysis_id
+    if out_dir.exists():
+        try:
+            import shutil
+            shutil.rmtree(out_dir)
+        except Exception:
+            pass
+
+
 @celery_app.task(
     bind=True,
     name="backend.workers.analysis_tasks.analyze_video_task",
@@ -108,6 +119,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
     pipeline_start = time.monotonic()
     current_stage = "INIT"
     claim_token = None
+    analysis = None
 
     try:
         analysis = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
@@ -136,7 +148,9 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         # BOSQICH 1: Yuklash (mavjud dublyaj pipeline'idan qayta foydalanish)
         current_stage = "DOWNLOAD"
         stage_t0 = time.monotonic()
-        audio_path = str(job_dir / "audio.wav")
+        audio_path_upload = Path(settings.UPLOAD_DIR) / analysis_id / "audio.wav"
+        audio_path_output = Path(settings.OUTPUT_DIR) / analysis_id / "audio.wav"
+        audio_path = str(audio_path_output if audio_path_output.exists() else audio_path_upload)
         if analysis.transcript_segments:
             # Transkript allaqachon boshqa manbadan ko'chirilgan (bog'langan
             # dublyaj job'idan, backend/api/learn_routes.py) -- audio fayl
@@ -144,7 +158,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             # o'tkazib yuboriladi. Bo'lmasa bu holatda ham qimmat/keraksiz
             # YouTube yuklab olish bajarilib qolardi.
             _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "skipped")
-        elif Path(audio_path).exists():
+        elif audio_path_upload.exists() or audio_path_output.exists():
             _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.DOWNLOADING, 10.0, "YouTube'dan yuklanmoqda...")
@@ -217,39 +231,56 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         analysis.error_message = None
         db.commit()
 
-        _cleanup_upload_dir(analysis_id)
+        _cleanup_analysis_dirs(analysis_id)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "COMPLETED")
 
         return {"analysis_id": analysis_id, "status": "completed"}
 
     except PermanentError as exc:
-        # PermanentError xabari BIZ tomonidan yozilgan, xavfsiz matn --
-        # xom exception emas (scrub_secrets baribir himoya sifatida
-        # qo'llanadi, backend/workers/tasks.py:_safe_persisted_error bilan
-        # bir xil qoida, 2026-08-26 audit).
-        # Status-o'tkazish endi mustaqil, yangi sessiya bilan
-        # (_mark_analysis_failed) -- eski `db` sessiyasi shu paytda qanday
-        # holatda bo'lishidan qat'i nazar (2026-08-27 audit).
+        try:
+            from backend.services.telegram_notify import send_error_to_admins
+            u = getattr(analysis, "user", None) if analysis else None
+            send_error_to_admins(
+                exc,
+                context_msg=f"Analysis: {analysis_id} | Stage: {current_stage} | Type: PermanentError",
+                job_id=analysis_id,
+                user_name=getattr(u, "name", None) if u else None,
+                user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
+                video_title=getattr(analysis, "video_title", None) if analysis else None,
+                video_url=getattr(analysis, "youtube_url", None) if analysis else None,
+                stage=f"ANALYSIS:{current_stage}",
+            )
+        except Exception:
+            pass
+
         _, safe_message = _safe_persisted_error(exc, current_stage)
         _mark_analysis_failed(analysis_id, _error_code_for(exc, current_stage), safe_message)
-        _cleanup_upload_dir(analysis_id)
+        _cleanup_analysis_dirs(analysis_id)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
 
     except Exception as exc:
+        try:
+            from backend.services.telegram_notify import send_error_to_admins
+            u = getattr(analysis, "user", None) if analysis else None
+            send_error_to_admins(
+                exc,
+                context_msg=f"Analysis: {analysis_id} | Stage: {current_stage} | Retry: {self.request.retries}/{self.max_retries}",
+                job_id=analysis_id,
+                user_name=getattr(u, "name", None) if u else None,
+                user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
+                video_title=getattr(analysis, "video_title", None) if analysis else None,
+                video_url=getattr(analysis, "youtube_url", None) if analysis else None,
+                stage=f"ANALYSIS:{current_stage}",
+            )
+        except Exception:
+            pass
+
         error_code = _error_code_for(exc, current_stage)
         # AUTH_ERROR uchun blind retry yo'q -- tasks.py:process_video bilan
         # bir xil qoida (2026-08-26 audit, Priority 5).
         if self.request.retries < self.max_retries and error_classification.should_retry(error_code):
-            # backend/workers/tasks.py'dagi bir xil sabab bilan 600s'gacha oshirilgan.
             countdown = min(600, 30 * (2 ** self.request.retries))
-            # 2026-08-26 audit (orphan-job topilmasi) -- backend/workers/tasks.py
-            # :process_video bilan bir xil bug va bir xil yechim: asl `db`
-            # sessiyasi aynan shu xatoga olib kelgan OperationalError sababli
-            # allaqachon buzilgan bo'lishi mumkin -- shuni qayta ishlatish
-            # ikkinchi, ushlanmagan xatoga va analiz'ning abadiy DOWNLOADING
-            # holatida (error_code'siz) qotib qolishiga olib kelardi. Yangi
-            # SessionLocal() -- _release_analysis_claim_safe bilan bir xil naqsh.
             retry_session = SessionLocal()
             try:
                 analysis = retry_session.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
@@ -270,19 +301,13 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, f"RETRY {self.request.retries + 1}/{self.max_retries}")
             raise self.retry(exc=exc, countdown=countdown)
 
-        # Status-o'tkazish endi mustaqil, yangi sessiya bilan
-        # (_mark_analysis_failed) -- eski `db` sessiyasi shu paytda qanday
-        # holatda bo'lishidan qat'i nazar (2026-08-27 audit: productonda
-        # haqiqiy analiz (fJ9rUzIMcZQ) AYNAN shu joyda -- yakuniy FAILED
-        # yozuvida -- abadiy DOWNLOADING holatida qotib qolgan edi,
-        # batafsili izoh _mark_analysis_failed'ning o'zida).
         _mark_analysis_failed(
             analysis_id,
             error_code,
             "Videoni tahlil qilishda xatolik yuz berdi. Iltimos, birozdan keyin qayta urinib ko'ring.",
         )
         logger.error(f"[{analysis_id}] ANALYZE FAILED (real error): {exc}")
-        _cleanup_upload_dir(analysis_id)
+        _cleanup_analysis_dirs(analysis_id)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "FAILED")
         raise exc
 

@@ -143,6 +143,33 @@ def get_analysis(
     return _analysis_to_dict(analysis)
 
 
+@router.post("/{analysis_id}/retry", dependencies=[Depends(rate_limit("video_analysis_retry", 8, 600))])
+def retry_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Xatolik yuz bergan (failed) tahlilni qayta ishga tushirish (retry)."""
+    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    if analysis.status != AnalysisStatus.FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail="Faqat xatolik yuz bergan tahlillarni qayta ishga tushirish mumkin.",
+        )
+
+    analysis.status = AnalysisStatus.PENDING
+    analysis.progress = 0.0
+    analysis.status_message = "Qayta navbatga qo'shildi..."
+    analysis.error_message = None
+    analysis.error_code = None
+    analysis.updated_at = datetime.utcnow()
+    db.commit()
+
+    analyze_video_task.apply_async(args=[str(analysis.id)], task_id=str(analysis.id))
+
+    return {"analysis_id": str(analysis.id), "status": "pending"}
+
+
 @router.get("/{analysis_id}/transcript")
 def get_transcript(
     analysis_id: str,

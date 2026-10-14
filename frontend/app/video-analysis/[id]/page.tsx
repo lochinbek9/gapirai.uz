@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Loader2, AlertTriangle, Search,
+  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
-  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
+  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
 } from "@/lib/api";
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
@@ -32,9 +32,10 @@ const TABS: { key: Tab; label: string }[] = [
 export default function VideoAnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { analysis, is404 } = useAnalysisPolling(id);
+  const { analysis, is404, refetch } = useAnalysisPolling(id);
   const playerRef = useRef<YouTubePlayerHandle>(null);
   const [tab, setTab] = useState<Tab>("summary");
+  const [retrying, setRetrying] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [qaHistory, setQaHistory] = useState<QAEntry[]>([]);
@@ -65,6 +66,19 @@ export default function VideoAnalysisPage() {
       getTranscript(id).then((res) => setTranscript(res.segments)).catch(() => {});
     }
   }, [analysis?.status, id]);
+
+  const handleRetry = async () => {
+    if (!id || retrying) return;
+    setRetrying(true);
+    try {
+      await retryAnalysis(id);
+      await refetch();
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.");
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const seek = (seconds: number) => playerRef.current?.seekTo(seconds);
 
@@ -188,12 +202,31 @@ export default function VideoAnalysisPage() {
         )}
 
         {isFailed && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center space-y-3">
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center space-y-4">
             <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
             <h2 className="text-lg font-bold text-white">Xatolik yuz berdi</h2>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 max-w-lg mx-auto">
               {analysis.error_message || "Videoni tahlil qilishda xatolik yuz berdi. Iltimos, birozdan keyin qayta urinib ko'ring."}
             </p>
+            <div className="pt-2">
+              <button
+                onClick={handleRetry}
+                disabled={retrying}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+              >
+                {retrying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Qayta ishga tushirilmoqda...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCw className="w-4 h-4" />
+                    <span>Qaytadan urinish</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 

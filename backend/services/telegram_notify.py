@@ -78,7 +78,7 @@ def send_error_to_admins(
     # Auto-resolve metadata from DB if job_id is present and info is missing
     if job_id and (not user_name or not video_title):
         try:
-            from backend.models.database import SessionLocal, DubbingJob, User
+            from backend.models.database import SessionLocal, DubbingJob, VideoAnalysis, User
             db = SessionLocal()
             try:
                 db_job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -93,6 +93,19 @@ def send_error_to_admins(
                             user_name = db_user.name
                             if not user_email_or_phone:
                                 user_email_or_phone = db_user.phone or db_user.email
+                else:
+                    analysis = db.query(VideoAnalysis).filter(VideoAnalysis.id == job_id).first()
+                    if analysis:
+                        if not video_title:
+                            video_title = f"[Tahlil] {analysis.video_title or 'Video'}"
+                        if not video_url:
+                            video_url = analysis.youtube_url
+                        if not user_name and analysis.user_id:
+                            db_user = db.query(User).filter(User.id == analysis.user_id).first()
+                            if db_user:
+                                user_name = db_user.name
+                                if not user_email_or_phone:
+                                    user_email_or_phone = db_user.phone or db_user.email
             finally:
                 db.close()
         except Exception:

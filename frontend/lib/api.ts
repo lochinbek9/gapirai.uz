@@ -651,6 +651,11 @@ export async function getAnalysis(analysisId: string): Promise<VideoAnalysis> {
   return res.data
 }
 
+export async function retryAnalysis(analysisId: string): Promise<{ analysis_id: string; status: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/retry`)
+  return res.data
+}
+
 export async function getTranscript(analysisId: string): Promise<{ segments: TranscriptSegment[] }> {
   const res = await apiClient.get(`/api/video-analysis/${analysisId}/transcript`)
   return res.data
