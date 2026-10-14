@@ -31,6 +31,7 @@ from backend.services.job_creation import (
     JobCreationResult,
 )
 from backend.services import subtitle_export, subtitle_cues
+from backend.services.timezone_utils import to_tashkent_iso, format_tashkent, now_tashkent
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -137,7 +138,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         remaining_factor = max(0.1, (100.0 - live_progress) / 100.0)
         est_seconds = (30 + 0.3 * duration) * remaining_factor
         expected_dt = baseline_dt + timedelta(seconds=est_seconds)
-        expected_end_time = expected_dt.isoformat() + "Z"
+        expected_end_time = to_tashkent_iso(expected_dt)
 
     return JobResponse(
         job_id=str(job.id),
@@ -157,7 +158,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         translated_text=job.translated_text,
         error_message=None if redact else job.error_message,
         error_code=None if redact else job.error_code,
-        created_at=job.created_at.isoformat() if job.created_at else None,
+        created_at=to_tashkent_iso(job.created_at) if job.created_at else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         uzbek_srt_content=job.uzbek_srt_content,
@@ -1207,7 +1208,7 @@ def submit_feedback(
             user_name=current_user.name if current_user else None,
             user_email=current_user.email if current_user else None,
             user_phone=current_user.phone if current_user else None,
-            created_at_str=datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+            created_at_str=now_tashkent().strftime("%Y-%m-%d %H:%M"),
         )
     except Exception as err:
         pass

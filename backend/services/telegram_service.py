@@ -7,6 +7,7 @@ import logging
 import httpx
 
 from backend.config import get_settings, telegram_api_base
+from backend.services.timezone_utils import now_tashkent, format_tashkent
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -69,7 +70,8 @@ def send_telegram_feedback(
         ) if line
     ]
     details_block = ("\n" + "\n".join(detail_lines) + "\n") if detail_lines else ""
-    date_line = f"\n🕒 <b>Sana</b>: {html.escape(created_at_str)}" if created_at_str else ""
+    date_val = created_at_str or format_tashkent(now_tashkent())
+    date_line = f"\n🕒 <b>Sana</b>: {html.escape(date_val)}"
 
     text = (
         f"⭐️ <b>YANGI FIKR VA BAHOLASH (GapirAI.uz)</b> ⭐️\n\n"
@@ -126,11 +128,13 @@ def send_telegram_platform_feedback(
 
     rating_line = f"⭐ <b>Baho</b>: {'⭐' * rating} ({rating} / 5)\n" if rating else ""
     user_line = f"👤 <b>Foydalanuvchi</b>: {user_email}\n" if user_email else "👤 <b>Foydalanuvchi</b>: Anonim\n"
+    date_line = f"🕒 <b>Sana</b>: {format_tashkent(now_tashkent())}\n"
 
     text = (
         f"💬 <b>PLATFORMA HAQIDA FIKR (GapirAI.uz)</b> 💬\n\n"
         f"{rating_line}"
         f"{user_line}"
+        f"{date_line}"
         f"📝 <b>Xabar</b>: \"{message.strip()}\""
     )
 

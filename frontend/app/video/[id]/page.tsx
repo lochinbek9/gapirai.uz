@@ -13,6 +13,7 @@ import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
+import { formatTashkentDateTime, formatTashkentTime } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -372,7 +373,7 @@ export default function VideoPage() {
                     <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-slate-400 space-y-1">
                       <p className="font-semibold text-slate-300">Taxminiy yakunlanish vaqti:</p>
                       <p className="text-white font-mono text-sm">
-                        {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {formatTashkentTime(job.expected_end_time)}
                       </p>
                       <p className="text-[11px] text-slate-500 font-medium">
                         {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
@@ -492,7 +493,7 @@ export default function VideoPage() {
                       <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
                     )}
                     {job.created_at && (
-                      <InfoRow label="Yuborilgan" value={new Date(job.created_at).toLocaleDateString('uz-UZ')} />
+                      <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                     )}
                     {job.uzbek_srt_content && <InfoRow label="Subtitr" value="✅ Mavjud" />}
                   </div>
@@ -532,7 +533,7 @@ export default function VideoPage() {
                   <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
                 )}
                 {job.created_at && (
-                  <InfoRow label="Yuborilgan" value={new Date(job.created_at).toLocaleDateString('uz-UZ')} />
+                  <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                 )}
                 {job.uzbek_srt_content && (
                   <InfoRow label="Subtitr" value="✅ Mavjud" />

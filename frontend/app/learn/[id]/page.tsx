@@ -20,6 +20,7 @@ import QATab from '@/components/analysis/QATab'
 import FiveMinuteTab from '@/components/analysis/FiveMinuteTab'
 import { extractYouTubeId } from '@/lib/youtube'
 import { trackEvent, trackOnce } from '@/lib/analytics'
+import { formatTashkentTime } from '@/lib/timestamp'
 
 // video/[id]/page.tsx bilan bir xil narx qoidasi (45 daqiqadan uzun videolar
 // uchun) -- backend/services/plans.py'dagi haqiqiy hisob-kitobning taxminiy
@@ -479,7 +480,7 @@ export default function LearnPage() {
                     {job.expected_end_time && (
                       <p className="text-[11px] text-slate-500">
                         Taxminan tugash vaqti:{' '}
-                        {new Date(job.expected_end_time).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                        {formatTashkentTime(job.expected_end_time, false)}
                       </p>
                     )}
                   </div>

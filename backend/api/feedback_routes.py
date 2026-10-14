@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.config import get_settings, telegram_api_base
 from backend.models.database import get_db, SessionLocal, User
 from backend.services.auth import decode_token, bearer_scheme
+from backend.services.timezone_utils import now_tashkent
 from fastapi.security import HTTPAuthorizationCredentials
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ async def submit_feedback(
         stars = "⭐" * req.rating + "☆" * (5 - req.rating)
         rating_str = f"⭐ <b>Baho:</b> {stars} ({req.rating}/5)\n"
 
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M (UTC)")
+    now_str = now_tashkent().strftime("%Y-%m-%d %H:%M")
     page_str = f"🌐 <b>Sahifa:</b> {html.escape(req.page_url)}\n" if req.page_url else ""
 
     # Telegram xabar matni (HTML formati)

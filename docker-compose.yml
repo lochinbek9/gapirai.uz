@@ -59,6 +59,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - TZ=Asia/Tashkent
       - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
       - REDIS_URL=redis://:0061f8931184fe1276650305600d5409df1a3af2692094d5@redis:6379/0
       - CELERY_BROKER_URL=redis://:0061f8931184fe1276650305600d5409df1a3af2692094d5@redis:6379/0
@@ -71,6 +72,7 @@ services:
       - ./outputs:/app/outputs
       - ./sources:/app/sources
       - ./cookies.txt:/app/cookies.txt:ro
+      - /etc/localtime:/etc/localtime:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro
     depends_on:
@@ -116,6 +118,7 @@ services:
     # navbatga qo'yiladi.
     stop_grace_period: 120s
     environment:
+      - TZ=Asia/Tashkent
       - DATABASE_URL=postgresql://dubber:dubber123@postgres:5432/dubber_db
       - REDIS_URL=redis://:0061f8931184fe1276650305600d5409df1a3af2692094d5@redis:6379/0
       - CELERY_BROKER_URL=redis://:0061f8931184fe1276650305600d5409df1a3af2692094d5@redis:6379/0
@@ -128,6 +131,7 @@ services:
       - ./outputs:/app/outputs
       - ./sources:/app/sources
       - ./cookies.txt:/app/cookies.txt:ro
+      - /etc/localtime:/etc/localtime:ro
       - oauth_cache:/root/.cache/yt-dlp
       - ${HOME}/.secrets/gapirai:/app/secrets:ro
     depends_on:
