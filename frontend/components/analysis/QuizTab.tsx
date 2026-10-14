@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X, RotateCcw } from "lucide-react";
+import { Check, X, RotateCcw, GraduationCap } from "lucide-react";
 import { QuizQuestion } from "@/lib/api";
 import { formatTs } from "@/lib/timestamp";
+import GenerationCard from "./GenerationCard";
 
 // frontend/app/video-analysis/[id]/page.tsx VA frontend/app/learn/[id]/page.tsx
 // ikkalasi ham shu komponentni ishlatadi -- "Test" tabining markup/xatti-
@@ -54,13 +55,27 @@ export default function QuizTab({
 
   if (!quiz) {
     return (
-      <button
-        onClick={onGenerate}
-        disabled={loading}
-        className="px-5 py-3 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition disabled:opacity-50"
-      >
-        {loading ? "Yaratilmoqda..." : "Test tuzish"}
-      </button>
+      <GenerationCard
+        badge="AI Test"
+        title="Interaktiv test yaratish"
+        description="Video bo'yicha bilimlaringizni sinash uchun ko'p variantli savollar, to'g'ri javoblar va har bir javobga batafsil tushuntirishlar tuziladi."
+        buttonText="Test tuzish"
+        icon={<GraduationCap className="w-6 h-6" />}
+        features={[
+          "Har bir savol video daqiqasiga bog'langan",
+          "To'g'ri va noto'g'ri javoblarga izohlar",
+          "Xatolar ustida alohida ishlash imkoniyati",
+        ]}
+        loading={loading}
+        loadingSteps={[
+          "Videodan asosiy faktlar va savollar tanlanmoqda...",
+          "Variantlar va to'g'ri javoblar tuzilmoqda...",
+          "Har bir savol uchun tushuntirishlar yozilmoqda...",
+          "Test savollari tayyorlanmoqda...",
+        ]}
+        estimatedTime="~15-20 soniya"
+        onGenerate={onGenerate}
+      />
     );
   }
 

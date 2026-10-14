@@ -368,7 +368,10 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
                 continue
 
             record_model_request(api_key, model_name)
-            client = genai.Client(api_key=api_key)
+            try:
+                client = genai.Client(api_key=api_key, http_options={"timeout": 20000})
+            except Exception:
+                client = genai.Client(api_key=api_key)
 
             for attempt in range(2):
                 try:
@@ -396,6 +399,7 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
                     err_str = str(exc)
                     is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
                     is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str
+                    is_timeout = "timeout" in err_str.lower() or "deadline" in err_str.lower() or "timed out" in err_str.lower()
                     is_not_found = "404" in err_str or "NOT_FOUND" in err_str
                     is_bad_json = isinstance(exc, json.JSONDecodeError)
 
@@ -407,8 +411,9 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
                         # Ushbu kalit/model uchun boshqa urinmaymiz, keyingisiga o'tamiz
                         break
 
-                    if is_server_error:
-                        logger.warning(f"Gemini {model_name} server band: {exc} — keyingi variantga o'tilmoqda.")
+                    if is_server_error or is_timeout:
+                        logger.warning(f"Gemini {model_name} server band/timeout: {exc} — 2 daqiqaga kutishga qo'yildi.")
+                        mark_model_cooldown(api_key, model_name, 120.0, reason=f"Server band/timeout: {exc}")
                         break
 
                     if is_bad_json:
