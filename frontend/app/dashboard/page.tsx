@@ -109,13 +109,35 @@ function VideoCard({
         <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-lg font-mono font-bold tracking-tighter">
           {duration}
         </div>
-        {/* Play overlay */}
+        {/* Play overlay for ready jobs */}
         {isReady && (
           <Link href={`/video/${job.job_id}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm">
             <div className="w-12 h-12 bg-white/95 rounded-2xl flex items-center justify-center shadow-lg transition transform translate-y-2 group-hover:translate-y-0 duration-300">
               <Play className="w-5 h-5 text-indigo-600 fill-indigo-600 ml-0.5" />
             </div>
           </Link>
+        )}
+        {/* In-progress overlay linking to video page */}
+        {!isReady && !isFailed && (
+          <Link
+            href={`/video/${job.job_id}`}
+            title="Jarayonni ko'rish"
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm"
+          >
+            <div className="px-3 py-1.5 bg-indigo-600/90 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-lg">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Jarayonni ko'rish</span>
+            </div>
+          </Link>
+        )}
+        {/* Progress bar on thumbnail for in-progress jobs */}
+        {!isReady && !isFailed && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 transition-all duration-300"
+              style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
+            />
+          </div>
         )}
         {/* Gender badge */}
         {job.speaker_gender && (
@@ -129,19 +151,35 @@ function VideoCard({
       {/* Info */}
       <div className="p-4">
         <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
-          {job.video_title || 'Yuklanmoqda...'}
+          {!isFailed ? (
+            <Link href={`/video/${job.job_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+              {job.video_title || 'Yuklanmoqda...'}
+            </Link>
+          ) : (
+            <span>{job.video_title || 'Yuklanmoqda...'}</span>
+          )}
         </h3>
         <div className="flex items-center justify-between">
           <StatusBadge status={job.status} />
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {isReady && (
+            {isReady ? (
               <Link
                 href={`/video/${job.job_id}`}
                 className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-bold"
               >
                 Ko'rish →
               </Link>
-            )}
+            ) : !isFailed ? (
+              <Link
+                href={`/video/${job.job_id}`}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium flex items-center gap-1"
+                title="Jarayonni ko'rish"
+              >
+                <span>Jarayon</span>
+                {job.progress ? <span className="font-mono text-[11px]">({Math.round(job.progress)}%)</span> : null}
+                <span>→</span>
+              </Link>
+            ) : null}
             {isFailed && (
               <button
                 onClick={() => onRetry(job.job_id)}
@@ -235,11 +273,9 @@ export default function DashboardPage() {
     setRetryingId(id)
     try {
       await retryJob(id)
-      const updated = await listJobs()
-      setJobs(updated)
+      router.push(`/video/${id}`)
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
-    } finally {
       setRetryingId(null)
     }
   }
