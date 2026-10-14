@@ -349,12 +349,6 @@ export default function Home() {
             <img src="/logo.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain dark:hidden drop-shadow-md" />
             <img src="/logodark.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain hidden dark:block drop-shadow-md" />
           </Link>
-          <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 backdrop-blur-md shadow-sm shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[9px] sm:text-[11px] font-black text-amber-600 dark:text-amber-400 tracking-wider uppercase whitespace-nowrap">
-              Test
-            </span>
-          </span>
         </div>
 
         {/* Right Controls */}
