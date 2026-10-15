@@ -17,7 +17,11 @@ TREND_YEARS = 5
 
 
 def _daily_counts(db, model, since: datetime, extra_filter=None) -> dict[str, int]:
-    q = db.query(func.date(model.created_at).label("day"), func.count(model.id)).filter(model.created_at >= since)
+    # Toshkent vaqti (UTC+5) bo'yicha kunlarga ajratish
+    q = db.query(
+        func.date(model.created_at + timedelta(hours=5)).label("day"),
+        func.count(model.id)
+    ).filter(model.created_at >= since)
     if extra_filter is not None:
         q = q.filter(extra_filter)
     rows = q.group_by("day").all()
@@ -28,7 +32,7 @@ def _bucketed_counts(db, model, since: datetime, trunc: str, extra_filter=None) 
     """`trunc` — Postgres date_trunc birligi ("month"/"year"). Kalitlar
     "YYYY-MM" (month) yoki "YYYY" (year) shaklida qaytadi — frontend'dagi
     granularity tugmasi shu formatga mos kunlik/oylik/yillik grafikni tanlaydi."""
-    bucket = func.date_trunc(trunc, model.created_at).label("bucket")
+    bucket = func.date_trunc(trunc, model.created_at + timedelta(hours=5)).label("bucket")
     q = db.query(bucket, func.count(model.id)).filter(model.created_at >= since)
     if extra_filter is not None:
         q = q.filter(extra_filter)
@@ -143,55 +147,115 @@ def admin_stats(
             for job, email in recent_jobs_rows
         ]
 
-        # ── Trendlar (faqat real mijozlar) ──
+        # ── Toshkent vaqti bo'yicha Bugun va Kecha (UTC+5) ──
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+
+        # Trendlar (faqat real mijozlar)
         trend_since = now - timedelta(days=TREND_DAYS)
         user_daily = _daily_counts(db, User, trend_since, extra_filter=user_filter)
         job_daily = _daily_counts(db, DubbingJob, trend_since, extra_filter=job_filter)
 
         daily = []
         for i in range(TREND_DAYS, -1, -1):
-            d = (now - timedelta(days=i)).date()
+            d = (tashkent_now - timedelta(days=i)).date()
             key = str(d)
             daily.append({"date": key, "users": user_daily.get(key, 0), "jobs": job_daily.get(key, 0)})
 
-        monthly_since = datetime(now.year, now.month, 1) - timedelta(days=31 * (TREND_MONTHS - 1))
+        monthly_since = datetime(tashkent_now.year, tashkent_now.month, 1) - timedelta(days=31 * (TREND_MONTHS - 1))
         user_monthly = _bucketed_counts(db, User, monthly_since, "month", extra_filter=user_filter)
         job_monthly = _bucketed_counts(db, DubbingJob, monthly_since, "month", extra_filter=job_filter)
         monthly = []
         for i in range(TREND_MONTHS - 1, -1, -1):
-            month_index0 = (now.year * 12 + (now.month - 1)) - i
+            month_index0 = (tashkent_now.year * 12 + (tashkent_now.month - 1)) - i
             y, m = divmod(month_index0, 12)
             key = f"{y}-{m + 1:02d}"
             monthly.append({"date": key, "users": user_monthly.get(key, 0), "jobs": job_monthly.get(key, 0)})
 
-        yearly_since = datetime(now.year - (TREND_YEARS - 1), 1, 1)
+        yearly_since = datetime(tashkent_now.year - (TREND_YEARS - 1), 1, 1)
         user_yearly = _bucketed_counts(db, User, yearly_since, "year", extra_filter=user_filter)
         job_yearly = _bucketed_counts(db, DubbingJob, yearly_since, "year", extra_filter=job_filter)
         yearly = []
         for i in range(TREND_YEARS - 1, -1, -1):
-            key = str(now.year - i)
+            key = str(tashkent_now.year - i)
             yearly.append({"date": key, "users": user_yearly.get(key, 0), "jobs": job_yearly.get(key, 0)})
 
-        today_key = str(now.date())
-        yesterday_key = str((now - timedelta(days=1)).date())
+        # UTC vaqtiga o'girilgan aniq chegaralar (DB dagi created_at UTC bilan solishtirish uchun)
+        today_start_utc = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day) - TASHKENT_OFFSET
+        yesterday_start_utc = today_start_utc - timedelta(days=1)
+        yesterday_end_utc = today_start_utc
 
-        this_month_start = datetime(now.year, now.month, 1)
-        last_month_end = this_month_start - timedelta(seconds=1)
-        last_month_start = datetime(last_month_end.year, last_month_end.month, 1)
+        # Bugungi va kechagi real mijozlar (users)
+        today_users_q = db.query(User).filter(User.created_at >= today_start_utc)
+        yesterday_users_q = db.query(User).filter(User.created_at >= yesterday_start_utc, User.created_at < yesterday_end_utc)
+        if user_filter is not None:
+            today_users_q = today_users_q.filter(user_filter)
+            yesterday_users_q = yesterday_users_q.filter(user_filter)
+        today_users = today_users_q.count()
+        yesterday_users = yesterday_users_q.count()
+
+        # Bugungi va kechagi video dublyajlar (jobs)
+        today_jobs_q = db.query(DubbingJob).filter(DubbingJob.created_at >= today_start_utc)
+        yesterday_jobs_q = db.query(DubbingJob).filter(DubbingJob.created_at >= yesterday_start_utc, DubbingJob.created_at < yesterday_end_utc)
+        if job_filter is not None:
+            today_jobs_q = today_jobs_q.filter(job_filter)
+            yesterday_jobs_q = yesterday_jobs_q.filter(job_filter)
+        today_jobs = today_jobs_q.count()
+        yesterday_jobs = yesterday_jobs_q.count()
+
+        # Bugungi va kechagi to'lovlar (payments)
+        today_pay_q = db.query(Payment).filter(Payment.status == PaymentStatus.APPROVED, Payment.created_at >= today_start_utc)
+        yesterday_pay_q = db.query(Payment).filter(Payment.status == PaymentStatus.APPROVED, Payment.created_at >= yesterday_start_utc, Payment.created_at < yesterday_end_utc)
+        if pay_user_filter is not None:
+            today_pay_q = today_pay_q.filter(pay_user_filter)
+            yesterday_pay_q = yesterday_pay_q.filter(pay_user_filter)
+        today_payments = today_pay_q.count()
+        yesterday_payments = yesterday_pay_q.count()
+
+        # Bugungi va kechagi tushum (revenue)
+        today_rev_q = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.APPROVED, Payment.created_at >= today_start_utc
+        )
+        yesterday_rev_q = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.APPROVED, Payment.created_at >= yesterday_start_utc, Payment.created_at < yesterday_end_utc
+        )
+        if pay_user_filter is not None:
+            today_rev_q = today_rev_q.filter(pay_user_filter)
+            yesterday_rev_q = yesterday_rev_q.filter(pay_user_filter)
+        today_revenue = float(today_rev_q.scalar() or 0)
+        yesterday_revenue = float(yesterday_rev_q.scalar() or 0)
+
+        this_month_start_tashkent = datetime(tashkent_now.year, tashkent_now.month, 1)
+        this_month_start_utc = this_month_start_tashkent - TASHKENT_OFFSET
+        last_month_end_tashkent = this_month_start_tashkent - timedelta(seconds=1)
+        last_month_start_tashkent = datetime(last_month_end_tashkent.year, last_month_end_tashkent.month, 1)
+        last_month_start_utc = last_month_start_tashkent - TASHKENT_OFFSET
+        last_month_end_utc = this_month_start_utc
 
         trends = {
             "daily": daily,
             "monthly": monthly,
             "yearly": yearly,
-            "today": {"users": user_daily.get(today_key, 0), "jobs": job_daily.get(today_key, 0)},
-            "yesterday": {"users": user_daily.get(yesterday_key, 0), "jobs": job_daily.get(yesterday_key, 0)},
+            "today": {
+                "users": today_users,
+                "jobs": today_jobs,
+                "payments": today_payments,
+                "revenue_uzs": today_revenue,
+            },
+            "yesterday": {
+                "users": yesterday_users,
+                "jobs": yesterday_jobs,
+                "payments": yesterday_payments,
+                "revenue_uzs": yesterday_revenue,
+            },
             "this_month": {
-                "users": _period_count(db, User, this_month_start, extra_filter=user_filter),
-                "jobs": _period_count(db, DubbingJob, this_month_start, extra_filter=job_filter),
+                "users": _period_count(db, User, this_month_start_utc, extra_filter=user_filter),
+                "jobs": _period_count(db, DubbingJob, this_month_start_utc, extra_filter=job_filter),
             },
             "last_month": {
-                "users": _period_count(db, User, last_month_start, last_month_end, extra_filter=user_filter),
-                "jobs": _period_count(db, DubbingJob, last_month_start, last_month_end, extra_filter=job_filter),
+                "users": _period_count(db, User, last_month_start_utc, last_month_end_utc, extra_filter=user_filter),
+                "jobs": _period_count(db, DubbingJob, last_month_start_utc, last_month_end_utc, extra_filter=job_filter),
             },
         }
 

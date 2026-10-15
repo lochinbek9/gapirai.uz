@@ -189,11 +189,13 @@ function DeltaCard({
   value,
   previousValue,
   previousLabel,
+  isCurrency,
 }: {
   label: string
   value: number
   previousValue: number
   previousLabel: string
+  isCurrency?: boolean
 }) {
   const diff = value - previousValue
   const isUp = diff > 0
@@ -201,13 +203,17 @@ function DeltaCard({
   const color = isUp ? '#0ca30c' : isDown ? '#e66767' : '#898781'
   const sign = isUp ? '+' : ''
 
+  const formattedVal = isCurrency ? `${value.toLocaleString('uz-UZ')} UZS` : value
+  const formattedPrev = isCurrency ? `${previousValue.toLocaleString('uz-UZ')} UZS` : previousValue
+  const formattedDiff = isCurrency ? `${sign}${diff.toLocaleString('uz-UZ')} UZS` : `${sign}${diff}`
+
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 min-w-0">
       <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest break-words leading-tight">{label}</p>
       <div className="flex items-end gap-2 mt-1 flex-wrap">
-        <p className="text-xl sm:text-2xl font-extrabold text-white">{value}</p>
+        <p className="text-xl sm:text-2xl font-extrabold text-white">{formattedVal}</p>
         <span className="text-[11px] font-bold mb-1" style={{ color }}>
-          {sign}{diff} ({previousLabel}: {previousValue})
+          {diff !== 0 ? `${formattedDiff} (${previousLabel}: ${formattedPrev})` : `(${previousLabel}: ${formattedPrev})`}
         </span>
       </div>
     </div>
@@ -237,6 +243,7 @@ export default function AdminPage() {
   const [blocked, setBlocked] = useState<BlockedUsersReport | null>(null)
   const [refunds, setRefunds] = useState<RefundsNeededReport | null>(null)
   const [granularity, setGranularity] = useState<Granularity>('daily')
+  const [showTrends, setShowTrends] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
   const [errorDetail, setErrorDetail] = useState('')
@@ -373,9 +380,20 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Trends */}
+        {/* Bugun (Toshkent vaqti) */}
         <section className="space-y-3">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Trendlar</h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                Bugun (Toshkent vaqti)
+              </h2>
+            </div>
+            <span className="text-[11px] text-gray-400 font-medium bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+              Asia/Tashkent (UTC+5)
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <DeltaCard
               label="Ro'yxatdan o'tish (bugun)"
@@ -390,49 +408,64 @@ export default function AdminPage() {
               previousLabel="kecha"
             />
             <DeltaCard
-              label="Ro'yxatdan o'tish (bu oy)"
-              value={stats.trends.this_month.users}
-              previousValue={stats.trends.last_month.users}
-              previousLabel="o'tgan oy"
+              label="To'lovlar soni (bugun)"
+              value={stats.trends.today.payments || 0}
+              previousValue={stats.trends.yesterday.payments || 0}
+              previousLabel="kecha"
             />
             <DeltaCard
-              label="Video (bu oy)"
-              value={stats.trends.this_month.jobs}
-              previousValue={stats.trends.last_month.jobs}
-              previousLabel="o'tgan oy"
+              label="Tushum (bugun)"
+              value={stats.trends.today.revenue_uzs || 0}
+              previousValue={stats.trends.yesterday.revenue_uzs || 0}
+              previousLabel="kecha"
+              isCurrency={true}
             />
           </div>
-          <div className="flex items-center gap-2">
-            {([
-              ['daily', 'Kunlik'],
-              ['monthly', 'Oylik'],
-              ['yearly', 'Yillik'],
-            ] as [Granularity, string][]).map(([g, label]) => (
-              <button
-                key={g}
-                onClick={() => setGranularity(g)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  granularity === g
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+
+          <div className="pt-1">
+            <button
+              onClick={() => setShowTrends(!showTrends)}
+              className="text-[11px] text-gray-400 hover:text-blue-400 transition flex items-center gap-1.5 font-medium"
+            >
+              <span>{showTrends ? "▲ Trend grafiklarini yashirish" : "▼ Oylik / yillik trend grafiklarini ko'rsatish"}</span>
+            </button>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <TrendChart
-              label={`Ro'yxatdan o'tishlar (${GRANULARITY_CHART_LABEL[granularity]})`}
-              color="#3987e5"
-              data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
-            />
-            <TrendChart
-              label={`Video buyurtmalar (${GRANULARITY_CHART_LABEL[granularity]})`}
-              color="#199e70"
-              data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
-            />
-          </div>
+
+          {showTrends && (
+            <div className="space-y-3 pt-2 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                {([
+                  ['daily', 'Kunlik'],
+                  ['monthly', 'Oylik'],
+                  ['yearly', 'Yillik'],
+                ] as [Granularity, string][]).map(([g, label]) => (
+                  <button
+                    key={g}
+                    onClick={() => setGranularity(g)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                      granularity === g
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TrendChart
+                  label={`Ro'yxatdan o'tishlar (${GRANULARITY_CHART_LABEL[granularity]})`}
+                  color="#3987e5"
+                  data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
+                />
+                <TrendChart
+                  label={`Video buyurtmalar (${GRANULARITY_CHART_LABEL[granularity]})`}
+                  color="#199e70"
+                  data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
+                />
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Users */}

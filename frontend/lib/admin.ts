@@ -29,8 +29,8 @@ export interface AdminStats {
     daily: { date: string; users: number; jobs: number }[]
     monthly: { date: string; users: number; jobs: number }[]
     yearly: { date: string; users: number; jobs: number }[]
-    today: { users: number; jobs: number }
-    yesterday: { users: number; jobs: number }
+    today: { users: number; jobs: number; payments?: number; revenue_uzs?: number }
+    yesterday: { users: number; jobs: number; payments?: number; revenue_uzs?: number }
     this_month: { users: number; jobs: number }
     last_month: { users: number; jobs: number }
   }
