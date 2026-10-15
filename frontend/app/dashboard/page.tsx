@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription } from '@/lib/api'
+import { listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats } from '@/lib/api'
 import PushOptIn from '@/components/PushOptIn'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
@@ -18,6 +18,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   if (!sub) return null
   const planName = PLAN_NAMES[sub.plan] || sub.plan
   const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
+  const isAdmin = sub.is_admin || sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
 
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
@@ -27,37 +28,58 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
         </div>
         <div>
           <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
-          <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
+            {isAdmin && (
+              <span className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                ADMIN
+              </span>
+            )}
+          </div>
         </div>
         <div className="sm:ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 w-full sm:w-auto">
           {sub.minutes && (
             <>
-              <p>
-                <span className="font-bold text-gray-800 dark:text-gray-200">{sub.minutes.monthly_remaining}</span>
-                {' / '}{sub.minutes.monthly_cap} daqiqa qoldi (oylik)
-              </p>
-              {sub.minutes.purchased > 0 && (
+              {isAdmin ? (
+                <p>
+                  <span className="font-bold text-violet-600 dark:text-violet-400">Cheksiz daqiqa</span>
+                  <span className="text-gray-500 text-[11px] ml-1.5 font-medium">(Barcha AI provayderlar faol)</span>
+                </p>
+              ) : (
+                <p>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{sub.minutes.monthly_remaining}</span>
+                  {' / '}{sub.minutes.monthly_cap} daqiqa qoldi (oylik)
+                </p>
+              )}
+              {sub.minutes.monthly_used > 0 && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {sub.minutes.monthly_used} daqiqa ishlatildi
+                </p>
+              )}
+              {sub.minutes.purchased > 0 && !isAdmin && (
                 <p className="text-violet-500 dark:text-violet-400 font-semibold">
                   + {sub.minutes.purchased} sotib olingan daqiqa
                 </p>
               )}
             </>
           )}
-          {sub.plan !== 'free' && sub.expires_at && (
+          {sub.plan !== 'free' && sub.expires_at && !isAdmin && (
             <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
               {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
             </p>
           )}
         </div>
       </div>
-      <Link
-        href="/pricing"
-        onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
-        className="flex items-center justify-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md w-full sm:w-auto"
-      >
-        {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-        {sub.plan === 'free' ? "Tarifni oshirish" : expiresSoon ? 'Yangilash' : 'Tariflarni ko\'rish'}
-      </Link>
+      {!isAdmin && (
+        <Link
+          href="/pricing"
+          onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
+          className="flex items-center justify-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md w-full sm:w-auto"
+        >
+          {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+          {sub.plan === 'free' ? "Tarifni oshirish" : expiresSoon ? 'Yangilash' : 'Tariflarni ko\'rish'}
+        </Link>
+      )}
     </div>
   )
 }
@@ -317,6 +339,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
+  const [jobsStats, setJobsStats] = useState<JobsStats | null>(null)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
   const [renewing, setRenewing] = useState(false)
 
@@ -331,10 +354,12 @@ export default function DashboardPage() {
         .catch(console.error)
         .finally(() => setJobsLoading(false))
 
+      getJobsStats().then(setJobsStats).catch(console.error)
       getPlans().then((res) => setSubscription(res.current)).catch(console.error)
 
       const interval = setInterval(() => {
         listJobs().then(setJobs).catch(console.error)
+        getJobsStats().then(setJobsStats).catch(console.error)
       }, 5000)
       return () => clearInterval(interval)
     }
@@ -365,6 +390,7 @@ export default function DashboardPage() {
     if (!confirm("Bu videoni o'chirishni tasdiqlaysizmi?")) return
     await deleteJob(id)
     setJobs((prev) => prev.filter((j) => j.job_id !== id))
+    getJobsStats().then(setJobsStats).catch(console.error)
   }
 
   async function handleRetry(id: string) {
@@ -391,8 +417,9 @@ export default function DashboardPage() {
     )
   }
 
-  const completedCount = jobs.filter(j => j.status === 'completed').length
-  const processingCount = jobs.filter(j => !['completed', 'failed'].includes(j.status)).length
+  const completedCount = jobsStats ? jobsStats.completed : jobs.filter(j => j.status === 'completed').length
+  const processingCount = jobsStats ? jobsStats.processing : jobs.filter(j => !['completed', 'failed'].includes(j.status)).length
+  const totalCount = jobsStats ? jobsStats.total : jobs.length
 
   return (
     <div className="min-h-screen relative flex flex-col transition-colors duration-300">
@@ -433,7 +460,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-6 sm:mb-8">
           <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
             <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Jami</p>
-            <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-white">{jobs.length}</p>
+            <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-white">{totalCount}</p>
           </div>
           <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
             <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Tayyor</p>

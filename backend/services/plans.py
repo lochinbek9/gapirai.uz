@@ -193,11 +193,15 @@ def get_minute_balance(db, user_id) -> dict:
     }
     """
     if is_user_admin(db, user_id):
+        sub = get_or_create_subscription(db, user_id)
+        used = sub.monthly_minutes_used or 0.0
+        purchased = sub.purchased_minutes or 0.0
         return {
+            "is_unlimited": True,
             "monthly_cap": 999999.0,
-            "monthly_used": 0.0,
+            "monthly_used": round(used, 1),
             "monthly_remaining": 999999.0,
-            "purchased": 999999.0,
+            "purchased": round(purchased, 1),
             "total_available": 999999.0,
         }
     sub = get_or_create_subscription(db, user_id)

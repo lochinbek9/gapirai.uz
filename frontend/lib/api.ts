@@ -312,6 +312,7 @@ export interface MinuteBalance {
   monthly_remaining: number
   purchased: number
   total_available: number
+  is_unlimited?: boolean
 }
 
 export interface MinutePack {
@@ -323,6 +324,19 @@ export interface CurrentSubscription {
   plan: string
   expires_at: string | null
   minutes: MinuteBalance
+  is_admin?: boolean
+}
+
+export interface JobsStats {
+  total: number
+  completed: number
+  processing: number
+  failed: number
+}
+
+export async function getJobsStats(): Promise<JobsStats> {
+  const res = await apiClient.get('/api/jobs/stats')
+  return res.data
 }
 
 export async function getPlans(): Promise<{ plans: PlanDef[]; minute_packs: MinutePack[]; current: CurrentSubscription | null }> {

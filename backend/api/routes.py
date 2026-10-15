@@ -533,9 +533,33 @@ def get_job(
     return response
 
 
+@router.get("/jobs/stats")
+def get_jobs_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Foydalanuvchining barcha joblari bo'yicha haqiqiy dinamik statistika."""
+    total = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count()
+    completed = db.query(DubbingJob).filter(
+        DubbingJob.user_id == current_user.id,
+        DubbingJob.status == JobStatus.COMPLETED,
+    ).count()
+    failed = db.query(DubbingJob).filter(
+        DubbingJob.user_id == current_user.id,
+        DubbingJob.status == JobStatus.FAILED,
+    ).count()
+    processing = max(0, total - completed - failed)
+    return {
+        "total": total,
+        "completed": completed,
+        "processing": processing,
+        "failed": failed,
+    }
+
+
 @router.get("/jobs")
 def list_jobs(
-    limit: int = Query(20, le=100),
+    limit: int = Query(50, le=200),
     offset: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

@@ -25,10 +25,12 @@ def list_plans(
     if current_user:
         sub = get_or_create_subscription(db, current_user.id)
         bal = get_minute_balance(db, current_user.id)
+        from backend.services.plans import is_user_admin
         current = {
             "plan": sub.plan.value,
             "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
             "minutes": bal,  # {monthly_cap, monthly_used, monthly_remaining, purchased, total_available}
+            "is_admin": is_user_admin(db, current_user.id),
         }
     return {
         "plans": [
