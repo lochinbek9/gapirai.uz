@@ -89,6 +89,9 @@ class DubbingJob(Base):
     video_thumbnail = Column(String(500))
     speaker_gender = Column(String(10))       # GPT aniqlagan: male / female
     voice_gender_setting = Column(String(10), default="auto")  # foydalanuvchi tanlagan: auto/male/female
+    tts_provider = Column(String(30), nullable=True)  # tanlangan yoki ishlatilgan TTS provayder: azure / edge / gemini
+    voice_name = Column(String(50), nullable=True)    # aniq ishlatilgan ovoz: masalan uz-UZ-MadinaNeural, Autonoe, Charon
+    voice_style = Column(String(30), nullable=True, default="neutral")  # ohang: neutral
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))

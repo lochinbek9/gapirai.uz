@@ -177,10 +177,32 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [voiceGender, setVoiceGender] = useState("male");
+  const [ttsProvider, setTtsProvider] = useState<string>("azure");
+  const [isProUser, setIsProUser] = useState<boolean>(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mode, setMode] = useState<"dub" | "subtitle" | "analyze">("dub");
   const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      if (user.role === "admin") {
+        setIsProUser(true);
+      } else {
+        import("@/lib/api").then(({ getPlans }) => {
+          getPlans()
+            .then((res) => {
+              if (res.current?.plan === "pro") {
+                setIsProUser(true);
+              }
+            })
+            .catch(() => {});
+        });
+      }
+    } else {
+      setIsProUser(false);
+    }
+  }, [user]);
 
   const handleCancel = async () => {
     if (!jobId) return;
@@ -302,7 +324,13 @@ export default function Home() {
       // tahlil qilish endi o'zining alohida tablari bor, shuning uchun bu
       // yerda learnVideo() (dublyaj+tahlil birga) o'rniga oddiy createJob()
       // ishlatiladi, natija /learn/[id] emas /video/[id]da ko'rsatiladi.
-      const { job_id } = await createJob(url, voiceGender);
+      const { job_id } = await createJob(
+        url,
+        voiceGender,
+        false,
+        "auto",
+        isProUser ? ttsProvider : "edge"
+      );
       router.push(`/video/${job_id}`);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -434,8 +462,11 @@ export default function Home() {
                     loading={loading}
                     error={error}
                     voiceGender={voiceGender}
+                    ttsProvider={ttsProvider}
+                    isProUser={isProUser}
                     onChange={handleUrlChange}
                     onGenderChange={setVoiceGender}
+                    onTtsProviderChange={setTtsProvider}
                     onSubmit={handleSubmit}
                   />
                 ) : mode === "subtitle" ? (

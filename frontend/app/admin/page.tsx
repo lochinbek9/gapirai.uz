@@ -246,6 +246,7 @@ export default function AdminPage() {
   const [showTrends, setShowTrends] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [showBlockedTables, setShowBlockedTables] = useState(false)
+  const [showPaymentsHistory, setShowPaymentsHistory] = useState(false)
   const [showRecentUsers, setShowRecentUsers] = useState(false)
   const [showRecentJobs, setShowRecentJobs] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -557,11 +558,82 @@ export default function AdminPage() {
 
         {/* Payments */}
         <section id="sec-payments" className="space-y-3 scroll-mt-16">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lovlar</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lovlar</h2>
+            <button
+              onClick={() => setShowPaymentsHistory(!showPaymentsHistory)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
+            >
+              <span>
+                {showPaymentsHistory
+                  ? "▲ Haqiqiy to'lovchilar ro'yxatini yashirish"
+                  : "▼ Haqiqiy to'lovchilar ro'yxati (12 mijoz, 15 to'lov — 774,000 UZS)"}
+              </span>
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <Card label="Tasdiqlangan to'lovlar" value={stats.payments.approved_count} icon={<Wallet className="w-5 h-5" />} />
             <Card label="Jami tushum" value={`${stats.payments.revenue_total_uzs.toLocaleString('uz-UZ')} UZS`} icon={<Wallet className="w-5 h-5" />} />
           </div>
+
+          {/* Collapsible Real Customer Payments Table */}
+          {showPaymentsHistory && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-3">
+              <div className="px-4 py-3 bg-white/[0.03] border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">Haqiqiy to'lov qilgan mijozlar (Top to'lovchilar)</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Sinov va ichki to'lovlar chetlatilgan, sof 12 nafar real mijoz</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                  Jami: 774,000 UZS
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left bg-white/[0.01]">
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">#</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mijoz</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">To'lovlar</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Jami summa</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sotib olingan xizmat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: 'Tojir watch', email: 'tojirwatch@gmail.com', count: 2, sum: 154000, desc: 'PRO tarif (149k) + Balans (5k)', prov: 'Click' },
+                      { name: 'Shahzod', email: 'shahzodbekreyimboyev022@gmail.com', count: 1, sum: 149000, desc: 'PRO tarif', prov: 'Click' },
+                      { name: 'Soatmurod Eshpo\'latov', email: 'eshpolatovsoatmurod@gmail.com', count: 1, sum: 100000, desc: '+300 daqiqa paketi', prov: 'Uzum' },
+                      { name: 'Bitikchi', email: 'bitikchioghlan@gmail.com', count: 2, sum: 64000, desc: 'STANDARD (49k) + 30 daqiqa (15k)', prov: 'Uzum' },
+                      { name: 'aziz raxmanov', email: 'azizraxmanov11@gmail.com', count: 2, sum: 60000, desc: '+120 daqiqa (45k) + 30 daqiqa (15k)', prov: 'Payme' },
+                      { name: 'Adilet Orazaliev', email: 'aorazaliyev99@gmail.com', count: 1, sum: 49000, desc: 'STANDARD tarif', prov: 'Uzum' },
+                      { name: 'Dilshod', email: 'dilshododilov1717@gmail.com', count: 1, sum: 49000, desc: 'STANDARD tarif', prov: 'Uzum' },
+                      { name: 'Nodir Mirzayev', email: 'mirzayevnodir130@gmail.com', count: 1, sum: 45000, desc: '+120 daqiqa paketi', prov: 'Uzum' },
+                      { name: 'Maks Donka', email: 'maksdonka0@gmail.com', count: 1, sum: 45000, desc: '+120 daqiqa paketi', prov: 'Click' },
+                      { name: 'Chinora Boboqulova', email: 'boboqulovachinora739@gmail.com', count: 1, sum: 28500, desc: 'Video dublyaj (+57 daqiqa balans qo\'shildi)', prov: 'Payme' },
+                      { name: 'Umid Valiyev', email: 'umidvaliyev479@gmail.com', count: 1, sum: 25500, desc: 'Video dublyaj (+51 daqiqa balans qo\'shildi)', prov: 'Uzum' },
+                      { name: 'G‘ulomjon Eshniyozov', email: 'eshniyazov.g@gmail.com', count: 1, sum: 5000, desc: 'Balans to\'ldirish', prov: 'Click' },
+                    ].map((c, i) => (
+                      <tr key={c.email} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                        <td className="px-4 py-2.5 text-xs text-gray-500 font-mono">{i + 1}</td>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-gray-200">{c.name}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{c.email}</td>
+                        <td className="px-4 py-2.5 text-xs text-center text-blue-400 font-bold">{c.count}</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-mono font-bold text-emerald-400">{c.sum.toLocaleString('uz-UZ')} UZS</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-300">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-mono">{c.prov}</span>
+                            <span>{c.desc}</span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Bloklangan foydalanuvchilar -- Content Safety Gate (Katta blok ochilib-yopiladigan) */}

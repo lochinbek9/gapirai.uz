@@ -12,8 +12,11 @@ interface Props {
   loading: boolean;
   error: string | null;
   voiceGender: string;
+  ttsProvider?: string;
+  isProUser?: boolean;
   onChange: (url: string) => void;
   onGenderChange: (gender: string) => void;
+  onTtsProviderChange?: (provider: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -23,8 +26,11 @@ export default function DubbingForm({
   loading,
   error,
   voiceGender,
+  ttsProvider = "azure",
+  isProUser = false,
   onChange,
   onGenderChange,
+  onTtsProviderChange,
   onSubmit,
 }: Props) {
   const [source, setSource] = useState<"url" | "file">("url");
@@ -59,8 +65,11 @@ export default function DubbingForm({
           loading={loading}
           error={error}
           voiceGender={voiceGender}
+          ttsProvider={ttsProvider}
+          isProUser={isProUser}
           onChange={onChange}
           onGenderChange={onGenderChange}
+          onTtsProviderChange={onTtsProviderChange}
           onSubmit={onSubmit}
         />
       ) : (

@@ -107,11 +107,23 @@ def get_max_resolution_for_job(db, job) -> str:
 
 
 def get_tts_provider_for_job(db, job) -> str:
-    """Job egasining tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
-    Barcha tariflar uchun (Free, Standart, Pro) birlamchi provayder: Gemini TTS.
-    Azure esa 2-o'rindagi zaxira (fallback) sifatida ishlaydi.
+    """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
+    1. Agar job.tts_provider aniq belgilangan bo'lsa (Pro/Admin tanlovi) -> o'sha ishlatiladi.
+    2. Aks holda: Pro/Admin -> settings.TTS_PROVIDER (default: azure),
+       Free/Standard -> edge (100% bepul, Azure xarajatlarini tejash uchun).
     """
-    return getattr(settings, "TTS_PROVIDER", "gemini") or "gemini"
+    if getattr(job, "tts_provider", None):
+        return job.tts_provider.lower().strip()
+
+    if job.user_id:
+        if is_user_admin(db, job.user_id):
+            return getattr(settings, "TTS_PROVIDER", "azure") or "azure"
+        sub = get_or_create_subscription(db, job.user_id)
+        if sub.plan == PlanTier.PRO:
+            return getattr(settings, "TTS_PROVIDER", "azure") or "azure"
+
+    # Bepul va Standart foydalanuvchilar uchun Edge TTS (bepul)
+    return "edge"
 
 
 def get_max_resolution_for_user(db, user_id) -> str:

@@ -123,11 +123,13 @@ function VideoCard({
   onDelete,
   onRetry,
   isRetrying,
+  isAdmin = false,
 }: {
   job: Job
   onDelete: (id: string) => void
   onRetry: (id: string) => void
   isRetrying: boolean
+  isAdmin?: boolean
 }) {
   const thumbnail = job.video_thumbnail || `https://img.youtube.com/vi/${job.job_id}/mqdefault.jpg`
   const duration = job.video_duration ? formatDuration(job.video_duration) : '--:--'
@@ -136,6 +138,25 @@ function VideoCard({
   const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || job.error_message?.toLowerCase().includes('nutq topilmadi')
   const isContentBlocked = job.error_code === 'CONTENT_BLOCKED' || job.error_message?.toLowerCase().includes('kontent siyosati') || job.error_message?.toLowerCase().includes('taqiqlangan')
   const isNonRetryable = isNoSpeech || isContentBlocked
+
+  // TTS Metadata formatting
+  const prov = (job.tts_provider || 'azure').toLowerCase()
+  const isFemale = job.speaker_gender === 'female' || (job.voice_name && /madina|female|autonoe|aoede/i.test(job.voice_name))
+  const genderDisplayName = isFemale ? 'Ayol' : 'Erkak'
+
+  let voiceDisplayName = job.voice_name || ''
+  if (!voiceDisplayName) {
+    if (prov === 'gemini') {
+      voiceDisplayName = isFemale ? 'Autonoe' : 'Charon'
+    } else {
+      voiceDisplayName = isFemale ? 'Madina' : 'Sardor'
+    }
+  } else {
+    // Toza nomini ajratib ko'rsatish: masalan uz-UZ-MadinaNeural -> Madina
+    voiceDisplayName = voiceDisplayName.replace('uz-UZ-', '').replace('Neural', '')
+  }
+
+  const styleDisplayName = job.voice_style && job.voice_style !== 'neutral' ? job.voice_style : 'Neytral'
 
   return (
     <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
@@ -182,22 +203,60 @@ function VideoCard({
             />
           </div>
         )}
-        {/* Gender badge */}
-        {job.speaker_gender && (
-          <div className="absolute top-2.5 left-2.5 bg-black/70 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm">
-            {job.speaker_gender === 'female' ? <Mic2 className="w-3 h-3 text-pink-400" /> : <Mic2 className="w-3 h-3 text-indigo-400" />}
-            {job.speaker_gender === 'female' ? 'Ayol' : 'Erkak'}
-          </div>
-        )}
+        {/* Top-left: Voice & Gender badge */}
+        <div className="absolute top-2.5 left-2.5 bg-black/75 text-white text-[9px] font-bold tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm">
+          {isFemale ? <Mic2 className="w-3 h-3 text-pink-400" /> : <Mic2 className="w-3 h-3 text-indigo-400" />}
+          <span>{genderDisplayName} • {voiceDisplayName}</span>
+        </div>
+        {/* Top-right: Provider badge */}
+        <div className="absolute top-2.5 right-2.5">
+          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-md ${
+            prov === 'gemini'
+              ? 'bg-violet-900/80 text-violet-200 border border-violet-500/30'
+              : prov === 'edge'
+              ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-500/30'
+              : 'bg-sky-900/80 text-sky-200 border border-sky-500/30'
+          }`}>
+            {prov === 'gemini' ? 'Gemini' : prov === 'edge' ? 'Edge' : 'Azure'}
+          </span>
+        </div>
       </div>
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
+        <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
           <Link href={`/video/${job.job_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
             {job.video_title || 'Yuklanmoqda...'}
           </Link>
         </h3>
+
+        {/* Metadata chips */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[10px]">
+          <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border ${
+            prov === 'gemini'
+              ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20'
+              : prov === 'edge'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+              : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
+          }`}>
+            {prov === 'gemini' ? 'Gemini AI' : prov === 'edge' ? 'Edge TTS' : 'Azure Neural'}
+          </span>
+          <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+            {voiceDisplayName} ({genderDisplayName})
+          </span>
+          <span className="px-1.5 py-0.5 rounded-md font-medium text-gray-400 dark:text-gray-500 bg-black/[0.02] dark:bg-white/[0.02]">
+            Ohang: {styleDisplayName}
+          </span>
+        </div>
+
+        {/* Admin exact metadata inspection */}
+        {isAdmin && (
+          <div className="mb-3 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[9px] font-mono text-amber-600 dark:text-amber-400 flex items-center justify-between">
+            <span className="font-bold">ADMIN:</span>
+            <span>{prov} | {job.voice_name || voiceDisplayName} | {job.voice_style || 'neutral'}</span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <StatusBadge status={job.status} errorCode={job.error_code} errorMessage={job.error_message} />
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -415,6 +474,7 @@ export default function DashboardPage() {
                 onDelete={handleDelete}
                 onRetry={handleRetry}
                 isRetrying={retryingId === job.job_id}
+                isAdmin={user?.role === 'admin'}
               />
             ))}
           </div>

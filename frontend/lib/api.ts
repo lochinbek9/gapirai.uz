@@ -56,6 +56,9 @@ export interface Job {
   // status_message'ga yozilgan -- bular boshqa UI (masalan mobil) uchun.
   queue_position?: number | null
   queue_eta_minutes?: number | null
+  tts_provider?: string | null
+  voice_name?: string | null
+  voice_style?: string | null
 }
 
 export type JobStatus =
@@ -103,8 +106,22 @@ export async function createJob(
   voice_gender: string = 'auto',
   subtitle_only: boolean = false,
   source_language: SubtitleSourceLanguage = 'auto',
+  tts_provider?: string,
+  voice_name?: string,
+  voice_style?: string,
+  force_new?: boolean,
 ): Promise<{ job_id: string; status: string }> {
-  const res = await apiClient.post('/api/jobs', { youtube_url, target_language: 'uz', voice_gender, subtitle_only, source_language })
+  const res = await apiClient.post('/api/jobs', {
+    youtube_url,
+    target_language: 'uz',
+    voice_gender,
+    subtitle_only,
+    source_language,
+    tts_provider,
+    voice_name,
+    voice_style,
+    force_new,
+  })
   return res.data
 }
 

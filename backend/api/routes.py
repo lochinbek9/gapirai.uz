@@ -49,6 +49,10 @@ class CreateJobRequest(BaseModel):
     # "auto" -- chet tildagi video (o'zbekchaga tarjima qilinadi, eski xatti-harakat);
     # "uz" -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ (faqat subtitr rejimida).
     source_language: str = "auto"
+    tts_provider: Optional[str] = None   # azure / edge / gemini (faqat Pro va Admin tanlay oladi)
+    voice_name: Optional[str] = None
+    voice_style: Optional[str] = None
+    force_new: Optional[bool] = False
 
 
 class VideoInfoResponse(BaseModel):
@@ -87,6 +91,9 @@ class JobResponse(BaseModel):
     fallback_reason: Optional[str] = None
     linked_analysis_id: Optional[str] = None
     subtitle_only: bool = False
+    tts_provider: Optional[str] = None
+    voice_name: Optional[str] = None
+    voice_style: Optional[str] = None
     # Faqat kutayotgan (PENDING) job egasiga, va navbat worker o'rinlaridan
     # uzunroq bo'lgandagina to'ldiriladi (backend/services/queue_load.py).
     queue_position: Optional[int] = None
@@ -171,6 +178,9 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         content_flagged=job.content_flagged,
         linked_analysis_id=str(job.linked_analysis_id) if job.linked_analysis_id else None,
         subtitle_only=bool(job.subtitle_only),
+        tts_provider=job.tts_provider,
+        voice_name=job.voice_name,
+        voice_style=job.voice_style,
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
         # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
@@ -281,6 +291,10 @@ async def create_job(
     result = await create_dubbing_job(
         db, current_user, request.youtube_url, request.voice_gender, subtitle_only=request.subtitle_only,
         source_language=source_language,
+        tts_provider=request.tts_provider,
+        voice_name=request.voice_name,
+        voice_style=request.voice_style,
+        force_new=bool(request.force_new),
     )
 
     _raise_for_outcome(result)

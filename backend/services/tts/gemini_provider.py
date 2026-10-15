@@ -124,7 +124,11 @@ class GeminiProvider(TTSProvider):
         if not clean_text:
             return False
 
-        voice = settings.GEMINI_FEMALE_VOICE if self._is_female(voice_name) else settings.GEMINI_MALE_VOICE
+        valid_gemini_voices = {"Autonoe", "Aoede", "Kore", "Charon", "Fenrir", "Puck"}
+        if voice_name and voice_name in valid_gemini_voices:
+            voice = voice_name
+        else:
+            voice = settings.GEMINI_FEMALE_VOICE if self._is_female(voice_name) else settings.GEMINI_MALE_VOICE
 
         try:
             pcm_data = _generate_pcm_with_retry(clean_text, voice)

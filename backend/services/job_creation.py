@@ -182,6 +182,10 @@ def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[
 async def create_dubbing_job(
     db: Session, user: User, youtube_url: str, voice_gender: str = "male", subtitle_only: bool = False,
     source_language: str | None = None,
+    tts_provider: str | None = None,
+    voice_name: str | None = None,
+    voice_style: str | None = None,
+    force_new: bool = False,
 ) -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
@@ -190,39 +194,64 @@ async def create_dubbing_job(
     subtitle_only=True -- "Subtitr" rejimi (2026-09-16): dublyaj audiosi/
     videosi yaratilmaydi, faqat transkripsiya+tarjima+VTT/SRT (process_video()
     TRANSLATE bosqichidan keyin darhol COMPLETED qiladi, tasks.py).
-    source_language="uz" (faqat subtitle_only bilan) -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ."""
+    source_language="uz" (faqat subtitle_only bilan) -- video o'zbekcha nutqli: o'zbekcha STT, TARJIMASIZ.
+    tts_provider -- "azure" | "edge" | "gemini" (faqat Pro va Admin tarifidagi foydalanuvchilar tanlay oladi).
+    force_new -- agar True bo'lsa yoki parametrlar o'zgargan bo'lsa kesh chetlab o'tiladi."""
     if not is_valid_youtube_url(youtube_url):
         return JobCreationResult(outcome="invalid_url")
 
     if _daily_job_limit_reached(db, user.id):
         return JobCreationResult(outcome="daily_limit", daily_limit=get_settings().MAX_JOBS_PER_DAY)
 
-    # Kesh: agar shu video ALLAQACHON (istalgan foydalanuvchi tomonidan)
-    # dublyaj qilingan bo'lsa, YouTube'ga so'rov yubormasdan (video ID
-    # URL matnining o'zidan ajratiladi) va Safety Gate'ni qayta ishlatmasdan
-    # tayyor natijani arzon narxda taqdim etamiz (2026-08-15, foydalanuvchi
-    # so'rovi -- YouTube bot-check va OpenAI xarajatini ham kamaytiradi).
-    # subtitle_only so'rovlari kesh'ni chetlab o'tadi (2026-09-16) -- to'liq
-    # dublyaj keshidan subtitr olish o'zi xavfsiz bo'lardi (audio ortiqcha,
-    # zarar yo'q), lekin buni to'g'ri sinash uchun _create_job_from_cache()ni
-    # ham subtitle_only bilan mos qilish kerak edi; V1'da soddalik uchun
-    # har doim yangi (tez, TTS'siz) ishlov beriladi.
+    # Foydalanuvchi huquqini tekshirish: Pro va Admin tanlay oladi
+    from backend.services.plans import get_or_create_subscription, PlanTier
+    user_is_pro = False
+    if is_user_admin(db, user.id):
+        user_is_pro = True
+    else:
+        sub = get_or_create_subscription(db, user.id)
+        user_is_pro = (sub.plan == PlanTier.PRO)
+
+    valid_providers = {"azure", "edge", "gemini"}
+    clean_provider = (tts_provider or "").strip().lower()
+    if clean_provider in valid_providers:
+        if not user_is_pro and clean_provider != "edge":
+            logger.info(f"Foydalanuvchi {user.id} Pro emas, {clean_provider} o'rniga edge ga yo'naltirildi")
+            clean_provider = "edge"
+    else:
+        clean_provider = "edge" if not user_is_pro else (getattr(get_settings(), "TTS_PROVIDER", "azure") or "azure")
+
+    # Kesh: agar shu video ALLAQACHON dublyaj qilingan bo'lsa,
+    # LEKIN barcha parametrlar (jins, provider, ovoz, ohang) 100% mos kelsagina keshdan olinadi.
+    # 1 ta parametr o'zgarsa ham yangi job sifatida qayta dublyaj qilinadi!
     video_id = extract_youtube_video_id(youtube_url)
     donor_job = None
-    if video_id and not subtitle_only:
+    if video_id and not subtitle_only and not force_new:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
-            # Faqat TO'LIQ dublyaj qilingan (audio/video mavjud) joblar --
-            # subtitle_only=True keshi audio/videoga ega emas, to'liq
-            # dublyaj so'rovini noto'g'ri "tayyor" deb belgilamasligi kerak.
             DubbingJob.subtitle_only.is_(False),
         )
+        # 1. Jins parametri
         if voice_gender in ("male", "female"):
-            exact_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
-            cached_job = exact_query.order_by(DubbingJob.completed_at.desc()).first()
-        else:
-            cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
+            cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
+
+        # 2. TTS Provider parametri (bitta parametr o'zgarsa ham yangidek hisoblanadi)
+        if clean_provider:
+            cache_query = cache_query.filter(
+                (DubbingJob.tts_provider == clean_provider) |
+                ((DubbingJob.tts_provider.is_(None)) & (clean_provider == "azure"))
+            )
+
+        # 3. Ovoz egasi parametri
+        if voice_name:
+            cache_query = cache_query.filter(DubbingJob.voice_name == voice_name)
+
+        # 4. Ohang parametri
+        if voice_style and voice_style != "neutral":
+            cache_query = cache_query.filter(DubbingJob.voice_style == voice_style)
+
+        cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
 
         if cached_job and _cached_job_files_exist(cached_job):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
@@ -353,6 +382,9 @@ async def create_dubbing_job(
         video_thumbnail=thumbnail,
         voice_gender_setting=voice_gender,
         speaker_gender=voice_gender if voice_gender in ("male", "female") else (donor_job.speaker_gender if donor_job else None),
+        tts_provider=clean_provider,
+        voice_name=voice_name,
+        voice_style=voice_style or "neutral",
         status=JobStatus.PENDING,
         progress=0.0,
         status_message="Navbatga qo'shildi (tayyor matnlar asosida)" if donor_job else "Navbatga qo'shildi",
@@ -563,6 +595,9 @@ async def _create_job_from_cache(db: Session, user: User, youtube_url: str, cach
         video_thumbnail=cached_job.video_thumbnail,
         speaker_gender=cached_job.speaker_gender,
         voice_gender_setting=voice_gender,
+        tts_provider=cached_job.tts_provider,
+        voice_name=cached_job.voice_name,
+        voice_style=cached_job.voice_style or "neutral",
         transcript_text=cached_job.transcript_text,
         translated_text=cached_job.translated_text,
         srt_content=cached_job.srt_content,

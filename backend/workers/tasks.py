@@ -876,19 +876,33 @@ def process_video(self: Task, job_id: str) -> dict:
             # balansi tekshiruvi o'tkazib yuboriladi.
             actual_timings = None
         else:
-            voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
-            _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
-                        f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'})...")
-            tts_dir = str(output_dir / "audio" / "tts_segments")
-            # Jonli progress: TTS eng uzun bosqich (uzun videoda daqiqalab) --
-            # har segment tugagach SYNTHESIZING oynasi (60..82) ichida
-            # progress bar siljiydi (backend/services/job_progress.py).
             from backend.services.job_progress import set_subprogress
             from backend.services.plans import get_tts_provider_for_job
-            # Tarifga qarab TTS provayderi: Pro -> premium (Azure/ElevenLabs),
-            # Free/Standard -> edge-tts (bepul). Uzun videolarni faqat Pro
-            # uchun pullik provayderga yuboradi (backend/services/plans.py).
+
             tts_provider = get_tts_provider_for_job(db, job)
+            job.tts_provider = tts_provider
+
+            # Provayder va jinsga qarab aniq ovoz nomini tanlash
+            if tts_provider in ("azure", "edge"):
+                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+            elif tts_provider == "gemini":
+                voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
+            else:
+                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+
+            if getattr(job, "voice_name", None):
+                voice = job.voice_name
+            else:
+                job.voice_name = voice
+
+            if not getattr(job, "voice_style", None):
+                job.voice_style = "neutral"
+            db.commit()
+
+            prov_title = {"azure": "Azure", "edge": "Edge", "gemini": "Gemini"}.get(tts_provider, tts_provider)
+            _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
+                        f"O'zbek ovozi yaratilmoqda ({prov_title} • {'ayol' if gender == 'female' else 'erkak'})...")
+            tts_dir = str(output_dir / "audio" / "tts_segments")
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
