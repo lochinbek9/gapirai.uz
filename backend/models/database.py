@@ -524,29 +524,6 @@ def get_db():
 
 
 def create_tables():
-    # 2026-08-19: bu yerda ilgari o'nlab bir martalik "ALTER TABLE ... ADD
-    # COLUMN IF NOT EXISTS" iboralari bor edi -- ularning BARCHASI allaqachon
-    # qo'llanilgan (tekshirilgan: barcha ustun/indekslar production'da
-    # mavjud). Har biri ACCESS EXCLUSIVE qulf talab qilardi va backend HAR
-    # safar qayta ishga tushganda ishga tushardi -- agar shu payt boshqa
-    # birorta ulanish (masalan Celery worker) dubbing_jobs'da ochiq
-    # tranzaksiyaga ega bo'lsa, bu butun saytni bir necha daqiqaga
-    # to'xtatib qo'yardi (2026-08-19 kechasi bir necha marta shu tarzda
-    # tanaffus bo'ldi -- ildiz sababi shu edi). Yangi ustun kerak bo'lsa,
-    # bir martalik `ALTER TABLE` to'g'ridan-to'g'ri production DB'da qo'lda
-    # bajariladi (bu funksiyaga umuman qo'shilmaydi).
+    # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
-    try:
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_internal BOOLEAN DEFAULT FALSE;"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS tts_provider VARCHAR(30);"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_name VARCHAR(50);"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_style VARCHAR(30) DEFAULT 'neutral';"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS stt_model VARCHAR(50);"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS translation_model VARCHAR(50);"))
-            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS tts_model VARCHAR(50);"))
-            conn.commit()
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning(f"create_tables ALTER TABLE ogohlantirish: {exc}")
+
