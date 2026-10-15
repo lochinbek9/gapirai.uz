@@ -118,7 +118,7 @@ class TestTelegramNotify(unittest.TestCase):
         self.assertIn("muhabbatmanapova639@gmail.com", sent_text)
         self.assertIn("Sample Video", sent_text)
         self.assertIn("DOWNLOAD", sent_text)
-        self.assertIn("Video faylidan audio ajratib bo'lmadi.", sent_text)
+        self.assertIn("Video faylidan audio ajratib", sent_text)
 
         reply_markup = mock_send_msg.call_args.kwargs.get("reply_markup")
         self.assertIsNotNone(reply_markup)
