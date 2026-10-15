@@ -33,8 +33,13 @@
 
 html {
   min-height: 100%;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.4) rgba(15, 23, 42, 0.6);
+  scroll-behavior: smooth;
+  scrollbar-width: auto;
+  scrollbar-color: #818cf8 rgba(15, 23, 42, 0.85);
+}
+
+* {
+  scrollbar-color: #818cf8 rgba(15, 23, 42, 0.85);
 }
 
 body {
@@ -105,26 +110,54 @@ body {
   100% { transform: translate(0, 0) scale(1); }
 }
 
-/* ── Scrollbar ────────────────────────────────────── */
+/* ── Scrollbar (Aniq ko'rinadigan qulay yurgich) ─── */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.85);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
   border-radius: 9999px;
-  border: 2px solid rgba(15, 23, 42, 0.7);
+  border: 3px solid rgba(15, 23, 42, 0.85);
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.3), 0 0 6px rgba(99, 102, 241, 0.35);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-  border: 2px solid rgba(15, 23, 42, 0.7);
+  background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+  border: 3px solid rgba(15, 23, 42, 0.85);
 }
 ::-webkit-scrollbar-thumb:hover,
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.65);
+  background: linear-gradient(180deg, #818cf8 0%, #a855f7 100%);
+  border: 2px solid rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.65), inset 0 0 6px rgba(255, 255, 255, 0.5);
+}
+::-webkit-scrollbar-thumb:active,
+.dark ::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #a855f7 0%, #c084fc 100%);
+  border: 2px solid rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.9);
+}
+
+/* Horizontal scrollbar (jadvallar va gorizontal konteynerlar uchun) */
+::-webkit-scrollbar:horizontal {
+  height: 12px;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+  border: 2px solid rgba(15, 23, 42, 0.85);
+}
+::-webkit-scrollbar-thumb:horizontal:hover {
+  background: linear-gradient(90deg, #818cf8 0%, #a855f7 100%);
+}
+::-webkit-scrollbar-thumb:horizontal:active {
+  background: linear-gradient(90deg, #a855f7 0%, #c084fc 100%);
+}
+::-webkit-scrollbar-corner {
+  background: rgba(15, 23, 42, 0.85);
 }
 
 /* ── Glassmorphism ────────────────────────────────── */
