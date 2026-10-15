@@ -463,6 +463,30 @@ async def upload_job_file(
     raise HTTPException(status_code=500, detail="Kutilmagan holat.")
 
 
+@router.get("/jobs/stats")
+def get_jobs_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Foydalanuvchining barcha joblari bo'yicha haqiqiy dinamik statistika."""
+    total = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count()
+    completed = db.query(DubbingJob).filter(
+        DubbingJob.user_id == current_user.id,
+        DubbingJob.status == JobStatus.COMPLETED,
+    ).count()
+    failed = db.query(DubbingJob).filter(
+        DubbingJob.user_id == current_user.id,
+        DubbingJob.status == JobStatus.FAILED,
+    ).count()
+    processing = max(0, total - completed - failed)
+    return {
+        "total": total,
+        "completed": completed,
+        "processing": processing,
+        "failed": failed,
+    }
+
+
 @router.get("/jobs/{job_id}")
 def get_job(
     job_id: uuid.UUID,
@@ -531,30 +555,6 @@ def get_job(
                 f"Navbatda: {position}-o'rin, taxminan {queue_load.format_wait(eta)} kutish"
             )
     return response
-
-
-@router.get("/jobs/stats")
-def get_jobs_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict:
-    """Foydalanuvchining barcha joblari bo'yicha haqiqiy dinamik statistika."""
-    total = db.query(DubbingJob).filter(DubbingJob.user_id == current_user.id).count()
-    completed = db.query(DubbingJob).filter(
-        DubbingJob.user_id == current_user.id,
-        DubbingJob.status == JobStatus.COMPLETED,
-    ).count()
-    failed = db.query(DubbingJob).filter(
-        DubbingJob.user_id == current_user.id,
-        DubbingJob.status == JobStatus.FAILED,
-    ).count()
-    processing = max(0, total - completed - failed)
-    return {
-        "total": total,
-        "completed": completed,
-        "processing": processing,
-        "failed": failed,
-    }
 
 
 @router.get("/jobs")
