@@ -60,6 +60,24 @@ def upload_file_to_s3(file_path: str, object_name: str) -> bool:
         logger.error(f"S3 upload failed for {file_path}: {e}")
         return False
 
+
+def delete_file_from_s3(object_name: str) -> bool:
+    """Delete an object from S3 bucket."""
+    s3_client, bucket = _get_s3_client()
+    if not s3_client:
+        return False
+
+    try:
+        s3_client.delete_object(Bucket=bucket, Key=object_name)
+        logger.info(f"Successfully deleted {object_name} from S3")
+        return True
+    except ClientError as e:
+        logger.warning(f"S3 dan o'chirishda xatolik ({object_name}): {e}")
+        return False
+    except Exception as e:
+        logger.error(f"S3 delete kutilmagan xatolik ({object_name}): {e}")
+        return False
+
 def download_file_from_s3(object_name: str, local_path: str) -> bool:
     """S3'dagi faylni lokal diskka yuklab oladi (masalan TTS keshdan qayta
     foydalanish uchun — backend/services/tts_cache.py)."""

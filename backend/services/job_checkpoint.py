@@ -38,7 +38,7 @@ objects already do, rather than adding a second cleanup mechanism.
 import logging
 from pathlib import Path
 
-from backend.services.storage import upload_file_to_s3, download_file_from_s3
+from backend.services.storage import upload_file_to_s3, download_file_from_s3, delete_file_from_s3
 
 logger = logging.getLogger(__name__)
 
@@ -86,3 +86,12 @@ def restore_checkpoint(job_id: str, filename: str, local_path: str) -> bool:
     except Exception as exc:
         logger.warning(f"[CHECKPOINT {job_id}] {filename} S3'dan tiklashda xatolik: {exc}")
     return False
+
+
+def delete_checkpoint(job_id: str, filename: str) -> None:
+    """S3'dagi ushbu job uchun saqlangan bosqich checkpoint faylini o'chiradi."""
+    key = checkpoint_s3_key(job_id, filename)
+    try:
+        delete_file_from_s3(key)
+    except Exception as exc:
+        logger.warning(f"[CHECKPOINT {job_id}] {filename} S3'dan o'chirishda xatolik: {exc}")

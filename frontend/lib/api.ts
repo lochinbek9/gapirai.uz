@@ -244,8 +244,20 @@ export async function deleteJob(jobId: string): Promise<void> {
   await apiClient.delete(`/api/jobs/${jobId}`)
 }
 
-export async function retryJob(jobId: string): Promise<{ success: boolean; message: string }> {
-  const res = await apiClient.post(`/api/jobs/${jobId}/retry`)
+export interface RegenerateOptions {
+  voice_name?: string
+  speaker_gender?: string
+  tts_provider?: string
+  force_regenerate?: boolean
+}
+
+export async function retryJob(jobId: string, options?: RegenerateOptions): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/retry`, options || {})
+  return res.data
+}
+
+export async function regenerateJob(jobId: string, options?: RegenerateOptions): Promise<{ success: boolean; message: string }> {
+  const res = await apiClient.post(`/api/jobs/${jobId}/regenerate`, options || {})
   return res.data
 }
 

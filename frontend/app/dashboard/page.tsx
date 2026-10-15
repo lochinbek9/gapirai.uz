@@ -149,7 +149,7 @@ function VideoCard({
 }: {
   job: Job
   onDelete: (id: string) => void
-  onRetry: (id: string) => void
+  onRetry: (id: string, isRegenerate?: boolean) => void
   isRetrying: boolean
   isAdmin?: boolean
 }) {
@@ -309,12 +309,22 @@ function VideoCard({
             ) : null}
             {isFailed && !isNonRetryable && (
               <button
-                onClick={() => onRetry(job.job_id)}
+                onClick={() => onRetry(job.job_id, false)}
                 disabled={isRetrying}
-                title="Qayta urinish (regenerate)"
+                title="Qayta urinish (retry)"
                 className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
               >
                 <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+            )}
+            {isReady && (
+              <button
+                onClick={() => onRetry(job.job_id, true)}
+                disabled={isRetrying}
+                title="Qayta yaratish (Regenerate)"
+                className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+              >
+                <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
               </button>
             )}
             <button
@@ -400,10 +410,15 @@ export default function DashboardPage() {
     getJobsStats().then(setJobsStats).catch(console.error)
   }
 
-  async function handleRetry(id: string) {
+  async function handleRetry(id: string, isRegenerate = false) {
+    if (isRegenerate) {
+      if (!confirm("Ushbu videoni qaytadan yaratishni (regenerate) tasdiqlaysizmi? Balansingizdan tegishli daqiqa yechiladi.")) {
+        return
+      }
+    }
     setRetryingId(id)
     try {
-      await retryJob(id)
+      await retryJob(id, isRegenerate ? { force_regenerate: true } : undefined)
       router.push(`/video/${id}`)
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")

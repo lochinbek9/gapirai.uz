@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import uuid
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, Body
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResponse
 from pydantic import BaseModel
@@ -53,6 +53,13 @@ class CreateJobRequest(BaseModel):
     voice_name: Optional[str] = None
     voice_style: Optional[str] = None
     force_new: Optional[bool] = False
+
+
+class RegenerateJobRequest(BaseModel):
+    voice_name: Optional[str] = None
+    speaker_gender: Optional[str] = None
+    tts_provider: Optional[str] = None
+    force_regenerate: Optional[bool] = None
 
 
 class VideoInfoResponse(BaseModel):
@@ -732,21 +739,37 @@ def delete_job(
 
 
 @router.post("/jobs/{job_id}/retry")
+@router.post("/jobs/{job_id}/regenerate")
 def retry_job(
     job_id: uuid.UUID,
+    payload: Optional[RegenerateJobRequest] = Body(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Xatolik yuz bergan (failed) job'ni qayta ishga tushirish (regenerate)."""
-    job = db.query(DubbingJob).filter(
-        DubbingJob.id == job_id,
-        DubbingJob.user_id == current_user.id,
-    ).first()
+    """Xatolik yuz bergan (failed) yoki muvaffaqiyatli yakunlangan (completed) job'ni
+    qayta ishga tushirish (regenerate).
+
+    Muvaffaqiyatli joblar yoki qayta yaratishda:
+    - Balansdan tegishli daqiqa yechiladi (u ham balansdan yechsin).
+    - STT va tarjima (matnlar) saqlanadi, faqat TTS va video birlashtirish noldan toza ishlaydi.
+    - Foydalanuvchi xohlasa ovoz yoki provayderni o'zgartirishi mumkin.
+    """
+    from backend.services.plans import check_and_consume_quota, is_user_admin
+    from backend.services.job_checkpoint import delete_checkpoint
+    from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
+
+    query = db.query(DubbingJob).filter(DubbingJob.id == job_id)
+    if not is_user_admin(db, current_user.id):
+        query = query.filter(DubbingJob.user_id == current_user.id)
+    job = query.first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    if job.status != JobStatus.FAILED:
-        raise HTTPException(status_code=400, detail="Faqat xatolik yuz bergan videolarni qayta ishga tushirish mumkin.")
+    if job.status not in (JobStatus.FAILED, JobStatus.COMPLETED):
+        raise HTTPException(
+            status_code=400,
+            detail="Faqat xatolik yuz bergan yoki yakunlangan videolarni qayta ishga tushirish mumkin.",
+        )
 
     err_code = (job.error_code or "").upper()
     err_msg = (job.error_message or "").lower()
@@ -755,12 +778,41 @@ def retry_job(
     if err_code == "CONTENT_BLOCKED" or "kontent siyosati" in err_msg or "taqiqlangan" in err_msg:
         raise HTTPException(status_code=400, detail="Ushbu video kontent xavfsizligi qoidalariga to'g'ri kelmagani sababli qayta ishga tushirish mumkin emas.")
 
-    from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
+    is_regenerate = (job.status == JobStatus.COMPLETED) or bool(payload and payload.force_regenerate)
 
-    # 1. Kesh tekshiruvi: Agar ushbu video allaqachon muvaffaqiyatli dublyaj qilingan bo'lsa
-    # (masalan, foydalanuvchining avvalgi tugallangan nusxasi yoki tizimdagi mavjud kesh)
+    # 1. Sozlamalarni yangilash (agar foydalanuvchi yangi ovoz yoki provayder yuborgan bo'lsa)
+    if payload:
+        if payload.speaker_gender:
+            if payload.speaker_gender != job.speaker_gender:
+                job.speech_segments = None  # yangi jins uchun qayta optimizatsiya bo'ladi
+            job.speaker_gender = payload.speaker_gender
+        if payload.tts_provider:
+            job.tts_provider = payload.tts_provider
+        if payload.voice_name:
+            job.voice_name = payload.voice_name
+
+    # 2. Balansdan daqiqa yechish (admin uchun cheksiz/bepul, oddiy user uchun balansdan yechiladi)
+    duration_seconds = job.video_duration
+    if not duration_seconds and job.original_video_path and Path(job.original_video_path).exists():
+        from backend.services.job_creation import _media_duration_seconds
+        dur = _media_duration_seconds(Path(job.original_video_path))
+        if dur:
+            duration_seconds = int(dur)
+            job.video_duration = duration_seconds
+
+    duration_minutes = max(0.1, round((duration_seconds or 60.0) / 60.0, 2))
+
+    has_quota, shortfall = check_and_consume_quota(db, current_user.id, duration_minutes)
+    if not has_quota:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
+        )
+    job.quota_consumed = True
+
+    # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
     video_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
-    if video_id and not getattr(job, "subtitle_only", False):
+    if not is_regenerate and video_id and not getattr(job, "subtitle_only", False):
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
@@ -793,7 +845,6 @@ def retry_job(
             job.recovery_attempt_count = 0
             job.processing_claim_token = None
             job.processing_lease_expires_at = None
-            job.quota_consumed = True
             job.status = JobStatus.COMPLETED
             job.progress = 100.0
             job.status_message = "Dublyaj tayyor!"
@@ -801,7 +852,7 @@ def retry_job(
             db.commit()
             return {"success": True, "message": "Video tayyor holatga keltirildi (keshdan)."}
 
-    elif video_id and getattr(job, "subtitle_only", False):
+    elif not is_regenerate and video_id and getattr(job, "subtitle_only", False):
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
@@ -826,7 +877,6 @@ def retry_job(
             job.recovery_attempt_count = 0
             job.processing_claim_token = None
             job.processing_lease_expires_at = None
-            job.quota_consumed = True
             job.status = JobStatus.COMPLETED
             job.progress = 100.0
             job.status_message = "Subtitr tayyor!"
@@ -851,7 +901,9 @@ def retry_job(
             job.uzbek_srt_content = job.uzbek_srt_content or donor_job.uzbek_srt_content
             job.speech_segments = job.speech_segments or donor_job.speech_segments
 
-    # 2. Buzuq yoki 0-baytli fayllarni tozalaymiz
+    # 4. Chiqish fayllarini tozalash (yangi sintez va birlashtirish uchun)
+    job.source_job_id = None
+
     if job.original_video_path:
         p_vid = Path(job.original_video_path)
         if p_vid.exists() and p_vid.is_file() and p_vid.stat().st_size == 0:
@@ -865,21 +917,51 @@ def retry_job(
 
     if job.dubbed_audio_path:
         p_aud = Path(job.dubbed_audio_path)
-        if p_aud.exists() and p_aud.is_file() and p_aud.stat().st_size == 0:
+        if p_aud.exists():
             try:
                 p_aud.unlink()
             except Exception:
                 pass
-            job.dubbed_audio_path = None
+        job.dubbed_audio_path = None
+
+    if job.output_video_path:
+        p_vid = Path(job.output_video_path)
+        if p_vid.exists():
+            try:
+                p_vid.unlink()
+            except Exception:
+                pass
+        job.output_video_path = None
+
+    job.output_video_url = None
+    job.segment_qa = None
+    job.uzbek_srt_content = None
+
+    # Checkpoint va eski audio segmentlarni tozalash
+    delete_checkpoint(str(job.id), "dubbed_audio.wav")
+    delete_checkpoint(str(job.id), "dubbed_final.mp4")
+
+    tts_seg_dir = Path("outputs") / str(job.id) / "audio" / "tts_segments"
+    if tts_seg_dir.exists():
+        try:
+            shutil.rmtree(tts_seg_dir)
+        except Exception:
+            pass
+
+    try:
+        db.query(ResolutionVariant).filter(ResolutionVariant.job_id == str(job.id)).delete()
+    except Exception:
+        pass
 
     job.status = JobStatus.PENDING
     job.progress = 0.0
-    job.status_message = "Qayta navbatga qo'yildi..."
+    job.status_message = "Qayta yaratilmoqda (navbatga qo'yildi)..." if is_regenerate else "Qayta navbatga qo'yildi..."
     job.error_code = None
     job.error_message = None
     job.recovery_attempt_count = 0
     job.processing_claim_token = None
     job.processing_lease_expires_at = None
+    job.completed_at = None
     db.commit()
 
     from backend.workers.tasks import process_video
@@ -887,7 +969,10 @@ def retry_job(
     queue = get_job_queue(db, current_user.id)
     process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=queue)
 
-    return {"success": True, "message": "Video qayta navbatga qo'yildi."}
+    return {
+        "success": True,
+        "message": "Video qayta yaratish uchun navbatga qo'yildi." if is_regenerate else "Video qayta navbatga qo'yildi."
+    }
 
 
 def _subtitle_cues_for(job) -> list | None:

@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert
+  MicOff, ShieldAlert, X
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -71,6 +71,10 @@ export default function VideoPage() {
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [retryLoading, setRetryLoading] = useState(false)
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+  const [regenProvider, setRegenProvider] = useState<'gemini' | 'edge' | 'azure'>('gemini')
+  const [regenGender, setRegenGender] = useState<'male' | 'female'>('male')
+  const [regenLoading, setRegenLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [isCopied, setIsCopied] = useState(false)
   const [isEnCopied, setIsEnCopied] = useState(false)
@@ -79,6 +83,21 @@ export default function VideoPage() {
   const paymentIdRef = useRef<string | null>(null)
 
   const job = polledJob
+
+  useEffect(() => {
+    if (job?.tts_provider) {
+      const p = job.tts_provider.toLowerCase()
+      if (p === 'gemini' || p === 'edge' || p === 'azure') {
+        setRegenProvider(p as any)
+      }
+    }
+    if (job?.speaker_gender) {
+      const g = job.speaker_gender.toLowerCase()
+      if (g === 'male' || g === 'female') {
+        setRegenGender(g as any)
+      }
+    }
+  }, [job?.tts_provider, job?.speaker_gender])
 
   const handleGoHome = () => {
     clearJobId()
@@ -94,6 +113,24 @@ export default function VideoPage() {
       alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
     } finally {
       setRetryLoading(false)
+    }
+  }
+
+  const handleRegenerateSubmit = async () => {
+    if (!id || regenLoading) return
+    setRegenLoading(true)
+    try {
+      await retryJob(id, {
+        tts_provider: regenProvider,
+        speaker_gender: regenGender,
+        force_regenerate: true,
+      })
+      setShowRegenerateModal(false)
+      window.location.reload()
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
+    } finally {
+      setRegenLoading(false)
     }
   }
 
@@ -535,8 +572,25 @@ export default function VideoPage() {
               {/* Download & Feedback */}
               {job.status === 'completed' && (
                 <div className="space-y-6 pt-1">
-                  <div>
-                    <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-5">
+                    <div className="space-y-2">
+                      <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
+                        Videoni yuklab olish
+                      </span>
+                      <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
+                    </div>
+
+                    <div className="pt-2 sm:pt-0 sm:border-l sm:border-white/10 sm:pl-5 flex flex-col justify-center">
+                      <button
+                        onClick={() => setShowRegenerateModal(true)}
+                        disabled={retryLoading || regenLoading}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25 transition duration-200 active:scale-95 border border-white/10 whitespace-nowrap cursor-pointer"
+                        title="Videoni yangi sozlamalar bilan qayta yaratish"
+                      >
+                        <RotateCw className={`w-4 h-4 ${regenLoading ? 'animate-spin' : ''}`} />
+                        <span>Qayta yaratish (Regenerate)</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Feedback rating component */}
@@ -705,6 +759,139 @@ export default function VideoPage() {
           )}
         </div>
       </div>
+
+      {/* Regenerate Modal */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-6 shadow-2xl relative overflow-hidden">
+            {/* Glow background */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full bg-violet-500/20 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
+                  <RotateCw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Qayta yaratish (Regenerate)</h3>
+                  <p className="text-xs text-slate-400">Yangi ovoz yoki dvigatel bilan qayta dublyaj</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegenerateModal(false)}
+                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/5 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Notice info */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-slate-300 space-y-2 relative z-10">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Video davomiyligi:</span>
+                <span className="text-white font-semibold">{job.video_duration ? formatDuration(job.video_duration) : '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Balansdan yechiladigan daqiqa:</span>
+                <span className="text-amber-400 font-bold font-mono text-sm">
+                  {isAdmin ? "0 daqiqa (Admin — bepul)" : `~${Math.max(1, Math.ceil((job.video_duration || 60) / 60))} daqiqa`}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-white/10 text-[11px] text-slate-400 leading-relaxed">
+                💡 Matnlar va tarjima saqlanadi. Faqat audio ovoz yangidan toza generatsiya qilinadi va video qayta birlashtiriladi (~1 daqiqa).
+              </div>
+            </div>
+
+            {/* Form Controls: Provider & Gender */}
+            <div className="space-y-4 relative z-10">
+              {/* Provider */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-violet-400 uppercase tracking-wider">
+                  Ovoz dvigateli
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'gemini', label: 'Gemini AI', icon: '✨', sub: 'Tiniq AI ovoz' },
+                    { id: 'edge', label: 'Edge TTS', icon: '⚡', sub: 'Tezkor ovoz' },
+                    { id: 'azure', label: 'Azure Neural', icon: '🔷', sub: 'Standart ovoz' },
+                  ].map((p) => {
+                    const active = regenProvider === p.id
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setRegenProvider(p.id as any)}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-2xl border text-center transition-all ${
+                          active
+                            ? "border-violet-500 bg-violet-500/20 text-white font-bold ring-2 ring-violet-500/40 shadow-lg shadow-violet-500/10"
+                            : "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300"
+                        }`}
+                      >
+                        <span className="text-base">{p.icon}</span>
+                        <span className="text-xs font-semibold">{p.label}</span>
+                        <span className="text-[10px] text-slate-400">{p.sub}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Gender */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                  Ovoz jinsi
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'male', label: '👨 Erkak ovozi', name: regenProvider === 'gemini' ? 'Charon' : 'Sardor' },
+                    { id: 'female', label: '👩 Ayol ovozi', name: regenProvider === 'gemini' ? 'Autonoe' : 'Madina' },
+                  ].map((g) => {
+                    const active = regenGender === g.id
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setRegenGender(g.id as any)}
+                        className={`flex items-center justify-between px-4 py-3 rounded-2xl border text-sm transition-all ${
+                          active
+                            ? "border-indigo-500 bg-indigo-500/20 text-white font-bold ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/10"
+                            : "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300"
+                        }`}
+                      >
+                        <span>{g.label}</span>
+                        <span className="text-xs text-indigo-300 font-mono">({g.name})</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2 relative z-10">
+              <button
+                type="button"
+                onClick={() => setShowRegenerateModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition"
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerateSubmit}
+                disabled={regenLoading}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/25 transition active:scale-95 disabled:opacity-50"
+              >
+                {regenLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                <span>Tasdiqlash va qayta yaratish</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
