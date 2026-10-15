@@ -11,7 +11,7 @@ from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus, ContentViolation, User
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
-from backend.services.errors import PermanentError
+from backend.services.errors import PermanentError, NoSpeechFoundError
 from backend.services import error_classification
 from backend.services.content_safety import check_safety
 from backend.services.email_service import send_dubbing_complete_email
@@ -292,7 +292,7 @@ def _safe_persisted_error(exc: Exception, current_stage: str) -> tuple[str, str]
       persisted/API-visible field.
     """
     code = _error_code_for(exc, current_stage)
-    if isinstance(exc, PermanentError):
+    if isinstance(exc, (PermanentError, NoSpeechFoundError)):
         return code, error_classification.scrub_secrets(str(exc))
     return code, error_classification.safe_user_message(code)
 
@@ -652,7 +652,7 @@ def process_video(self: Task, job_id: str) -> dict:
                     ) from exc
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
-                raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
+                raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
@@ -1045,9 +1045,28 @@ def process_video(self: Task, job_id: str) -> dict:
         return {"job_id": job_id, "status": "completed", "output_url": job.output_video_url}
 
 
+    except NoSpeechFoundError as exc:
+        # User xatoligi (videoda inson nutqi yo'q) -- bu tizim nosozligi EMAS, adminlarga xabar yuborilmaydi!
+        _mark_job_failed(job_id, exc, current_stage)
+        try:
+            if job.user_id and job.user and job.user.telegram_chat_id:
+                v_title = getattr(job, "video_title", None) or "Video"
+                msg = (
+                    f"🎙 <b>Videoda nutq topilmadi</b>: {v_title}\n\n"
+                    f"Ushbu videoda gapirilgan suhbat yoki inson nutqi aniqlanmadi. "
+                    f"Dublyaj xizmati faqat ovozli nutq mavjud videolarni tarjima qiladi."
+                )
+                send_telegram_message(job.user.telegram_chat_id, msg)
+        except Exception as notify_exc:
+            logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
+        _notify_job_failed_push(job_id, job, exc, "NO_SPEECH_FOUND")
+        _cleanup_upload_dir(job_id)
+        _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (no speech)")
+        raise exc
+
     except PermanentError as exc:
         try:
-            if getattr(exc, "code", None) != "CONTENT_BLOCKED":
+            if getattr(exc, "code", None) not in ("CONTENT_BLOCKED", "NO_SPEECH_FOUND"):
                 from backend.services.telegram_notify import send_error_to_admins
                 u = getattr(job, "user", None)
                 send_error_to_admins(

@@ -10,7 +10,7 @@ from backend.workers.tasks import _record_stage, _log_pipeline_summary, _error_c
 from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
 from backend.services import downloader, transcriber
 from backend.services.video_analysis import VideoAnalysisService, normalize_video_language
-from backend.services.errors import PermanentError
+from backend.services.errors import PermanentError, NoSpeechFoundError
 from backend.services import error_classification
 from backend.services.job_claim import try_claim, release_claim
 from backend.config import get_settings
@@ -181,7 +181,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             transcript = transcriber.transcribe_audio(audio_path, primary="gemini")
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
-                raise PermanentError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
+                raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             analysis.transcript_segments = transcript["segments"]
             analysis.video_language = normalize_video_language(transcript.get("language"))
             db.commit()
@@ -236,20 +236,29 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
 
         return {"analysis_id": analysis_id, "status": "completed"}
 
+    except NoSpeechFoundError as exc:
+        # User xatoligi (videoda nutq yo'q) -- bu tizim nosozligi emas, adminlarga xabar yuborilmaydi!
+        _, safe_message = _safe_persisted_error(exc, current_stage)
+        _mark_analysis_failed(analysis_id, "NO_SPEECH_FOUND", safe_message)
+        _cleanup_analysis_dirs(analysis_id)
+        _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "FAILED (no speech)")
+        raise exc
+
     except PermanentError as exc:
         try:
-            from backend.services.telegram_notify import send_error_to_admins
-            u = getattr(analysis, "user", None) if analysis else None
-            send_error_to_admins(
-                exc,
-                context_msg=f"Analysis: {analysis_id} | Stage: {current_stage} | Type: PermanentError",
-                job_id=analysis_id,
-                user_name=getattr(u, "name", None) if u else None,
-                user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
-                video_title=getattr(analysis, "video_title", None) if analysis else None,
-                video_url=getattr(analysis, "youtube_url", None) if analysis else None,
-                stage=f"ANALYSIS:{current_stage}",
-            )
+            if getattr(exc, "code", None) not in ("CONTENT_BLOCKED", "NO_SPEECH_FOUND"):
+                from backend.services.telegram_notify import send_error_to_admins
+                u = getattr(analysis, "user", None) if analysis else None
+                send_error_to_admins(
+                    exc,
+                    context_msg=f"Analysis: {analysis_id} | Stage: {current_stage} | Type: PermanentError",
+                    job_id=analysis_id,
+                    user_name=getattr(u, "name", None) if u else None,
+                    user_email_or_phone=(getattr(u, "phone", None) or getattr(u, "email", None)) if u else None,
+                    video_title=getattr(analysis, "video_title", None) if analysis else None,
+                    video_url=getattr(analysis, "youtube_url", None) if analysis else None,
+                    stage=f"ANALYSIS:{current_stage}",
+                )
         except Exception:
             pass
 

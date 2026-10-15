@@ -118,6 +118,18 @@ def send_error_to_admins(
     if not admin_ids:
         return
 
+    # Nutqsiz video yoki taqiqlangan kontent tizim nosozligi emas (user xatoligi) -- adminlarga xabar yuborilmaydi
+    err_code = getattr(exc, "code", None)
+    err_name = type(exc).__name__
+    err_str = str(exc).lower()
+    if (
+        err_code in ("NO_SPEECH_FOUND", "CONTENT_BLOCKED")
+        or err_name in ("NoSpeechFoundError", "NoSpeechError", "ContentBlockedError")
+        or "nutq topilmadi" in err_str
+        or "kontent siyosati" in err_str
+    ):
+        return
+
     # Extract job_id from context_msg if not explicitly provided
     if not job_id and context_msg:
         m = re.search(r"Job:\s*([0-9a-fA-F-]{36})", context_msg)
