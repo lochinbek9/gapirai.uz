@@ -245,6 +245,9 @@ export default function AdminPage() {
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [showTrends, setShowTrends] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [showBlockedTables, setShowBlockedTables] = useState(false)
+  const [showRecentUsers, setShowRecentUsers] = useState(false)
+  const [showRecentJobs, setShowRecentJobs] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
   const [errorDetail, setErrorDetail] = useState('')
@@ -533,7 +536,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card label="Jami video" value={stats.jobs.total} icon={<Video className="w-5 h-5" />} />
             <Card label="Ro'yxatdan o'tganlardan" value={stats.jobs.with_registered_user} icon={<Video className="w-5 h-5" />} />
-            <Card label="Anonim" value={stats.jobs.anonymous} icon={<Video className="w-5 h-5" />} />
+            <Card label="Tayyor (muvaffaqiyatli)" value={stats.jobs.by_status.COMPLETED || 0} icon={<Video className="w-5 h-5" />} />
             <Card label="So'nggi 24 soat" value={stats.jobs.last_24h} icon={<Video className="w-5 h-5" />} />
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
@@ -561,32 +564,46 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* Bloklangan foydalanuvchilar -- Content Safety Gate */}
+        {/* Bloklangan foydalanuvchilar -- Content Safety Gate (Katta blok ochilib-yopiladigan) */}
         {blocked && (
           <section className="space-y-3">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Kontent siyosati -- bloklanganlar</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Kontent siyosati -- bloklanganlar</h2>
+              {(blocked.total_blocked_accounts > 0 || blocked.recent_violations.length > 0) && (
+                <button
+                  onClick={() => setShowBlockedTables(!showBlockedTables)}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
+                >
+                  <span>
+                    {showBlockedTables
+                      ? "▲ Bloklanganlar jadvalini yashirish"
+                      : `▼ Bloklanganlar va xavfsizlik cheklovlari jadvalini ko'rish (${blocked.recent_violations.length} ta)`}
+                  </span>
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <Card label="Bloklangan akkauntlar" value={blocked.total_blocked_accounts} icon={<Ban className="w-5 h-5" />} />
               <Card label="Jami bloklanishlar" value={blocked.total_violations} icon={<ShieldAlert className="w-5 h-5" />} />
             </div>
-            {blocked.total_blocked_accounts > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
+            {showBlockedTables && blocked.total_blocked_accounts > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-left">
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Aloqa</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Necha marta</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">So'nggi marta</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchi</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Aloqa</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Necha marta</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">So'nggi marta</th>
                     </tr>
                   </thead>
                   <tbody>
                     {blocked.users.map((u) => (
-                      <tr key={u.user_id} className="border-b border-white/5 last:border-0">
-                        <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{u.name || 'Nomsiz'}</td>
-                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{u.email || u.phone || '—'}</td>
-                        <td className="px-4 sm:px-5 py-3 text-red-300 font-semibold whitespace-nowrap">{u.violation_count}</td>
-                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                      <tr key={u.user_id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                        <td className="px-4 py-3 text-gray-200">{u.name || 'Nomsiz'}</td>
+                        <td className="px-4 py-3 text-gray-400">{u.email || u.phone || '—'}</td>
+                        <td className="px-4 py-3 text-red-300 font-semibold">{u.violation_count}</td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
                           {u.last_violation_at ? new Date(u.last_violation_at).toLocaleString('uz-UZ') : '—'}
                         </td>
                       </tr>
@@ -595,30 +612,30 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
-            {blocked.recent_violations.length > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-                <table className="w-full text-sm min-w-[760px]">
+            {showBlockedTables && blocked.recent_violations.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-left">
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sana</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Bosqich</th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Toifa</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[150px] whitespace-nowrap">Sana</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[110px] whitespace-nowrap">Bosqich</th>
+                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[160px] whitespace-nowrap">Toifa</th>
                     </tr>
                   </thead>
                   <tbody>
                     {blocked.recent_violations.map((v) => (
-                      <tr key={v.id} className="border-b border-white/5 last:border-0">
-                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                      <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
                           {new Date(v.created_at).toLocaleString('uz-UZ')}
                         </td>
-                        <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={v.video_title || undefined}>
+                        <td className="px-4 py-3 text-gray-200 truncate max-w-[280px]" title={v.video_title || undefined}>
                           {v.video_title || '—'}
                         </td>
-                        <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
                           {v.stage === 'metadata' ? 'Sarlavha' : 'Transkript'}
                         </td>
-                        <td className="px-4 sm:px-5 py-3 text-red-300 whitespace-nowrap">
+                        <td className="px-4 py-3 text-red-300 whitespace-nowrap text-xs">
                           {CATEGORY_LABELS[v.category] || v.category}
                         </td>
                       </tr>
@@ -639,27 +656,27 @@ export default function AdminPage() {
               value={`${refunds.total_amount.toLocaleString('uz-UZ')} so'm`}
               icon={<Wallet className="w-5 h-5" />}
             />
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-              <table className="w-full text-sm min-w-[820px]">
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-left">
-                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
-                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Aloqa</th>
-                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Summa</th>
-                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                    <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Click tranzaksiya</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchi</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Aloqa</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Summa</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Click tranzaksiya</th>
                   </tr>
                 </thead>
                 <tbody>
                   {refunds.payments.map((p) => (
-                    <tr key={p.payment_id} className="border-b border-white/5 last:border-0">
-                      <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{p.user_name || 'Nomsiz'}</td>
-                      <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{p.user_email || p.user_phone || '—'}</td>
-                      <td className="px-4 sm:px-5 py-3 text-amber-300 font-semibold whitespace-nowrap">{p.amount.toLocaleString('uz-UZ')} so'm</td>
-                      <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={p.video_title || undefined}>
+                    <tr key={p.payment_id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 text-gray-200">{p.user_name || 'Nomsiz'}</td>
+                      <td className="px-4 py-3 text-gray-400">{p.user_email || p.user_phone || '—'}</td>
+                      <td className="px-4 py-3 text-amber-300 font-semibold whitespace-nowrap">{p.amount.toLocaleString('uz-UZ')} so'm</td>
+                      <td className="px-4 py-3 text-gray-200 truncate max-w-[260px]" title={p.video_title || undefined}>
                         {p.video_title || '—'}
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">{p.click_transaction_id || '—'}</td>
+                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs font-mono">{p.click_transaction_id || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -668,84 +685,130 @@ export default function AdminPage() {
           </section>
         )}
 
-        {/* Recent users */}
+        {/* Recent users (Katta blok ochilib-yopiladigan) */}
         <section className="space-y-3">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi ro'yxatdan o'tganlar</h2>
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
-              <thead>
-                <tr className="border-b border-white/10 text-left">
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Email</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sana</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Holat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recent_users.map((u, i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-0">
-                    <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{u.email}</td>
-                    <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
-                      {u.created_at ? new Date(u.created_at).toLocaleString('uz-UZ') : '—'}
-                    </td>
-                    <td className="px-4 sm:px-5 py-3 whitespace-nowrap">
-                      {u.is_verified ? (
-                        <span className="text-emerald-400 font-semibold">Tasdiqlangan</span>
-                      ) : (
-                        <span className="text-gray-500">Tasdiqlanmagan</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {stats.recent_users.length === 0 && (
-                  <tr><td colSpan={3} className="px-4 sm:px-5 py-6 text-center text-gray-500">Hali user yo'q</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi ro'yxatdan o'tganlar</h2>
+            <button
+              onClick={() => setShowRecentUsers(!showRecentUsers)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
+            >
+              <span>{showRecentUsers ? "▲ Jadvalni yashirish" : `▼ Ro'yxatni ko'rish (${stats.recent_users.length} ta)`}</span>
+            </button>
           </div>
+          {showRecentUsers && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left">
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Email</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[160px] whitespace-nowrap">Sana</th>
+                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[130px] whitespace-nowrap">Holat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recent_users.map((u, i) => (
+                    <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 text-gray-200 truncate max-w-[280px] font-mono text-xs">{u.email}</td>
+                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
+                        {u.created_at ? new Date(u.created_at).toLocaleString('uz-UZ') : '—'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {u.is_verified ? (
+                          <span className="text-emerald-400 font-semibold text-xs">Tasdiqlangan</span>
+                        ) : (
+                          <span className="text-gray-500 text-xs">Tasdiqlanmagan</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {stats.recent_users.length === 0 && (
+                    <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">Hali user yo'q</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
-        {/* Recent jobs — video, akkaunt va vaqt to'liq ko'rinishi */}
+        {/* Recent jobs (Katta blok ochilib-yopiladigan, gorizontal scrollsiz) */}
         <section className="space-y-3">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi joblar</h2>
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead>
-                <tr className="border-b border-white/10 text-left">
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Sana</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Akkaunt</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Holat</th>
-                  <th className="px-4 sm:px-5 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Xatolik</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recent_jobs.map((j) => (
-                  <tr key={j.id} className="border-b border-white/5 last:border-0">
-                    <td className="px-4 sm:px-5 py-3 text-gray-400 whitespace-nowrap">
-                      {j.created_at ? new Date(j.created_at).toLocaleString('uz-UZ') : '—'}
-                    </td>
-                    <td className="px-4 sm:px-5 py-3 text-gray-200 max-w-[260px] truncate" title={j.video_title || j.youtube_url}>
-                      <a href={j.youtube_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 hover:underline">
-                        {j.video_title || j.youtube_url}
-                      </a>
-                    </td>
-                    <td className="px-4 sm:px-5 py-3 text-gray-200 whitespace-nowrap">{j.user_email || 'Anonim'}</td>
-                    <td className="px-4 sm:px-5 py-3 whitespace-nowrap">
-                      <span className={j.status === 'FAILED' ? 'text-red-400' : j.status === 'COMPLETED' ? 'text-emerald-400' : 'text-gray-300'}>
-                        {STATUS_LABELS[j.status] || j.status}
-                      </span>
-                    </td>
-                    <td className="px-4 sm:px-5 py-3 text-red-300 max-w-[220px] truncate" title={j.error_message || undefined}>
-                      {j.error_code || '—'}
-                    </td>
-                  </tr>
-                ))}
-                {stats.recent_jobs.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 sm:px-5 py-6 text-center text-gray-500">Hali job yo'q</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi joblar</h2>
+            <button
+              onClick={() => setShowRecentJobs(!showRecentJobs)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
+            >
+              <span>{showRecentJobs ? "▲ Jadvalni yashirish" : `▼ Videolar jadvalini ko'rish (${stats.recent_jobs.length} ta)`}</span>
+            </button>
           </div>
+          {showRecentJobs && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left">
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[140px] whitespace-nowrap">Sana</th>
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[170px]">Akkaunt</th>
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[120px] whitespace-nowrap">Holat</th>
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[190px]">Xatolik</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recent_jobs.map((j) => {
+                    const isNoSpeech = j.error_code === 'NO_SPEECH_FOUND'
+                    const isSuccess = j.status === 'COMPLETED'
+                    return (
+                      <tr key={j.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                        <td className="px-3 sm:px-4 py-3 text-gray-400 whitespace-nowrap text-xs font-mono">
+                          {j.created_at ? new Date(j.created_at).toLocaleString('uz-UZ') : '—'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[240px] truncate" title={j.video_title || j.youtube_url}>
+                          <a href={j.youtube_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 hover:underline">
+                            {j.video_title || j.youtube_url}
+                          </a>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[170px] truncate font-mono text-xs" title={j.user_email || ''}>
+                          {j.user_email || 'Anonim'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                          {isNoSpeech ? (
+                            <span className="text-amber-400 font-semibold text-xs">Mijoz xatosi</span>
+                          ) : (
+                            <span
+                              className={`text-xs font-medium ${
+                                j.status === 'FAILED' ? 'text-red-400' : isSuccess ? 'text-emerald-400' : 'text-gray-300'
+                              }`}
+                            >
+                              {STATUS_LABELS[j.status] || j.status}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 max-w-[190px] truncate" title={j.error_message || undefined}>
+                          {isSuccess ? null : isNoSpeech ? (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              Ovoz topilmadi (Mijoz)
+                            </span>
+                          ) : (
+                            <span className="text-red-300 text-xs font-mono">
+                              {j.error_code || j.error_message || ''}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {stats.recent_jobs.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                        Hali job yo'q
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
 

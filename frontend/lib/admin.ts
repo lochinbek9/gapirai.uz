@@ -234,6 +234,8 @@ export interface RetentionUserItem {
   created_at: string | null
   last_active_at: string | null
   active_days: number
+  streak: number
+  plan: string
   jobs_count: number
   loyalty_status: 'loyal' | 'returning' | 'one_time'
   loyalty_label: string
@@ -246,10 +248,15 @@ export interface RetentionStatsResponse {
   recent_users: RetentionUserItem[]
 }
 
-export async function apiAdminRetentionStats(token: string, days: number = 14): Promise<RetentionStatsResponse> {
+export async function apiAdminRetentionStats(
+  token: string,
+  days: number = 7,
+  limit: number = 20,
+  offset: number = 0
+): Promise<RetentionStatsResponse> {
   const res = await axios.get(`${API_URL}/admin/retention`, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { days },
+    params: { days, limit, offset },
   })
   return res.data
 }

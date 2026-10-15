@@ -599,26 +599,35 @@ def admin_delete_cookies(current_user: User = Depends(get_current_admin_user)):
 
 @router.get("/retention")
 def admin_retention_stats(
-    days: int = Query(default=14, ge=7, le=60),
+    days: int = Query(default=7, ge=0, le=365),
     include_internal: bool = Query(default=False),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_admin_user),
 ):
     """Foydalanuvchilarning qaytib kirish (Retention) tahlili:
     - Jami ro'yxatdan o'tganlar, qaytganlar soni va umumiy qaytish foizi
-    - Bugungi va kechagi faol, yangi va qaytganlar soni
+    - Bugungi va kechagi faol, yangi va qaytganlar soni (Toshkent vaqti UTC+5)
     - Kunma-kun faollik (Total Active, New Users, Returning Users, Returning %)
-    - Kirish chastotasi bo'yicha taqsimot (1 kun, 2-3 kun, 4-7 kun, 8+ kun)
-    - Oxirgi faol bo'lgan foydalanuvchilar ro'yxati (holat belgilari bilan)
+    - Kirish chastotasi bo'yicha taqsimot (1 kun, 2-3 kun, 4-6 kun, 7-14 kun, 15-30 kun, 30+ kun)
+    - Oxirgi faol bo'lgan foydalanuvchilar (20 ta limit, streak va tarif bilan)
     
     `include_internal=False` bo'lganda test/dasturchi hisoblari hisobga olinmaydi.
     """
     from sqlalchemy import text
+    from datetime import date
     db = SessionLocal()
     try:
-        now = datetime.utcnow()
-        today = now.date()
+        now_utc = datetime.utcnow()
+        now_tashkent = now_utc + timedelta(hours=5)
+        today = now_tashkent.date()
         yesterday = today - timedelta(days=1)
-        since_date = today - timedelta(days=days)
+        project_start_date = date(2026, 7, 27)
+
+        if days == 0:
+            since_date = project_start_date
+        else:
+            since_date = today - timedelta(days=max(0, days - 1))
 
         internal_clause = "" if include_internal else "AND u.is_internal = FALSE"
         internal_where = "" if include_internal else "WHERE is_internal = FALSE"
@@ -626,14 +635,23 @@ def admin_retention_stats(
 
         # 1. Umumiy hisob (Overall summary)
         summary_row = db.execute(text(f"""
-            WITH user_summary AS (
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            ),
+            user_summary AS (
                 SELECT 
-                    v.user_id,
-                    count(DISTINCT v.visit_date) as active_days
-                FROM user_daily_visits v
-                JOIN users u ON v.user_id = u.id
+                    a.user_id,
+                    count(DISTINCT a.day) as active_days
+                FROM user_activity a
+                JOIN users u ON a.user_id = u.id
                 {internal_u_where}
-                GROUP BY v.user_id
+                GROUP BY a.user_id
             )
             SELECT 
                 (SELECT count(*) FROM users {internal_where}) as total_registered,
@@ -649,15 +667,24 @@ def admin_retention_stats(
         total_ret = summary_row["total_returning_all_time"] or 0
         overall_ret_pct = round(100.0 * total_ret / max(1, total_act), 1)
 
-        # 2. Bugun va kechagi ko'rsatkichlar
+        # 2. Bugun va kechagi ko'rsatkichlar (Toshkent vaqti bilan)
         today_row = db.execute(text(f"""
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            )
             SELECT 
-                count(DISTINCT v.user_id) as total_active,
-                count(DISTINCT CASE WHEN v.visit_date::date = u.created_at::date THEN v.user_id END) as new_users,
-                count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users
-            FROM user_daily_visits v
-            JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date = :tdate {internal_clause}
+                count(DISTINCT a.user_id) as total_active,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date = :tdate THEN a.user_id END) as new_users,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date < :tdate THEN a.user_id END) as returning_users
+            FROM user_activity a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.day = :tdate {internal_clause}
         """), {"tdate": today}).mappings().first()
 
         today_active = today_row["total_active"] or 0
@@ -666,13 +693,22 @@ def admin_retention_stats(
         today_ret_pct = round(100.0 * today_returning / max(1, today_active), 1)
 
         yesterday_row = db.execute(text(f"""
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            )
             SELECT 
-                count(DISTINCT v.user_id) as total_active,
-                count(DISTINCT CASE WHEN v.visit_date::date = u.created_at::date THEN v.user_id END) as new_users,
-                count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users
-            FROM user_daily_visits v
-            JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date = :ydate {internal_clause}
+                count(DISTINCT a.user_id) as total_active,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date = :ydate THEN a.user_id END) as new_users,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date < :ydate THEN a.user_id END) as returning_users
+            FROM user_activity a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.day = :ydate {internal_clause}
         """), {"ydate": yesterday}).mappings().first()
 
         yesterday_active = yesterday_row["total_active"] or 0
@@ -680,25 +716,34 @@ def admin_retention_stats(
         yesterday_returning = yesterday_row["returning_users"] or 0
         yesterday_ret_pct = round(100.0 * yesterday_returning / max(1, yesterday_active), 1)
 
-        # 3. Kunma-kun tahlil (Oxirgi N kun)
+        # 3. Kunma-kun tahlil (Oxirgi N kun yoki loyiha boshidan)
         daily_rows = db.execute(text(f"""
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            )
             SELECT 
-                v.visit_date::date as day,
-                count(DISTINCT v.user_id) as total_active,
-                count(DISTINCT CASE WHEN v.visit_date::date = u.created_at::date THEN v.user_id END) as new_users,
-                count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users,
+                a.day,
+                count(DISTINCT a.user_id) as total_active,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date = a.day THEN a.user_id END) as new_users,
+                count(DISTINCT CASE WHEN (u.created_at + interval '5 hours')::date < a.day THEN a.user_id END) as returning_users,
                 COALESCE((
                     SELECT count(*) FROM dubbing_jobs j 
                     LEFT JOIN users ju ON j.user_id = ju.id
-                    WHERE j.created_at::date = v.visit_date::date
+                    WHERE (j.created_at + interval '5 hours')::date = a.day
                     {'AND (ju.id IS NULL OR ju.is_internal = FALSE)' if not include_internal else ''}
                 ), 0) as jobs_count
-            FROM user_daily_visits v
-            JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date >= :since {internal_clause}
-            GROUP BY v.visit_date::date
-            ORDER BY day DESC
-        """), {"since": since_date}).mappings().all()
+            FROM user_activity a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.day >= :since AND a.day <= :today {internal_clause}
+            GROUP BY a.day
+            ORDER BY a.day DESC
+        """), {"since": since_date, "today": today}).mappings().all()
 
         daily_stats = []
         for r in daily_rows:
@@ -713,52 +758,100 @@ def admin_retention_stats(
                 "jobs_count": r["jobs_count"] or 0,
             })
 
-        # 4. Kirish chastotasi taqsimoti (Frequency distribution)
+        # 4. Kirish chastotasi taqsimoti (Frequency distribution: 1, 3, 6, 14, 30, 30+)
         freq_row = db.execute(text(f"""
-            WITH counts AS (
-                SELECT v.user_id, count(DISTINCT v.visit_date) as cnt
-                FROM user_daily_visits v
-                JOIN users u ON v.user_id = u.id
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            ),
+            counts AS (
+                SELECT a.user_id, count(DISTINCT a.day) as cnt
+                FROM user_activity a
+                JOIN users u ON a.user_id = u.id
                 {internal_u_where}
-                GROUP BY v.user_id
+                GROUP BY a.user_id
             )
             SELECT 
-                count(DISTINCT CASE WHEN cnt = 1 THEN user_id END) as one_day,
+                count(DISTINCT CASE WHEN cnt = 1 THEN user_id END) as days_1,
                 count(DISTINCT CASE WHEN cnt BETWEEN 2 AND 3 THEN user_id END) as days_2_3,
-                count(DISTINCT CASE WHEN cnt BETWEEN 4 AND 7 THEN user_id END) as days_4_7,
-                count(DISTINCT CASE WHEN cnt >= 8 THEN user_id END) as days_8_plus
+                count(DISTINCT CASE WHEN cnt BETWEEN 4 AND 6 THEN user_id END) as days_4_6,
+                count(DISTINCT CASE WHEN cnt BETWEEN 7 AND 14 THEN user_id END) as days_7_14,
+                count(DISTINCT CASE WHEN cnt BETWEEN 15 AND 30 THEN user_id END) as days_15_30,
+                count(DISTINCT CASE WHEN cnt > 30 THEN user_id END) as days_30_plus
             FROM counts;
         """)).mappings().first()
 
-        one_day = freq_row["one_day"] or 0
-        days_2_3 = freq_row["days_2_3"] or 0
-        days_4_7 = freq_row["days_4_7"] or 0
-        days_8_plus = freq_row["days_8_plus"] or 0
+        d1 = freq_row["days_1"] or 0
+        d23 = freq_row["days_2_3"] or 0
+        d46 = freq_row["days_4_6"] or 0
+        d714 = freq_row["days_7_14"] or 0
+        d1530 = freq_row["days_15_30"] or 0
+        d30p = freq_row["days_30_plus"] or 0
 
         frequency = [
-            {"label": "1 marta kirgan", "count": one_day, "pct": round(100.0 * one_day / max(1, total_act), 1)},
-            {"label": "2-3 kun kirgan", "count": days_2_3, "pct": round(100.0 * days_2_3 / max(1, total_act), 1)},
-            {"label": "4-7 kun kirgan (Faol)", "count": days_4_7, "pct": round(100.0 * days_4_7 / max(1, total_act), 1)},
-            {"label": "8+ kun kirgan (Sodiq)", "count": days_8_plus, "pct": round(100.0 * days_8_plus / max(1, total_act), 1)},
+            {"label": "1 kun", "count": d1, "pct": round(100.0 * d1 / max(1, total_act), 1)},
+            {"label": "3 kun (2-3 kun)", "count": d23, "pct": round(100.0 * d23 / max(1, total_act), 1)},
+            {"label": "6 kun (4-6 kun)", "count": d46, "pct": round(100.0 * d46 / max(1, total_act), 1)},
+            {"label": "14 kun (7-14 kun)", "count": d714, "pct": round(100.0 * d714 / max(1, total_act), 1)},
+            {"label": "30 kun (15-30 kun)", "count": d1530, "pct": round(100.0 * d1530 / max(1, total_act), 1)},
+            {"label": "Barchasi (30+ kun)", "count": d30p, "pct": round(100.0 * d30p / max(1, total_act), 1)},
         ]
 
-        # 5. Oxirgi faol bo'lgan foydalanuvchilar (50 ta)
+        # 5. Oxirgi faol bo'lgan foydalanuvchilar (Default 20 ta limit, streak va tarif bilan)
         user_rows = db.execute(text(f"""
+            WITH user_activity AS (
+                SELECT v.user_id, v.visit_date as day FROM user_daily_visits v
+                UNION
+                SELECT u.id as user_id, (u.created_at + interval '5 hours')::date as day FROM users u
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as day FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT u.id as user_id, (u.last_active_at + interval '5 hours')::date as day FROM users u WHERE u.last_active_at IS NOT NULL
+            ),
+            user_days AS (
+                SELECT user_id, day,
+                       day - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY day))::int as grp
+                FROM user_activity
+            ),
+            user_streaks AS (
+                SELECT user_id, count(*) as streak_len
+                FROM user_days
+                GROUP BY user_id, grp
+            ),
+            streaks AS (
+                SELECT user_id, max(streak_len) as streak
+                FROM user_streaks
+                GROUP BY user_id
+            ),
+            act_days AS (
+                SELECT user_id, count(DISTINCT day) as total_days
+                FROM user_activity
+                GROUP BY user_id
+            )
             SELECT 
                 u.id,
                 u.name,
                 u.email,
                 u.phone,
-                u.created_at,
-                u.last_active_at,
-                COALESCE(v.active_days, 1) as active_days,
+                (u.created_at + interval '5 hours') as created_at_tashkent,
+                (u.last_active_at + interval '5 hours') as last_active_at_tashkent,
+                COALESCE(ad.total_days, 1) as active_days,
+                COALESCE(st.streak, 1) as streak,
+                COALESCE(s.plan::text, 'free') as plan,
                 COALESCE(j.jobs_count, 0) as jobs_count
             FROM users u
+            LEFT JOIN act_days ad ON u.id = ad.user_id
+            LEFT JOIN streaks st ON u.id = st.user_id
             LEFT JOIN (
-                SELECT user_id, count(DISTINCT visit_date) as active_days
-                FROM user_daily_visits
-                GROUP BY user_id
-            ) v ON u.id = v.user_id
+                SELECT DISTINCT ON (user_id) user_id, plan 
+                FROM subscriptions 
+                ORDER BY user_id, created_at DESC
+            ) s ON u.id = s.user_id
             LEFT JOIN (
                 SELECT user_id, count(*) as jobs_count
                 FROM dubbing_jobs
@@ -767,30 +860,38 @@ def admin_retention_stats(
             ) j ON u.id = j.user_id
             {internal_u_where}
             ORDER BY u.last_active_at DESC NULLS LAST
-            LIMIT 50;
-        """)).mappings().all()
+            LIMIT :limit OFFSET :offset;
+        """), {"limit": limit, "offset": offset}).mappings().all()
 
         recent_users_list = []
         for u in user_rows:
             act_days = u["active_days"] or 1
-            if act_days >= 4:
+            streak = u["streak"] or 1
+            plan = u["plan"] or "free"
+
+            if act_days >= 7:
                 status = "loyal"
-                status_label = "Sodiq (4+ kun)"
-            elif act_days >= 2:
+                status_label = "Sodiq (7+ kun)"
+            elif act_days >= 3:
                 status = "returning"
-                status_label = "Qaytgan (2-3 kun)"
+                status_label = "Faol (3-6 kun)"
+            elif act_days == 2:
+                status = "returning"
+                status_label = "Qaytgan (2 kun)"
             else:
                 status = "one_time"
-                status_label = "1 marta kirgan"
+                status_label = "1 kun kirgan"
 
             recent_users_list.append({
                 "id": str(u["id"]),
                 "name": u["name"] or "Noma'lum",
                 "email": u["email"] or "",
                 "phone": u["phone"] or "",
-                "created_at": u["created_at"].strftime("%Y-%m-%d %H:%M") if u["created_at"] else None,
-                "last_active_at": u["last_active_at"].strftime("%Y-%m-%d %H:%M") if u["last_active_at"] else None,
+                "created_at": u["created_at_tashkent"].strftime("%Y-%m-%d %H:%M") if u["created_at_tashkent"] else None,
+                "last_active_at": u["last_active_at_tashkent"].strftime("%Y-%m-%d %H:%M") if u["last_active_at_tashkent"] else None,
                 "active_days": act_days,
+                "streak": streak,
+                "plan": plan,
                 "jobs_count": u["jobs_count"] or 0,
                 "loyalty_status": status,
                 "loyalty_label": status_label,
