@@ -60,11 +60,12 @@ def save_error_log(
     from redis import Redis
 
     settings = get_settings()
-    if not settings.REDIS_URL:
+    redis_url = getattr(settings, "REDIS_URL", None)
+    if not redis_url or not isinstance(redis_url, str):
         return None
 
     try:
-        r = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=3)
+        r = Redis.from_url(redis_url, decode_responses=True, socket_timeout=3)
         raw_tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         data = {
             "id": error_id,
@@ -81,7 +82,8 @@ def save_error_log(
             "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
         r.setex(f"errlog:{error_id}", 7 * 86400, json.dumps(data, ensure_ascii=False))
-        base_url = settings.FRONTEND_URL.rstrip("/")
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://gapirai.uz")
+        base_url = (frontend_url if isinstance(frontend_url, str) else "https://gapirai.uz").rstrip("/")
         return f"{base_url}/api/errors/{error_id}"
     except Exception as e:
         logger.warning(f"Error logni Redisga saqlashda xatolik: {e}")

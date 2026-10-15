@@ -69,9 +69,13 @@ class TestTelegramNotify(unittest.TestCase):
         self.assertIn("18+ behayo / shahvoniy", sent_text)
         self.assertIn("Videodagi nutq (transkript)", sent_text)
 
-        # Local file should not have inline URL button
+        # Local file should not have inline URL button, but should have delete button
         reply_markup = mock_send_msg.call_args_list[0].kwargs.get("reply_markup")
-        self.assertIsNone(reply_markup)
+        self.assertIsNotNone(reply_markup)
+        delete_btn = [btn for row in reply_markup["inline_keyboard"] for btn in row if btn.get("callback_data") == "del_msg"]
+        self.assertEqual(len(delete_btn), 1)
+        url_btns = [btn for row in reply_markup["inline_keyboard"] for btn in row if "url" in btn]
+        self.assertEqual(len(url_btns), 0)
 
     @patch("backend.services.telegram_notify.send_telegram_message")
     @patch("backend.services.telegram_notify.get_settings")
