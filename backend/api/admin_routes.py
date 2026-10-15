@@ -400,6 +400,7 @@ class AddMinutesRequest(BaseModel):
     minutes: float | None = None
     amount_uzs: float | None = None
     rate_per_minute: float = 500.0
+    action: str = "add"  # "add" | "deduct"
     reason: str | None = None
 
 
@@ -481,14 +482,16 @@ def admin_add_minutes(
     req: AddMinutesRequest,
     current_user: User = Depends(get_current_admin_user),
 ):
-    """Admin orqali daqiqa yoki so'm kiritilganda avtomatik hisoblab balansga daqiqa qo'shish."""
-    minutes_to_add = req.minutes
-    if (minutes_to_add is None or minutes_to_add <= 0) and req.amount_uzs is not None and req.amount_uzs > 0:
+    """Admin orqali daqiqa yoki so'm kiritilganda avtomatik hisoblab balansga daqiqa qo'shish yoki ayirish."""
+    mins = req.minutes
+    if (mins is None or mins <= 0) and req.amount_uzs is not None and req.amount_uzs > 0:
         rate = req.rate_per_minute if req.rate_per_minute > 0 else 500.0
-        minutes_to_add = round(req.amount_uzs / rate, 1)
+        mins = round(req.amount_uzs / rate, 1)
 
-    if minutes_to_add is None or minutes_to_add <= 0:
-        raise HTTPException(status_code=400, detail="Qo'shiladigan daqiqa yoki summa 0 dan katta bo'lishi kerak")
+    if mins is None or mins <= 0:
+        raise HTTPException(status_code=400, detail="Daqiqa yoki summa 0 dan katta bo'lishi kerak")
+
+    is_deduct = str(req.action or "").lower() in ["deduct", "subtract", "minus", "ayirish"]
 
     db = SessionLocal()
     try:
@@ -497,20 +500,58 @@ def admin_add_minutes(
             raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
 
         sub = get_or_create_subscription(db, user.id, for_update=True)
-        sub.purchased_minutes = round(float(sub.purchased_minutes or 0.0) + float(minutes_to_add), 1)
-        db.commit()
-        db.refresh(sub)
+        from backend.services.plans import PLANS
+        plan = PLANS[sub.plan.value]
 
-        bal = get_minute_balance(db, user.id)
-        return {
-            "success": True,
-            "message": f"{minutes_to_add} daqiqa muvaffaqiyatli qo'shildi",
-            "added_minutes": minutes_to_add,
-            "purchased_minutes": sub.purchased_minutes,
-            "balance": bal,
-        }
+        if is_deduct:
+            # 1. Avval kuymaydigan (purchased_minutes) dan ayiramiz
+            purchased = float(sub.purchased_minutes or 0.0)
+            if purchased >= mins:
+                sub.purchased_minutes = round(purchased - mins, 1)
+            else:
+                leftover = mins - purchased
+                sub.purchased_minutes = 0.0
+                # Qolganini joriy oylik kvotadan ayiramiz (monthly_minutes_used ni oshirish orqali)
+                current_used = float(sub.monthly_minutes_used or 0.0)
+                sub.monthly_minutes_used = round(min(float(plan.monthly_minutes), current_used + leftover), 1)
+
+            db.commit()
+            db.refresh(sub)
+
+            bal = get_minute_balance(db, user.id)
+            return {
+                "success": True,
+                "message": f"{mins} daqiqa muvaffaqiyatli ayirildi",
+                "deducted_minutes": mins,
+                "purchased_minutes": sub.purchased_minutes,
+                "balance": bal,
+            }
+        else:
+            sub.purchased_minutes = round(float(sub.purchased_minutes or 0.0) + float(mins), 1)
+            db.commit()
+            db.refresh(sub)
+
+            bal = get_minute_balance(db, user.id)
+            return {
+                "success": True,
+                "message": f"{mins} daqiqa muvaffaqiyatli qo'shildi",
+                "added_minutes": mins,
+                "purchased_minutes": sub.purchased_minutes,
+                "balance": bal,
+            }
     finally:
         db.close()
+
+
+@router.post("/users/{user_id}/deduct-minutes")
+def admin_deduct_minutes(
+    user_id: str,
+    req: AddMinutesRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin orqali daqiqa ayirish uchun alohida endpoint."""
+    req.action = "deduct"
+    return admin_add_minutes(user_id=user_id, req=req, current_user=current_user)
 
 
 @router.post("/users/{user_id}/set-plan")

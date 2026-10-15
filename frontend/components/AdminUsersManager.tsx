@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNod
 import {
   Search,
   Plus,
+  Minus,
   Zap,
   Crown,
   Sparkles,
@@ -76,8 +77,9 @@ function AdminUsersManagerInner() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  // Minute Top-up modal state
+  // Minute Top-up / Deduct modal state
   const [minuteModalUser, setMinuteModalUser] = useState<AdminUserItem | null>(null)
+  const [actionType, setActionType] = useState<'add' | 'deduct'>('add')
   const [amountUzs, setAmountUzs] = useState<string>('')
   const [minutes, setMinutes] = useState<string>('')
   const [ratePerMinute, setRatePerMinute] = useState<number>(500)
@@ -170,15 +172,17 @@ function AdminUsersManagerInner() {
         minutes: !isNaN(numMins) && numMins > 0 ? numMins : undefined,
         amount_uzs: !isNaN(numAmount) && numAmount > 0 ? numAmount : undefined,
         rate_per_minute: ratePerMinute,
+        action: actionType,
       })
-      setSuccessMsg(res.message || "Daqiqalar muvaffaqiyatli qo'shildi!")
+      setSuccessMsg(res.message || (actionType === 'deduct' ? "Daqiqalar muvaffaqiyatli ayirildi!" : "Daqiqalar muvaffaqiyatli qo'shildi!"))
       setMinuteModalUser(null)
       setAmountUzs('')
       setMinutes('')
+      setActionType('add')
       fetchUsers(search, page)
       setTimeout(() => setSuccessMsg(null), 4000)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Daqiqa qo'shishda xatolik yuz berdi")
+      setError(err?.response?.data?.detail || "Amalni bajarishda xatolik yuz berdi")
     } finally {
       setActionLoading(false)
     }
@@ -442,15 +446,15 @@ function AdminUsersManagerInner() {
         )}
       </div>
 
-      {/* MODAL 1: ADD MINUTES / SUMMA MODAL */}
+      {/* MODAL 1: ADD / DEDUCT MINUTES MODAL */}
       {minuteModalUser && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Coins className="w-5 h-5 text-emerald-400" />
-                  Daqiqa yoki Summa qo'shish
+                  <Coins className={`w-5 h-5 ${actionType === 'deduct' ? 'text-rose-400' : 'text-emerald-400'}`} />
+                  {actionType === 'deduct' ? "Daqiqa yoki Summa ayirish" : "Daqiqa yoki Summa qo'shish"}
                 </h3>
                 <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
                   {minuteModalUser.email || minuteModalUser.phone || minuteModalUser.name || 'Foydalanuvchi'}
@@ -464,6 +468,32 @@ function AdminUsersManagerInner() {
               </button>
             </div>
 
+            {/* Segmented control: Qo'shish / Ayirish */}
+            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
+              <button
+                type="button"
+                onClick={() => setActionType('add')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                  actionType === 'add'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" /> Balansga qo'shish
+              </button>
+              <button
+                type="button"
+                onClick={() => setActionType('deduct')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                  actionType === 'deduct'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Minus className="w-3.5 h-3.5" /> Balansdan ayirish
+              </button>
+            </div>
+
             <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs flex justify-between items-center">
               <span className="text-gray-400">Joriy balans:</span>
               <span className="text-emerald-400 font-bold">
@@ -474,7 +504,7 @@ function AdminUsersManagerInner() {
             {/* Quick presets */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                Tezkor summalar:
+                {actionType === 'deduct' ? "Tezkor ayirish:" : "Tezkor summalar:"}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -489,7 +519,9 @@ function AdminUsersManagerInner() {
                     key={p.amount}
                     type="button"
                     onClick={() => applyPreset(p.amount)}
-                    className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-gray-200 hover:border-emerald-500/50 transition text-center"
+                    className={`px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-gray-200 transition text-center ${
+                      actionType === 'deduct' ? 'hover:border-rose-500/50' : 'hover:border-emerald-500/50'
+                    }`}
                   >
                     {p.label}
                   </button>
@@ -510,7 +542,9 @@ function AdminUsersManagerInner() {
                     placeholder="Masalan: 5000"
                     min="0"
                     step="any"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+                    className={`w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition ${
+                      actionType === 'deduct' ? 'focus:border-rose-500' : 'focus:border-emerald-500'
+                    }`}
                   />
                 </div>
 
@@ -525,7 +559,9 @@ function AdminUsersManagerInner() {
                     placeholder="Masalan: 10"
                     min="0"
                     step="any"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+                    className={`w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none transition ${
+                      actionType === 'deduct' ? 'focus:border-rose-500' : 'focus:border-emerald-500'
+                    }`}
                   />
                 </div>
               </div>
@@ -544,7 +580,11 @@ function AdminUsersManagerInner() {
               </div>
 
               <p className="text-[11px] text-gray-400 leading-relaxed">
-                ℹ️ Qo'shilgan daqiqalar foydalanuvchining <span className="text-emerald-400 font-semibold">kuymaydigan balansi</span>ga yoziladi va oylik obuna tugasa ham saqlanib qoladi.
+                {actionType === 'deduct' ? (
+                  <>⚠️ Belgilangan daqiqa foydalanuvchining <span className="text-rose-400 font-semibold">balansidan yechib olinadi</span>.</>
+                ) : (
+                  <>ℹ️ Qo'shilgan daqiqalar foydalanuvchining <span className="text-emerald-400 font-semibold">kuymaydigan balansi</span>ga yoziladi va oylik obuna tugasa ham saqlanib qoladi.</>
+                )}
               </p>
 
               <div className="flex items-center gap-2 pt-2">
@@ -558,10 +598,20 @@ function AdminUsersManagerInner() {
                 <button
                   type="submit"
                   disabled={actionLoading || (!minutes && !amountUzs)}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                  className={`flex-1 py-2.5 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${
+                    actionType === 'deduct'
+                      ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-lg shadow-rose-900/30'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
+                  }`}
                 >
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Balansga qo'shish
+                  {actionLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : actionType === 'deduct' ? (
+                    <Minus className="w-4 h-4" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  {actionType === 'deduct' ? "Balansdan ayirish" : "Balansga qo'shish"}
                 </button>
               </div>
             </form>

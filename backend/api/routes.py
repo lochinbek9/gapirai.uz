@@ -525,8 +525,10 @@ def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
+    from backend.services.plans import is_user_admin
+    is_admin = is_user_admin(db, current_user_id)
     is_owner = current_user_id is not None and job.user_id == current_user_id
-    if current_user_id is not None and not is_owner:
+    if current_user_id is not None and not is_owner and not is_admin:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
     # On-demand video recovery tekshiruvi:
@@ -550,7 +552,7 @@ def get_job(
         and (job.status in (JobStatus.DOWNLOADING, JobStatus.SYNTHESIZING, JobStatus.MERGING, JobStatus.PENDING))
     )
 
-    if not is_owner:
+    if not is_owner and not is_admin:
         raw_status = job.status.value if hasattr(job.status, "value") else job.status
         if str(raw_status).upper() != "COMPLETED" and not is_recovering:
             raise HTTPException(status_code=404, detail="Job topilmadi.")
