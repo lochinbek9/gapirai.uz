@@ -116,6 +116,11 @@ class TestTelegramNotify(unittest.TestCase):
         self.assertIn("TRANSCRIBE", sent_text)
         self.assertIn("Bu videoda nutq topilmadi.", sent_text)
 
+        reply_markup = mock_send_msg.call_args.kwargs.get("reply_markup")
+        self.assertIsNotNone(reply_markup)
+        delete_btn = [btn for row in reply_markup["inline_keyboard"] for btn in row if btn.get("callback_data") == "del_msg"]
+        self.assertEqual(len(delete_btn), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

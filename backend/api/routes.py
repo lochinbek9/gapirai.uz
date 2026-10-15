@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, Response, RedirectResponse
+from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, defer
 from pathlib import Path
@@ -1231,5 +1231,231 @@ def submit_feedback(
         pass
 
     return {"success": True, "message": "Fikringiz va baholashingiz uchun rahmat!"}
+
+
+@router.get("/errors/{error_id}", response_class=HTMLResponse)
+def view_error_log(error_id: str):
+    import html
+    import json
+    from redis import Redis
+
+    settings = get_settings()
+    data = None
+    if settings.REDIS_URL:
+        try:
+            r = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=3)
+            raw = r.get(f"errlog:{error_id}")
+            if raw:
+                data = json.loads(raw)
+        except Exception as e:
+            logger.warning(f"Error logni Redisdan olishda xatolik: {e}")
+
+    if not data:
+        return HTMLResponse(
+            status_code=404,
+            content="""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Xatolik logi topilmadi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .box { background: #1e293b; padding: 32px; border-radius: 12px; text-align: center; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2 { color: #f87171; margin-top: 0; }
+        p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Xatolik logi topilmadi</h2>
+        <p>Ushbu log eskirgan (7 kundan ortiq) yoki serverda mavjud emas.</p>
+    </div>
+</body>
+</html>""",
+        )
+
+    exc_name = html.escape(data.get("exc_name") or "Xatolik")
+    exc_msg = html.escape(data.get("exc_msg") or "")
+    stage = html.escape(data.get("stage") or "Noma'lum")
+    job_id = html.escape(data.get("job_id") or "-")
+    user_name = html.escape(data.get("user_name") or "-")
+    user_contact = html.escape(data.get("user_email_or_phone") or "")
+    video_title = html.escape(data.get("video_title") or "-")
+    video_url = data.get("video_url") or ""
+    created_at = html.escape(data.get("created_at") or "")
+    traceback_str = html.escape(data.get("traceback") or "Traceback mavjud emas")
+
+    video_link_html = f'<a href="{html.escape(video_url)}" target="_blank" rel="noopener">{html.escape(video_url)}</a>' if video_url else "-"
+    user_html = f"{user_name} (<code>{user_contact}</code>)" if user_contact else user_name
+
+    og_title = f"🚨 {exc_name}: {exc_msg[:70]}"
+    og_desc = f"Bosqich: {stage} | Video: {data.get('video_title') or '-'}"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xatolik: {exc_name}</title>
+    <meta property="og:site_name" content="GapirAI.uz Error Log">
+    <meta property="og:title" content="{html.escape(og_title)}">
+    <meta property="og:description" content="{html.escape(og_desc)}">
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        :root {{
+            --bg: #090d16;
+            --card: #131c2e;
+            --border: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-red: #ef4444;
+            --code-bg: #050811;
+        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px 16px;
+            display: flex;
+            justify-content: center;
+        }}
+        .container {{
+            width: 100%;
+            max-width: 900px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }}
+        .header {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }}
+        .header h1 {{
+            font-size: 1.25rem;
+            color: var(--accent-red);
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            word-break: break-all;
+        }}
+        .badge {{
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }}
+        .meta-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }}
+        .meta-card {{
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 8px;
+        }}
+        .meta-card .label {{
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }}
+        .meta-card .value {{
+            font-size: 0.9rem;
+            color: var(--text);
+            word-break: break-all;
+        }}
+        .meta-card a {{ color: #38bdf8; text-decoration: none; }}
+        .meta-card a:hover {{ text-decoration: underline; }}
+        .section-title {{
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .copy-btn {{
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid #334155;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .copy-btn:hover {{ background: #334155; color: white; }}
+        pre {{
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.84rem;
+            line-height: 1.55;
+            color: #7dd3fc;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 {exc_name}</h1>
+            <span class="badge">{stage}</span>
+        </div>
+        <div class="meta-grid">
+            <div class="meta-card">
+                <div class="label">Sana / Vaqt</div>
+                <div class="value">{created_at}</div>
+            </div>
+            <div class="meta-card">
+                <div class="label">Foydalanuvchi</div>
+                <div class="value">{user_html}</div>
+            </div>
+            <div class="meta-card">
+                <div class="label">Video</div>
+                <div class="value">{video_title}</div>
+            </div>
+            <div class="meta-card">
+                <div class="label">Havola</div>
+                <div class="value">{video_link_html}</div>
+            </div>
+            <div class="meta-card">
+                <div class="label">Job ID</div>
+                <div class="value"><code>{job_id}</code></div>
+            </div>
+            <div class="meta-card">
+                <div class="label">Xatolik matni</div>
+                <div class="value">{exc_msg}</div>
+            </div>
+        </div>
+        <div class="section-title">
+            <span>Traceback</span>
+            <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('tb').innerText); this.innerText='Nusxalandi!'; setTimeout(() => this.innerText='Nusxa olish', 2000)">Nusxa olish</button>
+        </div>
+        <pre id="tb">{traceback_str}</pre>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
 
 

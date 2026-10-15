@@ -42,6 +42,52 @@ def send_telegram_message(chat_id: str, text: str, reply_markup: dict | None = N
         return False
 
 
+def save_error_log(
+    error_id: str,
+    exc: Exception,
+    *,
+    context_msg: str = "",
+    job_id: str | None = None,
+    user_name: str | None = None,
+    user_email_or_phone: str | None = None,
+    video_title: str | None = None,
+    video_url: str | None = None,
+    stage: str | None = None,
+) -> str | None:
+    import json
+    import traceback
+    from datetime import datetime
+    from redis import Redis
+
+    settings = get_settings()
+    if not settings.REDIS_URL:
+        return None
+
+    try:
+        r = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=3)
+        raw_tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        data = {
+            "id": error_id,
+            "exc_name": type(exc).__name__,
+            "exc_msg": str(exc),
+            "context_msg": context_msg,
+            "stage": stage,
+            "job_id": job_id,
+            "video_title": video_title,
+            "video_url": video_url,
+            "user_name": user_name,
+            "user_email_or_phone": user_email_or_phone,
+            "traceback": raw_tb,
+            "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        }
+        r.setex(f"errlog:{error_id}", 7 * 86400, json.dumps(data, ensure_ascii=False))
+        base_url = settings.FRONTEND_URL.rstrip("/")
+        return f"{base_url}/api/errors/{error_id}"
+    except Exception as e:
+        logger.warning(f"Error logni Redisga saqlashda xatolik: {e}")
+        return None
+
+
 def send_error_to_admins(
     exc: Exception,
     context_msg: str = "",
@@ -56,6 +102,7 @@ def send_error_to_admins(
     import traceback
     import html
     import re
+    import uuid
 
     settings = get_settings()
     if not settings.ADMIN_TG_IDS:
@@ -111,6 +158,19 @@ def send_error_to_admins(
         except Exception:
             pass
 
+    error_id = uuid.uuid4().hex[:12]
+    error_url = save_error_log(
+        error_id,
+        exc,
+        context_msg=context_msg,
+        job_id=job_id,
+        user_name=user_name,
+        user_email_or_phone=user_email_or_phone,
+        video_title=video_title,
+        video_url=video_url,
+        stage=stage,
+    )
+
     tb_str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     tb_str = html.escape(tb_str)
     exc_name = html.escape(type(exc).__name__)
@@ -138,13 +198,25 @@ def send_error_to_admins(
     elif context_msg:
         lines.append(f"<b>Context:</b> {html.escape(context_msg)}")
 
-    lines.append(f"⚠️ <b>Xatolik:</b> <code>{exc_name}</code>: {exc_msg}\n")
-    lines.append(f"<b>Traceback:</b>\n<pre>{tb_str[:2500]}</pre>")
+    lines.append(f"⚠️ <b>Xatolik:</b> <code>{exc_name}</code>: {exc_msg}")
+
+    if error_url:
+        lines.append(f"\n📄 <b>Log:</b> <a href=\"{error_url}\">Traceback ko'rish</a>")
+    else:
+        lines.append(f"\n<blockquote expandable><b>Traceback:</b>\n<pre>{tb_str[:2500]}</pre></blockquote>")
 
     text = "\n".join(lines)
 
+    btn_row = []
+    if video_url and (video_url.startswith("http://") or video_url.startswith("https://")):
+        btn_row.append({"text": "🎬 Video", "url": video_url})
+    if error_url:
+        btn_row.append({"text": "📄 Log", "url": error_url})
+    btn_row.append({"text": "🗑", "callback_data": "del_msg"})
+    reply_markup = {"inline_keyboard": [btn_row]}
+
     for admin_id in admin_ids:
-        send_telegram_message(admin_id, text)
+        send_telegram_message(admin_id, text, reply_markup=reply_markup)
 
 
 
@@ -187,18 +259,17 @@ def send_content_blocked_to_admins(
     cat_label = category_names.get(category, category or "Noma'lum")
     stage_label = "Sarlavha/tavsif (metadata)" if stage == "metadata" else "Videodagi nutq (transkript)"
 
-    reply_markup = None
+    btn_row = []
     if video_url and (video_url.startswith("http://") or video_url.startswith("https://")):
         video_link_html = f'<a href="{html.escape(video_url)}">{html.escape(video_url)}</a>'
-        reply_markup = {
-            "inline_keyboard": [
-                [{"text": "🎬 Videoni ko'rish", "url": video_url}]
-            ]
-        }
+        btn_row.append({"text": "🎬 Videoni ko'rish", "url": video_url})
     elif video_url:
         video_link_html = f'<code>{html.escape(video_url)}</code>'
     else:
         video_link_html = "<i>Fayl orqali yuklangan (havola mavjud emas)</i>"
+
+    btn_row.append({"text": "🗑", "callback_data": "del_msg"})
+    reply_markup = {"inline_keyboard": [btn_row]}
 
     default_title = "Noma'lum"
     default_reason = "Ko'rsatilmagan"

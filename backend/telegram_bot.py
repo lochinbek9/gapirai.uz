@@ -727,6 +727,18 @@ async def handle_resolution_callback(update: Update, context: ContextTypes.DEFAU
         db.close()
 
 
+async def handle_delete_message_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+    try:
+        if query.message:
+            await query.message.delete()
+    except Exception as e:
+        logger.warning(f"Admin xabarini o'chirishda xatolik: {e}")
+
+
 def main() -> None:
     if not settings.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN sozlanmagan -- bot ishga tushmaydi.")
@@ -752,6 +764,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.VIDEO | filters.VIDEO_NOTE | filters.Document.ALL | filters.ANIMATION, handle_video))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(handle_delete_message_callback, pattern=r"^del_msg$"))
     app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern=r"^menu:"))
     app.add_handler(CallbackQueryHandler(handle_gender_callback, pattern=r"^vg:"))
     app.add_handler(CallbackQueryHandler(handle_file_gender_callback, pattern=r"^vg_file:"))
