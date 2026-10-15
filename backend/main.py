@@ -337,6 +337,18 @@ async def auth_busy_handler(request: Request, exc: AuthBusyError):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # ClientDisconnect -- foydalanuvchi o'zi ulanishni uzgan (tab yopdi,
+    # internet uzildi, yuklash o'rtasida orqaga qaytdi). Bu SERVER xatosi emas,
+    # shuning uchun admin xabarnomasi yubormaylik va log darajasini WARNING qilamiz.
+    from starlette.requests import ClientDisconnect as _ClientDisconnect
+    if isinstance(exc, _ClientDisconnect):
+        logger.warning(f"[client_disconnect] {request.method} {request.url.path} — mijoz ulanishni uzdi")
+        return JSONResponse(
+            status_code=499,
+            content={"detail": "Ulanish uzildi."},
+            headers={"Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                     "Access-Control-Allow-Credentials": "true"},
+        )
     """Barcha ushlanmagan xatoliklar shu yerga tushadi. Avval bu yerda
     xom `str(exc)` to'g'ridan-to'g'ri foydalanuvchiga qaytarilardi (ichki
     xato matnini, ba'zan fayl yo'llari yoki kutubxona ichki tafsilotlarini
