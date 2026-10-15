@@ -140,6 +140,12 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
             err_str = str(e)
             is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
             is_503 = "503" in err_str or "UNAVAILABLE" in err_str
+            is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
+
+            if is_unauth:
+                mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: yaroqsiz kalit")
+                logger.warning(f"Gemini TTS [{key[:10]}...] 401 yaroqsiz kalit — o'chirildi.")
+                continue
 
             if is_rate_limit:
                 delay = parse_retry_delay(err_str)
@@ -154,12 +160,20 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
 
             logger.warning(f"Gemini TTS [{key[:10]}...] xato: {e}")
 
-    # 2. Agar barcha kalitlar cooldown'da bo'lsa, 3 soniya kutib 1-kalit bilan qayta urinish
-    logger.warning("Gemini TTS: Barcha kalitlar cooldown'da yoki band. 3.0s kutib qayta sinab ko'riladi.")
-    time.sleep(3.0)
+    # 2. Agar barcha kalitlar cooldown'da bo'lsa
+    key_cooldowns = [is_model_available(k, model_name)[1] for k in api_keys]
+    min_rem = min(key_cooldowns, default=99999.0)
+    if min_rem > 15.0:
+        logger.warning(f"Gemini TTS: Barcha kalitlar uzoq cooldown'da ({min_rem:.0f}s). Zaxira providerga o'tilmoqda.")
+        return None
+
+    # Faqat qisqa cooldown (<= 15 soniya) bo'lsa kutib eng yaxshi kalit bilan qayta urinish
+    best_key = min(api_keys, key=lambda k: is_model_available(k, model_name)[1])
+    wait_time = max(1.0, min(min_rem, 3.0))
+    logger.info(f"Gemini TTS: Qisqa kutish ({wait_time:.1f}s) va qayta urinish...")
+    time.sleep(wait_time)
     try:
-        fallback_key = api_keys[0]
-        client = _get_client(api_key=fallback_key)
+        client = _get_client(api_key=best_key)
         response = client.models.generate_content(
             model=model_name,
             contents=contents,
@@ -173,7 +187,7 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                     if isinstance(raw_data, str):
                         import base64
                         raw_data = base64.b64decode(raw_data)
-                    record_model_success(fallback_key, model_name)
+                    record_model_success(best_key, model_name)
                     return raw_data
     except Exception as e:
         logger.error(f"Gemini TTS oxirgi urinish ham xato berdi: {e}")
