@@ -26,24 +26,33 @@ _NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
 _gemini_local = threading.local()
 
 
-def _get_gemini_transcribe_client():
-    if not hasattr(_gemini_local, "client"):
-        from google import genai
+def _get_gemini_transcribe_client(api_key: str | None = None):
+    from google import genai
 
-        if settings.GEMINI_USE_VERTEX:
+    if settings.GEMINI_USE_VERTEX:
+        if not hasattr(_gemini_local, "vertex_client"):
             if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
-            _gemini_local.client = genai.Client(
+            _gemini_local.vertex_client = genai.Client(
                 vertexai=True,
                 project=settings.GCP_PROJECT_ID,
                 location=settings.GCP_LOCATION,
             )
-        else:
-            api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
-            if not api_key:
-                raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
-            _gemini_local.client = genai.Client(api_key=api_key)
-    return _gemini_local.client
+        return _gemini_local.vertex_client
+
+    if not api_key:
+        api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
+
+    clients = getattr(_gemini_local, "clients", None)
+    if clients is None:
+        clients = {}
+        _gemini_local.clients = clients
+
+    if api_key not in clients:
+        clients[api_key] = genai.Client(api_key=api_key)
+    return clients[api_key]
 
 # Whisper faqat cholg'u ohangini "♪♪" yoki "[Music]"/"(applause)" kabi
 # belgi bilan qaytarishi mumkin — bular haqiqiy nutq emas.
@@ -287,11 +296,11 @@ def _get_gemini_candidate_models(primary: str) -> list[str]:
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
-        "gemini-3.5-transcribe",
         "gemini-3.5-flash-lite",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
-        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-preview",
     ]
     seen = set()
     return [m for m in order if m and not (m in seen or seen.add(m))]
@@ -333,8 +342,16 @@ def _build_transcribe_prompt(language: str | None) -> str:
 
 def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
     """Google AI Studio / Vertex AI orqali Gemini bilan audio STT transkripsiya.
-    Model ro'yxati (3.8 Flash High -> soddaroq modellar) asosida ketma-ket sinaydi."""
+    Model ro'yxati va bir nechta API kalitlar asosida navbatma-navbat sinaydi."""
     from google.genai import types
+    from backend.services.gemini_quota_manager import (
+        get_all_gemini_api_keys,
+        is_model_available,
+        mark_model_cooldown,
+        record_model_request,
+        record_model_success,
+        parse_retry_delay,
+    )
 
     audio_bytes = chunk_path.read_bytes()
     config = types.GenerateContentConfig(
@@ -347,74 +364,104 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     ]
 
     candidate_models = _get_gemini_candidate_models(_get_gemini_stt_model_name())
+    api_keys = get_all_gemini_api_keys()
+    if not api_keys:
+        primary_k = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+        if primary_k:
+            api_keys = [primary_k]
+
     last_error = None
 
     for model_name in candidate_models:
-        for attempt in range(3):
-            try:
-                response = _get_gemini_transcribe_client().models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config,
-                )
-                raw_text = (response.text or "").strip()
-                if raw_text.startswith("```"):
-                    raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
-                    raw_text = re.sub(r"\s*```$", "", raw_text)
-                raw_text = raw_text.strip()
-                result = json.loads(raw_text)
+        for api_key in (api_keys or [None]):
+            if api_key:
+                avail, remaining = is_model_available(api_key, model_name)
+                if not avail:
+                    logger.info(f"Gemini STT ({model_name}) kalit cooldown'da ({remaining:.1f}s qoldi) — keyingi kalitga o'tilmoqda.")
+                    continue
+                record_model_request(api_key, model_name)
 
-                detected_lang = language
-                if isinstance(result, dict):
-                    raw_segments = result.get("segments") or result.get("subtitles") or []
-                    detected_lang = result.get("language") or language or "uz"
-                elif isinstance(result, list):
-                    raw_segments = result
-                else:
-                    raw_segments = []
+            client = _get_gemini_transcribe_client(api_key=api_key)
 
-                segments = []
-                text_parts = []
-                for seg in raw_segments or []:
-                    text = (seg.get("text") or "").strip()
-                    start = seg.get("start")
-                    end = seg.get("end")
-                    if not text or start is None or end is None:
-                        continue
-                    text_parts.append(text)
-                    segments.append({
-                        "start": round(float(start) + offset_seconds, 3),
-                        "end": round(float(end) + offset_seconds, 3),
-                        "text": text,
-                    })
-                return segments, " ".join(text_parts), detected_lang or "uz"
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
-                is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
-                is_bad_json = isinstance(e, json.JSONDecodeError)
-                if not (is_rate_limit or is_server_error or is_bad_json):
-                    logger.warning(f"Gemini STT ({model_name}) doimiy xato: {e} — keyingi modelga o'tilmoqda.")
-                    break
+            for attempt in range(2):
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config,
+                    )
+                    raw_text = (response.text or "").strip()
+                    if raw_text.startswith("```"):
+                        raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
+                        raw_text = re.sub(r"\s*```$", "", raw_text)
+                    raw_text = raw_text.strip()
+                    result = json.loads(raw_text)
 
-                if is_rate_limit:
-                    m = re.search(r"retry in ([\d\.]+)s", err_str) or re.search(r"retryDelay['\"]:\s*['\"](\d+)s", err_str)
-                    delay = float(m.group(1)) if m else 30.0
-                    if delay > 20.0:
-                        logger.warning(f"Gemini STT ({model_name}) kvotasi uzoq muddatga band ({delay:.1f}s) — darhol keyingi soddaroq modelga o'tilmoqda.")
+                    detected_lang = language
+                    if isinstance(result, dict):
+                        raw_segments = result.get("segments") or result.get("subtitles") or []
+                        detected_lang = result.get("language") or language or "uz"
+                    elif isinstance(result, list):
+                        raw_segments = result
+                    else:
+                        raw_segments = []
+
+                    segments = []
+                    text_parts = []
+                    for seg in raw_segments or []:
+                        text = (seg.get("text") or "").strip()
+                        start = seg.get("start")
+                        end = seg.get("end")
+                        if not text or start is None or end is None:
+                            continue
+                        text_parts.append(text)
+                        segments.append({
+                            "start": round(float(start) + offset_seconds, 3),
+                            "end": round(float(end) + offset_seconds, 3),
+                            "text": text,
+                        })
+
+                    if api_key:
+                        record_model_success(api_key, model_name)
+
+                    return segments, " ".join(text_parts), detected_lang or "uz"
+                except Exception as e:
+                    last_error = e
+                    err_str = str(e)
+                    is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                    is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
+                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str
+                    is_bad_json = isinstance(e, json.JSONDecodeError)
+
+                    if is_not_found:
+                        logger.warning(f"Gemini STT ({model_name}) mavjud emas (404): {e} — tashlab ketilmoqda.")
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, 86400.0, reason=f"404: {e}")
                         break
-                    logger.warning(f"Gemini STT ({model_name}) qisqa 429 kutish — {delay + 1.0:.1f}s ({attempt + 1}/3)")
-                    time.sleep(delay + 1.0)
-                elif is_server_error:
-                    logger.warning(f"Gemini STT ({model_name}) server band (503) — keyingi soddaroq modelga o'tilmoqda: {e}")
-                    break
-                else:
-                    backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
-                    logger.warning(f"Gemini STT ({model_name}) JSON/qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
-                    time.sleep(backoff)
 
-    raise last_error or RuntimeError("Barcha Gemini STT modellari muvaffaqiyatsiz bo'ldi")
+                    if is_rate_limit:
+                        delay = parse_retry_delay(err_str)
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, delay, reason=err_str)
+                        logger.warning(f"Gemini STT ({model_name}) 429 kvota limiti ({delay:.1f}s) — keyingi kalit/modelga o'tilmoqda.")
+                        break
+
+                    if is_server_error:
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, 120.0, reason=f"Server band (503): {e}")
+                        logger.warning(f"Gemini STT ({model_name}) server band (503) — keyingi kalit/modelga o'tilmoqda: {e}")
+                        break
+
+                    if is_bad_json:
+                        backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
+                        logger.warning(f"Gemini STT ({model_name}) JSON qayta urinish {backoff:.2f}s ({attempt + 1}/2): {e}")
+                        time.sleep(backoff)
+                        continue
+
+                    logger.warning(f"Gemini STT ({model_name}) kutilmagan xato: {e} — keyingi kalit/modelga o'tilmoqda.")
+                    break
+
+    raise last_error or RuntimeError("Barcha Gemini STT modellari va API kalitlari muvaffaqiyatsiz bo'ldi")
 
 
 def transcribe_audio(audio_path: str, language: str | None = None, primary: str | None = None) -> dict:
