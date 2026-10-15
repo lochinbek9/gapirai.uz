@@ -59,6 +59,9 @@ export interface Job {
   tts_provider?: string | null
   voice_name?: string | null
   voice_style?: string | null
+  stt_model?: string | null
+  translation_model?: string | null
+  tts_model?: string | null
 }
 
 export type JobStatus =

@@ -273,9 +273,16 @@ function VideoCard({
 
         {/* Admin exact metadata inspection */}
         {isAdmin && (
-          <div className="mb-3 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[9px] font-mono text-amber-600 dark:text-amber-400 flex items-center justify-between">
-            <span className="font-bold">ADMIN:</span>
-            <span>{prov} | {job.voice_name || voiceDisplayName} | {job.voice_style || 'neutral'}</span>
+          <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono text-amber-600 dark:text-amber-400 space-y-1">
+            <div className="flex items-center justify-between font-bold text-amber-500">
+              <span className="flex items-center gap-1"><span>🛠</span> AI MODELLAR (ADMIN)</span>
+              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20">{prov}</span>
+            </div>
+            <div className="text-[9px] text-gray-700 dark:text-gray-300 space-y-0.5">
+              <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || 'gemini-3.8-flash'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || 'gemini-3.8-flash'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || `${job.tts_provider || 'gemini'} (${job.voice_name || voiceDisplayName})`}</span></div>
+            </div>
           </div>
         )}
 

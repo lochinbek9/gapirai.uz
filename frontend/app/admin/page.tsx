@@ -822,6 +822,7 @@ export default function AdminPage() {
                     <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[140px] whitespace-nowrap">Sana</th>
                     <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
                     <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[170px]">Akkaunt</th>
+                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">AI Modellar</th>
                     <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[120px] whitespace-nowrap">Holat</th>
                     <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[190px]">Xatolik</th>
                   </tr>
@@ -842,6 +843,16 @@ export default function AdminPage() {
                         </td>
                         <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[170px] truncate font-mono text-xs" title={j.user_email || ''}>
                           {j.user_email || 'Anonim'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 text-xs">
+                          <div className="font-mono text-[11px] font-semibold text-amber-300">
+                            {j.tts_provider === 'gemini' ? '✨ Gemini' : j.tts_provider === 'edge' ? '⚡ Edge' : '🔷 Azure'}: {j.voice_name || 'Charon'}
+                          </div>
+                          <div className="text-[10px] text-gray-400 space-x-1 font-mono">
+                            <span>STT: {j.stt_model || 'gemini-3.8-flash'}</span>
+                            <span>•</span>
+                            <span>Tarjima: {j.translation_model || 'gemini-3.8-flash'}</span>
+                          </div>
                         </td>
                         <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                           {isNoSpeech ? (
@@ -872,7 +883,7 @@ export default function AdminPage() {
                   })}
                   {stats.recent_jobs.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
                         Hali job yo'q
                       </td>
                     </tr>

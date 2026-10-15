@@ -196,6 +196,14 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
 
 
 def _write_wav(path: str, pcm_data: bytes) -> None:
+    # Agar pcm_data allaqachon to'liq WAV fayli bo'lsa (RIFF sarlavhali), to'g'ridan-to'g'ri yozamiz.
+    # Aks holda wave.open orqali qayta o'rash sarlavha va C2PA metadatalarini audio sifatida
+    # yanglish talqin qilib, har gap oxirida 'jiriq' degan baland xillash / klik tovushini keltirib chiqaradi.
+    if pcm_data.startswith(b"RIFF"):
+        with open(path, "wb") as f:
+            f.write(pcm_data)
+        return
+
     with wave.open(path, "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)

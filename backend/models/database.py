@@ -92,6 +92,9 @@ class DubbingJob(Base):
     tts_provider = Column(String(30), nullable=True)  # tanlangan yoki ishlatilgan TTS provayder: azure / edge / gemini
     voice_name = Column(String(50), nullable=True)    # aniq ishlatilgan ovoz: masalan uz-UZ-MadinaNeural, Autonoe, Charon
     voice_style = Column(String(30), nullable=True, default="neutral")  # ohang: neutral
+    stt_model = Column(String(50), nullable=True)     # STT modeli: gemini-3.8-flash, whisper-1, etc.
+    translation_model = Column(String(50), nullable=True)  # Tarjima modeli: gemini-3.8-flash, gpt-4o, etc.
+    tts_model = Column(String(50), nullable=True)     # TTS modeli: gemini-3.8-flash-tts, edge-neural, etc.
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -540,6 +543,9 @@ def create_tables():
             conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS tts_provider VARCHAR(30);"))
             conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_name VARCHAR(50);"))
             conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_style VARCHAR(30) DEFAULT 'neutral';"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS stt_model VARCHAR(50);"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS translation_model VARCHAR(50);"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS tts_model VARCHAR(50);"))
             conn.commit()
     except Exception as exc:
         import logging

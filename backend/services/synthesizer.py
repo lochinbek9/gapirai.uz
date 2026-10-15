@@ -191,10 +191,17 @@ def _synthesize_text(
     for fb_candidate in fallback_chain:
         try:
             fallback = get_provider(fb_candidate)
-            if get_cached(text, voice_name, fallback.name, output_path):
+            fb_voice = voice_name
+            if fb_candidate in ("azure", "edge"):
+                if fb_voice not in ("uz-UZ-MadinaNeural", "uz-UZ-SardorNeural"):
+                    if fb_voice and any(f in fb_voice.lower() for f in ["female", "madina", "autonoe", "aoede", "kore"]):
+                        fb_voice = "uz-UZ-MadinaNeural"
+                    else:
+                        fb_voice = "uz-UZ-SardorNeural"
+            if get_cached(text, fb_voice, fallback.name, output_path):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
                 return fallback.name
-            if fallback.synthesize(text, output_path, voice_name=voice_name):
+            if fallback.synthesize(text, output_path, voice_name=fb_voice):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
                 return fallback.name
         except PermanentTTSError as exc:
@@ -278,6 +285,9 @@ def synthesize_segments(
             audio = audio[silence_len:]
         while len(audio) > 150 and audio[-silence_len:].dBFS < -42:
             audio = audio[:-silence_len]
+        # Kesish chegaralaridagi 'klik' / 'jiriq' tovushlarini yo'qotish uchun silliq fade
+        if len(audio) > 40:
+            audio = audio.fade_in(10).fade_out(15)
         return audio.normalize(headroom=2.0)
 
     # Ba'zi provayderlar (masalan Gemini) bir nechta segmentni BITTA so'rovda

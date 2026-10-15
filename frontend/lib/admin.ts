@@ -24,6 +24,11 @@ export interface AdminStats {
     status: string
     error_code: string | null
     error_message: string | null
+    tts_provider?: string | null
+    voice_name?: string | null
+    stt_model?: string | null
+    translation_model?: string | null
+    tts_model?: string | null
   }[]
   trends: {
     daily: { date: string; users: number; jobs: number }[]

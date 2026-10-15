@@ -143,6 +143,11 @@ def admin_stats(
                 "status": job.status.value if hasattr(job.status, "value") else str(job.status),
                 "error_code": job.error_code,
                 "error_message": job.error_message,
+                "tts_provider": job.tts_provider,
+                "voice_name": job.voice_name,
+                "stt_model": job.stt_model or ("gemini-3.8-flash" if (job.transcript_segments or job.transcript_text) else None),
+                "translation_model": job.translation_model or ("gemini-3.8-flash" if (job.translated_segments or job.translated_text) else None),
+                "tts_model": job.tts_model or (f"gemini-3.8-flash-tts ({job.voice_name})" if job.tts_provider == 'gemini' else (f"edge-tts ({job.voice_name})" if job.tts_provider == 'edge' else f"azure ({job.voice_name})")),
             }
             for job, email in recent_jobs_rows
         ]

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
+import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
@@ -59,6 +60,8 @@ function getStatusLabel(status: string, errorCode?: string | null, errorMessage?
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const { job: polledJob, error: pollError, is404 } = useJobPolling(id)
   
   const [loading, setLoading] = useState(true)
@@ -648,6 +651,33 @@ export default function VideoPage() {
                 )}
                 {job.uzbek_srt_content && (
                   <InfoRow label="Subtitr" value="✅ Mavjud" />
+                )}
+
+                {/* Admin-only AI models breakdown */}
+                {isAdmin && (
+                  <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-4 -mb-4 p-4 rounded-b-2xl space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-400 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5">
+                        <span>🛠</span> AI Modellar (Admin)
+                      </span>
+                      <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-300 font-mono font-bold">
+                        ADMIN
+                      </span>
+                    </div>
+                    <InfoRow label="STT Dvigateli" value={job.stt_model || 'gemini-3.8-flash'} />
+                    <InfoRow label="Tarjima Modeli" value={job.translation_model || 'gemini-3.8-flash'} />
+                    <InfoRow
+                      label="TTS Modeli"
+                      value={
+                        job.tts_model ||
+                        (job.tts_provider === 'gemini'
+                          ? `gemini-3.8-flash-tts (${job.voice_name || 'Charon'})`
+                          : job.tts_provider === 'edge'
+                          ? `edge-tts (${job.voice_name || 'uz-UZ-SardorNeural'})`
+                          : `azure-neural (${job.voice_name || 'uz-UZ-SardorNeural'})`)
+                      }
+                    />
+                  </div>
                 )}
               </div>
 

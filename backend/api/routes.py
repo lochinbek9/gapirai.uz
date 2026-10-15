@@ -94,6 +94,9 @@ class JobResponse(BaseModel):
     tts_provider: Optional[str] = None
     voice_name: Optional[str] = None
     voice_style: Optional[str] = None
+    stt_model: Optional[str] = None
+    translation_model: Optional[str] = None
+    tts_model: Optional[str] = None
     # Faqat kutayotgan (PENDING) job egasiga, va navbat worker o'rinlaridan
     # uzunroq bo'lgandagina to'ldiriladi (backend/services/queue_load.py).
     queue_position: Optional[int] = None
@@ -181,6 +184,14 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         tts_provider=job.tts_provider,
         voice_name=job.voice_name,
         voice_style=job.voice_style,
+        stt_model=job.stt_model or ("gemini-3.8-flash" if (job.transcript_segments or job.transcript_text) else None),
+        translation_model=job.translation_model or ("gemini-3.8-flash" if (job.translated_segments or job.translated_text) else None),
+        tts_model=job.tts_model or (
+            f"gemini-3.8-flash-tts ({job.voice_name or 'Charon'})" if job.tts_provider == 'gemini'
+            else (f"edge-tts ({job.voice_name or 'uz-UZ-SardorNeural'})" if job.tts_provider == 'edge'
+            else (f"azure-neural ({job.voice_name or 'uz-UZ-SardorNeural'})" if job.tts_provider == 'azure'
+            else None))
+        ),
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
         # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz

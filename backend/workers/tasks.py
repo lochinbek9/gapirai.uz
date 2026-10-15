@@ -638,6 +638,8 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
             segments = job.transcript_segments
             transcript_text = job.transcript_text or ""
+            if not getattr(job, "stt_model", None):
+                job.stt_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             # Subtitr rejimi yoki uzbek_source uchun STT doim Gemini (Google AI Studio) bo'ladi.
@@ -677,6 +679,7 @@ def process_video(self: Task, job_id: str) -> dict:
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
+            job.stt_model = transcript.get("model") or getattr(settings, "GEMINI_STT_MODEL", "gemini-3.8-flash")
 
             # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
             # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)
@@ -785,6 +788,8 @@ def process_video(self: Task, job_id: str) -> dict:
         if job.translated_segments:
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
             translated_segments = job.translated_segments
+            if not getattr(job, "translation_model", None):
+                job.translation_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
             if uzbek_source:
                 # Nutq allaqachon o'zbekcha: tarjima ham, qisqartirish ham kerak emas.
@@ -827,6 +832,7 @@ def process_video(self: Task, job_id: str) -> dict:
             job.translated_text = " ".join(s["text"] for s in translated_segments)
             job.uzbek_srt_content = _segments_to_vtt(translated_segments)
             job.translated_segments = translated_segments
+            job.translation_model = "original (o'zbekcha)" if uzbek_source else getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash")
             db.commit()
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "ok")
 
@@ -923,6 +929,12 @@ def process_video(self: Task, job_id: str) -> dict:
                 provider_name=tts_provider,
             )
             job.dubbed_audio_path = dubbed_audio_path
+            if tts_provider == "gemini":
+                job.tts_model = f"gemini-3.8-flash-tts ({voice})"
+            elif tts_provider == "edge":
+                job.tts_model = f"edge-tts ({voice})"
+            else:
+                job.tts_model = f"azure-neural ({voice})"
             # Segment darajasidagi QA checkpoint — Celery qayta urinishida
             # faqat muvaffaqiyatsiz/tekshirilmagan segmentlar qayta
             # ishlanadi (synthesizer.py'ning existing_qa parametri orqali).
