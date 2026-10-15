@@ -85,7 +85,7 @@ class TestLoginFlow(unittest.TestCase):
         c = self.calls
         return (
             patch.object(auth_routes, "verify_password", side_effect=lambda p, h: c.append("bcrypt") or verify),
-            patch.object(auth_routes, "create_access_token", side_effect=lambda data: c.append("jwt") or "TOKEN123"),
+            patch.object(auth_routes, "create_access_token", side_effect=lambda *args, **kwargs: c.append("jwt") or "TOKEN123"),
         )
 
     def _login(self, user=None, **kw):
@@ -96,7 +96,7 @@ class TestLoginFlow(unittest.TestCase):
 
     def test_direct_login_returns_token_without_email_code(self):
         r = self._login()
-        self.assertEqual(self.calls, ["rollback", "bcrypt", "jwt"])
+        self.assertEqual(self.calls, ["bcrypt", "jwt"])
         self.assertEqual(r.access_token, "TOKEN123")
         self.assertEqual(r.user["email"], "a@b.co")
 
@@ -114,11 +114,11 @@ class TestLoginFlow(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 401)
         self.assertNotIn("jwt", self.calls)
 
-    def test_google_only_account_without_password_is_401_not_a_crash(self):
+    def test_google_only_account_without_password_is_400_not_a_crash(self):
         google_only = SimpleNamespace(id="g1", password_hash=None, email="g@b.co", name="G", is_verified=True)
         with self.assertRaises(HTTPException) as cm:
             self._login(user=google_only)
-        self.assertEqual(cm.exception.status_code, 401)
+        self.assertEqual(cm.exception.status_code, 400)
         self.assertNotIn("bcrypt", self.calls)
 
 

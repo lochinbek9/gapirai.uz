@@ -220,6 +220,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVeri
     # qaytadi. Shu sabab oddiy qiymatlarni oldindan olamiz.
     db.rollback()
     name = req.name.strip()
+    password_hash = hash_password(req.password)
     user = User(
         email=email,
         name=name,

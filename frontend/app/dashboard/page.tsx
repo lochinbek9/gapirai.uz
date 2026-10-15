@@ -145,12 +145,14 @@ function VideoCard({
   onDelete,
   onRetry,
   isRetrying,
+  isDeleting = false,
   isAdmin = false,
 }: {
   job: Job
   onDelete: (id: string) => void
   onRetry: (id: string, isRegenerate?: boolean) => void
   isRetrying: boolean
+  isDeleting?: boolean
   isAdmin?: boolean
 }) {
   const thumbnail = job.video_thumbnail || `https://img.youtube.com/vi/${job.job_id}/mqdefault.jpg`
@@ -328,11 +330,20 @@ function VideoCard({
               </button>
             )}
             <button
-              onClick={() => onDelete(job.job_id)}
-              className="text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(job.job_id)
+              }}
+              disabled={isDeleting || isRetrying}
+              className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
               title="O'chirish"
             >
-              <Trash2 className="w-4 h-4" />
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
@@ -402,12 +413,25 @@ export default function DashboardPage() {
   }
 
   const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleDelete(id: string) {
     if (!confirm("Bu videoni o'chirishni tasdiqlaysizmi?")) return
-    await deleteJob(id)
-    setJobs((prev) => prev.filter((j) => j.job_id !== id))
-    getJobsStats().then(setJobsStats).catch(console.error)
+    setDeletingId(id)
+    try {
+      await deleteJob(id)
+      setJobs((prev) => prev.filter((j) => j.job_id !== id))
+      getJobsStats().then(setJobsStats).catch(console.error)
+    } catch (err: any) {
+      console.error("Failed to delete job:", err)
+      const message =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Videoni o'chirishda xatolik yuz berdi."
+      alert(message)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   async function handleRetry(id: string, isRegenerate = false) {
@@ -523,6 +547,7 @@ export default function DashboardPage() {
                 onDelete={handleDelete}
                 onRetry={handleRetry}
                 isRetrying={retryingId === job.job_id}
+                isDeleting={deletingId === job.job_id}
                 isAdmin={user?.role === 'admin'}
               />
             ))}

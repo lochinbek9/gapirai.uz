@@ -27,7 +27,7 @@ def _get_duration(file_path: str) -> float:
         return 0.0
 
 
-def _build_audio_filtergraph() -> str:
+def _build_audio_filtergraph(target_dur: float | None = None) -> str:
     """
     Original audio (musiqa/SFX/ambient) va o'zbekcha dublyajni professional
     kino-dublyaji uslubida aralashtiradi — original TO'LIQ o'chirilmaydi.
@@ -63,9 +63,14 @@ def _build_audio_filtergraph() -> str:
         f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1"
     )
     orig_vol = getattr(s, "ORIGINAL_AUDIO_VOLUME", 0.22)
+    # FFmpeg sidechaincompress filtri sidechain (1:a) trekida EOF bo'lishi bilan
+    # asosiy trek (0:a)ni ham uzatishni to'xtatadi. Agar video audio dan uzun bo'lsa,
+    # dub tugaganidan keyin original fon musiqa/ovoz uzilib qolmasligi uchun
+    # dub trekini video oxirigacha sukunat bilan to'ldiramiz (apad).
+    dub_pad = f"apad=whole_dur={target_dur:.3f}," if target_dur and target_dur > 0 else ""
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,volume={orig_vol}[orig];"
-        f"[1:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
+        f"[1:a]{dub_pad}aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
         f"asplit=3[dubsc1][dubsc2][dubdsp];"
         f"[orig][dubsc1]{duck_stage}[duck1];"
         f"[duck1][dubsc2]{duck_stage}[ducked];"
@@ -117,7 +122,11 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
     video_dur = _get_duration(video_path)
     audio_dur = _get_duration(dubbed_audio_path)
 
-    audio_filter = _build_audio_filtergraph()
+    # Agar video audio dan uzunroq bo'lsa, sidechaincompress dublyaj audio
+    # tugashi bilan original fon musiqasini kesib tashlamasligi uchun dublyaj
+    # audio trekini video oxirigacha sukunat bilan to'ldiramiz (apad).
+    target_dur = video_dur if audio_dur <= video_dur else None
+    audio_filter = _build_audio_filtergraph(target_dur=target_dur)
 
     # iOS Safari va barcha mobil qurilmalarda 100% ochilishi uchun:
     # Agar video formati H.264 bo'lmasa (masalan AV1 yoki VP9 bo'lsa),
