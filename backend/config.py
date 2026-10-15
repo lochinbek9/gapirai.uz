@@ -1,8 +1,24 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    @model_validator(mode="before")
+    @classmethod
+    def clean_quoted_strings(cls, values):
+        if isinstance(values, dict):
+            cleaned = {}
+            for k, v in values.items():
+                if isinstance(v, str) and len(v) >= 2 and (
+                    (v.startswith('"') and v.endswith('"')) or
+                    (v.startswith("'") and v.endswith("'"))
+                ):
+                    cleaned[k] = v[1:-1]
+                else:
+                    cleaned[k] = v
+            return cleaned
+        return values
     # App
     APP_NAME: str = "GapirAI.uz"
     DEBUG: bool = False
@@ -227,7 +243,7 @@ class Settings(BaseSettings):
     TRANSLATE_PROVIDER: str = "gemini"
 
     # Gemini native TTS (tayyor ovozlar: Autonoe, Charon va h.k.)
-    GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
+    GEMINI_TTS_MODEL: str = "gemini-3.8-flash-tts"
     GEMINI_MALE_VOICE: str = "Charon"
     GEMINI_FEMALE_VOICE: str = "Autonoe"
 

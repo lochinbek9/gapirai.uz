@@ -20,23 +20,33 @@ settings = get_settings()
 _gemini_local = threading.local()
 
 
-def _get_client():
-    if not hasattr(_gemini_local, "client"):
-        from google import genai
+def _get_client(api_key: str | None = None):
+    from google import genai
 
-        if settings.GEMINI_USE_VERTEX:
-            # Vertex AI — service account orqali (AI Studio'ning kunlik
-            # "preview" chegarasidan mustaqil, daqiqalik DSQ ishlatadi).
+    if settings.GEMINI_USE_VERTEX:
+        if not hasattr(_gemini_local, "vertex_client"):
             if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
-            _gemini_local.client = genai.Client(
+            _gemini_local.vertex_client = genai.Client(
                 vertexai=True,
                 project=settings.GCP_PROJECT_ID,
                 location=settings.GCP_LOCATION,
             )
-        else:
-            _gemini_local.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    return _gemini_local.client
+        return _gemini_local.vertex_client
+
+    if not api_key:
+        api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY sozlanmagan")
+
+    clients = getattr(_gemini_local, "clients", None)
+    if clients is None:
+        clients = {}
+        _gemini_local.clients = clients
+
+    if api_key not in clients:
+        clients[api_key] = genai.Client(api_key=api_key)
+    return clients[api_key]
 
 
 def _config_for(voice: str):
@@ -52,14 +62,67 @@ def _config_for(voice: str):
 
 
 def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
-    """Bitta so'rovni yuboradi. Rate limit bo'lsa darhol fallbackga imkon berish
-    uchun uzoq kutmasdan tezkor javob qaytaradi (job 60% da qotib qolmasligi uchun)."""
+    """Bitta so'rovni yuboradi. Barcha mavjud Gemini API kalitlari bo'yicha rotatsiya qiladi.
+    429/503 bo'lsa, tegishli kalit cooldown'ga olinib, darhol keyingi toza kalitga o'tiladi."""
+    from backend.services.gemini_quota_manager import (
+        get_all_gemini_api_keys,
+        is_model_available,
+        mark_model_cooldown,
+        record_model_request,
+        record_model_success,
+        parse_retry_delay,
+    )
+
     config = _config_for(voice)
-    max_attempts = 2
-    for attempt in range(max_attempts):
+    model_name = settings.GEMINI_TTS_MODEL or "gemini-3.8-flash-tts"
+
+    if settings.GEMINI_USE_VERTEX:
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                response = _get_client().models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        inline_data = getattr(part, "inline_data", None)
+                        if inline_data and getattr(inline_data, "data", None):
+                            raw_data = inline_data.data
+                            if isinstance(raw_data, str):
+                                import base64
+                                raw_data = base64.b64decode(raw_data)
+                            return raw_data
+            except Exception as e:
+                if attempt == max_attempts - 1:
+                    logger.warning(f"Vertex Gemini TTS xato: {e}")
+                    return None
+                time.sleep(2.0 * (attempt + 1))
+        return None
+
+    api_keys = get_all_gemini_api_keys()
+    if not api_keys:
+        primary = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+        if primary:
+            api_keys = [primary]
+
+    if not api_keys:
+        logger.warning("Gemini TTS: Hech qanday API kalit topilmadi")
+        return None
+
+    # 1. Toza (cooldown'da bo'lmagan) kalitlar bo'yicha sinash
+    for key in api_keys:
+        avail, remaining = is_model_available(key, model_name)
+        if not avail:
+            logger.info(f"Gemini TTS ({key[:10]}...): model cooldown'da ({remaining:.1f}s qoldi) — keyingi kalitga o'tilmoqda.")
+            continue
+
+        record_model_request(key, model_name)
         try:
-            response = _get_client().models.generate_content(
-                model=settings.GEMINI_TTS_MODEL,
+            client = _get_client(api_key=key)
+            response = client.models.generate_content(
+                model=model_name,
                 contents=contents,
                 config=config,
             )
@@ -71,13 +134,50 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                         if isinstance(raw_data, str):
                             import base64
                             raw_data = base64.b64decode(raw_data)
+                        record_model_success(key, model_name)
                         return raw_data
         except Exception as e:
-            is_rate_limit = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
-            if attempt == max_attempts - 1 or not is_rate_limit:
-                logger.warning(f"Gemini TTS xato: {e}")
-                return None
-            time.sleep(1.0)
+            err_str = str(e)
+            is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+            is_503 = "503" in err_str or "UNAVAILABLE" in err_str
+
+            if is_rate_limit:
+                delay = parse_retry_delay(err_str)
+                mark_model_cooldown(key, model_name, delay, reason=f"429: {err_str[:60]}")
+                logger.warning(f"Gemini TTS [{key[:10]}...] 429 kvota limiti ({delay:.1f}s) — navbatdagi kalitga o'tilmoqda.")
+                continue
+
+            if is_503:
+                mark_model_cooldown(key, model_name, 120.0, reason="503 server band")
+                logger.warning(f"Gemini TTS [{key[:10]}...] 503 server band — navbatdagi kalitga o'tilmoqda.")
+                continue
+
+            logger.warning(f"Gemini TTS [{key[:10]}...] xato: {e}")
+
+    # 2. Agar barcha kalitlar cooldown'da bo'lsa, 3 soniya kutib 1-kalit bilan qayta urinish
+    logger.warning("Gemini TTS: Barcha kalitlar cooldown'da yoki band. 3.0s kutib qayta sinab ko'riladi.")
+    time.sleep(3.0)
+    try:
+        fallback_key = api_keys[0]
+        client = _get_client(api_key=fallback_key)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=config,
+        )
+        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                inline_data = getattr(part, "inline_data", None)
+                if inline_data and getattr(inline_data, "data", None):
+                    raw_data = inline_data.data
+                    if isinstance(raw_data, str):
+                        import base64
+                        raw_data = base64.b64decode(raw_data)
+                    record_model_success(fallback_key, model_name)
+                    return raw_data
+    except Exception as e:
+        logger.error(f"Gemini TTS oxirgi urinish ham xato berdi: {e}")
+
     return None
 
 
@@ -99,8 +199,7 @@ _SILENCE_THRESH_OFFSET = 16
 
 
 class GeminiProvider(TTSProvider):
-    """Gemini'ning tayyor ovozlari (Autonoe/Charon) — Starfish/HeyGen'da mavjud
-    bo'lmagan, faqat Gemini API orqali ochiq bo'lgan ovozlar."""
+    """Gemini'ning tayyor ovozlari (Autonoe/Aoede/Charon/Fenrir/Puck)."""
 
     @property
     def name(self) -> str:
@@ -124,9 +223,11 @@ class GeminiProvider(TTSProvider):
         if not clean_text:
             return False
 
-        valid_gemini_voices = {"Autonoe", "Aoede", "Kore", "Charon", "Fenrir", "Puck"}
+        valid_gemini_voices = {"Autonoe", "Aoede", "Charon", "Fenrir", "Puck"}
         if voice_name and voice_name in valid_gemini_voices:
             voice = voice_name
+        elif voice_name and voice_name.lower() in ("kore", "aoede"):
+            voice = "Aoede"
         else:
             voice = settings.GEMINI_FEMALE_VOICE if self._is_female(voice_name) else settings.GEMINI_MALE_VOICE
 

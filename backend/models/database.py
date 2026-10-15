@@ -533,3 +533,14 @@ def create_tables():
     # bir martalik `ALTER TABLE` to'g'ridan-to'g'ri production DB'da qo'lda
     # bajariladi (bu funksiyaga umuman qo'shilmaydi).
     Base.metadata.create_all(bind=engine)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_internal BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS tts_provider VARCHAR(30);"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_name VARCHAR(50);"))
+            conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN IF NOT EXISTS voice_style VARCHAR(30) DEFAULT 'neutral';"))
+            conn.commit()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(f"create_tables ALTER TABLE ogohlantirish: {exc}")

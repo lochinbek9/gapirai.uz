@@ -277,17 +277,32 @@ async def create_dubbing_job(
     if video_id:
         # Cross-gender yoki umumiy donor job qidirish:
         # Ushbu video uchun allaqachon transkripsiya va tarjima qilingan segmentlar bormi?
-        # Agar bor bo'lsa, jinslar aro barcha matnlar 100% qayta ishlatiladi (resurs tejaladi).
+        # Agar bor bo'lsa, barcha oldingi matnlar qayta ishlatiladi (resurs tejaladi).
         donor_job = (
             db.query(DubbingJob)
             .filter(
                 DubbingJob.youtube_video_id == video_id,
-                DubbingJob.status == JobStatus.COMPLETED,
                 DubbingJob.translated_segments.isnot(None),
             )
-            .order_by(DubbingJob.completed_at.desc())
+            .order_by(
+                (DubbingJob.status == JobStatus.COMPLETED).desc(),
+                DubbingJob.created_at.desc(),
+            )
             .first()
         )
+        if not donor_job:
+            donor_job = (
+                db.query(DubbingJob)
+                .filter(
+                    DubbingJob.youtube_video_id == video_id,
+                    DubbingJob.transcript_segments.isnot(None),
+                )
+                .order_by(
+                    (DubbingJob.status == JobStatus.COMPLETED).desc(),
+                    DubbingJob.created_at.desc(),
+                )
+                .first()
+            )
 
     rejection = check_queue_capacity(db, user.id)
     if rejection:
@@ -388,6 +403,23 @@ async def create_dubbing_job(
         p_vid = Path(donor_job.original_video_path)
         if p_vid.exists() and p_vid.is_file() and p_vid.stat().st_size > 0:
             reused_video_path = donor_job.original_video_path
+
+    if not reused_video_path and video_id:
+        prev_video_jobs = (
+            db.query(DubbingJob)
+            .filter(
+                DubbingJob.youtube_video_id == video_id,
+                DubbingJob.original_video_path.isnot(None),
+            )
+            .order_by(DubbingJob.created_at.desc())
+            .all()
+        )
+        for pj in prev_video_jobs:
+            if pj.original_video_path:
+                pv = Path(pj.original_video_path)
+                if pv.exists() and pv.is_file() and pv.stat().st_size > 0:
+                    reused_video_path = str(pv)
+                    break
 
     job_id = str(uuid.uuid4())
     job = DubbingJob(

@@ -102,7 +102,6 @@ export default function DubFileForm({
     ? [
         { id: "Autonoe", label: "Autonoe", desc: "Asosiy mayin" },
         { id: "Aoede",   label: "Aoede",   desc: "Ravon, ohangdor" },
-        { id: "Kore",    label: "Kore",    desc: "Yorqin, muloyim" },
       ]
     : [
         { id: "uz-UZ-MadinaNeural", label: "Madina", desc: "Microsoft Neural (uz-UZ)" },

@@ -14,12 +14,19 @@ import logging
 import os
 import tempfile
 
+import hashlib
+import logging
+import os
+import shutil
+from pathlib import Path
+
 from backend.models.database import SessionLocal, TTSCache
 from backend.services.storage import upload_file_to_s3, download_file_from_s3
 
 logger = logging.getLogger(__name__)
 
 _CACHE_S3_PREFIX = "dubber-cache/tts"
+_LOCAL_CACHE_DIR = Path("outputs/cache/tts")
 
 
 def _cache_key(text: str, voice_name: str | None, provider: str) -> str:
@@ -28,10 +35,23 @@ def _cache_key(text: str, voice_name: str | None, provider: str) -> str:
 
 
 def get_cached(text: str, voice_name: str | None, provider: str, output_path: str) -> bool:
-    """Kesh'da mavjud bo'lsa, audio'ni output_path'ga yuklab, True qaytaradi.
-    Topilmasa yoki S3 sozlanmagan bo'lsa (yoki xatolik) — False, pipeline
-    oddiy sintezga o'tadi."""
+    """Kesh'da mavjud bo'lsa, audio'ni output_path'ga nusxalab, True qaytaradi.
+    1-qatlam: Mahalliy disk keshi (outputs/cache/tts) — 0ms va mutlaqo bepul.
+    2-qatlam: S3 / Cloud Storage — boshqa server/workerlar uchun."""
     key = _cache_key(text, voice_name, provider)
+
+    # 1. Lokal disk keshi
+    try:
+        local_file = _LOCAL_CACHE_DIR / f"{key}.wav"
+        if local_file.exists() and local_file.is_file() and local_file.stat().st_size > 100:
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            shutil.copyfile(str(local_file), output_path)
+            logger.info(f"TTS lokal disk keshidan olindi: {provider} • {voice_name}")
+            return True
+    except Exception as exc:
+        logger.debug(f"Lokal kesh tekshirishda ogohlantirish: {exc}")
+
+    # 2. S3 keshi
     db = SessionLocal()
     try:
         entry = db.query(TTSCache).filter(TTSCache.cache_key == key).first()
@@ -41,6 +61,14 @@ def get_cached(text: str, voice_name: str | None, provider: str, output_path: st
             return False
         entry.hit_count += 1
         db.commit()
+
+        # S3 dan kelgan faylni lokal keshga ham saqlab qo'yamiz
+        try:
+            _LOCAL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(output_path, str(_LOCAL_CACHE_DIR / f"{key}.wav"))
+        except Exception:
+            pass
+
         return True
     except Exception as exc:
         logger.warning(f"TTS keshni o'qishda xatolik (oddiy sintezga o'tiladi): {exc}")
@@ -50,14 +78,23 @@ def get_cached(text: str, voice_name: str | None, provider: str, output_path: st
 
 
 def store_cached(text: str, voice_name: str | None, provider: str, audio_path: str) -> None:
-    """Yangi sintez qilingan audio'ni keshga yozadi. Xatolik bo'lsa faqat
-    log qilinadi — kesh yozish ikkinchi darajali, asosiy pipeline birinchi."""
-    if not os.path.exists(audio_path):
+    """Yangi sintez qilingan audio'ni keshga (lokal disk va S3) yozadi."""
+    if not os.path.exists(audio_path) or os.path.getsize(audio_path) < 100:
         return
 
     key = _cache_key(text, voice_name, provider)
-    s3_key = f"{_CACHE_S3_PREFIX}/{key}.wav"
 
+    # 1. Lokal disk keshiga saqlash
+    try:
+        _LOCAL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        local_target = _LOCAL_CACHE_DIR / f"{key}.wav"
+        if not local_target.exists():
+            shutil.copyfile(audio_path, str(local_target))
+    except Exception as exc:
+        logger.debug(f"Lokal TTS keshga yozishda ogohlantirish: {exc}")
+
+    # 2. S3 keshiga saqlash
+    s3_key = f"{_CACHE_S3_PREFIX}/{key}.wav"
     try:
         if not upload_file_to_s3(audio_path, s3_key):
             return
@@ -72,4 +109,4 @@ def store_cached(text: str, voice_name: str | None, provider: str, audio_path: s
         finally:
             db.close()
     except Exception as exc:
-        logger.warning(f"TTS keshga yozishda xatolik (pipeline davom etadi): {exc}")
+        logger.warning(f"TTS S3 keshga yozishda xatolik: {exc}")

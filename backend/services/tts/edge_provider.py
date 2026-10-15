@@ -54,7 +54,11 @@ class EdgeProvider(TTSProvider):
         voice_name: str | None = None,
     ) -> bool:
         is_female = self._is_female(voice_name)
-        chosen_voice = self.DEFAULT_VOICE_FEMALE if is_female else self.DEFAULT_VOICE_MALE
+        if voice_name and ("madina" in voice_name.lower() or "sardor" in voice_name.lower()):
+            is_female = ("madina" in voice_name.lower())
+            chosen_voice = self.DEFAULT_VOICE_FEMALE if is_female else self.DEFAULT_VOICE_MALE
+        else:
+            chosen_voice = self.DEFAULT_VOICE_FEMALE if is_female else self.DEFAULT_VOICE_MALE
         clean_text = re.sub(r"<[^>]+>", "", text)
         clean_text = (
             clean_text
@@ -131,4 +135,4 @@ class EdgeProvider(TTSProvider):
 
         except Exception as exc:
             logger.error(f"Edge TTS xato: {exc}", exc_info=True)
-            raise RuntimeError(f"Edge TTS xato: {exc}") from exc
+            return False

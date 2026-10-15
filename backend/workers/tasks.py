@@ -514,11 +514,23 @@ def process_video(self: Task, job_id: str) -> dict:
         if v_id and not job.translated_segments:
             donor_q = db.query(DubbingJob).filter(
                 DubbingJob.youtube_video_id == v_id,
-                DubbingJob.status == JobStatus.COMPLETED,
                 DubbingJob.translated_segments.isnot(None),
                 DubbingJob.id != job.id,
             )
-            donor_j = donor_q.order_by(DubbingJob.completed_at.desc()).first()
+            donor_j = donor_q.order_by(
+                (DubbingJob.status == JobStatus.COMPLETED).desc(),
+                DubbingJob.created_at.desc(),
+            ).first()
+            if not donor_j:
+                donor_q = db.query(DubbingJob).filter(
+                    DubbingJob.youtube_video_id == v_id,
+                    DubbingJob.transcript_segments.isnot(None),
+                    DubbingJob.id != job.id,
+                )
+                donor_j = donor_q.order_by(
+                    (DubbingJob.status == JobStatus.COMPLETED).desc(),
+                    DubbingJob.created_at.desc(),
+                ).first()
             if donor_j:
                 logger.info(
                     f"[JOB {job_id}] Video {v_id} uchun tayyor matnlar donor job {donor_j.id} dan olindi "

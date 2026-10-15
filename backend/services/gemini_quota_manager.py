@@ -21,6 +21,10 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+GEMINI_TTS_MODELS: List[str] = [
+    "gemini-3.8-flash-tts",
+]
+
 # Sifat va tezlik bo'yicha saralangan barqaror modellar ro'yxati:
 # 1. Flash flagship (yuqori sifat, tezkor, tabiiy dublyaj, yuqori kvota)
 # 2. Flash-Lite (yuqori kvotali zaxira modellar)
@@ -44,6 +48,8 @@ GEMINI_TEXT_MODELS: List[str] = [
     "gemini-pro-latest",
     "gemini-3.1-pro-preview",
 ]
+
+GEMINI_ALL_MONITORED_MODELS: List[str] = GEMINI_TTS_MODELS + GEMINI_TEXT_MODELS
 
 _memory_cooldowns: Dict[str, float] = {}
 _memory_stats: Dict[str, Dict[str, Any]] = {}
@@ -281,7 +287,7 @@ def get_gemini_quota_status() -> Dict[str, Any]:
         masked = mask_key(key)
         models_info = []
 
-        for model in GEMINI_TEXT_MODELS:
+        for model in GEMINI_ALL_MONITORED_MODELS:
             avail, remaining_sec = is_model_available(key, model)
             stats = {}
             if redis_client:
