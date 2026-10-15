@@ -191,12 +191,12 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         tts_provider=job.tts_provider,
         voice_name=job.voice_name,
         voice_style=job.voice_style,
-        stt_model=job.stt_model or ("gemini-3.8-flash" if (job.transcript_segments or job.transcript_text) else None),
-        translation_model=job.translation_model or ("gemini-3.8-flash" if (job.translated_segments or job.translated_text) else None),
+        stt_model=job.stt_model,
+        translation_model=job.translation_model,
         tts_model=job.tts_model or (
             f"gemini-3.8-flash-tts ({job.voice_name or 'Charon'})" if job.tts_provider == 'gemini'
             else (f"edge-tts ({job.voice_name or 'uz-UZ-SardorNeural'})" if job.tts_provider == 'edge'
-            else (f"azure-neural ({job.voice_name or 'uz-UZ-SardorNeural'})" if job.tts_provider == 'azure'
+            else (f"azure-neural ({job.voice_name or 'uz-UZ-SardorNeural'})" if (job.tts_provider == 'azure' or (job.voice_name and 'Neural' in str(job.voice_name)))
             else None))
         ),
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq

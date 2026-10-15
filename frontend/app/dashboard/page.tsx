@@ -279,9 +279,9 @@ function VideoCard({
               <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20">{prov}</span>
             </div>
             <div className="text-[9px] text-gray-700 dark:text-gray-300 space-y-0.5">
-              <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || 'gemini-3.8-flash'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || 'gemini-3.8-flash'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || `${job.tts_provider || 'gemini'} (${job.voice_name || voiceDisplayName})`}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || '— (eski job)'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || '— (eski job)'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || (prov === 'azure' ? `azure-neural (${voiceDisplayName})` : prov === 'edge' ? `edge-tts (${voiceDisplayName})` : `gemini-tts (${voiceDisplayName})`)}</span></div>
             </div>
           </div>
         )}

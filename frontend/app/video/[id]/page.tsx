@@ -718,8 +718,8 @@ export default function VideoPage() {
                         ADMIN
                       </span>
                     </div>
-                    <InfoRow label="STT Dvigateli" value={job.stt_model || 'gemini-3.8-flash'} />
-                    <InfoRow label="Tarjima Modeli" value={job.translation_model || 'gemini-3.8-flash'} />
+                    <InfoRow label="STT Dvigateli" value={job.stt_model || '— (eski job)'} />
+                    <InfoRow label="Tarjima Modeli" value={job.translation_model || '— (eski job)'} />
                     <InfoRow
                       label="TTS Modeli"
                       value={
@@ -728,7 +728,9 @@ export default function VideoPage() {
                           ? `gemini-3.8-flash-tts (${job.voice_name || 'Charon'})`
                           : job.tts_provider === 'edge'
                           ? `edge-tts (${job.voice_name || 'uz-UZ-SardorNeural'})`
-                          : `azure-neural (${job.voice_name || 'uz-UZ-SardorNeural'})`)
+                          : (job.tts_provider === 'azure' || (job.voice_name && String(job.voice_name).includes('Neural'))
+                          ? `azure-neural (${job.voice_name || 'uz-UZ-SardorNeural'})`
+                          : '— (eski job)'))
                       }
                     />
                   </div>
