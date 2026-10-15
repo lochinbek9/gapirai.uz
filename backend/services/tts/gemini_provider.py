@@ -74,31 +74,36 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
     )
 
     config = _config_for(voice)
-    model_name = settings.GEMINI_TTS_MODEL or "gemini-3.8-flash-tts"
+    primary_model = settings.GEMINI_TTS_MODEL or "gemini-3.8-flash-tts"
+    candidate_models = [primary_model]
+    for alt_model in ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]:
+        if alt_model not in candidate_models:
+            candidate_models.append(alt_model)
 
     if settings.GEMINI_USE_VERTEX:
         max_attempts = 3
-        for attempt in range(max_attempts):
-            try:
-                response = _get_client().models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config,
-                )
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        inline_data = getattr(part, "inline_data", None)
-                        if inline_data and getattr(inline_data, "data", None):
-                            raw_data = inline_data.data
-                            if isinstance(raw_data, str):
-                                import base64
-                                raw_data = base64.b64decode(raw_data)
-                            return raw_data
-            except Exception as e:
-                if attempt == max_attempts - 1:
-                    logger.warning(f"Vertex Gemini TTS xato: {e}")
-                    return None
-                time.sleep(2.0 * (attempt + 1))
+        for model_name in candidate_models:
+            for attempt in range(max_attempts):
+                try:
+                    response = _get_client().models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config,
+                    )
+                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                        for part in response.candidates[0].content.parts:
+                            inline_data = getattr(part, "inline_data", None)
+                            if inline_data and getattr(inline_data, "data", None):
+                                raw_data = inline_data.data
+                                if isinstance(raw_data, str):
+                                    import base64
+                                    raw_data = base64.b64decode(raw_data)
+                                return raw_data
+                except Exception as e:
+                    if attempt == max_attempts - 1:
+                        logger.warning(f"Vertex Gemini TTS [{model_name}] xato: {e}")
+                    else:
+                        time.sleep(1.0 * (attempt + 1))
         return None
 
     api_keys = get_all_gemini_api_keys()
@@ -111,71 +116,79 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
         logger.warning("Gemini TTS: Hech qanday API kalit topilmadi")
         return None
 
-    # 1. Toza (cooldown'da bo'lmagan) kalitlar bo'yicha sinash
-    for key in api_keys:
-        avail, remaining = is_model_available(key, model_name)
-        if not avail:
-            logger.info(f"Gemini TTS ({key[:10]}...): model cooldown'da ({remaining:.1f}s qoldi) — keyingi kalitga o'tilmoqda.")
-            continue
-
-        record_model_request(key, model_name)
-        try:
-            client = _get_client(api_key=key)
-            response = client.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config,
-            )
-            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    inline_data = getattr(part, "inline_data", None)
-                    if inline_data and getattr(inline_data, "data", None):
-                        raw_data = inline_data.data
-                        if isinstance(raw_data, str):
-                            import base64
-                            raw_data = base64.b64decode(raw_data)
-                        record_model_success(key, model_name)
-                        return raw_data
-        except Exception as e:
-            err_str = str(e)
-            is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
-            is_503 = "503" in err_str or "UNAVAILABLE" in err_str
-            is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
-
-            if is_unauth:
-                mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: yaroqsiz kalit")
-                logger.warning(f"Gemini TTS [{key[:10]}...] 401 yaroqsiz kalit — o'chirildi.")
+    # 1. Modellar va toza (cooldown'da bo'lmagan) kalitlar bo'yicha sinash
+    for model_name in candidate_models:
+        for key in api_keys:
+            avail, remaining = is_model_available(key, model_name)
+            if not avail:
                 continue
 
-            if is_rate_limit:
-                delay = parse_retry_delay(err_str)
-                mark_model_cooldown(key, model_name, delay, reason=f"429: {err_str[:60]}")
-                logger.warning(f"Gemini TTS [{key[:10]}...] 429 kvota limiti ({delay:.1f}s) — navbatdagi kalitga o'tilmoqda.")
-                continue
+            record_model_request(key, model_name)
+            try:
+                client = _get_client(api_key=key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        inline_data = getattr(part, "inline_data", None)
+                        if inline_data and getattr(inline_data, "data", None):
+                            raw_data = inline_data.data
+                            if isinstance(raw_data, str):
+                                import base64
+                                raw_data = base64.b64decode(raw_data)
+                            record_model_success(key, model_name)
+                            return raw_data
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_503 = "503" in err_str or "UNAVAILABLE" in err_str
+                is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
 
-            if is_503:
-                mark_model_cooldown(key, model_name, 120.0, reason="503 server band")
-                logger.warning(f"Gemini TTS [{key[:10]}...] 503 server band — navbatdagi kalitga o'tilmoqda.")
-                continue
+                if is_unauth:
+                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: yaroqsiz kalit")
+                    logger.warning(f"Gemini TTS [{key[:10]}...] 401 yaroqsiz kalit — o'chirildi.")
+                    continue
 
-            logger.warning(f"Gemini TTS [{key[:10]}...] xato: {e}")
+                if is_rate_limit:
+                    delay = parse_retry_delay(err_str)
+                    mark_model_cooldown(key, model_name, delay, reason=f"429: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 429 kvota limiti ({delay:.1f}s) — navbatdagi kalitga o'tilmoqda.")
+                    continue
 
-    # 2. Agar barcha kalitlar cooldown'da bo'lsa
-    key_cooldowns = [is_model_available(k, model_name)[1] for k in api_keys]
-    min_rem = min(key_cooldowns, default=99999.0)
-    if min_rem > 15.0:
-        logger.warning(f"Gemini TTS: Barcha kalitlar uzoq cooldown'da ({min_rem:.0f}s). Zaxira providerga o'tilmoqda.")
+                if is_503:
+                    mark_model_cooldown(key, model_name, 120.0, reason="503 server band")
+                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 503 server band — navbatdagi kalitga o'tilmoqda.")
+                    continue
+
+                logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] xato: {e}")
+
+    # 2. Agar barcha modellar va kalitlar cooldown'da bo'lsa:
+    # Eng kam cooldown qolgan model va kalitni topish
+    best_candidate = None
+    min_rem = 999999.0
+    for model_name in candidate_models:
+        for k in api_keys:
+            avail, rem = is_model_available(k, model_name)
+            if rem < min_rem:
+                min_rem = rem
+                best_candidate = (k, model_name)
+
+    if min_rem > 30.0 or not best_candidate:
+        logger.warning(f"Gemini TTS: Barcha modellar va kalitlar uzoq cooldown'da ({min_rem:.0f}s qoldi).")
         return None
 
-    # Faqat qisqa cooldown (<= 15 soniya) bo'lsa kutib eng yaxshi kalit bilan qayta urinish
-    best_key = min(api_keys, key=lambda k: is_model_available(k, model_name)[1])
-    wait_time = max(1.0, min(min_rem, 3.0))
-    logger.info(f"Gemini TTS: Qisqa kutish ({wait_time:.1f}s) va qayta urinish...")
+    # Qisqa cooldown (<= 30 soniya) bo'lsa kutib eng yaxshi kalit bilan qayta urinish
+    best_key, best_model = best_candidate
+    wait_time = max(1.0, min(min_rem, 5.0))
+    logger.info(f"Gemini TTS: Qisqa kutish ({wait_time:.1f}s, model={best_model}) va qayta urinish...")
     time.sleep(wait_time)
     try:
         client = _get_client(api_key=best_key)
         response = client.models.generate_content(
-            model=model_name,
+            model=best_model,
             contents=contents,
             config=config,
         )
@@ -187,10 +200,10 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                     if isinstance(raw_data, str):
                         import base64
                         raw_data = base64.b64decode(raw_data)
-                    record_model_success(best_key, model_name)
+                    record_model_success(best_key, best_model)
                     return raw_data
     except Exception as e:
-        logger.error(f"Gemini TTS oxirgi urinish ham xato berdi: {e}")
+        logger.error(f"Gemini TTS oxirgi urinish ham xato berdi ({best_model}): {e}")
 
     return None
 
