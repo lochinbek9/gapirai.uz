@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
@@ -59,7 +59,7 @@ def admin_stats(
     try:
         now = datetime.utcnow()
 
-        internal_subq = db.query(User.id).filter(User.is_internal.is_(True)).subquery()
+        internal_ids_select = select(User.id).filter(User.is_internal.is_(True))
 
         if include_internal:
             user_filter = None
@@ -68,8 +68,8 @@ def admin_stats(
             recent_jobs_user_filter = None
         else:
             user_filter = User.is_internal.is_(False)
-            job_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_subq))
-            pay_user_filter = or_(Payment.user_id.is_(None), Payment.user_id.notin_(internal_subq))
+            job_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select))
+            pay_user_filter = or_(Payment.user_id.is_(None), Payment.user_id.notin_(internal_ids_select))
             recent_jobs_user_filter = or_(User.id.is_(None), User.is_internal.is_(False))
 
         # ── Foydalanuvchilar ──
@@ -192,7 +192,7 @@ def admin_stats(
         }
 
         internal_users_count = db.query(User).filter(User.is_internal.is_(True)).count()
-        internal_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id.in_(internal_subq)).count()
+        internal_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id.in_(internal_ids_select)).count()
 
         return {
             "users": {
