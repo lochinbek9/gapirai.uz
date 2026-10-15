@@ -3,8 +3,16 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from backend.models.database import User, get_db
+from sqlalchemy import func
+from backend.models.database import User, ExcludedEmail, get_db
 from backend.services.auth import hash_password, verify_password, create_access_token, get_current_user
+
+
+def is_email_internal(db: Session, email: str | None) -> bool:
+    """Tekshiradi: agar email 'mijoz emas' (ExcludedEmail) ro'yxatida bo'lsa True qaytaradi."""
+    if not email:
+        return False
+    return db.query(ExcludedEmail).filter(func.lower(ExcludedEmail.email) == email.lower().strip()).first() is not None
 from backend.services.email_service import (
     generate_verification_code,
     send_verification_email,
@@ -212,9 +220,13 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> PendingVeri
     # qaytadi. Shu sabab oddiy qiymatlarni oldindan olamiz.
     db.rollback()
     name = req.name.strip()
-    password_hash = hash_password(req.password)
-
-    user = User(email=email, name=name, password_hash=password_hash, is_verified=False)
+    user = User(
+        email=email,
+        name=name,
+        password_hash=password_hash,
+        is_verified=False,
+        is_internal=is_email_internal(db, email),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -301,6 +313,8 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthRe
         user = db.query(User).filter(User.email == info["email"]).first()
         if user:
             user.google_id = info["sub"]
+            if is_email_internal(db, info["email"]) and not getattr(user, "is_internal", False):
+                user.is_internal = True
             # Xavfsizlik: agar profil tasdiqlanmagan holda parolli bo'lgan bo'lsa,
             # begonaning paroli bilan kirish xavfini bartaraf etish uchun
             # parolni tozalaymiz (chunki Google orqali haqiqiy egasi tasdiqlandi).
@@ -318,6 +332,7 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthRe
             password_hash=None,
             is_verified=info["email_verified"],
             auth_provider="google",
+            is_internal=is_email_internal(db, info["email"]),
         )
         db.add(user)
         db.commit()

@@ -63,6 +63,7 @@ class User(Base):
     # Faqat ma'lumot uchun — hech qanday kod bu maydonga qarab tarmoqlanmaydi.
     auth_provider = Column(String(20), nullable=False, default="password")  # "password" | "google" | "phone"
     role = Column(String(20), nullable=False, default="user")  # "user" | "admin"
+    is_internal = Column(Boolean, default=False, nullable=False)  # True bo'lsa: dasturchi/test/ichki xodim -- real mijozlar statistikasidan chiqariladi
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active_at = Column(DateTime, default=datetime.utcnow)
 
@@ -492,6 +493,19 @@ class BroadcastCampaign(Base):
     completed_at = Column(DateTime, nullable=True)
 
     admin = relationship("User")
+
+
+class ExcludedEmail(Base):
+    """Mijoz emas (test, dasturchi, ichki xodimlar) ro'yxati.
+    Real mijozlar statistikasi (Admin stats, retention, conversion) buzilmasligi
+    uchun ushbu emaillar statistikadan chiqarib tashlanadi.
+    """
+    __tablename__ = "excluded_emails"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    reason = Column(String(255), nullable=True, default="internal_test")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 

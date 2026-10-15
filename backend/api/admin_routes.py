@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import func, or_
-from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign
+from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
 from backend.services.auth import get_current_admin_user
@@ -16,72 +16,115 @@ TREND_MONTHS = 12
 TREND_YEARS = 5
 
 
-def _daily_counts(db, model, since: datetime) -> dict[str, int]:
-    rows = (
-        db.query(func.date(model.created_at).label("day"), func.count(model.id))
-        .filter(model.created_at >= since)
-        .group_by("day")
-        .all()
-    )
+def _daily_counts(db, model, since: datetime, extra_filter=None) -> dict[str, int]:
+    q = db.query(func.date(model.created_at).label("day"), func.count(model.id)).filter(model.created_at >= since)
+    if extra_filter is not None:
+        q = q.filter(extra_filter)
+    rows = q.group_by("day").all()
     return {str(day): count for day, count in rows}
 
 
-def _bucketed_counts(db, model, since: datetime, trunc: str) -> dict[str, int]:
+def _bucketed_counts(db, model, since: datetime, trunc: str, extra_filter=None) -> dict[str, int]:
     """`trunc` — Postgres date_trunc birligi ("month"/"year"). Kalitlar
     "YYYY-MM" (month) yoki "YYYY" (year) shaklida qaytadi — frontend'dagi
     granularity tugmasi shu formatga mos kunlik/oylik/yillik grafikni tanlaydi."""
     bucket = func.date_trunc(trunc, model.created_at).label("bucket")
-    rows = db.query(bucket, func.count(model.id)).filter(model.created_at >= since).group_by(bucket).all()
+    q = db.query(bucket, func.count(model.id)).filter(model.created_at >= since)
+    if extra_filter is not None:
+        q = q.filter(extra_filter)
+    rows = q.group_by(bucket).all()
     fmt = "%Y-%m" if trunc == "month" else "%Y"
     return {b.strftime(fmt): count for b, count in rows}
 
 
-def _period_count(db, model, start: datetime, end: datetime | None = None):
+def _period_count(db, model, start: datetime, end: datetime | None = None, extra_filter=None):
     q = db.query(model).filter(model.created_at >= start)
     if end is not None:
         q = q.filter(model.created_at <= end)
+    if extra_filter is not None:
+        q = q.filter(extra_filter)
     return q.count()
 
 
 @router.get("/stats")
-def admin_stats(current_user: User = Depends(get_current_admin_user)):
+def admin_stats(
+    include_internal: bool = Query(default=False),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel statistikasi:
+    `include_internal=False` (default): haqiqiy mijozlar statistikasi (dasturchilar, test va
+    'mijoz emas' ro'yxatidagi hisoblar chiqarib tashlanadi).
+    """
     db = SessionLocal()
     try:
         now = datetime.utcnow()
 
-        total_users = db.query(User).count()
-        verified_users = db.query(User).filter(User.is_verified.is_(True)).count()
-        users_7d = db.query(User).filter(User.created_at > now - timedelta(days=7)).count()
-        users_24h = db.query(User).filter(User.created_at > now - timedelta(hours=24)).count()
+        internal_subq = db.query(User.id).filter(User.is_internal.is_(True)).subquery()
 
-        status_rows = db.query(DubbingJob.status, func.count(DubbingJob.id)).group_by(DubbingJob.status).all()
+        if include_internal:
+            user_filter = None
+            job_filter = None
+            pay_user_filter = None
+            recent_jobs_user_filter = None
+        else:
+            user_filter = User.is_internal.is_(False)
+            job_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_subq))
+            pay_user_filter = or_(Payment.user_id.is_(None), Payment.user_id.notin_(internal_subq))
+            recent_jobs_user_filter = or_(User.id.is_(None), User.is_internal.is_(False))
+
+        # ── Foydalanuvchilar ──
+        u_q = db.query(User)
+        if user_filter is not None:
+            u_q = u_q.filter(user_filter)
+        total_users = u_q.count()
+        verified_users = u_q.filter(User.is_verified.is_(True)).count()
+        users_7d = u_q.filter(User.created_at > now - timedelta(days=7)).count()
+        users_24h = u_q.filter(User.created_at > now - timedelta(hours=24)).count()
+
+        # ── Dublyaj ishlari ──
+        j_q = db.query(DubbingJob)
+        if job_filter is not None:
+            j_q = j_q.filter(job_filter)
+        total_jobs = j_q.count()
+        jobs_with_user = j_q.filter(DubbingJob.user_id.isnot(None)).count()
+        jobs_7d = j_q.filter(DubbingJob.created_at > now - timedelta(days=7)).count()
+        jobs_24h = j_q.filter(DubbingJob.created_at > now - timedelta(hours=24)).count()
+
+        status_q = db.query(DubbingJob.status, func.count(DubbingJob.id))
+        if job_filter is not None:
+            status_q = status_q.filter(job_filter)
+        status_rows = status_q.group_by(DubbingJob.status).all()
         jobs_by_status = {(s.value if hasattr(s, "value") else str(s)): c for s, c in status_rows}
 
-        total_jobs = db.query(DubbingJob).count()
-        jobs_with_user = db.query(DubbingJob).filter(DubbingJob.user_id.isnot(None)).count()
-        jobs_7d = db.query(DubbingJob).filter(DubbingJob.created_at > now - timedelta(days=7)).count()
-        jobs_24h = db.query(DubbingJob).filter(DubbingJob.created_at > now - timedelta(hours=24)).count()
+        # ── To'lovlar ──
+        p_q = db.query(Payment).filter(Payment.status == PaymentStatus.APPROVED)
+        if pay_user_filter is not None:
+            p_q = p_q.filter(pay_user_filter)
+        payments_approved = p_q.count()
 
-        revenue_total = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-            Payment.status == PaymentStatus.APPROVED
-        ).scalar()
-        payments_approved = db.query(Payment).filter(Payment.status == PaymentStatus.APPROVED).count()
+        revenue_q = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(Payment.status == PaymentStatus.APPROVED)
+        if pay_user_filter is not None:
+            revenue_q = revenue_q.filter(pay_user_filter)
+        revenue_total = revenue_q.scalar()
 
+        # ── So'nggi foydalanuvchilar ──
+        recent_u_q = db.query(User)
+        if user_filter is not None:
+            recent_u_q = recent_u_q.filter(user_filter)
         recent_users = [
             {"email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None, "is_verified": u.is_verified}
-            for u in db.query(User).order_by(User.created_at.desc()).limit(10).all()
+            for u in recent_u_q.order_by(User.created_at.desc()).limit(10).all()
         ]
 
-        # Har bir jobning qaysi video, qaysi akkaunt va qachon bo'lganini
-        # to'liq ko'rish uchun — admin panelidagi umumlashtirilgan
-        # "xatolik turlari" kartasi o'rniga individual joblar ro'yxati.
-        recent_jobs_rows = (
+        # ── So'nggi joblar ──
+        recent_jobs_query = (
             db.query(DubbingJob, User.email)
             .outerjoin(User, DubbingJob.user_id == User.id)
-            .order_by(DubbingJob.created_at.desc())
-            .limit(50)
-            .all()
         )
+        if recent_jobs_user_filter is not None:
+            recent_jobs_query = recent_jobs_query.filter(recent_jobs_user_filter)
+        recent_jobs_rows = recent_jobs_query.order_by(DubbingJob.created_at.desc()).limit(50).all()
+
         recent_jobs = [
             {
                 "id": str(job.id),
@@ -96,11 +139,10 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
             for job, email in recent_jobs_rows
         ]
 
-        # ── Trendlar: kunlik ro'yxatdan o'tish/video soni, bugun/kecha,
-        # bu oy/o'tgan oy solishtiruvi — admin panelda grafik uchun.
+        # ── Trendlar (faqat real mijozlar) ──
         trend_since = now - timedelta(days=TREND_DAYS)
-        user_daily = _daily_counts(db, User, trend_since)
-        job_daily = _daily_counts(db, DubbingJob, trend_since)
+        user_daily = _daily_counts(db, User, trend_since, extra_filter=user_filter)
+        job_daily = _daily_counts(db, DubbingJob, trend_since, extra_filter=job_filter)
 
         daily = []
         for i in range(TREND_DAYS, -1, -1):
@@ -108,11 +150,9 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
             key = str(d)
             daily.append({"date": key, "users": user_daily.get(key, 0), "jobs": job_daily.get(key, 0)})
 
-        # Oylik/yillik granularity — kunlik chiziqli grafik bilan bir xil
-        # {date, users, jobs} shakli, faqat sana kaliti "YYYY-MM"/"YYYY".
         monthly_since = datetime(now.year, now.month, 1) - timedelta(days=31 * (TREND_MONTHS - 1))
-        user_monthly = _bucketed_counts(db, User, monthly_since, "month")
-        job_monthly = _bucketed_counts(db, DubbingJob, monthly_since, "month")
+        user_monthly = _bucketed_counts(db, User, monthly_since, "month", extra_filter=user_filter)
+        job_monthly = _bucketed_counts(db, DubbingJob, monthly_since, "month", extra_filter=job_filter)
         monthly = []
         for i in range(TREND_MONTHS - 1, -1, -1):
             month_index0 = (now.year * 12 + (now.month - 1)) - i
@@ -121,8 +161,8 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
             monthly.append({"date": key, "users": user_monthly.get(key, 0), "jobs": job_monthly.get(key, 0)})
 
         yearly_since = datetime(now.year - (TREND_YEARS - 1), 1, 1)
-        user_yearly = _bucketed_counts(db, User, yearly_since, "year")
-        job_yearly = _bucketed_counts(db, DubbingJob, yearly_since, "year")
+        user_yearly = _bucketed_counts(db, User, yearly_since, "year", extra_filter=user_filter)
+        job_yearly = _bucketed_counts(db, DubbingJob, yearly_since, "year", extra_filter=job_filter)
         yearly = []
         for i in range(TREND_YEARS - 1, -1, -1):
             key = str(now.year - i)
@@ -142,14 +182,17 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
             "today": {"users": user_daily.get(today_key, 0), "jobs": job_daily.get(today_key, 0)},
             "yesterday": {"users": user_daily.get(yesterday_key, 0), "jobs": job_daily.get(yesterday_key, 0)},
             "this_month": {
-                "users": _period_count(db, User, this_month_start),
-                "jobs": _period_count(db, DubbingJob, this_month_start),
+                "users": _period_count(db, User, this_month_start, extra_filter=user_filter),
+                "jobs": _period_count(db, DubbingJob, this_month_start, extra_filter=job_filter),
             },
             "last_month": {
-                "users": _period_count(db, User, last_month_start, last_month_end),
-                "jobs": _period_count(db, DubbingJob, last_month_start, last_month_end),
+                "users": _period_count(db, User, last_month_start, last_month_end, extra_filter=user_filter),
+                "jobs": _period_count(db, DubbingJob, last_month_start, last_month_end, extra_filter=job_filter),
             },
         }
+
+        internal_users_count = db.query(User).filter(User.is_internal.is_(True)).count()
+        internal_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id.in_(internal_subq)).count()
 
         return {
             "users": {
@@ -157,6 +200,7 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "verified": verified_users,
                 "last_7d": users_7d,
                 "last_24h": users_24h,
+                "internal_count": internal_users_count,
             },
             "jobs": {
                 "total": total_jobs,
@@ -165,6 +209,7 @@ def admin_stats(current_user: User = Depends(get_current_admin_user)):
                 "by_status": jobs_by_status,
                 "last_7d": jobs_7d,
                 "last_24h": jobs_24h,
+                "internal_count": internal_jobs_count,
             },
             "payments": {
                 "approved_count": payments_approved,
@@ -295,6 +340,7 @@ class SetPlanRequest(BaseModel):
 @router.get("/users")
 def admin_list_users(
     q: str | None = None,
+    filter_type: str | None = Query(None, description="all | customers | internal"),
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_admin_user),
@@ -303,6 +349,11 @@ def admin_list_users(
     db = SessionLocal()
     try:
         query = db.query(User)
+        if filter_type == "customers":
+            query = query.filter(User.is_internal.is_(False))
+        elif filter_type == "internal":
+            query = query.filter(User.is_internal.is_(True))
+
         if q and q.strip():
             term = f"%{q.strip()}%"
             query = query.filter(
@@ -332,6 +383,7 @@ def admin_list_users(
                 "name": u.name,
                 "phone": u.phone,
                 "role": u.role,
+                "is_internal": getattr(u, "is_internal", False),
                 "is_verified": u.is_verified,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
                 "plan": sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan),
@@ -480,6 +532,7 @@ def admin_delete_cookies(current_user: User = Depends(get_current_admin_user)):
 @router.get("/retention")
 def admin_retention_stats(
     days: int = Query(default=14, ge=7, le=60),
+    include_internal: bool = Query(default=False),
     current_user: User = Depends(get_current_admin_user),
 ):
     """Foydalanuvchilarning qaytib kirish (Retention) tahlili:
@@ -488,6 +541,8 @@ def admin_retention_stats(
     - Kunma-kun faollik (Total Active, New Users, Returning Users, Returning %)
     - Kirish chastotasi bo'yicha taqsimot (1 kun, 2-3 kun, 4-7 kun, 8+ kun)
     - Oxirgi faol bo'lgan foydalanuvchilar ro'yxati (holat belgilari bilan)
+    
+    `include_internal=False` bo'lganda test/dasturchi hisoblari hisobga olinmaydi.
     """
     from sqlalchemy import text
     db = SessionLocal()
@@ -497,17 +552,23 @@ def admin_retention_stats(
         yesterday = today - timedelta(days=1)
         since_date = today - timedelta(days=days)
 
+        internal_clause = "" if include_internal else "AND u.is_internal = FALSE"
+        internal_where = "" if include_internal else "WHERE is_internal = FALSE"
+        internal_u_where = "" if include_internal else "WHERE u.is_internal = FALSE"
+
         # 1. Umumiy hisob (Overall summary)
-        summary_row = db.execute(text("""
+        summary_row = db.execute(text(f"""
             WITH user_summary AS (
                 SELECT 
-                    user_id,
-                    count(DISTINCT visit_date) as active_days
-                FROM user_daily_visits
-                GROUP BY user_id
+                    v.user_id,
+                    count(DISTINCT v.visit_date) as active_days
+                FROM user_daily_visits v
+                JOIN users u ON v.user_id = u.id
+                {internal_u_where}
+                GROUP BY v.user_id
             )
             SELECT 
-                (SELECT count(*) FROM users) as total_registered,
+                (SELECT count(*) FROM users {internal_where}) as total_registered,
                 count(DISTINCT user_id) as total_active_all_time,
                 count(DISTINCT CASE WHEN active_days > 1 THEN user_id END) as total_returning_all_time,
                 count(DISTINCT CASE WHEN active_days = 1 THEN user_id END) as total_one_time,
@@ -521,14 +582,14 @@ def admin_retention_stats(
         overall_ret_pct = round(100.0 * total_ret / max(1, total_act), 1)
 
         # 2. Bugun va kechagi ko'rsatkichlar
-        today_row = db.execute(text("""
+        today_row = db.execute(text(f"""
             SELECT 
                 count(DISTINCT v.user_id) as total_active,
                 count(DISTINCT CASE WHEN v.visit_date::date = u.created_at::date THEN v.user_id END) as new_users,
                 count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users
             FROM user_daily_visits v
             JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date = :tdate
+            WHERE v.visit_date::date = :tdate {internal_clause}
         """), {"tdate": today}).mappings().first()
 
         today_active = today_row["total_active"] or 0
@@ -536,14 +597,14 @@ def admin_retention_stats(
         today_returning = today_row["returning_users"] or 0
         today_ret_pct = round(100.0 * today_returning / max(1, today_active), 1)
 
-        yesterday_row = db.execute(text("""
+        yesterday_row = db.execute(text(f"""
             SELECT 
                 count(DISTINCT v.user_id) as total_active,
                 count(DISTINCT CASE WHEN v.visit_date::date = u.created_at::date THEN v.user_id END) as new_users,
                 count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users
             FROM user_daily_visits v
             JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date = :ydate
+            WHERE v.visit_date::date = :ydate {internal_clause}
         """), {"ydate": yesterday}).mappings().first()
 
         yesterday_active = yesterday_row["total_active"] or 0
@@ -552,7 +613,7 @@ def admin_retention_stats(
         yesterday_ret_pct = round(100.0 * yesterday_returning / max(1, yesterday_active), 1)
 
         # 3. Kunma-kun tahlil (Oxirgi N kun)
-        daily_rows = db.execute(text("""
+        daily_rows = db.execute(text(f"""
             SELECT 
                 v.visit_date::date as day,
                 count(DISTINCT v.user_id) as total_active,
@@ -560,11 +621,13 @@ def admin_retention_stats(
                 count(DISTINCT CASE WHEN v.visit_date::date > u.created_at::date THEN v.user_id END) as returning_users,
                 COALESCE((
                     SELECT count(*) FROM dubbing_jobs j 
+                    LEFT JOIN users ju ON j.user_id = ju.id
                     WHERE j.created_at::date = v.visit_date::date
+                    {'AND (ju.id IS NULL OR ju.is_internal = FALSE)' if not include_internal else ''}
                 ), 0) as jobs_count
             FROM user_daily_visits v
             JOIN users u ON v.user_id = u.id
-            WHERE v.visit_date::date >= :since
+            WHERE v.visit_date::date >= :since {internal_clause}
             GROUP BY v.visit_date::date
             ORDER BY day DESC
         """), {"since": since_date}).mappings().all()
@@ -583,11 +646,13 @@ def admin_retention_stats(
             })
 
         # 4. Kirish chastotasi taqsimoti (Frequency distribution)
-        freq_row = db.execute(text("""
+        freq_row = db.execute(text(f"""
             WITH counts AS (
-                SELECT user_id, count(DISTINCT visit_date) as cnt
-                FROM user_daily_visits
-                GROUP BY user_id
+                SELECT v.user_id, count(DISTINCT v.visit_date) as cnt
+                FROM user_daily_visits v
+                JOIN users u ON v.user_id = u.id
+                {internal_u_where}
+                GROUP BY v.user_id
             )
             SELECT 
                 count(DISTINCT CASE WHEN cnt = 1 THEN user_id END) as one_day,
@@ -610,7 +675,7 @@ def admin_retention_stats(
         ]
 
         # 5. Oxirgi faol bo'lgan foydalanuvchilar (50 ta)
-        user_rows = db.execute(text("""
+        user_rows = db.execute(text(f"""
             SELECT 
                 u.id,
                 u.name,
@@ -632,6 +697,7 @@ def admin_retention_stats(
                 WHERE user_id IS NOT NULL
                 GROUP BY user_id
             ) j ON u.id = j.user_id
+            {internal_u_where}
             ORDER BY u.last_active_at DESC NULLS LAST
             LIMIT 50;
         """)).mappings().all()
@@ -1054,6 +1120,109 @@ def get_gemini_quota(current_admin: User = Depends(get_current_admin_user)):
     """
     from backend.services.gemini_quota_manager import get_gemini_quota_status
     return get_gemini_quota_status()
+
+
+class ExcludedEmailCreateRequest(BaseModel):
+    email: str
+    reason: str = "Dasturchi / Test"
+
+
+@router.get("/excluded-emails")
+def list_excluded_emails(current_user: User = Depends(get_current_admin_user)):
+    """Mijoz emas (ExcludedEmail) ro'yxatini qaytaradi."""
+    db = SessionLocal()
+    try:
+        items = db.query(ExcludedEmail).order_by(ExcludedEmail.created_at.desc()).all()
+        return [
+            {
+                "id": str(item.id),
+                "email": item.email,
+                "reason": item.reason,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+            for item in items
+        ]
+    finally:
+        db.close()
+
+
+@router.post("/excluded-emails")
+def add_excluded_email(req: ExcludedEmailCreateRequest, current_user: User = Depends(get_current_admin_user)):
+    """Yangi emailni 'Mijoz emas' ro'yxatiga qo'shadi va agar user mavjud bo'lsa is_internal=True qiladi."""
+    db = SessionLocal()
+    try:
+        clean_email = req.email.strip().lower()
+        if not clean_email:
+            raise HTTPException(status_code=400, detail="Email bo'sh bo'lishi mumkin emas.")
+        
+        ex = db.query(ExcludedEmail).filter(func.lower(ExcludedEmail.email) == clean_email).first()
+        if not ex:
+            ex = ExcludedEmail(email=clean_email, reason=req.reason)
+            db.add(ex)
+        else:
+            ex.reason = req.reason
+            
+        # Agar bu email bilan user allaqachon mavjud bo'lsa, is_internal=True
+        user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+        if user:
+            user.is_internal = True
+            
+        db.commit()
+        return {"status": "ok", "email": clean_email, "message": f"{clean_email} mijoz emas ro'yxatiga qo'shildi."}
+    finally:
+        db.close()
+
+
+@router.delete("/excluded-emails/{email}")
+def remove_excluded_email(email: str, current_user: User = Depends(get_current_admin_user)):
+    """Emailni 'Mijoz emas' ro'yxatidan chiqaradi va userning is_internal holatini False qiladi."""
+    db = SessionLocal()
+    try:
+        clean_email = email.strip().lower()
+        ex = db.query(ExcludedEmail).filter(func.lower(ExcludedEmail.email) == clean_email).first()
+        if ex:
+            db.delete(ex)
+            
+        user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+        if user:
+            user.is_internal = False
+            
+        db.commit()
+        return {"status": "ok", "email": clean_email, "message": f"{clean_email} ro'yxatdan chiqarildi."}
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/toggle-internal")
+def toggle_user_internal(user_id: str, current_user: User = Depends(get_current_admin_user)):
+    """Foydalanuvchini 'Mijoz emas' (is_internal) holatini yoqish/o'chirish."""
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.id == user_id).first()
+        if not u:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        
+        u.is_internal = not getattr(u, "is_internal", False)
+        
+        # ExcludedEmail jadvalini ham sinxronlashtirish
+        if u.email:
+            clean_email = u.email.strip().lower()
+            ex = db.query(ExcludedEmail).filter(func.lower(ExcludedEmail.email) == clean_email).first()
+            if u.is_internal and not ex:
+                db.add(ExcludedEmail(email=clean_email, reason="Admin panel orqali belgilandi"))
+            elif not u.is_internal and ex:
+                db.delete(ex)
+
+        db.commit()
+        return {
+            "status": "ok",
+            "user_id": str(u.id),
+            "email": u.email,
+            "is_internal": u.is_internal,
+            "message": f"Foydalanuvchi {'mijoz emas (internal)' if u.is_internal else 'haqiqiy mijoz'} deb belgilandi.",
+        }
+    finally:
+        db.close()
 
 
 
