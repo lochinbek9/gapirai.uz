@@ -25,24 +25,33 @@ _NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
 _gemini_local = threading.local()
 
 
-def _get_gemini_client():
-    if not hasattr(_gemini_local, "client"):
-        from google import genai
+def _get_gemini_client(api_key: str | None = None):
+    from google import genai
 
-        if settings.GEMINI_USE_VERTEX:
+    if settings.GEMINI_USE_VERTEX:
+        if not hasattr(_gemini_local, "vertex_client"):
             if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.GOOGLE_APPLICATION_CREDENTIALS
-            _gemini_local.client = genai.Client(
+            _gemini_local.vertex_client = genai.Client(
                 vertexai=True,
                 project=settings.GCP_PROJECT_ID,
                 location=settings.GCP_LOCATION,
             )
-        else:
-            api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
-            if not api_key:
-                raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
-            _gemini_local.client = genai.Client(api_key=api_key)
-    return _gemini_local.client
+        return _gemini_local.vertex_client
+
+    if not api_key:
+        api_key = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY yoki GOOGLE_GENERATIVE_AI_API_KEY sozlanmagan")
+
+    clients = getattr(_gemini_local, "clients", None)
+    if clients is None:
+        clients = {}
+        _gemini_local.clients = clients
+
+    if api_key not in clients:
+        clients[api_key] = genai.Client(api_key=api_key)
+    return clients[api_key]
 
 
 def _gemini_text_model() -> str:
@@ -300,13 +309,20 @@ def _translate_chunk_openai(segments: list[dict], clean_segments: list[dict]) ->
 
 def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
     """
-    Gemini ba'zan finish_reason=STOP deb hisoblasa ham, JSON'ni yakuniy
-    yopuvchi qavssiz uzib qo'yadi (model tomonidagi xatti-harakat, token
-    limitiga tegishli emas) — bu taxminan har 3 urinishdan 1 tasida
-    uchraydi. Shuning uchun JSON parse xatosi ham rate-limit kabi qayta
-    urinishga sabab bo'ladi — API chaqiruvining o'zi emas.
+    Gemini orqali segmentlarni o'zbek tiliga tarjima qilish:
+    - Birinchi o'rinda eng sifatli Flash flagman modellar barcha mavjud API kalitlar orqali sinab chiqiladi.
+    - Agar 1-kalit kvota limiti olsa (429), navbat darhol sifatni tushirmasdan 2-3-4-kalitlarga o'tadi.
+    - Faqat va faqat barcha kalitlar band bo'lgandagina zaxira (Flash-Lite) modellarga o'tiladi.
     """
     from google.genai import types
+    from backend.services.gemini_quota_manager import (
+        get_all_gemini_api_keys,
+        is_model_available,
+        mark_model_cooldown,
+        record_model_request,
+        record_model_success,
+        parse_retry_delay,
+    )
 
     instruction = _build_instruction(clean_segments)
     config = types.GenerateContentConfig(
@@ -318,55 +334,91 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
     candidate_models = [
         _gemini_text_model(),
         "gemini-3.8-flash",
+        "gemini-3.5-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
         "gemini-flash-latest",
+        "gemini-3.5-flash-lite",
         "gemini-flash-lite-latest",
-        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-preview",
     ]
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
+    api_keys = get_all_gemini_api_keys()
+    if not api_keys:
+        primary_k = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
+        if primary_k:
+            api_keys = [primary_k]
+
     last_error = None
     for model_name in candidate_models:
-        for attempt in range(3):
-            try:
-                response = _get_gemini_client().models.generate_content(
-                    model=model_name,
-                    contents=instruction,
-                    config=config,
-                )
-                result = json.loads(response.text)
-                return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
-                is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
-                is_bad_json = isinstance(e, json.JSONDecodeError)
-                if not (is_rate_limit or is_server_error or is_bad_json):
-                    logger.warning(f"Gemini tarjima ({model_name}) doimiy xato: {e} — keyingi modelga o'tilmoqda.")
-                    break
+        for api_key in (api_keys or [None]):
+            if api_key:
+                avail, remaining = is_model_available(api_key, model_name)
+                if not avail:
+                    logger.info(f"Gemini tarjima ({model_name}) kalit cooldown'da ({remaining:.1f}s qoldi) — keyingi kalitga o'tilmoqda.")
+                    continue
+                record_model_request(api_key, model_name)
 
-                if is_rate_limit:
-                    m = re.search(r"retry in ([\d\.]+)s", err_str) or re.search(r"retryDelay['\"]:\s*['\"](\d+)s", err_str)
-                    delay = float(m.group(1)) if m else 30.0
-                    if delay > 20.0:
-                        logger.warning(f"Gemini tarjima ({model_name}) kvotasi uzoq muddatga band ({delay:.1f}s) — darhol keyingi soddaroq modelga o'tilmoqda.")
+            client = _get_gemini_client(api_key=api_key)
+
+            for attempt in range(2):
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=instruction,
+                        config=config,
+                    )
+                    raw_text = (response.text or "").strip()
+                    if raw_text.startswith("```"):
+                        raw_text = re.sub(r"^```[a-zA-Z]*\s*", "", raw_text)
+                        raw_text = re.sub(r"\s*```$", "", raw_text)
+                    raw_text = raw_text.strip()
+                    result = json.loads(raw_text)
+
+                    if api_key:
+                        record_model_success(api_key, model_name)
+
+                    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+                except Exception as e:
+                    last_error = e
+                    err_str = str(e)
+                    is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                    is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
+                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str
+                    is_bad_json = isinstance(e, json.JSONDecodeError)
+
+                    if is_not_found:
+                        logger.warning(f"Gemini tarjima ({model_name}) mavjud emas (404): {e} — tashlab ketilmoqda.")
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, 86400.0, reason=f"404: {e}")
                         break
-                    logger.warning(f"Gemini tarjima ({model_name}) qisqa 429 kutish — {delay + 1.0:.1f}s ({attempt + 1}/3)")
-                    time.sleep(delay + 1.0)
-                elif is_server_error:
-                    logger.warning(f"Gemini tarjima ({model_name}) server band (503) — keyingi soddaroq modelga o'tilmoqda: {e}")
-                    break
-                else:
-                    backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
-                    logger.warning(f"Gemini tarjima ({model_name}) JSON/qayta urinish {backoff:.2f}s ({attempt + 1}/3): {e}")
-                    time.sleep(backoff)
 
-    raise last_error or RuntimeError("Barcha Gemini tarjima modellari muvaffaqiyatsiz bo'ldi")
+                    if is_rate_limit:
+                        delay = parse_retry_delay(err_str)
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, delay, reason=err_str)
+                        logger.warning(f"Gemini tarjima ({model_name}) 429 kvota limiti ({delay:.1f}s) — keyingi kalit/modelga o'tilmoqda.")
+                        break
+
+                    if is_server_error:
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, 120.0, reason=f"Server band (503): {e}")
+                        logger.warning(f"Gemini tarjima ({model_name}) server band (503) — keyingi kalit/modelga o'tilmoqda: {e}")
+                        break
+
+                    if is_bad_json:
+                        backoff = (2 ** attempt) + random.uniform(0.5, 1.5)
+                        logger.warning(f"Gemini tarjima ({model_name}) JSON qayta urinish {backoff:.2f}s ({attempt + 1}/2): {e}")
+                        time.sleep(backoff)
+                        continue
+
+                    logger.warning(f"Gemini tarjima ({model_name}) kutilmagan xato: {e} — keyingi kalit/modelga o'tilmoqda.")
+                    break
+
+    raise last_error or RuntimeError("Barcha Gemini tarjima modellari va API kalitlari muvaffaqiyatsiz bo'ldi")
 
 
 def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:

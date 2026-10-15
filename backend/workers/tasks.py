@@ -196,15 +196,24 @@ def _detect_gender(transcript_text: str) -> str:
     def _call_gemini():
         from google.genai import types
         from backend.services.translator import _get_gemini_client, _gemini_text_model
+        from backend.services.gemini_quota_manager import get_all_gemini_api_keys
 
         config = types.GenerateContentConfig(
             system_instruction=_GENDER_SYSTEM_PROMPT, temperature=0, max_output_tokens=5,
         )
-        response = _get_gemini_client().models.generate_content(
-            model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
-        )
-        result = (response.text or "").strip().lower()
-        return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
+        keys = get_all_gemini_api_keys() or [None]
+        last_e = None
+        for k in keys:
+            try:
+                response = _get_gemini_client(api_key=k).models.generate_content(
+                    model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
+                )
+                result = (response.text or "").strip().lower()
+                return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
+            except Exception as e:
+                last_e = e
+                continue
+        raise last_e or RuntimeError("Gemini gender detection failed")
 
     def _call_openai():
         if not settings.OPENAI_API_KEY:

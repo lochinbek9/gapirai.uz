@@ -21,31 +21,28 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Sifat bo'yicha saralangan faol matn modellar ro'yxati (yaxshisidan oddiysiga qarab):
-# 1. Pro / Advanced Reasoning (chuqur tahlil, yuqori aql)
-# 2. Flash flagship (tezkor, yuqori sifat, muvozanatli)
-# 3. Flash-Lite & Fallbacks (yuqori kvotali zaxira modellar)
+# Sifat va tezlik bo'yicha saralangan barqaror modellar ro'yxati:
+# 1. Flash flagship (yuqori sifat, tezkor, tabiiy dublyaj, yuqori kvota)
+# 2. Flash-Lite (yuqori kvotali zaxira modellar)
+# 3. Pro (chuqur tahlil, past kvotali zaxira)
 GEMINI_TEXT_MODELS: List[str] = [
-    # 1. Pro / Advanced Reasoning
-    "gemini-pro-latest",
-    "gemini-4-argon",
-    "gemini-3.1-pro-preview",
-
-    # 2. Flash Flagship Models
-    "gemini-flash-latest",
+    # 1. Flash Flagship Models (Asosiy va yuqori sifatli)
     "gemini-3.8-flash",
+    "gemini-3.5-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3-flash-preview",
+    "gemini-flash-latest",
     "gemini-omni-1.1-flash",
 
-    # 3. Flash-Lite & High-Throughput Fallbacks
-    "gemini-flash-lite-latest",
+    # 2. Flash-Lite Fallbacks (Zaxira - yuqori tezlik va kvota)
     "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-3.1-flash-lite",
     "gemini-3.1-flash-lite-preview",
-    "gemma-4-26b-a4b-it",
+
+    # 3. Pro Reasoning Models (Faqat barcha Flash modellar to'lganda)
+    "gemini-pro-latest",
+    "gemini-3.1-pro-preview",
 ]
 
 _memory_cooldowns: Dict[str, float] = {}
