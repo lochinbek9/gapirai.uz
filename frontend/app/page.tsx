@@ -177,6 +177,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [voiceGender, setVoiceGender] = useState("male");
+  const [voiceName, setVoiceName] = useState<string>("");
   const [ttsProvider, setTtsProvider] = useState<string>("azure");
   const [isProUser, setIsProUser] = useState<boolean>(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -329,7 +330,8 @@ export default function Home() {
         voiceGender,
         false,
         "auto",
-        isProUser ? ttsProvider : "edge"
+        isProUser ? ttsProvider : "edge",
+        voiceName || undefined
       );
       router.push(`/video/${job_id}`);
     } catch (err: any) {
@@ -462,10 +464,12 @@ export default function Home() {
                     loading={loading}
                     error={error}
                     voiceGender={voiceGender}
+                    voiceName={voiceName}
                     ttsProvider={ttsProvider}
                     isProUser={isProUser}
                     onChange={handleUrlChange}
                     onGenderChange={setVoiceGender}
+                    onVoiceNameChange={setVoiceName}
                     onTtsProviderChange={setTtsProvider}
                     onSubmit={handleSubmit}
                   />

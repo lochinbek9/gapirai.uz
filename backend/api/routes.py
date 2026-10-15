@@ -328,7 +328,7 @@ def _upload_display_title(raw_name: Optional[str]) -> str:
 
 def _finish_uploaded_job(
     user_id, job_id: str, video_path: Path, subtitle_only: bool, voice_gender: str, title: str,
-    source_language: Optional[str] = None,
+    source_language: Optional[str] = None, tts_provider: Optional[str] = None, voice_name: Optional[str] = None,
 ) -> JobCreationResult:
     """Yuklash tugagach ffprobe/kvota/ffmpeg/DB ishlari -- SINXRON, threadpool'da
     chaqiriladi (event loop bloklanmasin). O'z DB sessiyasini ochadi: yuklash
@@ -343,6 +343,7 @@ def _finish_uploaded_job(
         return create_job_from_local_video_file_sync(
             db, user, job_id, video_path, source_url=f"upload://{job_id}", voice_gender=voice_gender,
             subtitle_only=subtitle_only, video_title=title, source_language=source_language,
+            tts_provider=tts_provider, voice_name=voice_name,
         )
     finally:
         db.close()
@@ -354,6 +355,8 @@ async def upload_job_file(
     subtitle_only: bool = Query(True),
     voice_gender: str = Query("auto"),
     source_language: str = Query("auto"),
+    tts_provider: Optional[str] = Query(None),
+    voice_name: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -444,6 +447,7 @@ async def upload_job_file(
         result = await run_in_threadpool(
             _finish_uploaded_job, user_id, job_id, video_path, subtitle_only, voice_gender,
             _upload_display_title(request.headers.get("x-file-name")), source_language,
+            tts_provider, voice_name,
         )
     except BaseException:
         # DB/ffmpeg kutilmagan xatosi: job yaratilmadi, demak fayl ham hech kimga

@@ -505,9 +505,14 @@ export default function VideoPage() {
                     </span>
                   )}
                   {job.speaker_gender && (
-                    <span className="flex items-center gap-1">
-                      <Mic2 className="w-4 h-4" />
-                      {job.speaker_gender === 'female' ? 'Ayol ovozi (MadinaNeural)' : 'Erkak ovozi (SardorNeural)'}
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Mic2 className="w-4 h-4 text-indigo-400" />
+                      {(() => {
+                        const prov = (job.tts_provider || 'azure').toLowerCase();
+                        const provLabel = prov === 'gemini' ? 'Gemini AI' : prov === 'edge' ? 'Edge TTS' : 'Azure Neural';
+                        const voiceName = (job.voice_name || (prov === 'gemini' ? (job.speaker_gender === 'female' ? 'Autonoe' : 'Charon') : (job.speaker_gender === 'female' ? 'Madina' : 'Sardor'))).replace('uz-UZ-', '').replace('Neural', '');
+                        return `${job.speaker_gender === 'female' ? 'Ayol ovozi' : 'Erkak ovozi'} (${voiceName} • ${provLabel})`;
+                      })()}
                     </span>
                   )}
                 </div>
@@ -586,6 +591,12 @@ export default function VideoPage() {
                     {job.speaker_gender && (
                       <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
                     )}
+                    {job.tts_provider && (
+                      <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ Gemini AI' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Edge TTS' : '🔷 Azure Neural'} />
+                    )}
+                    {job.voice_name && (
+                      <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
+                    )}
                     {job.created_at && (
                       <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                     )}
@@ -625,6 +636,12 @@ export default function VideoPage() {
                 {job.video_duration && <InfoRow label="Davomiylik" value={formatDuration(job.video_duration)} />}
                 {job.speaker_gender && (
                   <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
+                )}
+                {job.tts_provider && (
+                  <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ Gemini AI' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Edge TTS' : '🔷 Azure Neural'} />
+                )}
+                {job.voice_name && (
+                  <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
                 )}
                 {job.created_at && (
                   <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />

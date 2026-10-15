@@ -200,14 +200,26 @@ export function detectVideoContentType(file: File): string | null {
 
 export async function uploadJobFile(
   file: File,
-  opts: { subtitleOnly?: boolean; voiceGender?: string; sourceLanguage?: SubtitleSourceLanguage } = {},
+  opts: {
+    subtitleOnly?: boolean;
+    voiceGender?: string;
+    sourceLanguage?: SubtitleSourceLanguage;
+    ttsProvider?: string;
+    voiceName?: string;
+  } = {},
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
 ): Promise<{ job_id: string; status: string }> {
   const contentType = detectVideoContentType(file)
   if (!contentType) throw new Error('Qo\'llab-quvvatlanmaydigan video formati')
   const res = await apiClient.post('/api/jobs/upload', file, {
-    params: { subtitle_only: opts.subtitleOnly ?? true, voice_gender: opts.voiceGender ?? 'auto', source_language: opts.sourceLanguage ?? 'auto' },
+    params: {
+      subtitle_only: opts.subtitleOnly ?? true,
+      voice_gender: opts.voiceGender ?? 'auto',
+      source_language: opts.sourceLanguage ?? 'auto',
+      ...(opts.ttsProvider ? { tts_provider: opts.ttsProvider } : {}),
+      ...(opts.voiceName ? { voice_name: opts.voiceName } : {}),
+    },
     headers: { 'Content-Type': contentType, 'X-File-Name': encodeURIComponent(file.name) },
     onUploadProgress: (e) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))

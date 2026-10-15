@@ -10,10 +10,12 @@ interface Props {
   loading: boolean;
   error: string | null;
   voiceGender: string;
+  voiceName?: string;
   ttsProvider?: string;
   isProUser?: boolean;
   onChange: (value: string) => void;
   onGenderChange: (gender: string) => void;
+  onVoiceNameChange?: (voice: string) => void;
   onTtsProviderChange?: (provider: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
@@ -50,19 +52,53 @@ function VideoPreview({ info }: { info: VideoInfo }) {
 }
 
 export default function UrlInput({
-  url, videoInfo, loading, error, voiceGender,
+  url, videoInfo, loading, error, voiceGender, voiceName,
   ttsProvider = "azure", isProUser = false,
-  onChange, onGenderChange, onTtsProviderChange, onSubmit,
+  onChange, onGenderChange, onVoiceNameChange, onTtsProviderChange, onSubmit,
 }: Props) {
   const currentProvider = isProUser ? ttsProvider : "edge";
-  const maleDesc = currentProvider === "gemini" ? "Charon ovozi" : "Sardor ovozi";
-  const femaleDesc = currentProvider === "gemini" ? "Autonoe ovozi" : "Madina ovozi";
+  const isGemini = currentProvider === "gemini";
+
+  // Real voices per provider
+  const maleVoices = isGemini
+    ? [
+        { id: "Charon", label: "Charon", desc: "Asosiy bariton" },
+        { id: "Fenrir", label: "Fenrir", desc: "Chuqur, salobatli" },
+        { id: "Puck",   label: "Puck",   desc: "Jonli, chaqqon" },
+      ]
+    : [
+        { id: "uz-UZ-SardorNeural", label: "Sardor", desc: "Microsoft Neural (uz-UZ)" },
+      ];
+
+  const femaleVoices = isGemini
+    ? [
+        { id: "Autonoe", label: "Autonoe", desc: "Asosiy mayin" },
+        { id: "Aoede",   label: "Aoede",   desc: "Ravon, ohangdor" },
+        { id: "Kore",    label: "Kore",    desc: "Yorqin, muloyim" },
+      ]
+    : [
+        { id: "uz-UZ-MadinaNeural", label: "Madina", desc: "Microsoft Neural (uz-UZ)" },
+      ];
+
+  const currentMaleVoice = maleVoices.find((v) => v.id === voiceName) || maleVoices[0];
+  const currentFemaleVoice = femaleVoices.find((v) => v.id === voiceName) || femaleVoices[0];
 
   const genderOptions = [
     { value: "auto",   label: "Avtomatik", icon: "🤖", desc: "AI aniqlaydi" },
-    { value: "male",   label: "Erkak",     icon: "👨", desc: maleDesc },
-    { value: "female", label: "Ayol",      icon: "👩", desc: femaleDesc },
+    { value: "male",   label: "Erkak",     icon: "👨", desc: `${currentMaleVoice.label} ovozi` },
+    { value: "female", label: "Ayol",      icon: "👩", desc: `${currentFemaleVoice.label} ovozi` },
   ];
+
+  const handleGenderSelect = (val: string) => {
+    onGenderChange(val);
+    if (val === "male") {
+      onVoiceNameChange?.(isGemini ? "Charon" : "uz-UZ-SardorNeural");
+    } else if (val === "female") {
+      onVoiceNameChange?.(isGemini ? "Autonoe" : "uz-UZ-MadinaNeural");
+    } else {
+      onVoiceNameChange?.("");
+    }
+  };
 
   const handlePaste = async () => {
     try {
@@ -197,7 +233,7 @@ export default function UrlInput({
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => onGenderChange(opt.value)}
+                onClick={() => handleGenderSelect(opt.value)}
                 className={`flex flex-col items-center gap-1 sm:gap-1.5 py-3 sm:py-4 px-1.5 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all duration-300 relative overflow-hidden ${
                   isSelected
                     ? "border-blue-500 bg-gradient-to-b from-blue-500/10 to-blue-500/20 dark:from-blue-500/20 dark:to-blue-500/30 shadow-lg shadow-blue-500/10"
@@ -216,6 +252,63 @@ export default function UrlInput({
             );
           })}
         </div>
+      </div>
+
+      {/* Voice owner indicator / selection */}
+      <div className="bg-black/[0.03] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-2xl p-3 space-y-2">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
+            <span>🎙️ Ovoz egasi:</span>
+            {voiceGender === "auto" ? (
+              <span className="text-blue-500 font-bold">AI aniqlaydi</span>
+            ) : voiceGender === "male" ? (
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">{currentMaleVoice.label} ({isGemini ? "Google Gemini" : "Microsoft Neural"})</span>
+            ) : (
+              <span className="text-pink-600 dark:text-pink-400 font-bold">{currentFemaleVoice.label} ({isGemini ? "Google Gemini" : "Microsoft Neural"})</span>
+            )}
+          </span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            {isGemini ? "Gemini Voice Engine" : (currentProvider === "edge" ? "Edge TTS Engine" : "Azure Neural Engine")}
+          </span>
+        </div>
+
+        {voiceGender === "auto" ? (
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed">
+            Video transkripsiyasidan so'ng spikerning jinsi avtomatik aniqlanadi va unga mos ravishda{' '}
+            <strong className="text-gray-700 dark:text-gray-300">{isGemini ? "Charon yoki Autonoe" : "Sardor yoki Madina"}</strong> ovozi biriktiriladi.
+          </p>
+        ) : isGemini ? (
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[9px] text-gray-400 uppercase tracking-wider font-bold">
+              Gemini ovozini tanlang:
+            </span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(voiceGender === "male" ? maleVoices : femaleVoices).map((v) => {
+                const active = (voiceName || (voiceGender === "male" ? "Charon" : "Autonoe")) === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => onVoiceNameChange?.(v.id)}
+                    className={`py-1.5 px-2 rounded-xl text-center border transition-all ${
+                      active
+                        ? "border-violet-500 bg-violet-500/15 text-violet-700 dark:text-violet-300 font-bold shadow-sm"
+                        : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400"
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">{v.label}</div>
+                    <div className="text-[8px] text-gray-400 dark:text-gray-500 truncate">{v.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+            <span>O'zbek tili uchun tasdiqlangan tabiiy neyral ovoz: <strong className="text-gray-700 dark:text-gray-200">{voiceGender === "male" ? "Sardor (uz-UZ-SardorNeural)" : "Madina (uz-UZ-MadinaNeural)"}</strong></span>
+          </div>
+        )}
       </div>
 
       {/* Error */}

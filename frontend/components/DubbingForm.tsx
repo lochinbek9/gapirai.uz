@@ -12,10 +12,12 @@ interface Props {
   loading: boolean;
   error: string | null;
   voiceGender: string;
+  voiceName?: string;
   ttsProvider?: string;
   isProUser?: boolean;
   onChange: (url: string) => void;
   onGenderChange: (gender: string) => void;
+  onVoiceNameChange?: (voice: string) => void;
   onTtsProviderChange?: (provider: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
@@ -26,10 +28,12 @@ export default function DubbingForm({
   loading,
   error,
   voiceGender,
+  voiceName,
   ttsProvider = "azure",
   isProUser = false,
   onChange,
   onGenderChange,
+  onVoiceNameChange,
   onTtsProviderChange,
   onSubmit,
 }: Props) {
@@ -65,17 +69,24 @@ export default function DubbingForm({
           loading={loading}
           error={error}
           voiceGender={voiceGender}
+          voiceName={voiceName}
           ttsProvider={ttsProvider}
           isProUser={isProUser}
           onChange={onChange}
           onGenderChange={onGenderChange}
+          onVoiceNameChange={onVoiceNameChange}
           onTtsProviderChange={onTtsProviderChange}
           onSubmit={onSubmit}
         />
       ) : (
         <DubFileForm
           voiceGender={voiceGender}
+          voiceName={voiceName}
+          ttsProvider={ttsProvider}
+          isProUser={isProUser}
           onGenderChange={onGenderChange}
+          onVoiceNameChange={onVoiceNameChange}
+          onTtsProviderChange={onTtsProviderChange}
         />
       )}
     </div>

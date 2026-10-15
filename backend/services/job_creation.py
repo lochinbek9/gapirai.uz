@@ -221,6 +221,24 @@ async def create_dubbing_job(
     else:
         clean_provider = "edge" if not user_is_pro else (getattr(get_settings(), "TTS_PROVIDER", "azure") or "azure")
 
+    # Aniq ovoz nomini provayder va jinsga qarab to'liq normallashtirish / biriktirish:
+    if voice_gender in ("male", "female"):
+        if not voice_name:
+            if clean_provider == "gemini":
+                voice_name = "Autonoe" if voice_gender == "female" else "Charon"
+            else:
+                voice_name = "uz-UZ-MadinaNeural" if voice_gender == "female" else "uz-UZ-SardorNeural"
+        else:
+            v_low = voice_name.strip().lower()
+            if clean_provider in ("azure", "edge"):
+                voice_name = "uz-UZ-MadinaNeural" if "madina" in v_low else "uz-UZ-SardorNeural"
+            elif clean_provider == "gemini":
+                gemini_map = {
+                    "charon": "Charon", "fenrir": "Fenrir", "puck": "Puck",
+                    "autonoe": "Autonoe", "aoede": "Aoede", "kore": "Kore",
+                }
+                voice_name = gemini_map.get(v_low, voice_name.strip())
+
     # Kesh: agar shu video ALLAQACHON dublyaj qilingan bo'lsa,
     # LEKIN barcha parametrlar (jins, provider, ovoz, ohang) 100% mos kelsagina keshdan olinadi.
     # 1 ta parametr o'zgarsa ham yangi job sifatida qayta dublyaj qilinadi!
@@ -439,6 +457,7 @@ def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
 def create_job_from_local_video_file_sync(
     db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "male",
     subtitle_only: bool = False, video_title: str | None = None, source_language: str | None = None,
+    tts_provider: str | None = None, voice_name: str | None = None, voice_style: str | None = None,
 ) -> JobCreationResult:
     """Diskda allaqachon mavjud video fayldan (YouTube havolasisiz) yangi job
     yaratadi -- Telegram bot (backend/telegram_bot.py:handle_video) foydalanuvchi
@@ -498,7 +517,36 @@ def create_job_from_local_video_file_sync(
     except Exception:
         pass
 
-    from backend.services.plans import consume_quota, LOCAL_UPLOAD_QUEUE
+    from backend.services.plans import consume_quota, LOCAL_UPLOAD_QUEUE, is_user_admin, get_or_create_subscription, PlanTier
+
+    user_is_pro = is_user_admin(db, user.id)
+    if not user_is_pro:
+        sub = get_or_create_subscription(db, user.id)
+        user_is_pro = (sub.plan == PlanTier.PRO)
+
+    clean_provider = (tts_provider or "").strip().lower()
+    if clean_provider in ("azure", "edge", "gemini"):
+        if not user_is_pro and clean_provider != "edge":
+            clean_provider = "edge"
+    else:
+        clean_provider = "edge" if not user_is_pro else (getattr(get_settings(), "TTS_PROVIDER", "azure") or "azure")
+
+    if voice_gender in ("male", "female"):
+        if not voice_name:
+            if clean_provider == "gemini":
+                voice_name = "Autonoe" if voice_gender == "female" else "Charon"
+            else:
+                voice_name = "uz-UZ-MadinaNeural" if voice_gender == "female" else "uz-UZ-SardorNeural"
+        else:
+            v_low = voice_name.strip().lower()
+            if clean_provider in ("azure", "edge"):
+                voice_name = "uz-UZ-MadinaNeural" if "madina" in v_low else "uz-UZ-SardorNeural"
+            elif clean_provider == "gemini":
+                gemini_map = {
+                    "charon": "Charon", "fenrir": "Fenrir", "puck": "Puck",
+                    "autonoe": "Autonoe", "aoede": "Aoede", "kore": "Kore",
+                }
+                voice_name = gemini_map.get(v_low, voice_name.strip())
 
     job = DubbingJob(
         id=job_id,
@@ -507,6 +555,10 @@ def create_job_from_local_video_file_sync(
         video_title=video_title,
         video_duration=duration,
         voice_gender_setting=voice_gender,
+        speaker_gender=voice_gender if voice_gender in ("male", "female") else None,
+        tts_provider=clean_provider,
+        voice_name=voice_name,
+        voice_style=voice_style or "neutral",
         subtitle_only=subtitle_only,
         source_language="uz" if (subtitle_only and source_language == "uz") else None,
         original_video_path=str(video_path),
@@ -531,11 +583,13 @@ def create_job_from_local_video_file_sync(
 async def create_job_from_local_video_file(
     db: Session, user: User, job_id: str, video_path: Path, source_url: str, voice_gender: str = "auto",
     subtitle_only: bool = False, video_title: str | None = None, source_language: str | None = None,
+    tts_provider: str | None = None, voice_name: str | None = None, voice_style: str | None = None,
 ) -> JobCreationResult:
     """Telegram bot (async) uchun o'ram -- mantiq yuqoridagi sinxron yadroda."""
     return create_job_from_local_video_file_sync(
         db, user, job_id, video_path, source_url, voice_gender,
         subtitle_only=subtitle_only, video_title=video_title, source_language=source_language,
+        tts_provider=tts_provider, voice_name=voice_name, voice_style=voice_style,
     )
 
 

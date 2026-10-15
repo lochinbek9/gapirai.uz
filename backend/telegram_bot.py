@@ -483,7 +483,7 @@ async def handle_file_gender_callback(update: Update, context: ContextTypes.DEFA
         await query.message.reply_text("Video ma'lumotlari topilmadi yoki eskirgan. Iltimos, videoni qaytadan yuboring.")
         return
 
-    gender_label = "👨 Erkak (Jasur)" if gender == "male" else "👩 Ayol (Kamola)" if gender == "female" else "🤖 Avtomatik (AI)"
+    gender_label = "👨 Erkak (Sardor)" if gender == "male" else "👩 Ayol (Madina)" if gender == "female" else "🤖 Avtomatik (AI)"
     await query.message.edit_text(f"Tanlandi: {gender_label}\n\n⏳ Video qabul qilinmoqda va navbatga qo'shilmoqda...")
     await _process_video_file_job(
         query.message,
@@ -675,8 +675,8 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         }
         markup = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("👨 Erkak (Jasur)", callback_data="vg_file:male"),
-                InlineKeyboardButton("👩 Ayol (Kamola)", callback_data="vg_file:female"),
+                InlineKeyboardButton("👨 Erkak (Sardor)", callback_data="vg_file:male"),
+                InlineKeyboardButton("👩 Ayol (Madina)", callback_data="vg_file:female"),
             ],
             [
                 InlineKeyboardButton("🤖 Avtomatik (AI)", callback_data="vg_file:auto"),
