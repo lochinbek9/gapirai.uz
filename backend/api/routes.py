@@ -695,6 +695,13 @@ def retry_job(
     if job.status != JobStatus.FAILED:
         raise HTTPException(status_code=400, detail="Faqat xatolik yuz bergan videolarni qayta ishga tushirish mumkin.")
 
+    err_code = (job.error_code or "").upper()
+    err_msg = (job.error_message or "").lower()
+    if err_code == "NO_SPEECH_FOUND" or "nutq topilmadi" in err_msg:
+        raise HTTPException(status_code=400, detail="Ushbu videoda nutq mavjud emasligi sababli qayta urinish mumkin emas.")
+    if err_code == "CONTENT_BLOCKED" or "kontent siyosati" in err_msg or "taqiqlangan" in err_msg:
+        raise HTTPException(status_code=400, detail="Ushbu video kontent xavfsizligi qoidalariga to'g'ri kelmagani sababli qayta ishga tushirish mumkin emas.")
+
     from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
 
     # 1. Kesh tekshiruvi: Agar ushbu video allaqachon muvaffaqiyatli dublyaj qilingan bo'lsa

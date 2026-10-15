@@ -7,7 +7,8 @@ import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
-  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw
+  Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
+  MicOff, ShieldAlert
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -30,6 +31,28 @@ function formatRemainingTime(seconds: number): string {
     return `${m} daqiqa ${s} soniya`
   }
   return `${s} soniya`
+}
+
+function getStatusLabel(status: string, errorCode?: string | null, errorMessage?: string | null): string {
+  if (status === 'completed') return '✅ Tayyor'
+  if (status === 'failed') {
+    const isNoSpeech = errorCode === 'NO_SPEECH_FOUND' || errorMessage?.toLowerCase().includes('nutq topilmadi')
+    const isContentBlocked = errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent siyosati') || errorMessage?.toLowerCase().includes('taqiqlangan')
+    if (isNoSpeech) return '🎙 Nutq topilmadi'
+    if (isContentBlocked) return '🛡 Rad etildi'
+    return '❌ Bajarilmadi'
+  }
+  switch (status) {
+    case 'pending': return '⏳ Navbatda'
+    case 'awaiting_payment': return '💳 To\'lov kutilmoqda'
+    case 'downloading': return '📥 Yuklanmoqda'
+    case 'transcribing': return '🎙 Matnga aylantirilmoqda'
+    case 'translating': return '🌐 Tarjima qilinmoqda'
+    case 'syncing': return '⚡ Moslashtirilmoqda'
+    case 'synthesizing': return '🗣 Ovozlashtirilmoqda'
+    case 'merging': return '🎬 Birlashtirilmoqda'
+    default: return status
+  }
 }
 
 /* ── Page ────────────────────────────────────────── */
@@ -312,41 +335,112 @@ export default function VideoPage() {
                   </button>
                 </div>
               </div>
-            ) : job.status === 'failed' ? (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
-                <div className="text-center space-y-4 max-w-md z-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
-                    <AlertTriangle className="w-6 h-6 animate-pulse" />
+            ) : job.status === 'failed' ? (() => {
+              const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || job.error_message?.toLowerCase().includes('nutq topilmadi');
+              const isContentBlocked = job.error_code === 'CONTENT_BLOCKED' || job.error_message?.toLowerCase().includes('kontent siyosati') || job.error_message?.toLowerCase().includes('taqiqlangan');
+
+              if (isNoSpeech) {
+                return (
+                  <div className="aspect-video bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-amber-500/20 shadow-2xl">
+                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+                    <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+                    
+                    <div className="text-center space-y-4 max-w-md z-10 px-4">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 mb-1 shadow-lg shadow-amber-500/10">
+                        <MicOff className="w-7 h-7" />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="text-white font-bold text-xl tracking-tight">Videoda nutq aniqlanmadi</h3>
+                        <p className="text-sm text-slate-300 leading-relaxed">
+                          Ushbu videoda suhbat yoki inson nutqi topilmadi. Dublyaj xizmati faqat ovozli nutq mavjud bo'lgan videolarni tarjima qiladi.
+                        </p>
+                      </div>
+
+                      <div className="text-xs text-amber-300/90 bg-amber-950/40 border border-amber-800/40 rounded-xl px-4 py-2.5 text-left flex items-start gap-2.5">
+                        <span className="text-sm select-none">💡</span>
+                        <span>Musiqa, fon shovqini yoki ovozsiz roliklar o'rniga, gapirilgan nutq (ma'ruza, intervyu, darslik) bor videoni tanlang.</span>
+                      </div>
+
+                      <div className="pt-2 flex justify-center gap-3">
+                        <button
+                          onClick={handleGoHome}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/20 hover:scale-[1.02]"
+                        >
+                          Boshqa video tanlash
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
-                    {!job.fallback_available && (
-                      <p className="text-xs text-violet-300 font-mono bg-violet-950/30 border border-violet-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
-                        {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
-                      </p>
-                    )}
+                );
+              }
+
+              if (isContentBlocked) {
+                return (
+                  <div className="aspect-video bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
+                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+                    
+                    <div className="text-center space-y-4 max-w-md z-10 px-4">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
+                        <ShieldAlert className="w-7 h-7" />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="text-white font-bold text-xl tracking-tight">Ushbu video dublyaj qilinmaydi</h3>
+                        <p className="text-sm text-slate-300 leading-relaxed">
+                          {job.error_message || "Video xavfsizlik va kontent siyosatimiz talablariga mos kelmagani sababli to'xtatildi."}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex justify-center gap-3">
+                        <button
+                          onClick={handleGoHome}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/20 hover:scale-[1.02]"
+                        >
+                          Boshqa video tanlash
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
-                  <div className="pt-2 flex justify-center gap-3">
-                    <button
-                      onClick={handleRetry}
-                      disabled={retryLoading}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition duration-200 disabled:opacity-50"
-                    >
-                      <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
-                      Qayta urinish
-                    </button>
-                    <button
-                      onClick={handleGoHome}
-                      className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition duration-200"
-                    >
-                      Bosh sahifaga qaytish
-                    </button>
+                );
+              }
+
+              return (
+                <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
+                  <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
+                  <div className="text-center space-y-4 max-w-md z-10">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
+                      <AlertTriangle className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
+                      {!job.fallback_available && (
+                        <p className="text-xs text-violet-300 font-mono bg-violet-950/30 border border-violet-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
+                          {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
+                        </p>
+                      )}
+                    </div>
+                    {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
+                    <div className="pt-2 flex justify-center gap-3">
+                      <button
+                        onClick={handleRetry}
+                        disabled={retryLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition duration-200 disabled:opacity-50"
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                        Qayta urinish
+                      </button>
+                      <button
+                        onClick={handleGoHome}
+                        className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition duration-200"
+                      >
+                        Bosh sahifaga qaytish
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
                 <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
                 <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
@@ -487,7 +581,7 @@ export default function VideoPage() {
               {theaterMode && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-                    <InfoRow label="Holat" value={job.status === 'completed' ? '✅ Tayyor' : job.status} />
+                    <InfoRow label="Holat" value={getStatusLabel(job.status, job.error_code, job.error_message)} />
                     {job.video_duration && <InfoRow label="Davomiylik" value={formatDuration(job.video_duration)} />}
                     {job.speaker_gender && (
                       <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
@@ -527,7 +621,7 @@ export default function VideoPage() {
             <div className="space-y-4">
               <h2 className="text-white font-semibold">Video ma'lumotlari</h2>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-                <InfoRow label="Holat" value={job.status === 'completed' ? '✅ Tayyor' : job.status} />
+                <InfoRow label="Holat" value={getStatusLabel(job.status, job.error_code, job.error_message)} />
                 {job.video_duration && <InfoRow label="Davomiylik" value={formatDuration(job.video_duration)} />}
                 {job.speaker_gender && (
                   <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />

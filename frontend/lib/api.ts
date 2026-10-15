@@ -33,6 +33,7 @@ export interface Job {
   transcript_text?: string
   translated_text?: string
   error_message?: string
+  error_code?: string | null
   created_at?: string
   speaker_gender?: string
   uzbek_srt_content?: string

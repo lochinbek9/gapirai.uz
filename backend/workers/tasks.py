@@ -297,7 +297,7 @@ def _safe_persisted_error(exc: Exception, current_stage: str) -> tuple[str, str]
     return code, error_classification.safe_user_message(code)
 
 
-def _notify_job_failed_push(job_id: str, job, exc_text: str) -> None:
+def _notify_job_failed_push(job_id: str, job, exc: Exception | str = "", error_code: str | None = None) -> None:
     """FAILED bo'lganda PWA push -- doim yangi sessiya bilan (chaqiruvchining
     `db`si bu paytda buzilgan bo'lishi mumkin, _mark_job_failed kabi).
     VAPID sozlanmagan / obuna yo'q bo'lsa jimgina o'tadi."""
@@ -308,9 +308,21 @@ def _notify_job_failed_push(job_id: str, job, exc_text: str) -> None:
         from backend.services.push_service import notify_user
         session = SessionLocal()
         try:
-            notify_user(session, user_id, "Dublyaj bajarilmadi ❌",
-                        (getattr(job, "video_title", None) or "Video") + " — qaytadan urinib ko'ring.",
-                        f"/video/{job_id}")
+            err_code = error_code or getattr(job, "error_code", None) or getattr(exc, "code", None)
+            err_str = str(exc).lower() if exc else ""
+            video_title = getattr(job, "video_title", None) or "Video"
+
+            if err_code == "NO_SPEECH_FOUND" or "nutq topilmadi" in err_str:
+                title = "Videoda nutq topilmadi 🎙"
+                body = f"{video_title} — videoda gapirilgan nutq aniqlanmadi."
+            elif err_code == "CONTENT_BLOCKED" or "kontent siyosati" in err_str:
+                title = "Dublyaj rad etildi 🛡"
+                body = f"{video_title} — kontent siyosatiga to'g'ri kelmadi."
+            else:
+                title = "Dublyaj bajarilmadi ❌"
+                body = f"{video_title} — qaytadan urinib ko'ring."
+
+            notify_user(session, user_id, title, body, f"/video/{job_id}")
         finally:
             session.close()
     except Exception as push_err:
@@ -1056,13 +1068,27 @@ def process_video(self: Task, job_id: str) -> dict:
         _mark_job_failed(job_id, exc, current_stage)
         try:
             if job.user_id and job.user and job.user.telegram_chat_id:
-                send_telegram_message(
-                    job.user.telegram_chat_id,
-                    f"\u274c Dublyaj bajarilmadi: {job.video_title or 'Video'}\n\n{str(exc)}",
-                )
+                err_code = getattr(exc, "code", None) or getattr(job, "error_code", None)
+                err_str = str(exc).lower()
+                v_title = getattr(job, "video_title", None) or "Video"
+                if err_code == "NO_SPEECH_FOUND" or "nutq topilmadi" in err_str:
+                    msg = (
+                        f"🎙 <b>Videoda nutq topilmadi</b>: {v_title}\n\n"
+                        f"Ushbu videoda gapirilgan suhbat yoki inson nutqi aniqlanmadi. "
+                        f"Dublyaj xizmati faqat ovozli nutq mavjud videolarni tarjima qiladi."
+                    )
+                elif err_code == "CONTENT_BLOCKED" or "kontent siyosati" in err_str:
+                    msg = (
+                        f"🛡 <b>Dublyaj rad etildi</b>: {v_title}\n\n"
+                        f"Ushbu video kontent xavfsizligi qoidalariga mos kelmagani sababli to'xtatildi."
+                    )
+                else:
+                    msg = f"❌ <b>Dublyaj bajarilmadi</b>: {v_title}\n\n{str(exc)}"
+
+                send_telegram_message(job.user.telegram_chat_id, msg)
         except Exception as notify_exc:
             logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
-        _notify_job_failed_push(job_id, job, str(exc))
+        _notify_job_failed_push(job_id, job, exc, getattr(exc, "code", None))
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (permanent)")
         raise exc
@@ -1193,7 +1219,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 )
         except Exception as notify_exc:
             logger.warning(f"[JOB {job_id}] Telegram xabari yuborilmadi: {notify_exc}")
-        _notify_job_failed_push(job_id, job, str(exc))
+        _notify_job_failed_push(job_id, job, exc, error_code)
 
         _cleanup_upload_dir(job_id)
         _log_pipeline_summary(job_id, stage_timings, pipeline_start, "FAILED (max retries)")

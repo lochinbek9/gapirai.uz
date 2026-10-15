@@ -9,7 +9,7 @@ import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
-  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw
+  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert
 } from 'lucide-react'
 
 const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
@@ -62,10 +62,50 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  errorCode,
+  errorMessage,
+}: {
+  status: string
+  errorCode?: string | null
+  errorMessage?: string | null
+}) {
+  if (status === 'completed') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+        <CheckCircle2 className="w-3 h-3" />
+        Tayyor
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    const isNoSpeech = errorCode === 'NO_SPEECH_FOUND' || errorMessage?.toLowerCase().includes('nutq topilmadi')
+    const isContentBlocked = errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent siyosati') || errorMessage?.toLowerCase().includes('taqiqlangan')
+    if (isNoSpeech) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+          <MicOff className="w-3 h-3" />
+          Nutq topilmadi
+        </span>
+      )
+    }
+    if (isContentBlocked) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+          <ShieldAlert className="w-3 h-3" />
+          Rad etildi
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+        <XCircle className="w-3 h-3" />
+        Xatolik
+      </span>
+    )
+  }
   const cfg: Record<string, { color: string; icon: React.ReactNode }> = {
-    completed: { color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
-    failed: { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <XCircle className="w-3 h-3" /> },
     pending: { color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', icon: <Clock className="w-3 h-3" /> },
   }
   const def = { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
@@ -93,6 +133,9 @@ function VideoCard({
   const duration = job.video_duration ? formatDuration(job.video_duration) : '--:--'
   const isReady = job.status === 'completed'
   const isFailed = job.status === 'failed'
+  const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || job.error_message?.toLowerCase().includes('nutq topilmadi')
+  const isContentBlocked = job.error_code === 'CONTENT_BLOCKED' || job.error_message?.toLowerCase().includes('kontent siyosati') || job.error_message?.toLowerCase().includes('taqiqlangan')
+  const isNonRetryable = isNoSpeech || isContentBlocked
 
   return (
     <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
@@ -151,16 +194,12 @@ function VideoCard({
       {/* Info */}
       <div className="p-4">
         <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-3 min-h-[2.5rem]">
-          {!isFailed ? (
-            <Link href={`/video/${job.job_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
-              {job.video_title || 'Yuklanmoqda...'}
-            </Link>
-          ) : (
-            <span>{job.video_title || 'Yuklanmoqda...'}</span>
-          )}
+          <Link href={`/video/${job.job_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+            {job.video_title || 'Yuklanmoqda...'}
+          </Link>
         </h3>
         <div className="flex items-center justify-between">
-          <StatusBadge status={job.status} />
+          <StatusBadge status={job.status} errorCode={job.error_code} errorMessage={job.error_message} />
           <div className="flex items-center gap-1.5 sm:gap-2">
             {isReady ? (
               <Link
@@ -180,7 +219,7 @@ function VideoCard({
                 <span>→</span>
               </Link>
             ) : null}
-            {isFailed && (
+            {isFailed && !isNonRetryable && (
               <button
                 onClick={() => onRetry(job.job_id)}
                 disabled={isRetrying}
