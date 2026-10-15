@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, Ban } from 'lucide-react'
+import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, Ban, ArrowUp } from 'lucide-react'
 import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers, RefundsNeededReport, apiAdminRefundsNeeded } from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
@@ -244,6 +244,7 @@ export default function AdminPage() {
   const [refunds, setRefunds] = useState<RefundsNeededReport | null>(null)
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [showTrends, setShowTrends] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
   const [errorDetail, setErrorDetail] = useState('')
@@ -282,6 +283,12 @@ export default function AdminPage() {
     if (authLoading) return
     loadStats().finally(() => setStatsLoading(false))
   }, [authLoading, loadStats])
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -380,8 +387,32 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Sticky Tezkor O'tish paneli */}
+        <div className="sticky top-2 z-30 bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl">
+          {[
+            { id: 'sec-today', label: 'Bugun', icon: '⚡' },
+            { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
+            { id: 'sec-jobs', label: 'Dublyaj', icon: '🎬' },
+            { id: 'sec-payments', label: "To'lovlar", icon: '💳' },
+            { id: 'sec-retention', label: 'Retention', icon: '📊' },
+            { id: 'sec-management', label: 'Boshqaruv', icon: '⚙️' },
+            { id: 'sec-broadcast', label: 'Xabarnoma', icon: '📢' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                document.getElementById(tab.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/10 transition shrink-0"
+            >
+              <span className="mr-1">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Bugun (Toshkent vaqti) */}
-        <section className="space-y-3">
+        <section id="sec-today" className="space-y-3 scroll-mt-16">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -402,7 +433,7 @@ export default function AdminPage() {
               previousLabel="kecha"
             />
             <DeltaCard
-              label="Video (bugun)"
+              label="Video dublyaj (bugun)"
               value={stats.trends.today.jobs}
               previousValue={stats.trends.yesterday.jobs}
               previousLabel="kecha"
@@ -459,7 +490,7 @@ export default function AdminPage() {
                   data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
                 />
                 <TrendChart
-                  label={`Video buyurtmalar (${GRANULARITY_CHART_LABEL[granularity]})`}
+                  label={`Video dublyajlar (${GRANULARITY_CHART_LABEL[granularity]})`}
                   color="#199e70"
                   data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
                 />
@@ -469,7 +500,7 @@ export default function AdminPage() {
         </section>
 
         {/* Users */}
-        <section className="space-y-3">
+        <section id="sec-users" className="space-y-3 scroll-mt-16">
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchilar</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card label="Jami ro'yxatdan o'tgan" value={stats.users.total} icon={<Users className="w-5 h-5" />} />
@@ -479,20 +510,25 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* YouTube Cookies Management */}
-        <AdminCookiesManager token={getToken() || ''} />
+        {/* YouTube Cookies Management -- nofaol qilingan (Edge orqali barqaror yuklangan) */}
 
         {/* User Retention & Activity Analytics */}
-        <AdminRetentionManager token={getToken() || ''} />
+        <div id="sec-retention" className="scroll-mt-16">
+          <AdminRetentionManager token={getToken() || ''} />
+        </div>
 
         {/* Users & Plans Management */}
-        <AdminUsersManager />
+        <div id="sec-management" className="scroll-mt-16">
+          <AdminUsersManager />
+        </div>
 
         {/* Broadcast Notifications: Email & Telegram */}
-        <AdminBroadcastManager token={getToken() || ''} />
+        <div id="sec-broadcast" className="scroll-mt-16">
+          <AdminBroadcastManager token={getToken() || ''} />
+        </div>
 
         {/* Jobs */}
-        <section className="space-y-3">
+        <section id="sec-jobs" className="space-y-3 scroll-mt-16">
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dublyaj (foydalanish)</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card label="Jami video" value={stats.jobs.total} icon={<Video className="w-5 h-5" />} />
@@ -517,7 +553,7 @@ export default function AdminPage() {
         </section>
 
         {/* Payments */}
-        <section className="space-y-3">
+        <section id="sec-payments" className="space-y-3 scroll-mt-16">
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lovlar</h2>
           <div className="grid grid-cols-2 gap-4">
             <Card label="Tasdiqlangan to'lovlar" value={stats.payments.approved_count} icon={<Wallet className="w-5 h-5" />} />
@@ -712,6 +748,18 @@ export default function AdminPage() {
           </div>
         </section>
       </div>
+
+      {/* Floating Scroll To Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-40 p-3.5 bg-blue-600/90 hover:bg-blue-500 text-white rounded-2xl shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 backdrop-blur cursor-pointer"
+          aria-label="Yuqoriga qaytish"
+          title="Yuqoriga qaytish"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
+      )}
     </div>
   )
 }
