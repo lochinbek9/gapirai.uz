@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, and_, select
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
@@ -69,7 +69,11 @@ def admin_stats(
         else:
             user_filter = User.is_internal.is_(False)
             job_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select))
-            pay_user_filter = or_(Payment.user_id.is_(None), Payment.user_id.notin_(internal_ids_select))
+            pay_user_filter = and_(
+                Payment.user_id.isnot(None),
+                Payment.user_id.notin_(internal_ids_select),
+                or_(Payment.is_donation.is_(False), Payment.is_donation.is_(None)),
+            )
             recent_jobs_user_filter = or_(User.id.is_(None), User.is_internal.is_(False))
 
         # ── Foydalanuvchilar ──
