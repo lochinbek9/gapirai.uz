@@ -147,15 +147,16 @@ services:
       # shu server orqali yuboriladi (bot bulutdan ko'chirilgan bo'lsa).
       telegram-bot-api:
         condition: service_started
-    # WORKER_QUEUES -- WORKER_CONCURRENCY/WORKER_MEM_LIMIT kabi har bir host
-    # o'z .env faylida belgilaydi (2026-09-16, worker scaling). Standart --
-    # uchala navbat ham (asosiy host, Telegram fayl-yuklash shu yerda ishlaydi).
-    # Scaling uchun qo'shiladigan YANGI worker host'lar .env'da
-    # WORKER_QUEUES=video_processing_priority,video_processing qo'yishi kerak --
-    # video_processing_local'ni ATAYLAB qo'ymasdan, chunki ular Telegram orqali
-    # yuklangan video fayllarga (faqat asosiy hostning diskida bor) ega emas
-    # (backend/services/plans.py LOCAL_UPLOAD_QUEUE izohiga qarang).
-    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_processing_priority,video_processing,video_processing_local} -c ${WORKER_CONCURRENCY:-2}
+    # WORKER_QUEUES -- har bir host o'z .env faylida belgilaydi.
+    # 2026-10-16: 5-navbatli Short/Long Track arxitekturasi:
+    #   1. video_processing_priority_short  (Pro/Admin, <=10 daqiqa)
+    #   2. video_processing_priority_long   (Pro/Admin, >10 daqiqa)
+    #   3. video_processing_short           (Standart/Free, <=10 daqiqa)
+    #   4. video_processing_long            (Standart/Free, >10 daqiqa)
+    #   5. video_processing_local           (Telegram fayl, faqat asosiy host)
+    # Tartib muhim: Redis BRPOP chapdan o'ngga — Pro+qisqa har doim birinchi.
+    # Yangi scaling host'da: WORKER_QUEUES=video_processing_priority_short,video_processing_priority_long,video_processing_short,video_processing_long
+    command: celery -A backend.workers.celery_app worker -l info -Q ${WORKER_QUEUES:-video_short_pro,video_short_standard,video_short_free,video_short_admin,video_long_pro,video_long_standard,video_long_free,video_long_admin,video_processing_local,video_processing} -c ${WORKER_CONCURRENCY:-2}
 
   # ──────────────────────────────
   # Self-hosted local Telegram Bot API server -- OPTIONAL, only actually used

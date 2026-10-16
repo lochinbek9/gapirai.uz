@@ -59,12 +59,67 @@ LEGACY_MINUTE_PACKS: dict[int, int] = {
     300: 100_000,
 }
 
-# Celery navbat nomlari — worker ikkalasini ham tinglaydi (docker-compose.yml,
-# "-Q video_processing_priority,video_processing"), lekin ustuvor navbat
-# BIRINCHI ko'rsatilgan: Redis transport BRPOP bilan navbatlarni shu tartibda
-# tekshiradi, shuning uchun priority navbatidagi job doim birinchi olinadi.
-PRIORITY_QUEUE = "video_processing_priority"
-DEFAULT_QUEUE = "video_processing"
+# ─────────────────────────────────────────────────────────────────────────────
+# Celery navbat arxitekturasi (2026-10-16 qayta ishlandi)
+#
+# 5 ta navbat, Redis BRPOP ularni QAT'IY SHUNAQA TARTIBDA tekshiradi:
+#
+#   1. video_processing_priority_short   ← Pro,   ≤10 daqiqa
+#   2. video_processing_priority_long    ← Pro,   >10 daqiqa
+#   3. video_processing_short            ← Standart/Free, ≤10 daqiqa
+#   4. video_processing_long             ← Standart/Free, >10 daqiqa
+#   5. video_processing_local            ← Telegram fayl yuklash (shu host)
+#
+# Ustuvorlik tartibi: Pro → Standart → Free → Admin → tizim joblari
+#
+# Admin ham priority navbatga tushadi LEKIN Pro dan keyin turadi —
+# chunki Admin joblari asosan biz tomondan yuboriladigan tizim ishlari.
+# Real mijozlar (Pro > Standart > Free) ustunroq.
+#
+# Qisqa/Uzun Track (SHORT_TRACK_MAX_MINUTES = 10.0):
+#   Short ≤10 daqiqa → parallel, tez tugaydi, OOM xavfi past
+#   Long  >10 daqiqa → og'ir, worker slot band tutadi, OOM xavfi bor
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Qisqa videodan uzun videoga o'tish chegarasi (daqiqa)
+SHORT_TRACK_MAX_MINUTES: float = 10.0
+
+# ── Celery navbat nomlari (2026-10-16: 8 ta aniq darajali navbat) ───────────
+# Redis BRPOP tartibiga mos: chapdan o'ngga eng yuqori ustuvorlikdan pastga qarab:
+#   1. Qisqa video (<=10 daq): Pro -> Standart -> Free -> Admin
+#   2. Uzun video (>10 daq):  Pro -> Standart -> Free -> Admin
+#   3. Qo'shimchalar: Telegram local -> Legacy video_processing
+QUEUE_SHORT_PRO      = "video_short_pro"       # Pro, <=10 daqiqa (1-ustuvorlik)
+QUEUE_SHORT_STANDARD = "video_short_standard"  # Standart, <=10 daqiqa (2-ustuvorlik)
+QUEUE_SHORT_FREE     = "video_short_free"      # Free / Anon, <=10 daqiqa (3-ustuvorlik)
+QUEUE_SHORT_ADMIN    = "video_short_admin"     # Admin tizim testlari, <=10 daqiqa (4-ustuvorlik)
+
+QUEUE_LONG_PRO       = "video_long_pro"        # Pro, >10 daqiqa (5-ustuvorlik)
+QUEUE_LONG_STANDARD  = "video_long_standard"   # Standart, >10 daqiqa (6-ustuvorlik)
+QUEUE_LONG_FREE      = "video_long_free"       # Free / Anon, >10 daqiqa (7-ustuvorlik)
+QUEUE_LONG_ADMIN     = "video_long_admin"      # Admin tizim testlari, >10 daqiqa (8-ustuvorlik)
+
+# Orqaga moslik uchun eski konstantalar:
+PRIORITY_SHORT_QUEUE = QUEUE_SHORT_PRO
+PRIORITY_LONG_QUEUE  = QUEUE_LONG_PRO
+DEFAULT_SHORT_QUEUE  = QUEUE_SHORT_FREE
+DEFAULT_LONG_QUEUE   = QUEUE_LONG_FREE
+PRIORITY_QUEUE       = QUEUE_SHORT_PRO
+DEFAULT_QUEUE        = QUEUE_SHORT_FREE
+
+# Worker tinglash tartibi (docker-compose WORKER_QUEUES uchun standart qiymat)
+ALL_WORKER_QUEUES = (
+    f"{QUEUE_SHORT_PRO},"
+    f"{QUEUE_SHORT_STANDARD},"
+    f"{QUEUE_SHORT_FREE},"
+    f"{QUEUE_SHORT_ADMIN},"
+    f"{QUEUE_LONG_PRO},"
+    f"{QUEUE_LONG_STANDARD},"
+    f"{QUEUE_LONG_FREE},"
+    f"{QUEUE_LONG_ADMIN},"
+    "video_processing_local,"
+    "video_processing"
+)
 
 # Telegram orqali yuborilgan video FAYL (link emas) shu navbatga tushadi.
 # Sabab: bunday job'ning original video fayli faqat uni qabul qilgan hostning
@@ -151,10 +206,10 @@ def get_or_create_subscription(db, user_id, for_update: bool = False) -> Subscri
     # Muddati o'tgan pullik obuna -> FREE'ga qaytadi, davr qayta boshlanadi.
     # DIQQAT: purchased_minutes TEGILMAYDI -- sotib olingan daqiqalar hech
     # qachon tugamaydi, obuna bekor bo'lsa ham.
-    if sub.plan != PlanTier.FREE and sub.expires_at and sub.expires_at < datetime.utcnow():
+    if sub.plan != PlanTier.FREE and getattr(sub, "expires_at", None) and isinstance(sub.expires_at, datetime) and sub.expires_at < datetime.utcnow():
         # Avtomatik uzaytirish grace davrida bo'lsa (backend/services/recurring.py)
         # tarif imtiyozlari saqlanadi — kunlik cron kartadan qayta urinib ko'radi.
-        if getattr(sub, "grace_until", None) and sub.grace_until >= datetime.utcnow():
+        if getattr(sub, "grace_until", None) and isinstance(sub.grace_until, datetime) and sub.grace_until >= datetime.utcnow():
             return sub
         sub.plan = PlanTier.FREE
         sub.expires_at = None
@@ -169,7 +224,7 @@ def get_or_create_subscription(db, user_id, for_update: bool = False) -> Subscri
 
     # Oylik daqiqa byudjeti har doim 30 kunda qayta boshlanadi — to'lov
     # davridan mustaqil (yillik obunada ham). purchased_minutes TEGILMAYDI.
-    if sub.period_started_at and (datetime.utcnow() - sub.period_started_at) > timedelta(days=QUOTA_RESET_DAYS):
+    if getattr(sub, 'period_started_at', None) and isinstance(sub.period_started_at, datetime) and (datetime.utcnow() - sub.period_started_at) > timedelta(days=QUOTA_RESET_DAYS):
         sub.period_started_at = datetime.utcnow()
         sub.monthly_minutes_used = 0.0
         db.commit()
@@ -345,16 +400,48 @@ def activate_subscription(db, user_id, plan_id: str) -> Subscription:
 
 
 def get_job_queue(db, user_id) -> str:
-    """Foydalanuvchining joriy tarifiga qarab qaysi Celery navbatiga
-    yuborilishi kerakligini aniqlaydi — Pro/Premium (priority=True)
-    PRIORITY_QUEUE'ga, qolganlari DEFAULT_QUEUE'ga tushadi. Muddati
-    o'tgan/topilmagan obuna FREE deb hisoblanadi (get_or_create_subscription
-    o'zi shuni bajaradi). Anonim job (user_id=None) — Subscription.user_id
-    NOT NULL bo'lgani uchun bazaga tegmasdan darhol DEFAULT_QUEUE."""
+    """Orqaga moslik uchun saqlanadi — yangi kod get_job_queue_v2() ishlatsin.
+    duration_minutes=0.0 bilan chaqiriladi → short track qaytaradi.
+    """
+    return get_job_queue_v2(db, user_id, duration_minutes=0.0)
+
+
+def get_job_queue_v2(db, user_id, duration_minutes: float) -> str:
+    """Foydalanuvchi tarifi VA video davomiyligiga qarab to'g'ri Celery navbatini
+    aniqlaydi.
+
+    Ustuvorlik qoidalari (2026-10-16):
+      1. Qisqa video (<=10 daqiqa) -> Uzun video (>10 daqiqa)
+      2. Har bir trek ichida qat'iy tartib:
+         Pro -> Standart -> Free -> Admin -> qo'shimcha
+
+    Worker Redis BRPOP orqali navbatlarni quyidagi qat'iy tartibda tekshiradi:
+      1. video_short_pro        (Pro, <=10 daq)
+      2. video_short_standard   (Standart, <=10 daq)
+      3. video_short_free       (Free/Anon, <=10 daq)
+      4. video_short_admin      (Admin test/ichki, <=10 daq)
+      5. video_long_pro         (Pro, >10 daq)
+      6. video_long_standard    (Standart, >10 daq)
+      7. video_long_free        (Free/Anon, >10 daq)
+      8. video_long_admin       (Admin test/ichki, >10 daq)
+      9. video_processing_local (Telegram local)
+     10. video_processing       (Eski / zaxira)
+    """
+    is_short = (duration_minutes <= SHORT_TRACK_MAX_MINUTES)
+
     if user_id is None:
-        return DEFAULT_QUEUE
+        return QUEUE_SHORT_FREE if is_short else QUEUE_LONG_FREE
+
     if is_user_admin(db, user_id):
-        return PRIORITY_QUEUE
+        # Admin tizim testlari — haqiqiy to'lov qilgan foydalanuvchilardan keyin
+        return QUEUE_SHORT_ADMIN if is_short else QUEUE_LONG_ADMIN
+
     sub = get_or_create_subscription(db, user_id)
-    plan = PLANS[sub.plan.value]
-    return PRIORITY_QUEUE if plan.priority else DEFAULT_QUEUE
+    plan_tier = sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan)
+
+    if plan_tier == "pro":
+        return QUEUE_SHORT_PRO if is_short else QUEUE_LONG_PRO
+    elif plan_tier in ("standard", "standart"):
+        return QUEUE_SHORT_STANDARD if is_short else QUEUE_LONG_STANDARD
+    else:
+        return QUEUE_SHORT_FREE if is_short else QUEUE_LONG_FREE

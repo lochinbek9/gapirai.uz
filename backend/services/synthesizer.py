@@ -590,29 +590,13 @@ def synthesize_segments(
     original_end_ms = last["end_ms"]
     total_ms = max(natural_end_ms, original_end_ms) + 200
 
-    # 4. Har bir segmentni o'zining ANIQ vaqt koordinatasiga o'rnatish
-    # DIQQAT: combined.overlay() har iteratsiyada butun buferni yangidan xotirada
-    # nusxalaydi (500 segment x 50MB = 25GB virtual allokatsiya va OOM-kill).
-    # Segmentlar 2-bosqichda ketma-ket (non-overlapping) qilinganligi sababli,
-    # ularni sukunat oraliqlari bilan bitta o'tishda yig'amiz.
-    combined = AudioSegment.empty()
-    current_pos_ms = 0
-    for item in seg_data:
-        seg_audio = item["audio"].set_frame_rate(_FRAME_RATE).set_channels(1)
-        start_ms = max(item["start_ms"], current_pos_ms)
-        if start_ms > current_pos_ms:
-            combined += AudioSegment.silent(duration=start_ms - current_pos_ms, frame_rate=_FRAME_RATE)
-        combined += seg_audio
-        current_pos_ms = start_ms + len(seg_audio)
-
-    if total_ms > current_pos_ms:
-        combined += AudioSegment.silent(duration=total_ms - current_pos_ms, frame_rate=_FRAME_RATE)
-
-    # Final headroom normalization to prevent clipping/crackling
-    combined = combined.normalize(headroom=1.5)
-
+    # 4. Har bir segmentni o'zining ANIQ vaqt koordinatasiga o'rnatish.
+    # 2026-10-16 OOM yechimi: pydub "combined +=" o'rniga ffmpeg concat ishlatamiz.
+    # Eski usul: 500 segment x 50MB = 25GB virtual allokatsiya => OOM-kill.
+    # Yangi usul: har bir segment/sukunat disk fayliga yoziladi, keyin ffmpeg
+    # concat demuxer bilan 1 MB dan kam xotirada birlashtiriladi.
     merged_path = str(output_path / "dubbed_audio.wav")
-    combined.set_frame_rate(_FRAME_RATE).export(merged_path, format="wav")
+    _merge_segments_via_ffmpeg(seg_data, total_ms, merged_path, _FRAME_RATE)
 
     # Alohida segment fayllari (seg_XXXX.wav) birlashtirilgan audioga
     # kirgandan so'ng boshqa hech qachon kerak bo'lmaydi — ular diskda
@@ -627,3 +611,97 @@ def synthesize_segments(
     return merged_path, actual_timings, qa_results
 
 
+def _merge_segments_via_ffmpeg(
+    seg_data: list[dict],
+    total_ms: float,
+    output_path: str,
+    frame_rate: int = 24000,
+) -> None:
+    """Segmentlarni RAMni minimal sarflab ffmpeg concat bilan birlashtiradi.
+
+    pydub AudioSegment "combined +=" yondashuvi 90-daqiqalik videoda
+    1.5-2 GB RAM sarflaydi (har iteratsiyada bufer nusxalanadi).
+    Bu funksiya har bir segment/sukunatni alohida disk fayliga yozib,
+    keyin ffmpeg concat demuxer bilan birlashtiradi — RAM faqat
+    bitta segment uchun kerak (~1-5 MB).
+
+    Args:
+        seg_data: [{audio: AudioSegment, start_ms: int, end_ms: int}, ...]
+        total_ms: Final audio uzunligi (ms)
+        output_path: Chiqish WAV fayl yo'li
+        frame_rate: Audio sample rate (Hz)
+    """
+    import tempfile
+    import shutil as _shutil
+    from pydub import AudioSegment as _AS
+
+    _logger = logging.getLogger(__name__)
+    tmp_dir = tempfile.mkdtemp(prefix="synth_merge_")
+    concat_list_path = os.path.join(tmp_dir, "concat.txt")
+    pieces: list[str] = []
+
+    try:
+        current_pos_ms = 0
+        for i, item in enumerate(seg_data):
+            seg_audio: "_AS" = item["audio"].set_frame_rate(frame_rate).set_channels(1)
+            start_ms = max(item["start_ms"], current_pos_ms)
+
+            # Sukunat kerak bo'lsa — diskka yoz
+            if start_ms > current_pos_ms:
+                silence_ms = start_ms - current_pos_ms
+                sil_path = os.path.join(tmp_dir, f"sil_{i:04d}.wav")
+                _AS.silent(duration=silence_ms, frame_rate=frame_rate).export(sil_path, format="wav")
+                pieces.append(sil_path)
+
+            # Segment — diskka yoz
+            seg_path = os.path.join(tmp_dir, f"seg_{i:04d}.wav")
+            seg_audio.export(seg_path, format="wav")
+            pieces.append(seg_path)
+            current_pos_ms = start_ms + len(seg_audio)
+
+        # Oxirida sukunat kerak bo'lsa
+        if total_ms > current_pos_ms:
+            tail_ms = int(total_ms - current_pos_ms)
+            if tail_ms > 0:
+                tail_path = os.path.join(tmp_dir, "tail.wav")
+                _AS.silent(duration=tail_ms, frame_rate=frame_rate).export(tail_path, format="wav")
+                pieces.append(tail_path)
+
+        if not pieces:
+            _AS.silent(duration=200, frame_rate=frame_rate).export(output_path, format="wav")
+            return
+
+        # ffmpeg concat demuxer — RAM sarfi minimal, tez
+        with open(concat_list_path, "w") as _f:
+            for p in pieces:
+                _f.write(f"file '{os.path.abspath(p)}'\n")
+
+        # Normalizatsiya bilan birlashtirish
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_list_path,
+            "-af", "aresample=resampler=swr,loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-ar", str(frame_rate), "-ac", "1",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0:
+            _logger.warning(f"ffmpeg loudnorm xatosi, oddiy concat: {result.stderr[-300:]}")
+            # Fallback: normalizatsiyasiz
+            cmd2 = [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", concat_list_path,
+                "-ar", str(frame_rate), "-ac", "1",
+                output_path,
+            ]
+            result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=600)
+            if result2.returncode != 0:
+                raise RuntimeError(f"ffmpeg audio concat xatosi: {result2.stderr[-500:]}")
+
+        size_kb = os.path.getsize(output_path) // 1024
+        _logger.info(f"[SYNTH] ffmpeg merge: {len(pieces)} bo'lak -> {size_kb} KB")
+
+    finally:
+        _shutil.rmtree(tmp_dir, ignore_errors=True)

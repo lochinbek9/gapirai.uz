@@ -95,7 +95,7 @@ def initiate_job_payment(
         raise HTTPException(status_code=400, detail="Video davomiyligi aniqlanmadi.")
 
     duration_minutes = job.video_duration / 60.0
-    from backend.services.plans import check_quota, consume_quota, get_job_queue
+    from backend.services.plans import check_quota, consume_quota, get_job_queue_v2
     covered_by_quota, minutes_short = check_quota(db, current_user.id, duration_minutes)
     if not covered_by_quota:
         # 2026-08-31: per-job to'lov o'chirildi -- kvota daqiqa bo'yicha.
@@ -122,7 +122,8 @@ def initiate_job_payment(
                 job.status_message = "Navbatga qo'shildi"
                 db.commit()
                 from backend.workers.tasks import process_video
-                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
+                _dur = (job.video_duration or 0) / 60.0
+                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue_v2(db, current_user.id, _dur))
         return {"success": True, "message": "Bepul video. Ishlov berish boshlandi.", "amount": 0}
 
     existing_approved = db.query(Payment).filter(

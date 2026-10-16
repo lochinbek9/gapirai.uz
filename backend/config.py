@@ -58,8 +58,15 @@ class Settings(BaseSettings):
     # yig'indisi: host-1 2 + worker-3 4 = 6). Faqat ETA/rad qilish taxmini
     # uchun -- worker qo'shilganda/olinganda shu yerni yangilang.
     QUEUE_WORKER_SLOTS: int = 6
-    # Bitta job o'rtacha necha daqiqa oladi (~10 daqiqalik video CPU'da 10-15 daq).
-    QUEUE_AVG_JOB_MINUTES: float = 12.0
+    # Short track (<=10 daqiqa) o'rtacha ishlash vaqti — ETA taxmini uchun.
+    QUEUE_AVG_JOB_MINUTES: float = 8.0
+    # Long track (>10 daqiqa) o'rtacha ishlash vaqti — ETA taxmini uchun.
+    QUEUE_LONG_AVG_JOB_MINUTES: float = 45.0
+    # Short/Long track uchun max parallel worker slotlari (OOM xavfi nazorati).
+    # Short: OOM xavfi past (kichik audio/video), ko'proq parallel mumkin.
+    # Long: OOM xavfi bor (90+ daqiqalik video), kamroq parallel.
+    QUEUE_SHORT_WORKER_SLOTS: int = 4
+    QUEUE_LONG_WORKER_SLOTS: int = 2
     # Taxminiy kutish shu daqiqadan oshsa, yangi (ustuvor bo'lmagan) job'lar
     # "navbat to'la" deb rad etiladi. 0 = o'chirilgan.
     MAX_QUEUE_WAIT_MINUTES: int = 120

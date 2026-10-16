@@ -46,7 +46,7 @@ def initiate_payment(
     duration_minutes = job.video_duration / 60.0
     # Tarif kvotasi bilan bir xil mantiq — create_job (routes.py) bilan mos
     # kelishi kerak, aks holda AWAITING_PAYMENT job noto'g'ri qayta narxlanishi mumkin.
-    from backend.services.plans import check_quota, consume_quota, get_job_queue
+    from backend.services.plans import check_quota, consume_quota, get_job_queue_v2
     covered_by_quota, minutes_short = check_quota(db, current_user.id, duration_minutes)
     if not covered_by_quota:
         # 2026-08-31: per-job to'lov o'chirildi -- kvota daqiqa bo'yicha.
@@ -68,7 +68,8 @@ def initiate_payment(
             job.status = JobStatus.PENDING
             job.status_message = "Navbatga qo'shildi"
             db.commit()
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, current_user.id))
+            _dur = (job.video_duration or 0) / 60.0
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue_v2(db, current_user.id, _dur))
     return {"success": True, "message": "Video ishlov berish navbatiga qo'shildi.", "amount": 0}
 
 @router.post("/prepare")

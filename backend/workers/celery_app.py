@@ -61,22 +61,20 @@ celery_app.conf.update(
     },
     task_routes={
         # process_video'da "queue" ATAYLAB yo'q — chaqiruv joylarida
-        # (routes.py/click_routes.py/main.py) get_job_queue() orqali
-        # Pro/Premium uchun video_processing_priority yoki oddiylar uchun
-        # video_processing aniq ko'rsatiladi (backend/services/plans.py).
-        # Bu yerda qattiq "queue" bo'lsa, o'sha aniq yo'naltirishni bekor
-        # qilib qo'yishi mumkin edi.
+        # (routes.py/click_routes.py/main.py) get_job_queue_v2() orqali
+        # tarif + video davomiyligiga qarab to'g'ri navbat aniq ko'rsatiladi.
+        # Bu yerda qattiq "queue" bo'lsa, o'sha yo'naltirishni bekor qilardi.
         "backend.workers.tasks.process_video": {
             "rate_limit": "1/m",  # max 1 YouTube download per minute per worker
         },
         "backend.workers.analysis_tasks.analyze_video_task": {
-            "queue": "video_processing",  # ustuvorlik tizimiga kirmaydi, doim standart navbat
+            # Ustuvorlik tizimiga kirmaydi — doim default short navbat
+            "queue": "video_short_free",
             "rate_limit": "1/m",
         },
         "backend.workers.resolution_tasks.generate_resolution_variant_task": {
-            "queue": "video_processing",  # aniq queue ko'rsatilmasa Celery'ning
-            # o'zi "celery" default navbatiga tushar edi -- worker'lar faqat
-            # video_processing/video_processing_priority'ni tinglaydi.
+            # Resolution variant — qisqa, tez, default short navbatga
+            "queue": "video_short_free",
         },
     },
 )

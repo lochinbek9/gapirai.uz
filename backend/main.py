@@ -90,7 +90,7 @@ def recover_stuck_jobs(redis_conn=None):
     """
     from backend.models.database import SessionLocal, DubbingJob, JobStatus
     from backend.workers.tasks import process_video
-    from backend.services.plans import get_job_queue
+    from backend.services.plans import get_job_queue_v2
     db = SessionLocal()
     try:
         active_statuses = [
@@ -126,7 +126,8 @@ def recover_stuck_jobs(redis_conn=None):
             job.status = JobStatus.PENDING
             job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
-            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, job.user_id))
+            _dur = (job.video_duration or 0) / 60.0
+            process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue_v2(db, job.user_id, _dur))
     except Exception as e:
         print(f"[RECOVERY ERROR] Error during job recovery: {e}")
     finally:

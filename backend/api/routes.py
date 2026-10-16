@@ -1028,8 +1028,9 @@ def retry_job(
     db.commit()
 
     from backend.workers.tasks import process_video
-    from backend.services.plans import get_job_queue
-    queue = get_job_queue(db, current_user.id)
+    from backend.services.plans import get_job_queue_v2
+    _dur = (job.video_duration or 0) / 60.0
+    queue = get_job_queue_v2(db, current_user.id, _dur)
     process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=queue)
 
     return {

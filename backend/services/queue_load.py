@@ -117,9 +117,21 @@ def overload_wait_minutes(db: Session, user_id) -> int | None:
     if not limit or limit <= 0:
         return None
 
-    from backend.services.plans import PRIORITY_QUEUE, get_job_queue
-    if get_job_queue(db, user_id) == PRIORITY_QUEUE:
-        return None
+    from backend.services.plans import (
+        QUEUE_SHORT_PRO, QUEUE_LONG_PRO, QUEUE_SHORT_ADMIN, QUEUE_LONG_ADMIN,
+        PRIORITY_QUEUE, PRIORITY_SHORT_QUEUE, PRIORITY_LONG_QUEUE,
+        get_job_queue_v2, get_job_queue
+    )
+    try:
+        _q = get_job_queue(db, user_id)
+    except Exception:
+        _q = get_job_queue_v2(db, user_id, duration_minutes=0.0)
+
+    if _q in (
+        QUEUE_SHORT_PRO, QUEUE_LONG_PRO, QUEUE_SHORT_ADMIN, QUEUE_LONG_ADMIN,
+        PRIORITY_QUEUE, PRIORITY_SHORT_QUEUE, PRIORITY_LONG_QUEUE
+    ):
+        return None  # Pro/Admin — overload bloki yo'q, ular to'lagan
 
     wait = estimate_wait_minutes(waiting_total(db) + 1)
     return wait if wait > limit else None

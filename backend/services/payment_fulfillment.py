@@ -68,8 +68,9 @@ def apply_successful_payment(db, payment) -> None:
             else:
                 job.status = JobStatus.PENDING
                 job.status_message = "To'lov tasdiqlandi. Dublyaj navbatga qo'shildi."
-                from backend.services.plans import get_job_queue
-                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue(db, payment.user_id))
+                from backend.services.plans import get_job_queue_v2
+                _dur = (job.video_duration or 0) / 60.0
+                process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=get_job_queue_v2(db, payment.user_id, _dur))
 
     payment.fulfilled_at = datetime.utcnow()
     db.commit()

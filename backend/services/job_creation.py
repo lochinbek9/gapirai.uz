@@ -381,7 +381,7 @@ async def create_dubbing_job(
     if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
         return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
 
-    from backend.services.plans import check_quota, consume_quota, get_job_queue
+    from backend.services.plans import check_quota, consume_quota, get_job_queue_v2
     covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
     if not covered:
         # Daqiqa yetmadi -- job yaratilmaydi. Frontend "Buy additional minutes"
@@ -453,7 +453,7 @@ async def create_dubbing_job(
     consume_quota(db, user.id, duration_minutes)
     job.quota_consumed = True
     db.commit()
-    process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue(db, user.id))
+    process_video.apply_async(args=[job_id], task_id=job_id, queue=get_job_queue_v2(db, user.id, duration_minutes))
     return JobCreationResult(outcome="queued", job_id=job_id, video_title=title, duration_minutes=duration_minutes)
 
 
