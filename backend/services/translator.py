@@ -335,13 +335,12 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
         _gemini_text_model(),
         "gemini-3.8-flash",
         "gemini-3.5-flash",
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
+        "gemini-2.5-flash",
         "gemini-flash-latest",
+        "gemini-3.7-flash",
         "gemini-3.5-flash-lite",
+        "gemini-2.5-flash-lite",
         "gemini-flash-lite-latest",
-        "gemini-3.1-flash-lite",
-        "gemini-3.1-flash-lite-preview",
     ]
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
@@ -448,11 +447,16 @@ def _translate_chunk(segments: list[dict]) -> list[dict]:
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
 
     if settings.TRANSLATE_PROVIDER == "gemini":
-        try:
-            return _translate_chunk_gemini(segments, clean_segments)
-        except Exception as e:
-            logger.warning(f"Gemini tarjima muvaffaqiyatsiz ({e}) — bepul (LLM'siz) tarjimaga o'tilmoqda.")
-            return _translate_chunk_free_mt(segments)
+        last_ex = None
+        for attempt in range(3):
+            try:
+                return _translate_chunk_gemini(segments, clean_segments)
+            except Exception as e:
+                last_ex = e
+                logger.warning(f"Gemini tarjima urinishi {attempt+1}/3 muvaffaqiyatsiz ({e}).")
+                if attempt < 2:
+                    time.sleep(2.0 * (attempt + 1))
+        raise RuntimeError(f"Gemini tarjima barcha urinishlarda muvaffaqiyatsiz bo'ldi: {last_ex}")
 
     try:
         return _translate_chunk_openai(segments, clean_segments)

@@ -191,7 +191,16 @@ def get_minute_balance(db, user_id) -> dict:
     """
     if is_user_admin(db, user_id):
         sub = get_or_create_subscription(db, user_id)
-        used = sub.monthly_minutes_used or 0.0
+        from backend.models.database import DubbingJob, JobStatus
+        from sqlalchemy import func
+        q = db.query(func.coalesce(func.sum(DubbingJob.video_duration), 0.0)).filter(
+            DubbingJob.user_id == user_id,
+            DubbingJob.status == JobStatus.COMPLETED
+        )
+        if sub.period_started_at:
+            q = q.filter(DubbingJob.created_at >= sub.period_started_at)
+        actual_sec = q.scalar() or 0.0
+        used = actual_sec / 60.0 if actual_sec > 0 else (sub.monthly_minutes_used or 0.0)
         purchased = sub.purchased_minutes or 0.0
         return {
             "is_unlimited": True,
