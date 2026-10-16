@@ -18,30 +18,33 @@ function MeshBackground() {
 
 export default function AboutClient() {
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-between pt-24 sm:pt-28 pb-0 px-4 sm:px-8 overflow-x-hidden transition-colors duration-300">
+    <main className="relative min-h-screen flex flex-col justify-between overflow-x-hidden transition-colors duration-300">
       <MeshBackground />
 
       {/* Top Header Bar */}
-      <header className="absolute top-3 sm:top-6 left-3 sm:left-6 right-3 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
-        <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
-          <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain dark:hidden drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
-          <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-10 sm:h-16 md:h-24 w-auto object-contain hidden dark:block drop-shadow-md" style={{ maxWidth: "calc(100vw - 150px)" }} />
-        </Link>
-
-        <div className="pointer-events-auto flex items-center gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 h-10 px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
-          >
-            <ArrowLeft className="w-4 h-4 text-blue-500" />
-            Bosh sahifa
+      <header className="absolute top-0 left-0 right-0 z-50 w-full pointer-events-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex items-center justify-between relative gap-4">
+          <Link href="/" className="pointer-events-auto flex items-center transition duration-300 hover:scale-105">
+            <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-9 sm:h-11 md:h-12 w-auto object-contain dark:hidden drop-shadow-md" />
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={40} className="h-9 sm:h-11 md:h-12 w-auto object-contain hidden dark:block drop-shadow-md" />
           </Link>
-          <ThemeToggle />
+
+          <div className="pointer-events-auto flex items-center gap-2.5 sm:gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white text-xs font-bold rounded-2xl shadow-sm transition backdrop-blur-md hover:scale-105 active:scale-95"
+            >
+              <ArrowLeft className="w-4 h-4 text-blue-500" />
+              Bosh sahifa
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       {/* Main Content Container */}
-      <div className="w-full max-w-4xl z-10 space-y-12 my-6">
+      <div className="w-full flex-1 flex flex-col items-center justify-start pt-24 sm:pt-28 pb-12 px-4 sm:px-8">
+        <div className="w-full max-w-4xl z-10 space-y-12 my-6">
 
         {/* Hero Banner Card */}
         <motion.div
@@ -166,6 +169,7 @@ export default function AboutClient() {
           </div>
         </motion.div>
 
+        </div>
       </div>
 
       <Footer />

@@ -4,7 +4,7 @@ import { Send, Youtube, Instagram, Github, Mail, ShieldCheck, FileText, Users, I
 
 export default function Footer() {
   return (
-    <footer className="w-screen relative left-1/2 -translate-x-1/2 z-10 border-t border-black/5 dark:border-white/10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl transition-colors mt-20">
+    <footer className="w-full relative z-10 border-t border-black/5 dark:border-white/10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl transition-colors mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 lg:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
 

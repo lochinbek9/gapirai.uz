@@ -381,82 +381,87 @@ export default function Home() {
     : "processing";
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-start pt-16 sm:pt-24 pb-16 px-3 sm:px-8 overflow-x-hidden transition-colors duration-300">
+    <main className="relative min-h-screen flex flex-col justify-between overflow-x-hidden transition-colors duration-300">
       <MeshBackground />
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
-
-      <header className="absolute top-2.5 sm:top-6 left-2.5 sm:left-6 right-2.5 sm:right-6 z-50 flex items-center justify-between pointer-events-none gap-2">
-        {/* Left Logo */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <Link href="/" className="flex items-center transition duration-300 hover:scale-105">
-            <img src="/logo.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain dark:hidden drop-shadow-md" />
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-12 md:h-16 w-auto object-contain hidden dark:block drop-shadow-md" />
-          </Link>
-        </div>
-
-        {/* Center Navigation Links */}
-        <nav className="pointer-events-auto hidden md:flex items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
-          <Link
-            href="/pricing"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
-          >
-            <CreditCard className="w-3.5 h-3.5 text-violet-500" />
-            <span>Tariflar</span>
-          </Link>
-          <Link
-            href="/donate"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
-          >
-            <Heart className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
-            <span>Donat</span>
-          </Link>
-          <Link
-            href="/about"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
-          >
-            <Info className="w-3.5 h-3.5 text-blue-500" />
-            <span>Haqida</span>
-          </Link>
-        </nav>
-
-        {/* Right Controls */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <Link
-            href="/pricing"
-            className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
-            title="Tariflar"
-          >
-            <CreditCard className="w-4 h-4 text-violet-500" />
-          </Link>
-          <Link
-            href="/donate"
-            className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
-            title="Donat"
-          >
-            <Heart className="w-4 h-4 text-rose-500" fill="currentColor" />
-          </Link>
-          {isLoggedIn ? (
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
-              <span className="hidden sm:inline">Mening videolarim</span>
-              <span className="sm:hidden">Videolar</span>
+      {/* Top Header Bar bounded in max-w-7xl container */}
+      <header className="absolute top-0 left-0 right-0 z-50 w-full pointer-events-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex items-center justify-between relative gap-4">
+          {/* Left Logo */}
+          <div className="pointer-events-auto flex items-center shrink-0">
+            <Link href="/" className="flex items-center transition duration-300 hover:scale-105">
+              <img src="/logo.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain dark:hidden drop-shadow-md" />
+              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain hidden dark:block drop-shadow-md" />
             </Link>
-          ) : (
+          </div>
+
+          {/* Center Navigation Links: perfectly centered in max-w-7xl */}
+          <nav className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
             <Link
-              href="/login"
-              className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
+              href="/pricing"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
             >
-              <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
-              <span>Kirish</span>
+              <CreditCard className="w-3.5 h-3.5 text-violet-500" />
+              <span>Tariflar</span>
             </Link>
-          )}
-          <ThemeToggle />
+            <Link
+              href="/donate"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
+            >
+              <Heart className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
+              <span>Donat</span>
+            </Link>
+            <Link
+              href="/about"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-500" />
+              <span>Haqida</span>
+            </Link>
+          </nav>
+
+          {/* Right Controls */}
+          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link
+              href="/pricing"
+              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
+              title="Tariflar"
+            >
+              <CreditCard className="w-4 h-4 text-violet-500" />
+            </Link>
+            <Link
+              href="/donate"
+              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
+              title="Donat"
+            >
+              <Heart className="w-4 h-4 text-rose-500" fill="currentColor" />
+            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+                <span className="hidden sm:inline">Mening videolarim</span>
+                <span className="sm:hidden">Videolar</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
+              >
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+                <span>Kirish</span>
+              </Link>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
+
+      {/* Main Content Body */}
+      <div className="w-full flex-1 flex flex-col items-center justify-start pt-24 sm:pt-28 pb-12 px-3 sm:px-6">
 
       <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
         <Logo />
@@ -616,9 +621,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-4">
-        <DonateCTA />
-      </section>
+        <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-4">
+          <DonateCTA />
+        </section>
+      </div>
 
       <Footer />
     </main>
