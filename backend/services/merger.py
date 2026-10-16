@@ -103,81 +103,138 @@ def _get_video_codec(file_path: str) -> str:
         return ""
 
 
+def _get_video_dimensions(file_path: str) -> tuple[int, int]:
+    """FFprobe orqali video o'lchamlarini (width, height) olish."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=s=x:p=0",
+                file_path,
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        parts = result.stdout.strip().split("x")
+        if len(parts) == 2:
+            return int(parts[0]), int(parts[1])
+    except Exception:
+        pass
+    return 1280, 720
+
+
+WATERMARK_PATH = Path(__file__).resolve().parent.parent / "assets" / "watermark_gapirai.png"
+
+
 def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str) -> str:
     """
     Original video + O'zbekcha dublyaj → Tayyor video, kino-dublyaji uslubida
     aralashtirilgan (original musiqa/SFX/ambient saqlanadi, faqat dub
     gapirayotgan joyda moslashuvchan pasayadi — backend/config.py: DUCKING_*).
 
+    Barcha tariflar uchun pastki o'ng burchakda rasmiy gapirai.uz suv belgisi
+    (logo + domen) joylashtiriladi.
+
     Agar o'zbekcha dublyaj video dan uzunroq bo'lsa:
     → Video oxirgi kadri "freeze" qilinadi (qora ekran emas, tabiiy tugatish)
 
     Agar video uzunroq bo'lsa:
-    → Original video TO'LIQ uzunligida saqlanadi (avval dub tugagach video
-      kesib tashlanardi — bu endi original fon ovozini dub tugagandan keyin
-      ham tinglash imkoniyatini yo'qqa chiqarardi).
+    → Original video TO'LIQ uzunligida saqlanadi.
     """
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     video_dur = _get_duration(video_path)
     audio_dur = _get_duration(dubbed_audio_path)
 
-    # Agar video audio dan uzunroq bo'lsa, sidechaincompress dublyaj audio
-    # tugashi bilan original fon musiqasini kesib tashlamasligi uchun dublyaj
-    # audio trekini video oxirigacha sukunat bilan to'ldiramiz (apad).
     target_dur = video_dur if audio_dur <= video_dur else None
     audio_filter = _build_audio_filtergraph(target_dur=target_dur)
 
-    # iOS Safari va barcha mobil qurilmalarda 100% ochilishi uchun:
-    # Agar video formati H.264 bo'lmasa (masalan AV1 yoki VP9 bo'lsa),
-    # uni libx264 (yuv420p) ga o'girish shart!
     vcodec = _get_video_codec(video_path)
     needs_transcode = vcodec not in ("h264", "avc1")
 
-    if audio_dur <= video_dur:
-        filter_complex = audio_filter
-        if needs_transcode:
-            video_codec_args = [
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                "-crf", "22", "-preset", "veryfast", "-threads", "2",
-            ]
+    use_watermark = WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
+
+    extra = audio_dur - video_dur if audio_dur > video_dur else 0.0
+
+    if use_watermark:
+        w, h = _get_video_dimensions(video_path)
+        if w >= h:
+            wm_h = max(48, min(160, round(h * 0.11)))
+            wm_scale = f"scale=-1:{wm_h}:flags=lanczos"
         else:
-            video_codec_args = ["-c:v", "copy"]
+            wm_w = max(50, min(160, round(w * 0.18)))
+            wm_scale = f"scale={wm_w}:-1:flags=lanczos"
+
+        pad_x = max(16, round(w * 0.025))
+        pad_y = max(16, round(h * 0.035))
+
+        if extra > 0:
+            v_prep = f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v_base];"
+        else:
+            v_prep = "[0:v:0]null[v_base];"
+
+        filter_complex = (
+            f"{v_prep}"
+            f"[2:v]{wm_scale}[wm];"
+            f"[v_base][wm]overlay=W-w-{pad_x}:H-h-{pad_y}[v_out];"
+            f"{audio_filter}"
+        )
 
         cmd = [
             "ffmpeg", "-y",
             "-i", video_path,
             "-i", dubbed_audio_path,
+            "-i", str(WATERMARK_PATH),
             "-filter_complex", filter_complex,
-            "-map", "0:v:0",
-            "-map", "[final]",
-            *video_codec_args,
-            "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
-            "-movflags", "+faststart",
-            output_path,
-        ]
-    else:
-        # Dublyaj uzunroq — video oxirgi kadrini "freeze" qilib audio ga
-        # uzaytirish. Original audio o'z tabiiy uzunligida tugaydi (undan
-        # keyin fon ovozi yo'q — amix duration=longest shu qismni jim
-        # to'ldiradi), dub esa oxirigacha eshitiladi.
-        extra = audio_dur - video_dur
-        filter_complex = (
-            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];"
-            f"{audio_filter}"
-        )
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", dubbed_audio_path,
-            "-filter_complex", filter_complex,
-            "-map", "[v]",
+            "-map", "[v_out]",
             "-map", "[final]",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", "2",
             "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
             "-movflags", "+faststart",
             output_path,
         ]
+    else:
+        # Suv belgisisiz (fallback)
+        if extra <= 0:
+            filter_complex = audio_filter
+            if needs_transcode:
+                video_codec_args = [
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-crf", "22", "-preset", "veryfast", "-threads", "2",
+                ]
+            else:
+                video_codec_args = ["-c:v", "copy"]
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", video_path,
+                "-i", dubbed_audio_path,
+                "-filter_complex", filter_complex,
+                "-map", "0:v:0",
+                "-map", "[final]",
+                *video_codec_args,
+                "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
+                "-movflags", "+faststart",
+                output_path,
+            ]
+        else:
+            filter_complex = (
+                f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v];"
+                f"{audio_filter}"
+            )
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", video_path,
+                "-i", dubbed_audio_path,
+                "-filter_complex", filter_complex,
+                "-map", "[v]",
+                "-map", "[final]",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", "2",
+                "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
+                "-movflags", "+faststart",
+                output_path,
+            ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=8000)
 

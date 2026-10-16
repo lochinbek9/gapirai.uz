@@ -32,10 +32,11 @@ class Settings(BaseSettings):
     SEGMENT_QA_THRESHOLD: float = 0.75
 
     # Bir foydalanuvchi 24 soat ichida yaratishi mumkin bo'lgan dublyaj
-    # joblari soni -- tarif daqiqa-kvotasidan ALOHIDA, uning ustidan
-    # qo'yilgan abuse / runaway-loop to'sig'i (backend/services/job_creation.py).
-    # FAILED joblar hisobga olinmaydi. 0 = cheksiz.
-    MAX_JOBS_PER_DAY: int = 20
+    # joblari soni: 0 = cheksiz (faqat daqiqa kvotasi bilan cheklanadi).
+    MAX_JOBS_PER_DAY: int = 0
+
+    # Barcha yangi videolarga gapirai.uz watermark (logo + domen) qo'yish
+    ENABLE_VIDEO_WATERMARK: bool = True
 
     # Veb orqali video fayl yuklash (POST /api/jobs/upload). Fayl host-1
     # diskiga tushadi (faqat shu host o'qiy oladi -- LOCAL_UPLOAD_QUEUE),
