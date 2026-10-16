@@ -53,10 +53,10 @@ function VideoPreview({ info }: { info: VideoInfo }) {
 
 export default function UrlInput({
   url, videoInfo, loading, error, voiceGender, voiceName,
-  ttsProvider = "azure", isProUser = false,
+  ttsProvider = "gemini", isProUser = false,
   onChange, onGenderChange, onVoiceNameChange, onTtsProviderChange, onSubmit,
 }: Props) {
-  const currentProvider = isProUser ? ttsProvider : "edge";
+  const currentProvider = ttsProvider || "gemini";
   const isGemini = currentProvider === "gemini";
 
   // Real voices per provider
@@ -170,55 +170,43 @@ export default function UrlInput({
       </div>
 
       {/* TTS Provider Selector */}
-      {isProUser ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between ml-1">
-            <label className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest flex items-center gap-1.5">
-              <span>💎 Ovoz dvigateli (PRO tanlov)</span>
-            </label>
-            <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">
-              OpenAI balansi to'ldirilgach u ham qo'shiladi
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              { id: 'azure', label: 'Azure Neural', icon: '🔷', sub: 'Sardor & Madina' },
-              { id: 'edge', label: 'Edge Free', icon: '⚡', sub: 'Sardor & Madina' },
-              { id: 'gemini', label: 'Gemini AI', icon: '✨', sub: 'Charon & Autonoe' },
-            ].map((p) => {
-              const active = (ttsProvider || 'azure') === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onTtsProviderChange?.(p.id)}
-                  className={`flex flex-col items-center gap-1 p-2 sm:p-2.5 rounded-xl border text-center transition-all ${
-                    active
-                      ? "border-violet-500 bg-violet-500/10 dark:bg-violet-500/20 text-violet-600 dark:text-violet-300 shadow-md shadow-violet-500/10 font-bold ring-1 ring-violet-500/30"
-                      : "border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm sm:text-base">{p.icon}</span>
-                    <span className="text-[11px] sm:text-xs font-black">{p.label}</span>
-                  </div>
-                  <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-400 font-medium">{p.sub}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 rounded-xl px-3.5 py-2 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-          <div className="flex items-center gap-1.5">
-            <span className="text-emerald-500 font-bold">⚡ Ovoz dvigateli:</span>
-            <span>Edge TTS (Sardor & Madina)</span>
-          </div>
-          <span className="text-[10px] text-violet-500 dark:text-violet-400 font-bold">
-            Azure va Gemini — PRO tarifida
+      <div className="space-y-2">
+        <div className="flex items-center justify-between ml-1">
+          <label className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest flex items-center gap-1.5">
+            <span>💎 Ovoz dvigateli</span>
+          </label>
+          <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">
+            OpenAI balansi to'ldirilgach u ham qo'shiladi
           </span>
         </div>
-      )}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { id: 'azure', label: 'Azure Neural', icon: '🔷', sub: 'Sardor & Madina' },
+            { id: 'edge', label: 'Edge Free', icon: '⚡', sub: 'Sardor & Madina' },
+            { id: 'gemini', label: 'Gemini AI', icon: '✨', sub: 'Charon & Autonoe' },
+          ].map((p) => {
+            const active = (ttsProvider || 'gemini') === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onTtsProviderChange?.(p.id)}
+                className={`flex flex-col items-center gap-1 p-2 sm:p-2.5 rounded-xl border text-center transition-all ${
+                  active
+                    ? "border-violet-500 bg-violet-500/10 dark:bg-violet-500/20 text-violet-600 dark:text-violet-300 shadow-md shadow-violet-500/10 font-bold ring-1 ring-violet-500/30"
+                    : "border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm sm:text-base">{p.icon}</span>
+                  <span className="text-[11px] sm:text-xs font-black">{p.label}</span>
+                </div>
+                <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-400 font-medium">{p.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Gender selector */}
       <div className="space-y-2">

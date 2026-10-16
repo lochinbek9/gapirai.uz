@@ -98,6 +98,7 @@ class JobResponse(BaseModel):
     fallback_reason: Optional[str] = None
     linked_analysis_id: Optional[str] = None
     subtitle_only: bool = False
+    source_language: Optional[str] = None
     tts_provider: Optional[str] = None
     voice_name: Optional[str] = None
     voice_style: Optional[str] = None
@@ -188,6 +189,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         content_flagged=job.content_flagged,
         linked_analysis_id=str(job.linked_analysis_id) if job.linked_analysis_id else None,
         subtitle_only=bool(job.subtitle_only),
+        source_language=job.source_language,
         tts_provider=job.tts_provider,
         voice_name=job.voice_name,
         voice_style=job.voice_style,

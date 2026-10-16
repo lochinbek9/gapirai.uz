@@ -56,6 +56,7 @@ export interface Job {
   // status_message'ga yozilgan -- bular boshqa UI (masalan mobil) uchun.
   queue_position?: number | null
   queue_eta_minutes?: number | null
+  source_language?: string | null
   tts_provider?: string | null
   voice_name?: string | null
   voice_style?: string | null

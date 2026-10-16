@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert, X, CircleSlash
+  MicOff, ShieldAlert, X, CircleSlash, Download
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -105,6 +105,31 @@ function getStatusLabel(status: string, errorCode?: string | null, errorMessage?
   }
 }
 
+function getSourceLangLabel(code?: string | null): string {
+  if (!code) return "Asl tildagi matn";
+  const c = code.toLowerCase().trim();
+  const map: Record<string, string> = {
+    en: "Inglizcha matn",
+    ru: "Ruscha matn",
+    tr: "Turkcha matn",
+    de: "Nemischa matn",
+    fr: "Fransuzcha matn",
+    es: "Ispancha matn",
+    ar: "Arabcha matn",
+    zh: "Xitoycha matn",
+    ko: "Koreyscha matn",
+    ja: "Yaponcha matn",
+    fa: "Forscha matn",
+    hi: "Hindcha matn",
+    it: "Italyancha matn",
+    pt: "Portugalcha matn",
+    uz: "O'zbekcha matn",
+    kk: "Qozoqcha matn",
+    ky: "Qirg'izcha matn",
+  };
+  return map[c] || `Asl tildagi matn (${code.toUpperCase()})`;
+}
+
 /* ── Page ────────────────────────────────────────── */
 export default function VideoPage() {
   const { id } = useParams<{ id: string }>()
@@ -117,6 +142,10 @@ export default function VideoPage() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
+  const [expandSourceText, setExpandSourceText] = useState(false)
+  const [showSrt, setShowSrt] = useState(false)
+  const [isSrtCopied, setIsSrtCopied] = useState(false)
+  const [showSrtModal, setShowSrtModal] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [retryLoading, setRetryLoading] = useState(false)
@@ -730,6 +759,62 @@ export default function VideoPage() {
                 </div>
               )}
 
+              {/* Subtitles accordion */}
+              {job.uzbek_srt_content && (
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                  <div
+                    onClick={() => setShowSrt(!showSrt)}
+                    className="w-full flex items-center justify-between px-5 py-4 text-white font-medium hover:bg-white/5 transition cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>O'zbekcha subtitrlar</span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono font-medium">SRT</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const blob = new Blob([job.uzbek_srt_content || ''], { type: 'text/plain;charset=utf-8' })
+                          const url = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = `subtitles_${id.slice(0, 8)}.srt`
+                          a.click()
+                          URL.revokeObjectURL(url)
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-white/10 transition flex items-center gap-1 text-xs cursor-pointer"
+                        title="SRT faylini yuklab olish"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">Yuklab olish</span>
+                      </button>
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(job.uzbek_srt_content || '')
+                          setIsSrtCopied(true)
+                          setTimeout(() => setIsSrtCopied(false), 2000)
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
+                        title="Nusxa olish"
+                      >
+                        {isSrtCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </div>
+                      {showSrt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                  {showSrt && (
+                    <div className="px-5 pb-5">
+                      <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 max-h-80 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                        {job.uzbek_srt_content}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+
               {/* Donate CTA */}
               {job.status === 'completed' && (
                 <DonateCTA variant="line" className="pt-2" />
@@ -753,12 +838,12 @@ export default function VideoPage() {
                     {job.created_at && (
                       <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                     )}
-                    {job.uzbek_srt_content && <InfoRow label="Subtitr" value="✅ Mavjud" />}
+                    {job.uzbek_srt_content && <InfoRow label="Subtitr" value="✅ Mavjud (To'liq matn pastda)" />}
                   </div>
                   {job.transcript_text && (
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider">Inglizcha matn</p>
+                    <p className="text-slate-400 text-xs uppercase tracking-wider">{getSourceLangLabel(job.source_language)}</p>
                     <div
                       onClick={(e) => {
                         e.stopPropagation()
@@ -772,7 +857,26 @@ export default function VideoPage() {
                       {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </div>
                   </div>
-                  <p className="text-slate-300 text-sm leading-relaxed line-clamp-6">{job.transcript_text}</p>
+                  <p className={`text-slate-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
+                  {job.transcript_text.length > 240 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpandSourceText(!expandSourceText)}
+                      className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition"
+                    >
+                      {expandSourceText ? (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5" />
+                          <span>Qisqartirish</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          <span>To'liq matnni ko'rish</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                     </div>
                   )}
                 </div>
@@ -800,7 +904,7 @@ export default function VideoPage() {
                   <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                 )}
                 {job.uzbek_srt_content && (
-                  <InfoRow label="Subtitr" value="✅ Mavjud" />
+                  <InfoRow label="Subtitr" value="✅ Mavjud (To'liq matn pastda)" />
                 )}
 
                 {/* Admin-only AI models breakdown */}
@@ -836,7 +940,7 @@ export default function VideoPage() {
               {job.transcript_text && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider">Inglizcha matn</p>
+                    <p className="text-slate-400 text-xs uppercase tracking-wider">{getSourceLangLabel(job.source_language)}</p>
                     <div
                       onClick={(e) => {
                         e.stopPropagation()
@@ -850,7 +954,26 @@ export default function VideoPage() {
                       {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </div>
                   </div>
-                  <p className="text-slate-300 text-sm leading-relaxed line-clamp-6">{job.transcript_text}</p>
+                  <p className={`text-slate-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
+                  {job.transcript_text.length > 240 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpandSourceText(!expandSourceText)}
+                      className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition"
+                    >
+                      {expandSourceText ? (
+                        <>
+                          <ChevronUp className="w-3.5 h-3.5" />
+                          <span>Qisqartirish</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                          <span>To'liq matnni ko'rish</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

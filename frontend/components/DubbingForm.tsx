@@ -29,7 +29,7 @@ export default function DubbingForm({
   error,
   voiceGender,
   voiceName,
-  ttsProvider = "azure",
+  ttsProvider = "gemini",
   isProUser = false,
   onChange,
   onGenderChange,

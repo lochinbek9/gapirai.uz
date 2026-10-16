@@ -213,13 +213,9 @@ async def create_dubbing_job(
         user_is_pro = (sub.plan == PlanTier.PRO)
 
     valid_providers = {"azure", "edge", "gemini"}
-    clean_provider = (tts_provider or "").strip().lower()
-    if clean_provider in valid_providers:
-        if not user_is_pro and clean_provider != "edge":
-            logger.info(f"Foydalanuvchi {user.id} Pro emas, {clean_provider} o'rniga edge ga yo'naltirildi")
-            clean_provider = "edge"
-    else:
-        clean_provider = "edge" if not user_is_pro else (getattr(get_settings(), "TTS_PROVIDER", "azure") or "azure")
+    clean_provider = (tts_provider or "gemini").strip().lower()
+    if clean_provider not in valid_providers:
+        clean_provider = "gemini"
 
     # Aniq ovoz nomini provayder va jinsga qarab to'liq normallashtirish / biriktirish:
     if voice_gender in ("male", "female"):
@@ -556,12 +552,9 @@ def create_job_from_local_video_file_sync(
         sub = get_or_create_subscription(db, user.id)
         user_is_pro = (sub.plan == PlanTier.PRO)
 
-    clean_provider = (tts_provider or "").strip().lower()
-    if clean_provider in ("azure", "edge", "gemini"):
-        if not user_is_pro and clean_provider != "edge":
-            clean_provider = "edge"
-    else:
-        clean_provider = "edge" if not user_is_pro else (getattr(get_settings(), "TTS_PROVIDER", "azure") or "azure")
+    clean_provider = (tts_provider or "gemini").strip().lower()
+    if clean_provider not in ("azure", "edge", "gemini"):
+        clean_provider = "gemini"
 
     if voice_gender in ("male", "female"):
         if not voice_name:
