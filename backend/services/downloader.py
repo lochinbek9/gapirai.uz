@@ -386,13 +386,30 @@ def _get_video_info_via_api(youtube_url: str) -> dict | None:
         return None
 
 
+def _cache_channel_name(youtube_url: str, uploader: str) -> None:
+    if not uploader or not youtube_url:
+        return
+    try:
+        m = _YT_VIDEO_ID_RE.search(youtube_url)
+        if m:
+            import redis
+            r_cli = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+            r_cli.setex(f"yt:chan:{m.group(1)}", 86400 * 30, uploader)
+    except Exception:
+        pass
+
+
 def get_video_info(youtube_url: str) -> dict:
     api_result = _get_video_info_via_api(youtube_url)
     if api_result is not None:
+        _cache_channel_name(youtube_url, api_result.get("uploader", ""))
         return api_result
 
     try:
-        return proxy_manager.run_with_proxy_chain(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
+        res = proxy_manager.run_with_proxy_chain(lambda ydl: _extract_info_dict(ydl, youtube_url), use_cookies=True)
+        if res and res.get("uploader"):
+            _cache_channel_name(youtube_url, res["uploader"])
+        return res
     except Exception as e2:
         code = errcls.classify_text(str(e2))
         if code == errcls.VIDEO_UNAVAILABLE:
@@ -483,10 +500,16 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
 
     def _do_extract(ydl):
         info = ydl.extract_info(youtube_url, download=True)
-        return info.get("title", "Unknown"), float(info.get("duration", 0) or 0)
+        return (
+            info.get("title", "Unknown"),
+            float(info.get("duration", 0) or 0),
+            info.get("uploader", "") or info.get("channel", "") or "",
+        )
 
     try:
-        title, duration = proxy_manager.run_with_proxy_chain(_do_extract, extra=extra_opts, use_cookies=True)
+        title, duration, uploader = proxy_manager.run_with_proxy_chain(_do_extract, extra=extra_opts, use_cookies=True)
+        if uploader:
+            _cache_channel_name(youtube_url, uploader)
     except Exception as e2:
         code = errcls.classify_text(str(e2))
         if code == errcls.VIDEO_UNAVAILABLE:
@@ -538,4 +561,5 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
         "audio_path": str(audio_file),
         "title": title,
         "duration": duration,
+        "uploader": uploader,
     }

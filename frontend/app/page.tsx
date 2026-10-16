@@ -16,7 +16,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
-import { LayoutDashboard, LogIn, X, UserPlus } from "lucide-react";
+import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard } from "lucide-react";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -71,7 +71,7 @@ function Logo() {
       <div className="inline-flex items-center gap-2 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/20 backdrop-blur-md shadow-sm">
         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-violet-500 animate-pulse" />
         <span className="text-[10px] sm:text-[11px] font-black text-violet-600 dark:text-violet-400 tracking-wider uppercase">
-          AI Studio 2.0 • Avtomatik Dublyaj
+          ✨ AI Studio 2.0 • Avtomatik Dublyaj
         </span>
       </div>
 
@@ -84,6 +84,20 @@ function Logo() {
       <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
         YouTube havolasi yoki video faylingizni o'zbek tiliga sun'iy intellekt orqali avtomatik dublyaj qiling.
       </p>
+
+      {/* Feature chips */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1">
+          ⚡ 100% Avtomatik
+        </span>
+        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1">
+          🎙️ Tiniq Gemini AI ovozlari
+        </span>
+        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1 text-violet-600 dark:text-violet-400">
+          🎁 Har oy 5 daqiqa bepul
+        </span>
+      </div>
+
       <h2 className="sr-only">
         Dunyodagi bilimlarni o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
       </h2>
@@ -381,8 +395,47 @@ export default function Home() {
           </Link>
         </div>
 
+        {/* Center Navigation Links */}
+        <nav className="pointer-events-auto hidden md:flex items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
+          <Link
+            href="/pricing"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-violet-500" />
+            <span>Tariflar</span>
+          </Link>
+          <Link
+            href="/donate"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
+          >
+            <Heart className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
+            <span>Donat</span>
+          </Link>
+          <Link
+            href="/about"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
+          >
+            <Info className="w-3.5 h-3.5 text-blue-500" />
+            <span>Haqida</span>
+          </Link>
+        </nav>
+
         {/* Right Controls */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <Link
+            href="/pricing"
+            className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
+            title="Tariflar"
+          >
+            <CreditCard className="w-4 h-4 text-violet-500" />
+          </Link>
+          <Link
+            href="/donate"
+            className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
+            title="Donat"
+          >
+            <Heart className="w-4 h-4 text-rose-500" fill="currentColor" />
+          </Link>
           {isLoggedIn ? (
             <Link
               href="/dashboard"

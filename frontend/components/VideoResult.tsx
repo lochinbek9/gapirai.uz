@@ -100,6 +100,10 @@ export default function VideoResult({ job, onReset }: Props) {
         <VideoPlayer
           key={videoUrl}
           src={videoUrl}
+          jobId={job.job_id}
+          videoTitle={job.video_title}
+          channelName={job.channel_name}
+          youtubeUrl={job.youtube_url}
           subtitlesContent={job.uzbek_srt_content}
           className="rounded-3xl"
         />

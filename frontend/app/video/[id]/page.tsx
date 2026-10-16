@@ -375,6 +375,9 @@ export default function VideoPage() {
               <VideoPlayer
                 src={videoSrc}
                 jobId={id}
+                videoTitle={job.video_title}
+                channelName={job.channel_name}
+                youtubeUrl={job.youtube_url}
                 subtitlesContent={job.uzbek_srt_content}
                 audioDownloadUrl={audioUrl}
                 theaterMode={theaterMode}
@@ -1026,49 +1029,17 @@ export default function VideoPage() {
               </div>
             </div>
 
-            {/* Form Controls: Provider & Gender */}
+            {/* Form Controls: Gender */}
             <div className="space-y-4 relative z-10">
-              {/* Provider */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-violet-400 uppercase tracking-wider">
-                  Ovoz dvigateli
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'gemini', label: 'Gemini AI', icon: '✨', sub: 'Tiniq AI ovoz' },
-                    { id: 'edge', label: 'Edge TTS', icon: '⚡', sub: 'Tezkor ovoz' },
-                    { id: 'azure', label: 'Azure Neural', icon: '🔷', sub: 'Standart ovoz' },
-                  ].map((p) => {
-                    const active = regenProvider === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setRegenProvider(p.id as any)}
-                        className={`flex flex-col items-center gap-1 p-3 rounded-2xl border text-center transition-all ${
-                          active
-                            ? "border-violet-500 bg-violet-500/20 text-white font-bold ring-2 ring-violet-500/40 shadow-lg shadow-violet-500/10"
-                            : "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300"
-                        }`}
-                      >
-                        <span className="text-base">{p.icon}</span>
-                        <span className="text-xs font-semibold">{p.label}</span>
-                        <span className="text-[10px] text-slate-400">{p.sub}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               {/* Gender */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
-                  Ovoz jinsi
+                  Ovoz jinsi (Gemini AI)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { id: 'male', label: '👨 Erkak ovozi', name: regenProvider === 'gemini' ? 'Charon' : 'Sardor' },
-                    { id: 'female', label: '👩 Ayol ovozi', name: regenProvider === 'gemini' ? 'Autonoe' : 'Madina' },
+                    { id: 'male', label: '👨 Erkak ovozi', name: 'Charon' },
+                    { id: 'female', label: '👩 Ayol ovozi', name: 'Autonoe' },
                   ].map((g) => {
                     const active = regenGender === g.id
                     return (

@@ -5,7 +5,7 @@ import {
 } from "react";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-  Settings, RectangleHorizontal, Rows3, Check, Loader2, Sparkles, Lock
+  Settings, RectangleHorizontal, Rows3, Check, Loader2, Sparkles, Lock, SkipForward
 } from "lucide-react";
 import { getJobResolutions, requestResolution, ResolutionOption, getVideoUrl } from "@/lib/api";
 
@@ -49,11 +49,11 @@ function loadSubSettings(): SubSettings {
 function CcIcon({ on }: { on: boolean }) {
   return (
     <span
-      className={`text-[10px] font-extrabold border-2 rounded px-[3px] py-[1px] leading-none tracking-tight select-none transition-colors ${
-        on ? "border-blue-400 text-blue-400" : "border-white/40 text-white/40"
+      className={`text-[9px] font-extrabold border rounded px-[4px] py-[1.5px] leading-none tracking-tight select-none transition-colors uppercase ${
+        on ? "border-red-500 bg-red-500/20 text-red-400" : "border-white/40 text-white/60 hover:text-white hover:border-white"
       }`}
     >
-      CC
+      sub
     </span>
   );
 }
@@ -171,6 +171,9 @@ function SubPanel({
 export interface VideoPlayerProps {
   src: string;
   jobId?: string;
+  videoTitle?: string;
+  channelName?: string;
+  youtubeUrl?: string;
   initialQuality?: string;
   subtitlesContent?: string;
   audioDownloadUrl?: string;
@@ -189,12 +192,56 @@ export interface VideoPlayerHandle {
 
 /* ── VideoPlayer ──────────────────────────────────── */
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
-  src, jobId, initialQuality, subtitlesContent, audioDownloadUrl,
+  src, jobId, videoTitle, channelName, youtubeUrl, initialQuality, subtitlesContent, audioDownloadUrl,
   className = "", theaterMode = false, onTheaterToggle,
 }, ref) => {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const [resolvedTitle, setResolvedTitle] = useState<string>(videoTitle || "");
+  const [resolvedChannel, setResolvedChannel] = useState<string>(channelName || "");
+
+  useEffect(() => {
+    if (videoTitle) setResolvedTitle(videoTitle);
+  }, [videoTitle]);
+
+  useEffect(() => {
+    if (channelName) {
+      setResolvedChannel(channelName);
+      return;
+    }
+    if (!youtubeUrl) return;
+
+    const m = youtubeUrl.match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/);
+    if (!m || !m[1]) return;
+    const videoId = m[1];
+
+    try {
+      const cached = typeof window !== "undefined" ? sessionStorage.getItem(`yt_meta_${videoId}`) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.channel) setResolvedChannel(parsed.channel);
+        if (parsed.title && !videoTitle) setResolvedTitle(parsed.title);
+        return;
+      }
+    } catch {}
+
+    fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        if (data.author_name) setResolvedChannel(data.author_name);
+        if (data.title && !videoTitle) setResolvedTitle(data.title);
+        try {
+          sessionStorage.setItem(`yt_meta_${videoId}`, JSON.stringify({
+            channel: data.author_name,
+            title: data.title,
+          }));
+        } catch {}
+      })
+      .catch(() => {});
+  }, [channelName, videoTitle, youtubeUrl]);
 
   useImperativeHandle(ref, () => ({
     seekTo: (seconds: number) => {
@@ -500,7 +547,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         <div
           className="absolute left-0 right-0 flex justify-center px-6 pointer-events-none"
           style={{
-            bottom: ctrlVisible ? "76px" : "16px",
+            bottom: ctrlVisible ? ((resolvedTitle || resolvedChannel) ? "118px" : "76px") : "16px",
             transition: "bottom 0.25s ease",
             zIndex: 20,
           }}
@@ -529,7 +576,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
         >
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110">
+          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl">
             <Play className="w-8 h-8 text-white ml-1" fill="white" />
           </div>
         </div>
@@ -540,41 +587,82 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         className="absolute bottom-0 left-0 right-0 z-30 transition-opacity duration-300"
         style={{ opacity: ctrlVisible ? 1 : 0, pointerEvents: ctrlVisible ? "auto" : "none" }}
       >
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
-        <div className="relative px-4 pb-4 pt-10">
-          {/* Progress */}
-          <div className="mb-3 cursor-pointer group/bar" onClick={seek}>
-            <div className="h-1 group-hover/bar:h-1.5 bg-white/20 rounded-full relative transition-all duration-100">
-              <div className="absolute inset-y-0 left-0 bg-white/30 rounded-full" style={{ width: `${bufferedPct}%` }} />
-              <div className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+        <div className="relative px-3.5 sm:px-6 pb-3 sm:pb-4 pt-14">
+          {/* Video Title, Channel Name & Watermark (YouTube style) */}
+          {(resolvedTitle || resolvedChannel) && (
+            <div className="flex items-end justify-between gap-4 mb-2.5 sm:mb-3 select-none">
+              <div className="min-w-0 flex-1">
+                {resolvedTitle && (
+                  <h3
+                    className="text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-1 drop-shadow-md tracking-tight"
+                    title={resolvedTitle}
+                  >
+                    {resolvedTitle}
+                  </h3>
+                )}
+                {resolvedChannel && (
+                  <p className="text-white/70 text-xs sm:text-sm font-medium mt-0.5 line-clamp-1 drop-shadow">
+                    {resolvedChannel}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 text-white/50 hover:text-white/80 transition-colors text-xs sm:text-sm font-semibold tracking-wide drop-shadow pb-0.5">
+                Gapirai.uz
+              </div>
+            </div>
+          )}
+
+          {/* YouTube-style Red Progress Bar */}
+          <div className="mb-2 sm:mb-3 cursor-pointer group/bar py-1.5" onClick={seek}>
+            <div className="h-1 group-hover/bar:h-1.5 bg-white/25 rounded-full relative transition-all duration-100">
+              <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full" style={{ width: `${bufferedPct}%` }} />
+              <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow opacity-0 group-hover/bar:opacity-100 transition-opacity"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-red-600 rounded-full shadow-lg scale-0 group-hover/bar:scale-100 transition-transform"
                 style={{ left: `${progressPct}%` }}
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Play/Pause */}
-            <button onClick={togglePlay} className="text-white hover:text-blue-400 transition flex-shrink-0">
+            <button
+              onClick={togglePlay}
+              className="text-white hover:text-red-500 transition flex-shrink-0 focus:outline-none"
+              title={playing ? "Pauza (k)" : "Ijro (k)"}
+            >
               {playing ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5" fill="currentColor" />}
             </button>
 
+            {/* Skip 10s */}
+            <button
+              onClick={skipAhead}
+              className="text-white/80 hover:text-white transition flex-shrink-0 focus:outline-none hidden xs:flex items-center"
+              title="10 soniya oldinga (l)"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+
             {/* Volume */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button onClick={toggleMute} className="text-white hover:text-blue-400 transition">
+            <div className="flex items-center gap-1.5 flex-shrink-0 group/vol">
+              <button
+                onClick={toggleMute}
+                className="text-white hover:text-red-500 transition focus:outline-none"
+                title={muted ? "Ovozni yoqish (m)" : "Ovozni o'chirish (m)"}
+              >
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
               <input
                 type="range" min="0" max="1" step="0.05"
                 value={muted ? 0 : volume}
                 onChange={changeVol}
-                className="w-20 accent-blue-500 cursor-pointer"
+                className="w-16 sm:w-20 accent-red-600 cursor-pointer"
               />
             </div>
 
             {/* Time */}
-            <span className="text-white/70 text-sm font-mono ml-auto flex-shrink-0">
+            <span className="text-white/80 text-xs sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0">
               {fmt(progress)} / {fmt(duration)}
             </span>
 

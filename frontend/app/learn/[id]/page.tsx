@@ -330,6 +330,10 @@ export default function LearnPage() {
               <VideoPlayer
                 ref={dubbedPlayerRef}
                 src={videoSrc}
+                jobId={id}
+                videoTitle={job.video_title}
+                channelName={job.channel_name}
+                youtubeUrl={job.youtube_url}
                 subtitlesContent={job.uzbek_srt_content}
                 audioDownloadUrl={audioUrl}
                 className="rounded-2xl"

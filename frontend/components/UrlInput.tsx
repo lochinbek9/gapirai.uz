@@ -59,25 +59,18 @@ export default function UrlInput({
   const currentProvider = ttsProvider || "gemini";
   const isGemini = currentProvider === "gemini";
 
-  // Real voices per provider
-  const maleVoices = isGemini
-    ? [
-        { id: "Charon", label: "Charon", desc: "Asosiy bariton" },
-        { id: "Fenrir", label: "Fenrir", desc: "Chuqur, salobatli" },
-        { id: "Puck",   label: "Puck",   desc: "Jonli, chaqqon" },
-      ]
-    : [
-        { id: "uz-UZ-SardorNeural", label: "Sardor", desc: "Microsoft Neural (uz-UZ)" },
-      ];
+  // Real Gemini AI voices
+  const maleVoices = [
+    { id: "Charon", label: "Charon", desc: "Asosiy bariton" },
+    { id: "Fenrir", label: "Fenrir", desc: "Chuqur, salobatli" },
+    { id: "Puck",   label: "Puck",   desc: "Jonli, chaqqon" },
+  ];
 
-  const femaleVoices = isGemini
-    ? [
-        { id: "Autonoe", label: "Autonoe", desc: "Asosiy mayin" },
-        { id: "Aoede",   label: "Aoede",   desc: "Ravon, ohangdor" },
-      ]
-    : [
-        { id: "uz-UZ-MadinaNeural", label: "Madina", desc: "Microsoft Neural (uz-UZ)" },
-      ];
+  const femaleVoices = [
+    { id: "Autonoe", label: "Autonoe", desc: "Asosiy mayin" },
+    { id: "Aoede",   label: "Aoede",   desc: "Ravon, ohangdor" },
+    { id: "Kore",    label: "Kore",    desc: "Yumshoq, muloyim" },
+  ];
 
   const currentMaleVoice = maleVoices.find((v) => v.id === voiceName) || maleVoices[0];
   const currentFemaleVoice = femaleVoices.find((v) => v.id === voiceName) || femaleVoices[0];
@@ -91,9 +84,9 @@ export default function UrlInput({
   const handleGenderSelect = (val: string) => {
     onGenderChange(val);
     if (val === "male") {
-      onVoiceNameChange?.(isGemini ? "Charon" : "uz-UZ-SardorNeural");
+      onVoiceNameChange?.(voiceName && maleVoices.some(v => v.id === voiceName) ? voiceName : "Charon");
     } else if (val === "female") {
-      onVoiceNameChange?.(isGemini ? "Autonoe" : "uz-UZ-MadinaNeural");
+      onVoiceNameChange?.(voiceName && femaleVoices.some(v => v.id === voiceName) ? voiceName : "Autonoe");
     } else {
       onVoiceNameChange?.("");
     }
@@ -169,44 +162,6 @@ export default function UrlInput({
         </div>
       </div>
 
-      {/* TTS Provider Selector */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between ml-1">
-          <label className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest flex items-center gap-1.5">
-            <span>💎 Ovoz dvigateli</span>
-          </label>
-          <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">
-            OpenAI balansi to'ldirilgach u ham qo'shiladi
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {[
-            { id: 'azure', label: 'Azure Neural', icon: '🔷', sub: 'Sardor & Madina' },
-            { id: 'edge', label: 'Edge Free', icon: '⚡', sub: 'Sardor & Madina' },
-            { id: 'gemini', label: 'Gemini AI', icon: '✨', sub: 'Charon & Autonoe' },
-          ].map((p) => {
-            const active = (ttsProvider || 'gemini') === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onTtsProviderChange?.(p.id)}
-                className={`flex flex-col items-center gap-1 p-2 sm:p-2.5 rounded-xl border text-center transition-all ${
-                  active
-                    ? "border-violet-500 bg-violet-500/10 dark:bg-violet-500/20 text-violet-600 dark:text-violet-300 shadow-md shadow-violet-500/10 font-bold ring-1 ring-violet-500/30"
-                    : "border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] text-gray-700 dark:text-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm sm:text-base">{p.icon}</span>
-                  <span className="text-[11px] sm:text-xs font-black">{p.label}</span>
-                </div>
-                <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-400 font-medium">{p.sub}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Gender selector */}
       <div className="space-y-2">

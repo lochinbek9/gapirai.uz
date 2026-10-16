@@ -76,6 +76,7 @@ class JobResponse(BaseModel):
     status_message: Optional[str] = None
     youtube_url: Optional[str] = None
     video_title: Optional[str] = None
+    channel_name: Optional[str] = None
     video_duration: Optional[float] = None
     video_thumbnail: Optional[str] = None
     output_video_url: Optional[str] = None
@@ -158,6 +159,19 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         expected_dt = baseline_dt + timedelta(seconds=est_seconds)
         expected_end_time = to_tashkent_iso(expected_dt)
 
+    channel_name = getattr(job, "channel_name", None)
+    if not channel_name and job.youtube_url:
+        try:
+            import redis
+            import re
+            from backend.config import settings
+            m = re.search(r"(?:youtu\.be/|v=|/shorts/|/embed/)([A-Za-z0-9_-]{11})", job.youtube_url)
+            if m:
+                r_cli = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+                channel_name = r_cli.get(f"yt:chan:{m.group(1)}")
+        except Exception:
+            channel_name = None
+
     return JobResponse(
         job_id=str(job.id),
         status=status_str,
@@ -165,6 +179,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         status_message=job.status_message,
         youtube_url=job.youtube_url,
         video_title=job.video_title,
+        channel_name=channel_name,
         video_duration=job.video_duration,
         video_thumbnail=job.video_thumbnail,
         output_video_url=job.output_video_url or (

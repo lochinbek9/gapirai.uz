@@ -27,6 +27,7 @@ export interface Job {
   status_message?: string
   youtube_url?: string
   video_title?: string
+  channel_name?: string
   video_duration?: number
   video_thumbnail?: string
   output_video_url?: string
