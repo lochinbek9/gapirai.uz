@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, Loader2, CreditCard, AlertTriangle, Copy, Check, Clock,
+  ArrowLeft, Loader2, CreditCard, AlertTriangle, Copy, Check, Clock, CircleSlash, RotateCw,
 } from 'lucide-react'
 import {
   formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, initiateUzumPayment, cancelJob,
@@ -430,25 +430,55 @@ export default function LearnPage() {
                   )}
                 </div>
               </div>
-            ) : job.status === 'failed' ? (
-              <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
-                <div className="text-center space-y-4 max-w-md z-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
-                    <AlertTriangle className="w-6 h-6 animate-pulse" />
+            ) : job.status === 'failed' ? (() => {
+              const isCancelled = job.error_code === 'USER_CANCELLED' ||
+                job.error_message?.toLowerCase().includes('user cancelled') ||
+                job.error_message?.toLowerCase().includes('bekor qilindi') ||
+                job.status_message?.toLowerCase().includes('bekor qilindi');
+
+              if (isCancelled) {
+                return (
+                  <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-white/10 shadow-2xl">
+                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-slate-500/10 blur-3xl pointer-events-none" />
+                    <div className="text-center space-y-4 max-w-md z-10 px-4">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 text-slate-300 mb-1 shadow-lg shadow-black/40">
+                        <CircleSlash className="w-7 h-7 text-slate-400" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayoni bekor qilindi</h3>
+                        <p className="text-sm text-slate-400 leading-relaxed">
+                          Ushbu video uchun dublyaj jarayoni to'xtatildi. Istalgan vaqtda jarayonni qaytadan boshlashingiz mumkin.
+                        </p>
+                      </div>
+                      <div className="text-xs text-slate-300 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-center flex items-center justify-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                        <span>Jarayon yakunlanmagani sababli daqiqalaringiz sarflanmadi</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
-                    {!job.fallback_available && (
-                      <p className="text-xs text-violet-300 font-mono bg-violet-950/30 border border-violet-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
-                        {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
+                );
+              }
+
+              return (
+                <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
+                  <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+                  <div className="text-center space-y-4 max-w-md z-10 px-4">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
+                      <AlertTriangle className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayonida kutilmagan xatolik yuz berdi</h3>
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {job.error_message?.toLowerCase().includes('user cancelled')
+                          ? "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
+                          : job.error_message || "Tizimda kutilmagan texnik nosozlik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
                       </p>
-                    )}
+                    </div>
+                    {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
                   </div>
-                  {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               <>
                 {youtubeVideoId ? (
                   <YouTubePlayer ref={youtubePlayerRef} videoId={youtubeVideoId} />

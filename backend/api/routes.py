@@ -1333,8 +1333,19 @@ def cancel_job(
     
     job.status = JobStatus.FAILED
     job.status_message = "Foydalanuvchi tomonidan bekor qilindi."
-    job.error_message = "User cancelled the job."
+    job.error_code = "USER_CANCELLED"
+    job.error_message = "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
     job.updated_at = datetime.utcnow()
+
+    # Agar kvota sarflangan bo'lsa, foydalanuvchiga qaytarish
+    if getattr(job, "quota_consumed", False):
+        try:
+            from backend.services.plans import refund_quota
+            refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)
+            job.quota_consumed = False
+        except Exception:
+            pass
+
     db.commit()
 
     # Bekor qilingan job hech qachon yakunlanmaydi — yarim qolgan yuklama

@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert, X
+  MicOff, ShieldAlert, X, CircleSlash
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -34,9 +34,58 @@ function formatRemainingTime(seconds: number): string {
   return `${s} soniya`
 }
 
+function getFriendlyErrorMessage(errorCode?: string | null, errorMessage?: string | null): string {
+  if (
+    errorCode === 'USER_CANCELLED' ||
+    errorMessage?.toLowerCase().includes('user cancelled') ||
+    errorMessage?.toLowerCase().includes('bekor qilindi')
+  ) {
+    return "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
+  }
+  if (errorCode === 'NO_SPEECH_FOUND' || errorMessage?.toLowerCase().includes('nutq topilmadi')) {
+    return "Ushbu videoda inson nutqi yoki suhbat aniqlanmadi."
+  }
+  if (errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent') || errorMessage?.toLowerCase().includes('taqiqlangan')) {
+    return "Video xavfsizlik va kontent siyosatimiz talablariga mos kelmagani sababli to'xtatildi."
+  }
+  if (errorCode === 'TTS_FAILED') {
+    return "Ovoz sintez qilish (TTS) xizmatida texnik uzilish yuz berdi. Iltimos, qaytadan urinib ko'ring."
+  }
+  if (errorCode === 'TRANSCRIBE_FAILED') {
+    return "Video audiosini matnga aylantirishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."
+  }
+  if (errorCode === 'TRANSLATE_FAILED') {
+    return "Matnni o'zbek tiliga tarjima qilish jarayonida xatolik yuz berdi."
+  }
+  if (errorCode === 'VIDEO_UNAVAILABLE' || errorCode === 'DOWNLOAD_FAILED') {
+    return "Videoni manbadan yuklab olishda muammo yuz berdi. Video ochiq va mavjudligini tekshiring."
+  }
+  if (errorCode === 'MERGE_FAILED') {
+    return "Video va dublyaj qilingan ovozni birlashtirishda texnik xatolik yuz berdi."
+  }
+  if (errorCode === 'RECOVERY_EXHAUSTED' || errorCode === 'STUCK_JOB_TIMEOUT') {
+    return "Video hajmi juda katta yoki server yuklamasi yuqori bo'lgani sababli jarayon to'xtab qoldi."
+  }
+  if (
+    !errorMessage ||
+    errorMessage.toLowerCase().includes('error') ||
+    errorMessage.toLowerCase().includes('failed') ||
+    errorMessage.toLowerCase().includes('exception') ||
+    errorMessage.toLowerCase().includes('traceback')
+  ) {
+    return "Tizimda kutilmagan texnik nosozlik yuz berdi. Iltimos, qaytadan urinib ko'ring."
+  }
+  return errorMessage
+}
+
 function getStatusLabel(status: string, errorCode?: string | null, errorMessage?: string | null): string {
   if (status === 'completed') return '✅ Tayyor'
   if (status === 'failed') {
+    const isCancelled = errorCode === 'USER_CANCELLED' || 
+      errorMessage?.toLowerCase().includes('user cancelled') || 
+      errorMessage?.toLowerCase().includes('bekor qilindi')
+    if (isCancelled) return '⏹️ Bekor qilindi'
+
     const isNoSpeech = errorCode === 'NO_SPEECH_FOUND' || errorMessage?.toLowerCase().includes('nutq topilmadi')
     const isContentBlocked = errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent siyosati') || errorMessage?.toLowerCase().includes('taqiqlangan')
     if (isNoSpeech) return '🎙 Nutq topilmadi'
@@ -376,8 +425,56 @@ export default function VideoPage() {
                 </div>
               </div>
             ) : job.status === 'failed' ? (() => {
+              const isCancelled = job.error_code === 'USER_CANCELLED' ||
+                job.error_message?.toLowerCase().includes('user cancelled') ||
+                job.error_message?.toLowerCase().includes('bekor qilindi') ||
+                job.status_message?.toLowerCase().includes('bekor qilindi');
               const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || job.error_message?.toLowerCase().includes('nutq topilmadi');
               const isContentBlocked = job.error_code === 'CONTENT_BLOCKED' || job.error_message?.toLowerCase().includes('kontent siyosati') || job.error_message?.toLowerCase().includes('taqiqlangan');
+
+              if (isCancelled) {
+                return (
+                  <div className="aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-white/10 shadow-2xl">
+                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-slate-500/10 blur-3xl pointer-events-none" />
+                    <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+                    
+                    <div className="text-center space-y-4 max-w-md z-10 px-4">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 text-slate-300 mb-1 shadow-lg shadow-black/40">
+                        <CircleSlash className="w-7 h-7 text-slate-400" />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayoni bekor qilindi</h3>
+                        <p className="text-sm text-slate-400 leading-relaxed">
+                          Ushbu video uchun dublyaj jarayoni to'xtatildi. Istalgan vaqtda jarayonni qaytadan boshlashingiz mumkin.
+                        </p>
+                      </div>
+
+                      <div className="text-xs text-slate-300 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-center flex items-center justify-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                        <span>Jarayon yakunlanmagani sababli daqiqalaringiz sarflanmadi</span>
+                      </div>
+
+                      <div className="pt-2 flex justify-center gap-3">
+                        <button
+                          onClick={handleRetry}
+                          disabled={retryLoading}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/25 hover:scale-[1.02] disabled:opacity-50"
+                        >
+                          <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                          Qaytadan boshlash
+                        </button>
+                        <button
+                          onClick={handleGoHome}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition duration-200"
+                        >
+                          Bosh sahifaga qaytish
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
               if (isNoSpeech) {
                 return (
@@ -446,33 +543,32 @@ export default function VideoPage() {
               }
 
               return (
-                <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-violet-500/20">
-                  <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-violet-500/5 blur-3xl pointer-events-none" />
-                  <div className="text-center space-y-4 max-w-md z-10">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 text-violet-400 mb-2">
-                      <AlertTriangle className="w-6 h-6 animate-pulse" />
+                <div className="aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
+                  <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+                  <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+                  <div className="text-center space-y-4 max-w-md z-10 px-4">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
+                      <AlertTriangle className="w-7 h-7" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-white font-bold text-lg">Dublyaj jarayonida xatolik yuz berdi</h3>
-                      {!job.fallback_available && (
-                        <p className="text-xs text-violet-300 font-mono bg-violet-950/30 border border-violet-900/30 rounded-xl p-3 text-left overflow-auto max-h-32 leading-relaxed">
-                          {job.error_message || "Tizimda noma'lum xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
-                        </p>
-                      )}
+                      <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayonida kutilmagan xatolik yuz berdi</h3>
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        {getFriendlyErrorMessage(job.error_code, job.error_message)}
+                      </p>
                     </div>
                     {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
                     <div className="pt-2 flex justify-center gap-3">
                       <button
                         onClick={handleRetry}
                         disabled={retryLoading}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition duration-200 disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/25 hover:scale-[1.02] disabled:opacity-50"
                       >
                         <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
                         Qayta urinish
                       </button>
                       <button
                         onClick={handleGoHome}
-                        className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition duration-200"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition duration-200"
                       >
                         Bosh sahifaga qaytish
                       </button>

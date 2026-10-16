@@ -8,7 +8,7 @@ import PushOptIn from '@/components/PushOptIn'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
 import {
-  Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle,
+  Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert
 } from 'lucide-react'
 
@@ -102,6 +102,17 @@ function StatusBadge({
     )
   }
   if (status === 'failed') {
+    const isCancelled = errorCode === 'USER_CANCELLED' ||
+      errorMessage?.toLowerCase().includes('user cancelled') ||
+      errorMessage?.toLowerCase().includes('bekor qilindi')
+    if (isCancelled) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-slate-500/10 text-slate-400 border-slate-500/20">
+          <CircleSlash className="w-3 h-3 text-slate-400" />
+          Bekor qilindi
+        </span>
+      )
+    }
     const isNoSpeech = errorCode === 'NO_SPEECH_FOUND' || errorMessage?.toLowerCase().includes('nutq topilmadi')
     const isContentBlocked = errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent siyosati') || errorMessage?.toLowerCase().includes('taqiqlangan')
     if (isNoSpeech) {
