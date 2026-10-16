@@ -38,33 +38,53 @@ export default function DonateModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-md transition-opacity duration-300"
       onClick={close}
     >
       <div
-        className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-[#1b1b20]"
+        className="glass-card w-full max-w-md rounded-[28px] p-8 text-center space-y-5 border border-gray-200/60 dark:border-white/10 shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={close} className="ml-auto block text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Yopish">
+        <button
+          onClick={close}
+          className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
+          aria-label="Yopish"
+        >
           <X className="h-5 w-5" />
         </button>
-        <div className="mx-auto -mt-2 mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 text-rose-500">
-          <Heart className="h-7 w-7" fill="currentColor" />
+
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 shadow-inner">
+          <Heart className="h-8 w-8" fill="currentColor" />
         </div>
-        <h2 className="text-lg font-black text-gray-900 dark:text-white">GapirAI.uz sizga yordam beryaptimi?</h2>
-        <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
-          Biz mustaqil loyihamiz. Kichik hissangiz videolarni ko‘proq odamga, tezroq yetkazishga imkon beradi.
-        </p>
-        <Link
-          href="/donate"
-          onClick={() => setOpen(false)}
-          className="mt-4 block rounded-xl bg-gradient-to-r from-rose-500 to-violet-600 py-3 text-sm font-bold text-white active:scale-[0.98]"
-        >
-          Loyihani qo‘llab-quvvatlash
-        </Link>
-        <button onClick={close} className="mt-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-          Keyinroq
-        </button>
+
+        <div className="space-y-2">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full">
+            Loyiha rivoji
+          </span>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white pt-1">
+            GapirAI.uz sizga foyda keltiryaptimi?
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            Biz mustaqil loyihamiz. Kichik ehsoningiz yangi ovoz modellari va serverlarni ushlab turishga bevosita yordam beradi.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Link
+            href="/donate"
+            onClick={() => setOpen(false)}
+            className="btn-premium flex-1 py-3 px-5 rounded-2xl font-bold text-sm inline-flex items-center justify-center gap-2 shadow-lg"
+          >
+            Qo&apos;llab-quvvatlash
+          </Link>
+          <button
+            type="button"
+            onClick={close}
+            className="flex-1 py-3 px-5 glass-input rounded-2xl font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-all text-sm inline-flex items-center justify-center border border-gray-200/60 dark:border-white/10"
+          >
+            Keyinroq
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -19,6 +19,16 @@ import { formatTashkentDateTime, formatTashkentTime } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
+function MeshBackground() {
+  return (
+    <div className="mesh-gradient">
+      <div className="mesh-gradient-blob blob-1" />
+      <div className="mesh-gradient-blob blob-2" />
+      <div className="mesh-gradient-blob blob-3" />
+    </div>
+  )
+}
+
 function calculateClientPrice(durationMinutes: number): number {
   if (durationMinutes < 45.0) return 0
   return Math.ceil(durationMinutes) * 500
@@ -301,8 +311,14 @@ export default function VideoPage() {
 
   if (loading || !job) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      <div className="min-h-screen relative flex items-center justify-center p-6 transition-colors duration-300">
+        <MeshBackground />
+        <div className="glass-card rounded-[28px] p-8 max-w-sm w-full text-center space-y-4 border border-gray-200/60 dark:border-white/10 shadow-2xl z-10">
+          <div className="w-14 h-14 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-inner">
+            <Loader2 className="w-7 h-7 animate-spin" />
+          </div>
+          <p className="text-sm font-bold text-gray-900 dark:text-white">Video ma&apos;lumotlari yuklanmoqda...</p>
+        </div>
       </div>
     )
   }
@@ -344,20 +360,23 @@ export default function VideoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen relative transition-colors duration-300 text-gray-900 dark:text-white">
+      <MeshBackground />
+
       {/* Header */}
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
+      <header className="border-b border-gray-200/60 dark:border-white/10 glass-card sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 sm:py-4 flex items-center gap-3 sm:gap-4 pointer-events-auto">
           <button
             onClick={() => router.push("/dashboard")}
-            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm shrink-0"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl sm:rounded-2xl glass-input border border-gray-200/60 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white transition active:scale-95 shadow-sm shrink-0"
             aria-label="Orqaga qaytish"
           >
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-7 sm:h-8 w-auto object-contain" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
-            <span className="text-base sm:text-lg font-black tracking-tight text-white">
+            <img src="/logo.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-7 sm:h-8 w-auto object-contain dark:hidden" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-7 sm:h-8 w-auto object-contain hidden dark:block" style={{ maxWidth: "160px", maxHeight: "40px", height: "auto" }} />
+            <span className="text-base sm:text-lg font-black tracking-tight text-gray-900 dark:text-white">
               GapirAI<span className="text-violet-500">.uz</span>
             </span>
           </Link>
@@ -385,51 +404,46 @@ export default function VideoPage() {
                 className={theaterMode ? '' : 'rounded-2xl'}
               />
             ) : job.status === 'awaiting_payment' ? (
-              <div className="min-h-[28rem] bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 border border-white/5 shadow-2xl relative overflow-visible">
-                {/* Visual glow backdrop */}
-                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+              <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[380px]">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
+                  <CreditCard className="w-8 h-8 animate-pulse" />
+                </div>
 
-                <div className="max-w-md w-full text-center space-y-6 z-10">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-500/10 mb-2">
-                    <CreditCard className="w-7 h-7 text-blue-400 animate-pulse" />
+                <div className="space-y-2 max-w-md mx-auto">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 bg-violet-500/10 px-3 py-1 rounded-full">
+                    Obuna kerak
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white pt-1">Tarif reja talab etiladi</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Ushbu video 45 daqiqadan uzun ({job.video_duration ? formatDuration(job.video_duration) : ''}).
+                    Katta hajmli videolarni to&apos;liq dublyaj qilish uchun tarif rejalaridan biriga obuna bo&apos;ling.
+                  </p>
+                </div>
+
+                {paymentError && (
+                  <div className="text-xs font-semibold text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5 max-w-md w-full text-center">
+                    {paymentError}
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <h2 className="text-xl font-extrabold text-white">Tarif reja kerak</h2>
-                    <p className="text-sm text-slate-400 leading-relaxed">
-                      Ushbu video 45 daqiqadan uzun ({job.video_duration ? formatDuration(job.video_duration) : ''}).
-                      45 daqiqadan uzun videolarni dublyaj qilish uchun tarif rejalaridan biriga obuna bo'lishingiz kerak.
-                    </p>
-                  </div>
-
-                  {paymentError && (
-                    <div className="text-xs font-semibold text-blue-400 bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 text-left">
-                      {paymentError}
-                    </div>
-                  )}
-
+                <div className="max-w-md w-full space-y-4 pt-1">
                   <Link
                     href="/pricing"
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg"
+                    className="btn-premium w-full py-3.5 px-6 rounded-2xl font-bold text-sm inline-flex items-center justify-center gap-2 shadow-lg"
                   >
-                    Tarif rejalarini ko'rish
+                    Tarif rejalarini ko&apos;rish
                   </Link>
 
-                  <p className="text-[11px] text-slate-500">
-                    Obuna bo'lgandan so'ng, shunga o'xshash videolarni qo'shimcha to'lovsiz dublyaj qila olasiz.
-                  </p>
-
-                  <div className="border-t border-white/10 pt-4 space-y-2">
-                    <p className="text-xs text-slate-500">
-                      Ushbu video uchun bir martalik to'lov qiling{job.video_duration ? ` (${calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ')} so'm)` : ''}:
+                  <div className="border-t border-gray-200/60 dark:border-white/10 pt-4 space-y-2.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Yoki ushbu video uchun bir martalik to&apos;lov qiling{job.video_duration ? ` (${calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ')} so'm)` : ''}:
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center justify-center gap-3">
                       <button
                         onClick={() => handlePayment('click')}
                         disabled={paymentLoading}
                         title="Click orqali to'lash"
-                        className="flex items-center justify-center h-11 px-3.5 rounded-xl bg-white border border-white/10 hover:shadow-md transition disabled:opacity-50"
+                        className="flex items-center justify-center h-12 px-5 rounded-2xl bg-white border border-gray-200/80 hover:shadow-md transition disabled:opacity-50 active:scale-95 shadow-sm"
                       >
                         {paymentLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
@@ -441,19 +455,21 @@ export default function VideoPage() {
                         onClick={() => handlePayment('payme')}
                         disabled={paymentLoading}
                         title="Payme orqali to'lash"
-                        className="flex items-center justify-center h-11 px-3.5 rounded-xl bg-white border border-white/10 hover:shadow-md transition disabled:opacity-50"
+                        className="flex items-center justify-center h-12 px-5 rounded-2xl bg-white border border-gray-200/80 hover:shadow-md transition disabled:opacity-50 active:scale-95 shadow-sm"
                       >
                         <img src="/logos/payme.png" alt="Payme" className="h-4 w-auto object-contain" />
                       </button>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleGoHome}
-                    className="inline-block text-xs font-semibold text-slate-400 hover:text-white transition pt-2"
-                  >
-                    ← Bosh sahifaga qaytish
-                  </button>
+                  <div className="pt-2">
+                    <button
+                      onClick={handleGoHome}
+                      className="text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
+                    >
+                      ← Bosh sahifaga qaytish
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : job.status === 'failed' ? (() => {
@@ -466,43 +482,43 @@ export default function VideoPage() {
 
               if (isCancelled) {
                 return (
-                  <div className="aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-white/10 shadow-2xl">
-                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-slate-500/10 blur-3xl pointer-events-none" />
-                    <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-                    
-                    <div className="text-center space-y-4 max-w-md z-10 px-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 text-slate-300 mb-1 shadow-lg shadow-black/40">
-                        <CircleSlash className="w-7 h-7 text-slate-400" />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayoni bekor qilindi</h3>
-                        <p className="text-sm text-slate-400 leading-relaxed">
-                          Ushbu video uchun dublyaj jarayoni to'xtatildi. Istalgan vaqtda jarayonni qaytadan boshlashingiz mumkin.
-                        </p>
-                      </div>
+                  <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[360px]">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-500/10 text-slate-600 dark:text-slate-400 mx-auto shadow-inner">
+                      <CircleSlash className="w-8 h-8" />
+                    </div>
 
-                      <div className="text-xs text-slate-300 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-center flex items-center justify-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                        <span>Jarayon yakunlanmagani sababli daqiqalaringiz sarflanmadi</span>
-                      </div>
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 bg-slate-500/10 px-3 py-1 rounded-full">
+                        Bekor qilindi
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white pt-1">
+                        Dublyaj jarayoni to&apos;xtatildi
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                        Ushbu video uchun jarayon bekor qilindi. Istalgan vaqtda qaytadan boshlashingiz mumkin.
+                      </p>
+                    </div>
 
-                      <div className="pt-2 flex justify-center gap-3">
-                        <button
-                          onClick={handleRetry}
-                          disabled={retryLoading}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/25 hover:scale-[1.02] disabled:opacity-50"
-                        >
-                          <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
-                          Qaytadan boshlash
-                        </button>
-                        <button
-                          onClick={handleGoHome}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition duration-200"
-                        >
-                          Bosh sahifaga qaytish
-                        </button>
-                      </div>
+                    <div className="glass-input text-xs text-gray-600 dark:text-gray-300 rounded-2xl px-4 py-2.5 text-center flex items-center justify-center gap-2 border border-gray-200/60 dark:border-white/10 max-w-md">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                      <span>Jarayon yakunlanmagani sababli daqiqalaringiz sarflanmadi</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2 max-w-sm w-full">
+                      <button
+                        onClick={handleRetry}
+                        disabled={retryLoading}
+                        className="btn-premium flex-1 py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                        Qaytadan boshlash
+                      </button>
+                      <button
+                        onClick={handleGoHome}
+                        className="glass-input flex-1 py-3 px-5 text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-2xl transition border border-gray-200/60 dark:border-white/10"
+                      >
+                        Bosh sahifa
+                      </button>
                     </div>
                   </div>
                 );
@@ -510,35 +526,35 @@ export default function VideoPage() {
 
               if (isNoSpeech) {
                 return (
-                  <div className="aspect-video bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-amber-500/20 shadow-2xl">
-                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
-                    <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                    
-                    <div className="text-center space-y-4 max-w-md z-10 px-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 mb-1 shadow-lg shadow-amber-500/10">
-                        <MicOff className="w-7 h-7" />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h3 className="text-white font-bold text-xl tracking-tight">Videoda nutq aniqlanmadi</h3>
-                        <p className="text-sm text-slate-300 leading-relaxed">
-                          Ushbu videoda suhbat yoki inson nutqi topilmadi. Dublyaj xizmati faqat ovozli nutq mavjud bo'lgan videolarni tarjima qiladi.
-                        </p>
-                      </div>
+                  <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-amber-500/20 shadow-2xl relative overflow-hidden min-h-[360px]">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 mx-auto shadow-inner">
+                      <MicOff className="w-8 h-8" />
+                    </div>
 
-                      <div className="text-xs text-amber-300/90 bg-amber-950/40 border border-amber-800/40 rounded-xl px-4 py-2.5 text-left flex items-start gap-2.5">
-                        <span className="text-sm select-none">💡</span>
-                        <span>Musiqa, fon shovqini yoki ovozsiz roliklar o'rniga, gapirilgan nutq (ma'ruza, intervyu, darslik) bor videoni tanlang.</span>
-                      </div>
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full">
+                        Ovoz aniqlanmadi
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white pt-1">
+                        Videoda nutq topilmadi
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                        Ushbu videoda inson nutqi yoki suhbat aniqlanmadi. Dublyaj faqat ovozli nutq mavjud bo&apos;lgan videolarni tarjima qiladi.
+                      </p>
+                    </div>
 
-                      <div className="pt-2 flex justify-center gap-3">
-                        <button
-                          onClick={handleGoHome}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/20 hover:scale-[1.02]"
-                        >
-                          Boshqa video tanlash
-                        </button>
-                      </div>
+                    <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 text-left flex items-start gap-2.5 max-w-md">
+                      <span className="text-sm select-none">💡</span>
+                      <span>Musiqa yoki ovozsiz roliklar o&apos;rniga, gapirilgan nutq (ma&apos;ruza, intervyu, darslik) bor videoni tanlang.</span>
+                    </div>
+
+                    <div className="pt-2 max-w-xs w-full">
+                      <button
+                        onClick={handleGoHome}
+                        className="btn-premium w-full py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2"
+                      >
+                        Boshqa video tanlash
+                      </button>
                     </div>
                   </div>
                 );
@@ -546,85 +562,95 @@ export default function VideoPage() {
 
               if (isContentBlocked) {
                 return (
-                  <div className="aspect-video bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
-                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
-                    
-                    <div className="text-center space-y-4 max-w-md z-10 px-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
-                        <ShieldAlert className="w-7 h-7" />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h3 className="text-white font-bold text-xl tracking-tight">Ushbu video dublyaj qilinmaydi</h3>
-                        <p className="text-sm text-slate-300 leading-relaxed">
-                          {job.error_message || "Video xavfsizlik va kontent siyosatimiz talablariga mos kelmagani sababli to'xtatildi."}
-                        </p>
-                      </div>
+                  <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-rose-500/20 shadow-2xl relative overflow-hidden min-h-[360px]">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 mx-auto shadow-inner">
+                      <ShieldAlert className="w-8 h-8" />
+                    </div>
 
-                      <div className="pt-2 flex justify-center gap-3">
-                        <button
-                          onClick={handleGoHome}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/20 hover:scale-[1.02]"
-                        >
-                          Boshqa video tanlash
-                        </button>
-                      </div>
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full">
+                        Cheklov
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white pt-1">
+                        Ushbu video dublyaj qilinmaydi
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                        {job.error_message || "Video xavfsizlik va kontent siyosatimiz talablariga mos kelmagani sababli to'xtatildi."}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 max-w-xs w-full">
+                      <button
+                        onClick={handleGoHome}
+                        className="btn-premium w-full py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2"
+                      >
+                        Boshqa video tanlash
+                      </button>
                     </div>
                   </div>
                 );
               }
 
               return (
-                <div className="aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
-                  <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
-                  <div className="absolute -top-24 -left-24 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-                  <div className="text-center space-y-4 max-w-md z-10 px-4">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
-                      <AlertTriangle className="w-7 h-7" />
+                <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[360px]">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 text-blue-500 mx-auto shadow-inner">
+                    <AlertTriangle className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full">
+                      Xatolik
+                    </span>
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white pt-1">
+                      Kutilmagan xatolik yuz berdi
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                      {getFriendlyErrorMessage(job.error_code, job.error_message)}
+                    </p>
+                  </div>
+                  {job.fallback_available && (
+                    <div className="max-w-md w-full">
+                      <UploadRecoveryPrompt jobId={id} />
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayonida kutilmagan xatolik yuz berdi</h3>
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        {getFriendlyErrorMessage(job.error_code, job.error_message)}
-                      </p>
-                    </div>
-                    {job.fallback_available && <UploadRecoveryPrompt jobId={id} />}
-                    <div className="pt-2 flex justify-center gap-3">
-                      <button
-                        onClick={handleRetry}
-                        disabled={retryLoading}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl transition duration-200 shadow-lg shadow-blue-500/25 hover:scale-[1.02] disabled:opacity-50"
-                      >
-                        <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
-                        Qayta urinish
-                      </button>
-                      <button
-                        onClick={handleGoHome}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition duration-200"
-                      >
-                        Bosh sahifaga qaytish
-                      </button>
-                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2 max-w-sm w-full">
+                    <button
+                      onClick={handleRetry}
+                      disabled={retryLoading}
+                      className="btn-premium flex-1 py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                      Qayta urinish
+                    </button>
+                    <button
+                      onClick={handleGoHome}
+                      className="glass-input flex-1 py-3 px-5 text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-2xl transition border border-gray-200/60 dark:border-white/10"
+                    >
+                      Bosh sahifa
+                    </button>
                   </div>
                 </div>
               );
             })() : (
-              <div className="aspect-video bg-slate-800 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden">
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                
-                <div className="text-center space-y-4 max-w-sm z-10">
-                  <Loader2 className="w-10 h-10 animate-spin text-blue-400 mx-auto" />
-                  <div className="space-y-2">
-                    <p className="text-white font-semibold text-lg">{job.status_message || 'Qayta ishlanmoqda...'}</p>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-slate-500 uppercase tracking-wider">
-                        <span>Progress</span>
-                        <span className="text-slate-200 font-semibold tabular-nums">{Math.round(job.progress || 0)}%</span>
+              <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[380px]">
+                <div className="space-y-5 max-w-md w-full z-10">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-gray-900 dark:text-white font-bold text-lg sm:text-xl">
+                      {job.status_message || 'Qayta ishlanmoqda...'}
+                    </p>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
+                        <span>Jarayon</span>
+                        <span className="text-violet-600 dark:text-violet-400 font-bold tabular-nums">
+                          {Math.round(job.progress || 0)}%
+                        </span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-[width] duration-700 ease-out"
+                          className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500 transition-[width] duration-700 ease-out shadow-sm"
                           style={{ width: `${Math.max(3, Math.min(100, job.progress || 0))}%` }}
                         />
                       </div>
@@ -632,12 +658,12 @@ export default function VideoPage() {
                   </div>
 
                   {job.expected_end_time && (
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-slate-400 space-y-1">
-                      <p className="font-semibold text-slate-300">Taxminiy yakunlanish vaqti:</p>
-                      <p className="text-white font-mono text-sm">
+                    <div className="glass-input rounded-2xl p-4 text-xs space-y-1.5 border border-gray-200/60 dark:border-white/10">
+                      <p className="font-semibold text-gray-500 dark:text-gray-400">Taxminiy yakunlanish vaqti:</p>
+                      <p className="text-gray-900 dark:text-white font-mono text-base font-bold">
                         {formatTashkentTime(job.expected_end_time)}
                       </p>
-                      <p className="text-[11px] text-slate-500 font-medium">
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
                         {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
                           ? "(tez orada yakunlanadi...)"
                           : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
@@ -649,7 +675,7 @@ export default function VideoPage() {
                     <button
                       onClick={handleCancel}
                       disabled={cancelLoading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-violet-400 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-lg transition duration-200 disabled:opacity-50"
+                      className="glass-input hover:text-red-600 dark:hover:text-red-400 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition duration-200 disabled:opacity-50 border border-gray-200/60 dark:border-white/10"
                     >
                       {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       Jarayonni bekor qilish
@@ -662,10 +688,10 @@ export default function VideoPage() {
             {/* Title & info (below player, padded in theater mode) */}
             <div className={theaterMode ? 'max-w-6xl mx-auto px-6 pt-6 space-y-4' : 'space-y-4'}>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-white mb-2 leading-snug">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2 leading-snug">
                   {job.video_title || "Noma'lum video"}
                 </h1>
-                <div className="flex items-center gap-4 text-slate-400 text-sm">
+                <div className="flex items-center gap-4 text-gray-500 dark:text-gray-400 text-sm">
                   {job.video_duration && (
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
@@ -674,7 +700,7 @@ export default function VideoPage() {
                   )}
                   {job.speaker_gender && (
                     <span className="flex items-center gap-1.5 font-medium">
-                      <Mic2 className="w-4 h-4 text-indigo-400" />
+                      <Mic2 className="w-4 h-4 text-violet-600 dark:text-indigo-400" />
                       {(() => {
                         const prov = (job.tts_provider || 'azure').toLowerCase();
                         const provLabel = prov === 'gemini' ? 'Gemini AI' : prov === 'edge' ? 'Edge TTS' : 'Azure Neural';
@@ -700,19 +726,19 @@ export default function VideoPage() {
               {/* Download & Feedback */}
               {job.status === 'completed' && (
                 <div className="space-y-6 pt-1">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-4 sm:p-5 shadow-lg">
                     <div className="space-y-2">
-                      <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
+                      <span className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">
                         Videoni yuklab olish
                       </span>
                       <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
                     </div>
 
-                    <div className="pt-2 sm:pt-0 sm:border-l sm:border-white/10 sm:pl-5 flex flex-col justify-center">
+                    <div className="pt-2 sm:pt-0 sm:border-l sm:border-gray-200/60 dark:sm:border-white/10 sm:pl-5 flex flex-col justify-center">
                       <button
                         onClick={() => setShowRegenerateModal(true)}
                         disabled={retryLoading || regenLoading}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25 transition duration-200 active:scale-95 border border-white/10 whitespace-nowrap cursor-pointer"
+                        className="btn-premium inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs text-white shadow-lg shadow-violet-500/25 transition duration-200 active:scale-95 whitespace-nowrap cursor-pointer"
                         title="Videoni yangi sozlamalar bilan qayta yaratish"
                       >
                         <RotateCw className={`w-4 h-4 ${regenLoading ? 'animate-spin' : ''}`} />
@@ -732,12 +758,12 @@ export default function VideoPage() {
 
               {/* Translation accordion */}
               {job.translated_text && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] overflow-hidden shadow-lg">
                   <button
                     onClick={() => setShowTranscript(!showTranscript)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-white font-medium hover:bg-white/5 transition"
+                    className="w-full flex items-center justify-between px-5 py-4 text-gray-900 dark:text-white font-bold hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition"
                   >
-                    <span>O'zbek tilidagi matn</span>
+                    <span>O&apos;zbek tilidagi matn</span>
                     <div className="flex items-center gap-3">
                       <div
                         onClick={(e) => {
@@ -746,17 +772,17 @@ export default function VideoPage() {
                           setIsCopied(true)
                           setTimeout(() => setIsCopied(false), 2000)
                         }}
-                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
+                        className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
                         title="Nusxa olish"
                       >
-                        {isCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                        {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </div>
                       {showTranscript ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </button>
                   {showTranscript && (
                     <div className="px-5 pb-5">
-                      <p className="text-slate-300 text-sm leading-relaxed">{job.translated_text}</p>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{job.translated_text}</p>
                     </div>
                   )}
                 </div>
@@ -764,14 +790,14 @@ export default function VideoPage() {
 
               {/* Subtitles accordion */}
               {job.uzbek_srt_content && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] overflow-hidden shadow-lg">
                   <div
                     onClick={() => setShowSrt(!showSrt)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-white font-medium hover:bg-white/5 transition cursor-pointer select-none"
+                    className="w-full flex items-center justify-between px-5 py-4 text-gray-900 dark:text-white font-bold hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-2">
-                      <span>O'zbekcha subtitrlar</span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono font-medium">SRT</span>
+                      <span>O&apos;zbekcha subtitrlar</span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-mono font-bold">SRT</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
@@ -786,7 +812,7 @@ export default function VideoPage() {
                           a.click()
                           URL.revokeObjectURL(url)
                         }}
-                        className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-white/10 transition flex items-center gap-1 text-xs cursor-pointer"
+                        className="p-1.5 text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs cursor-pointer font-semibold"
                         title="SRT faylini yuklab olish"
                       >
                         <Download className="w-4 h-4" />
@@ -799,17 +825,17 @@ export default function VideoPage() {
                           setIsSrtCopied(true)
                           setTimeout(() => setIsSrtCopied(false), 2000)
                         }}
-                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
+                        className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
                         title="Nusxa olish"
                       >
-                        {isSrtCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {isSrtCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                       </div>
                       {showSrt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </div>
                   {showSrt && (
                     <div className="px-5 pb-5">
-                      <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 max-h-80 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      <div className="bg-gray-100 dark:bg-black/40 border border-gray-200/60 dark:border-white/5 rounded-2xl p-4 max-h-80 overflow-y-auto font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                         {job.uzbek_srt_content}
                       </div>
                     </div>
@@ -826,7 +852,7 @@ export default function VideoPage() {
               {/* Sidebar info shown below in theater mode */}
               {theaterMode && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+                  <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 space-y-3.5 shadow-lg">
                     <InfoRow label="Holat" value={getStatusLabel(job.status, job.error_code, job.error_message)} />
                     {job.video_duration && <InfoRow label="Davomiylik" value={formatDuration(job.video_duration)} />}
                     {job.speaker_gender && (
@@ -844,42 +870,42 @@ export default function VideoPage() {
                     {job.uzbek_srt_content && <InfoRow label="Subtitr" value="✅ Mavjud (To'liq matn pastda)" />}
                   </div>
                   {job.transcript_text && (
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider">{getSourceLangLabel(job.source_language)}</p>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigator.clipboard.writeText(job.transcript_text || '')
-                        setIsEnCopied(true)
-                        setTimeout(() => setIsEnCopied(false), 2000)
-                      }}
-                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/10 transition cursor-pointer"
-                      title="Nusxa olish"
-                    >
-                      {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </div>
-                  </div>
-                  <p className={`text-slate-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
-                  {job.transcript_text.length > 240 && (
-                    <button
-                      type="button"
-                      onClick={() => setExpandSourceText(!expandSourceText)}
-                      className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition"
-                    >
-                      {expandSourceText ? (
-                        <>
-                          <ChevronUp className="w-3.5 h-3.5" />
-                          <span>Qisqartirish</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="w-3.5 h-3.5" />
-                          <span>To'liq matnni ko'rish</span>
-                        </>
+                    <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">{getSourceLangLabel(job.source_language)}</p>
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard.writeText(job.transcript_text || '')
+                            setIsEnCopied(true)
+                            setTimeout(() => setIsEnCopied(false), 2000)
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+                          title="Nusxa olish"
+                        >
+                          {isEnCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </div>
+                      </div>
+                      <p className={`text-gray-600 dark:text-gray-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
+                      {job.transcript_text.length > 240 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandSourceText(!expandSourceText)}
+                          className="mt-2 text-xs text-violet-600 dark:text-indigo-400 hover:underline font-bold flex items-center gap-1 cursor-pointer transition"
+                        >
+                          {expandSourceText ? (
+                            <>
+                              <ChevronUp className="w-3.5 h-3.5" />
+                              <span>Qisqartirish</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3.5 h-3.5" />
+                              <span>To&apos;liq matnni ko&apos;rish</span>
+                            </>
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
                     </div>
                   )}
                 </div>
@@ -890,8 +916,8 @@ export default function VideoPage() {
           {/* Right sidebar (only in default mode) */}
           {!theaterMode && (
             <div className="space-y-4">
-              <h2 className="text-white font-semibold">Video ma'lumotlari</h2>
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+              <h2 className="text-gray-900 dark:text-white font-bold text-base">Video ma&apos;lumotlari</h2>
+              <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 space-y-3.5 shadow-xl">
                 <InfoRow label="Holat" value={getStatusLabel(job.status, job.error_code, job.error_message)} />
                 {job.video_duration && <InfoRow label="Davomiylik" value={formatDuration(job.video_duration)} />}
                 {job.speaker_gender && (
@@ -912,12 +938,12 @@ export default function VideoPage() {
 
                 {/* Admin-only AI models breakdown */}
                 {isAdmin && (
-                  <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-4 -mb-4 p-4 rounded-b-2xl space-y-2.5">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-5 -mb-5 p-4 rounded-b-[24px] space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-500 uppercase tracking-wider">
                       <span className="flex items-center gap-1.5">
                         <span>🛠</span> AI Modellar (Admin)
                       </span>
-                      <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-300 font-mono font-bold">
+                      <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-300 font-mono font-bold">
                         ADMIN
                       </span>
                     </div>
@@ -941,9 +967,9 @@ export default function VideoPage() {
               </div>
 
               {job.transcript_text && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 shadow-xl">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider">{getSourceLangLabel(job.source_language)}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider font-bold">{getSourceLangLabel(job.source_language)}</p>
                     <div
                       onClick={(e) => {
                         e.stopPropagation()
@@ -951,18 +977,18 @@ export default function VideoPage() {
                         setIsEnCopied(true)
                         setTimeout(() => setIsEnCopied(false), 2000)
                       }}
-                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/10 transition cursor-pointer"
+                      className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
                       title="Nusxa olish"
                     >
-                      {isEnCopied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {isEnCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </div>
                   </div>
-                  <p className={`text-slate-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
+                  <p className={`text-gray-600 dark:text-gray-300 text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
                   {job.transcript_text.length > 240 && (
                     <button
                       type="button"
                       onClick={() => setExpandSourceText(!expandSourceText)}
-                      className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition"
+                      className="mt-2 text-xs text-violet-600 dark:text-indigo-400 hover:underline font-bold flex items-center gap-1 cursor-pointer transition"
                     >
                       {expandSourceText ? (
                         <>
@@ -972,7 +998,7 @@ export default function VideoPage() {
                       ) : (
                         <>
                           <ChevronDown className="w-3.5 h-3.5" />
-                          <span>To'liq matnni ko'rish</span>
+                          <span>To&apos;liq matnni ko&apos;rish</span>
                         </>
                       )}
                     </button>
@@ -986,12 +1012,8 @@ export default function VideoPage() {
 
       {/* Regenerate Modal */}
       {showRegenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-6 shadow-2xl relative overflow-hidden">
-            {/* Glow background */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full bg-violet-500/20 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[28px] max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-3">
@@ -999,41 +1021,40 @@ export default function VideoPage() {
                   <RotateCw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Qayta yaratish (Regenerate)</h3>
-                  <p className="text-xs text-slate-400">Yangi ovoz yoki dvigatel bilan qayta dublyaj</p>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Qayta yaratish (Regenerate)</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Yangi ovoz yoki dvigatel bilan qayta dublyaj</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRegenerateModal(false)}
-                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/5 transition"
+                className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Notice info */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-slate-300 space-y-2 relative z-10">
+            <div className="glass-input border border-gray-200/60 dark:border-white/10 rounded-2xl p-4 text-xs text-gray-600 dark:text-gray-300 space-y-2 relative z-10">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Video davomiyligi:</span>
-                <span className="text-white font-semibold">{job.video_duration ? formatDuration(job.video_duration) : '—'}</span>
+                <span className="text-gray-500 dark:text-gray-400">Video davomiyligi:</span>
+                <span className="text-gray-900 dark:text-white font-semibold">{job.video_duration ? formatDuration(job.video_duration) : '—'}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Balansdan yechiladigan daqiqa:</span>
-                <span className="text-amber-400 font-bold font-mono text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Balansdan yechiladigan daqiqa:</span>
+                <span className="text-amber-500 font-bold font-mono text-sm">
                   {isAdmin ? "0 daqiqa (Admin — bepul)" : `~${Math.max(1, Math.ceil((job.video_duration || 60) / 60))} daqiqa`}
                 </span>
               </div>
-              <div className="pt-2 border-t border-white/10 text-[11px] text-slate-400 leading-relaxed">
+              <div className="pt-2 border-t border-gray-200/60 dark:border-white/10 text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
                 💡 Matnlar va tarjima saqlanadi. Faqat audio ovoz yangidan toza generatsiya qilinadi va video qayta birlashtiriladi (~1 daqiqa).
               </div>
             </div>
 
             {/* Form Controls: Gender */}
             <div className="space-y-4 relative z-10">
-              {/* Gender */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                <label className="text-[11px] font-bold text-violet-600 dark:text-indigo-400 uppercase tracking-wider">
                   Ovoz jinsi (Gemini AI)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1049,12 +1070,12 @@ export default function VideoPage() {
                         onClick={() => setRegenGender(g.id as any)}
                         className={`flex items-center justify-between px-4 py-3 rounded-2xl border text-sm transition-all ${
                           active
-                            ? "border-indigo-500 bg-indigo-500/20 text-white font-bold ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/10"
-                            : "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300"
+                            ? "border-violet-500 bg-violet-500/15 text-violet-700 dark:text-violet-300 font-bold ring-2 ring-violet-500/30 shadow-lg shadow-violet-500/10"
+                            : "border-gray-200/80 dark:border-white/10 glass-input hover:border-gray-300 text-gray-700 dark:text-gray-300"
                         }`}
                       >
                         <span>{g.label}</span>
-                        <span className="text-xs text-indigo-300 font-mono">({g.name})</span>
+                        <span className="text-xs text-violet-600 dark:text-indigo-300 font-mono">({g.name})</span>
                       </button>
                     )
                   })}
@@ -1067,7 +1088,7 @@ export default function VideoPage() {
               <button
                 type="button"
                 onClick={() => setShowRegenerateModal(false)}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition"
+                className="glass-input px-5 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-200/60 dark:border-white/10 transition"
               >
                 Bekor qilish
               </button>
@@ -1075,7 +1096,7 @@ export default function VideoPage() {
                 type="button"
                 onClick={handleRegenerateSubmit}
                 disabled={regenLoading}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/25 transition active:scale-95 disabled:opacity-50"
+                className="btn-premium inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-violet-500/25 transition active:scale-95 disabled:opacity-50"
               >
                 {regenLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
                 <span>Tasdiqlash va qayta yaratish</span>
@@ -1090,9 +1111,9 @@ export default function VideoPage() {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-start gap-2">
-      <span className="text-slate-400 text-sm">{label}</span>
-      <span className="text-white text-sm font-medium text-right">{value}</span>
+    <div className="flex justify-between items-start gap-2 text-sm">
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-gray-900 dark:text-white font-semibold text-right">{value}</span>
     </div>
   )
 }
