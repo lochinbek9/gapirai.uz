@@ -340,7 +340,12 @@ def synthesize_segments(
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         engine = "unknown"
-        if seg["id"] in pre_synthesized:
+        # Checkpoint reuse: agar ushbu segment audio fayli diskda allaqachon mavjud va yaroqli bo'lsa,
+        # API'ga qayta so'rov yuborilmaydi (qimmatli kvotani tejaydi va tez tugatadi):
+        if seg_file.exists() and seg_file.stat().st_size > 500 and _validate_wav_file(str(seg_file))[0]:
+            engine = get_provider(provider_name).name
+            logger.info(f"Segment {seg['id']}: mavjud audio keshdan olindi.")
+        elif seg["id"] in pre_synthesized:
             engine = get_provider(provider_name).name
         else:
             try:
