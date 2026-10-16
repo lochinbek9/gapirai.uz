@@ -394,10 +394,10 @@ export default function PricingPage() {
 }
 
 const DEFAULT_PACKS: MinutePack[] = [
-  { minutes: 30, price: 15000 },
-  { minutes: 60, price: 25000 },
-  { minutes: 120, price: 45000 },
-  { minutes: 300, price: 100000 },
+  { minutes: 35, price: 15000 },
+  { minutes: 70, price: 25000 },
+  { minutes: 140, price: 45000 },
+  { minutes: 350, price: 100000 },
 ]
 
 function MeshBackground() {

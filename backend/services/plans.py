@@ -46,6 +46,13 @@ MAX_JOB_MINUTES = 120
 # Sotib olingan daqiqalar Subscription.purchased_minutes'ga qo'shiladi va
 # hech qachon tugamaydi.
 MINUTE_PACKS: dict[int, int] = {
+    35: 15_000,
+    70: 25_000,
+    140: 45_000,
+    350: 100_000,
+}
+
+LEGACY_MINUTE_PACKS: dict[int, int] = {
     30: 15_000,
     60: 25_000,
     120: 45_000,

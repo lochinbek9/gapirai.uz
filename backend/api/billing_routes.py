@@ -23,7 +23,7 @@ from backend.models.database import get_db, User
 from backend.models.payment import PaymentCard
 from backend.services.auth import get_current_user
 from backend.services.card_providers import CardProviderError
-from backend.services.plans import PLANS, MINUTE_PACKS, get_or_create_subscription, get_minute_balance
+from backend.services.plans import PLANS, MINUTE_PACKS, LEGACY_MINUTE_PACKS, get_or_create_subscription, get_minute_balance
 from backend.services import recurring
 
 logger = logging.getLogger(__name__)
@@ -189,7 +189,8 @@ def set_auto_topup(req: AutoTopupRequest, db: Session = Depends(get_db),
     if req.enabled:
         if not recurring.get_default_card(db, current_user.id):
             raise HTTPException(status_code=400, detail="Avtomatik to'ldirish uchun avval karta bog'lang.")
-        if req.pack is not None and req.pack not in MINUTE_PACKS:
+        all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
+        if req.pack is not None and req.pack not in all_packs:
             raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
         sub.auto_topup_enabled = True
         sub.auto_topup_pack = req.pack

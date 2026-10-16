@@ -70,7 +70,7 @@ export default function TermsPage() {
                 <li><strong>Pro</strong> — oyiga 199 000 so'm (yoki yiliga 1 990 000 so'm), oyiga 600 daqiqa, premium ovoz va 1080p sifat.</li>
               </ul>
               <p>
-                Oylik daqiqa hajmi tugagach, foydalanuvchi qo'shimcha daqiqa paketlarini sotib olishi mumkin: +30 daqiqa — 15 000 so'm, +60 daqiqa — 25 000 so'm, +120 daqiqa — 45 000 so'm, +300 daqiqa — 100 000 so'm. Sotib olingan daqiqalar muddatsiz bo'lib, keyingi oyga o'tadi. Bitta video uchun maksimal davomiylik — 120 daqiqa. Barcha narxlar yakuniy va O'zbekiston so'mida ko'rsatilgan.
+                Oylik daqiqa hajmi tugagach, foydalanuvchi qo'shimcha daqiqa paketlarini sotib olishi mumkin: +35 daqiqa — 15 000 so'm, +70 daqiqa — 25 000 so'm, +140 daqiqa — 45 000 so'm, +350 daqiqa — 100 000 so'm. Sotib olingan daqiqalar muddatsiz bo'lib, keyingi oyga o'tadi. Bitta video uchun maksimal davomiylik — 120 daqiqa. Barcha narxlar yakuniy va O'zbekiston so'mida ko'rsatilgan.
               </p>
               <p className="font-semibold text-gray-800 dark:text-slate-200">To'lov usullari</p>
               <p>

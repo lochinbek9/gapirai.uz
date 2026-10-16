@@ -213,10 +213,11 @@ def initiate_minutes_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.services.plans import MINUTE_PACKS
-    if req.pack not in MINUTE_PACKS:
+    from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS
+    all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
+    if req.pack not in all_packs:
         raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
-    amount = MINUTE_PACKS[req.pack]
+    amount = all_packs[req.pack]
 
     payment = db.query(Payment).filter(
         Payment.user_id == current_user.id, Payment.minutes_purchased == req.pack,

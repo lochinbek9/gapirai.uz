@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from backend.models.database import get_db, User
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user
-from backend.services.plans import MINUTE_PACKS, get_minute_balance
+from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS, get_minute_balance
 from backend.services.click_service import generate_payment_url
 from backend.config import get_settings
 
@@ -57,9 +57,10 @@ def purchase_minutes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if req.pack not in MINUTE_PACKS:
+    all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
+    if req.pack not in all_packs:
         raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
-    amount = MINUTE_PACKS[req.pack]
+    amount = all_packs[req.pack]
     settings = get_settings()
 
     origin_header = request.headers.get("origin") or request.headers.get("referer")

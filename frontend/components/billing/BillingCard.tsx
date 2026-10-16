@@ -9,7 +9,12 @@ import {
   CreditCard, Plus, Trash2, Check, Loader2, ShieldCheck, AlertTriangle, X,
 } from 'lucide-react'
 
-const PACK_LABELS: Record<number, string> = { 30: '+30 daq', 60: '+60 daq', 120: '+120 daq', 300: '+300 daq' }
+const PACK_LABELS: Record<number, string> = {
+  30: '+30 daq', 35: '+35 daq',
+  60: '+60 daq', 70: '+70 daq',
+  120: '+120 daq', 140: '+140 daq',
+  300: '+300 daq', 350: '+350 daq',
+}
 
 function cardBrand(c: SavedCard) {
   if (c.card_type === 'humo') return 'Humo'
