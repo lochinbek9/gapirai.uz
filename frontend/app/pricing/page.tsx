@@ -415,8 +415,8 @@ function MeshBackground() {
 // bilan bir xil, faqat ko'rsatish uchun.
 const DEFAULT_PLANS: PlanDef[] = [
   { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'edge', tier: 'free', period_days: 30, max_resolution: '360p' },
-  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
-  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, monthly_minutes: 300, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
-  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
-  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1990000, monthly_minutes: 400, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365, max_resolution: '1080p' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 350, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 30, max_resolution: '720p' },
+  { id: 'standard_yearly', name: "Standart (yillik)", price: 490000, monthly_minutes: 350, priority: false, tts_tier: 'edge', tier: 'standard', period_days: 365, max_resolution: '720p' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 600, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 30, max_resolution: '1080p' },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1990000, monthly_minutes: 600, priority: true, tts_tier: 'premium', tier: 'pro', period_days: 365, max_resolution: '1080p' },
 ]

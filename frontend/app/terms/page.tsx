@@ -66,8 +66,8 @@ export default function TermsPage() {
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li><strong>Bepul (Free)</strong> — 0 so'm, oyiga 5 daqiqagacha dublyaj;</li>
-                <li><strong>Standart</strong> — oyiga 49 000 so'm (yoki yiliga 490 000 so'm), oyiga 300 daqiqa;</li>
-                <li><strong>Pro</strong> — oyiga 199 000 so'm (yoki yiliga 1 990 000 so'm), oyiga 400 daqiqa, premium ovoz va 1080p sifat.</li>
+                <li><strong>Standart</strong> — oyiga 49 000 so'm (yoki yiliga 490 000 so'm), oyiga 350 daqiqa;</li>
+                <li><strong>Pro</strong> — oyiga 199 000 so'm (yoki yiliga 1 990 000 so'm), oyiga 600 daqiqa, premium ovoz va 1080p sifat.</li>
               </ul>
               <p>
                 Oylik daqiqa hajmi tugagach, foydalanuvchi qo'shimcha daqiqa paketlarini sotib olishi mumkin: +30 daqiqa — 15 000 so'm, +60 daqiqa — 25 000 so'm, +120 daqiqa — 45 000 so'm, +300 daqiqa — 100 000 so'm. Sotib olingan daqiqalar muddatsiz bo'lib, keyingi oyga o'tadi. Bitta video uchun maksimal davomiylik — 120 daqiqa. Barcha narxlar yakuniy va O'zbekiston so'mida ko'rsatilgan.

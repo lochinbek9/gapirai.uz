@@ -649,8 +649,8 @@ function AdminUsersManagerInner() {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'free', label: 'BEPUL', desc: '5 daq/oy, 360p', icon: Sparkles },
-                    { id: 'standard', label: 'STANDART', desc: '300 daq/oy, 720p', icon: Zap },
-                    { id: 'pro', label: 'PRO', desc: '400 daq/oy, Azure TTS, 1080p', icon: Crown },
+                    { id: 'standard', label: 'STANDART', desc: '350 daq/oy, 720p', icon: Zap },
+                    { id: 'pro', label: 'PRO', desc: '600 daq/oy, Azure TTS, 1080p', icon: Crown },
                   ].map((p) => {
                     const Icon = p.icon
                     const isSelected = selectedPlan === p.id

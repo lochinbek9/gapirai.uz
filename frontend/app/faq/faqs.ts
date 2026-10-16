@@ -5,7 +5,7 @@ export const FAQS = [
   },
   {
     q: "Platformadan foydalanish bepulmi?",
-    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 300 daqiqa, 49 000 so'm; Pro — oyiga 400 daqiqa, premium ovoz va 1080p, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling (+30 daqiqa — 15 000 so'm, +60 — 25 000, +120 — 45 000, +300 — 100 000). Sarf haqiqiy video davomiyligi bo'yicha hisoblanadi. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi. Bitta video — maksimal 120 daqiqa."
+    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 350 daqiqa, 49 000 so'm; Pro — oyiga 600 daqiqa, premium ovoz va 1080p, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling (+30 daqiqa — 15 000 so'm, +60 — 25 000, +120 — 45 000, +300 — 100 000). Sarf haqiqiy video davomiyligi bo'yicha hisoblanadi. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi. Bitta video — maksimal 120 daqiqa."
   },
   {
     q: "Dublyaj qilish qancha vaqt oladi?",

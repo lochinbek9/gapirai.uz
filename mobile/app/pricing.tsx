@@ -18,8 +18,8 @@ const WEB_PRICING_URL = 'https://gapirai.uz/pricing';
 
 const DEFAULT_PLANS: PlanDef[] = [
   { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'edge' },
-  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 300, priority: false, tts_tier: 'edge' },
-  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 400, priority: true, tts_tier: 'premium' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 350, priority: false, tts_tier: 'edge' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 600, priority: true, tts_tier: 'premium' },
 ];
 
 function PlanCard({ plan, isCurrent }: { plan: PlanDef; isCurrent: boolean }) {

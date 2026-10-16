@@ -14,7 +14,7 @@ const FAQS = [
   },
   {
     q: 'Platformadan foydalanish bepulmi?',
-    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 300 daqiqa, 49 000 so'm; Pro — oyiga 400 daqiqa, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi.",
+    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 350 daqiqa, 49 000 so'm; Pro — oyiga 600 daqiqa, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi.",
   },
   {
     q: 'Dublyaj qilish qancha vaqt oladi?',

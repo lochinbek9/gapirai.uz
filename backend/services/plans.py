@@ -84,10 +84,10 @@ class PlanDef:
 
 PLANS: dict[str, PlanDef] = {
     "free":            PlanDef(id="free",            name="Bepul",             price=0,         monthly_minutes=5,   priority=False, tts_tier="gemini",  tier=PlanTier.FREE,     max_resolution="360p"),
-    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=300, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p"),
-    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=300, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p", period_days=365),
-    "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=400, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p"),
-    "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=400, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
+    "standard":        PlanDef(id="standard",        name="Standart",          price=49_000,    monthly_minutes=350, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p"),
+    "standard_yearly": PlanDef(id="standard_yearly", name="Standart (yillik)", price=490_000,   monthly_minutes=350, priority=False, tts_tier="gemini",  tier=PlanTier.STANDARD, max_resolution="1080p", period_days=365),
+    "pro":             PlanDef(id="pro",             name="Pro",               price=199_000,   monthly_minutes=600, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p"),
+    "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=600, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
 }
 
 RESOLUTION_ORDER = ["360p", "720p", "1080p"]
