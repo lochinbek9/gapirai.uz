@@ -180,10 +180,10 @@ def _synthesize_text(
         logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
         raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    # Gemini TTS muvaffaqiyatsiz bo'lsa (masalan barcha API kalitlar 429 kvotada bo'lsa),
-    # butun videoni xato bilan o'ldirmasdan, zaxira provayderga (Edge/Azure) xavfsiz o'tadi:
+    # Gemini tanlanganda foydalanuvchi aynan Gemini ovozini talab qiladi — Azure/Edge fallback qat'iyan taqiqlangan:
     if primary.name == "gemini" or provider_name == "gemini":
-        logger.warning(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — zaxira provayderga (Edge/Azure) xavfsiz fallback qilinmoqda.")
+        logger.error(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — Azure/Edge fallback foydalanuvchi talabi bo'yicha taqiqlangan.")
+        raise RuntimeError("Gemini TTS audio yarata olmadi (kalitlar limiti tugagan). Foydalanuvchi sozlamasi bo'yicha Azure/Edge fallback taqiqlangan.")
 
     # --- Fallback: 2-o'rinda Azure, so'ng oxirgi chora Edge ---
     fallback_name = getattr(settings, "TTS_FALLBACK_PROVIDER", "azure") or "azure"
