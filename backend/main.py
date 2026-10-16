@@ -302,7 +302,18 @@ app = FastAPI(
     description="YouTube videolarini sun'iy intellekt yordamida o'zbek tiliga dublyaj va tarjima qilish platformasi API",
     version="1.0.0",
     lifespan=lifespan,
+    redoc_url=None,
 )
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html():
+    from fastapi.openapi.docs import get_redoc_html
+    return get_redoc_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - ReDoc",
+        redoc_js_url="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js",
+    )
 
 # CORS — Next.js frontendi uchun. Ilgari "*" (istalgan sayt) edi -- 2026-08-20
 # audit paytida wildcard CORS aniqlanib, haqiqiy ruxsat etilgan originlar
