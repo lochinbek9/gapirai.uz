@@ -12,7 +12,7 @@ from backend.services.error_classification import scrub_secrets
 logger = get_task_logger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3300)
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, time_limit=7500, soft_time_limit=7200)
 def generate_resolution_variant_task(self: Task, job_id: str, resolution: str):
     db = SessionLocal()
     try:

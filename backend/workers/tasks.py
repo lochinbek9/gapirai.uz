@@ -23,13 +23,11 @@ from backend.config import get_settings
 logger = get_task_logger(__name__)
 settings = get_settings()
 
-# time_limit (3600s) dan sal ko'proq -- 2026-08-26 audit: task_time_limit
-# aynan Redis visibility_timeout defaultiga (3600s) teng edi, bu ikkalasi
-# bir vaqtda tugab qolish xavfini yaratardi. Lease shu ikkalasidan ham
-# ko'proq bo'lishi kerak, aks holda hali ishlayotgan vazifaning claim'i
-# lease muddati tugagani sababli "bo'sh" ko'rinib, boshqa worker tomonidan
-# noto'g'ri qayta claim qilinishi mumkin.
-CLAIM_LEASE_SECONDS = 3900
+# time_limit (8000s, ~133 daqiqa) dan ko'proq -- 120 daqiqalik videolar uchun
+# worker'ning soft_time_limit (7800s) va hard time_limit (8000s) oralig'ida
+# va undan keyin claim vaqti muddatidan oldin tugamasligi kerak.
+# Lease broker'ning visibility_timeout (9000s) ga yaqin bo'lishi lozim (8400s ~ 140 daqiqa).
+CLAIM_LEASE_SECONDS = 8400
 
 
 def _release_claim_safe(job_id: str, claim_token: str) -> None:
@@ -385,8 +383,8 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
     name="backend.workers.tasks.process_video",
     max_retries=5,
     default_retry_delay=60,
-    soft_time_limit=3300,  # 55 daqiqa — osilib qolgan bosqichga ogohlantirish
-    time_limit=3600,       # 60 daqiqa — worker'ni majburan to'xtatadi (hard limit)
+    soft_time_limit=7800,  # 130 daqiqa — 120 daqiqalik videolar uchun ogohlantirish
+    time_limit=8000,       # 133 daqiqa — worker'ni majburan to'xtatadi (hard limit)
 )
 def process_video(self: Task, job_id: str) -> dict:
     db = SessionLocal()

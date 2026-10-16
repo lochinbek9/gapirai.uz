@@ -57,8 +57,8 @@ def try_claim(db: Session, model: Type, row_id, lease_seconds: int, allow_reclai
     yoki (b) broker visibility_timeout tugagandan keyin. Ikkalasi ham
     FAQAT vazifa allaqachon o'lgan/tugagan bo'lishi mumkin bo'lgan
     paytda sodir bo'ladi -- bu loyihadagi HAR BIR vazifaning time_limit'i
-    (process_video=3600s, analyze_video_task=2700s) broker
-    visibility_timeout'idan (4000s) qat'iy kichik, shuning uchun Celery'ning
+    (process_video=8000s, analyze_video_task=2700s) broker
+    visibility_timeout'idan (9000s) qat'iy kichik, shuning uchun Celery'ning
     o'zi HECH QACHON hali tirik/ishlab turgan vazifa uchun redelivered=True
     bermaydi -- shuning uchun bu yo'l orqali sog'lom, faol ishlayotgan
     claim hech qachon "o'g'irlanmaydi".

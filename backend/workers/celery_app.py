@@ -35,14 +35,9 @@ celery_app.conf.update(
     worker_max_tasks_per_child=2, # Har 2 ta taskdan keyin bolani yangilash (RAM tozalanishi uchun)
     task_time_limit=8000,         # Max 8000 seconds execution time limit (8K)
     task_soft_time_limit=7800,    # Soft time limit to clean up gracefully
-    # 2026-08-26 audit: ilgari sozlanmagan edi -- Kombu/Redis'ning
-    # standart qiymati (3600s) process_video'ning o'z time_limit'iga
-    # (3600s) AYNAN teng edi: uzoq video uchun bu ikkalasi bir vaqtda
-    # tugab, vazifaning majburiy SIGKILL qilinishi bilan broker'ning uni
-    # "yo'qolgan" deb hisoblab qayta yetkazib berishi bir zumda to'qnashishi
-    # mumkin edi. 4000s -- eng uzun vazifaning (process_video, 3600s)
-    # o'zidan sezilarli ko'proq, lekin haddan tashqari uzun ham emas (haqiqatan
-    # qotib qolgan vazifa 66 daqiqadan ortiq kutmaydi).
+    # 9000s (150 daqiqa) -- eng uzun vazifaning (process_video, 8000s / 133 daqiqa)
+    # vaqtidan ko'proq bo'lishi shart, aks holda Redis 120 daqiqalik video
+    # bajarilayotgan paytda xabarni boshqa worker'ga qayta yetkazib beradi.
     # 2026-08-30: worker'lar bir necha marta xuddi shu naqsh bilan jim qotib
     # qoldi -- tarmoqda bir lahzalik uzilish -> kombu'ning ulanish-xatolik
     # tozalash yo'lida (connection.collect() -> maybe_close_channel() ->
@@ -52,7 +47,7 @@ celery_app.conf.update(
     # tasdiqlangan (kombu/celery/redis-py'ning rasmiy hujjatlashtirilgan
     # muammosi -- socket_timeout aynan shu holat uchun mo'ljallangan).
     broker_transport_options={
-        "visibility_timeout": 4000,
+        "visibility_timeout": 9000,
         "socket_timeout": 30,          # hech qanday o'qish 30s dan uzoq bloklanmasin
         "socket_connect_timeout": 10,
         "socket_keepalive": True,      # OS darajasida "o'lik" ulanishni aniqlaydi
@@ -60,7 +55,7 @@ celery_app.conf.update(
         "retry_on_timeout": True,      # vaqtinchalik uzilishda avtomatik qayta urinadi
     },
     result_backend_transport_options={
-        "visibility_timeout": 4000,
+        "visibility_timeout": 9000,
         "socket_timeout": 30,
         "socket_connect_timeout": 10,
     },

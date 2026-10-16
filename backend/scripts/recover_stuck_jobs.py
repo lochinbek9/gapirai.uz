@@ -27,7 +27,7 @@ STUCK_STATUSES = [
     JobStatus.MERGING,
 ]
 
-def recover_stuck_jobs(timeout_minutes: int = 30, dry_run: bool = False) -> int:
+def recover_stuck_jobs(timeout_minutes: int = 150, dry_run: bool = False) -> int:
     cutoff = datetime.utcnow() - timedelta(minutes=timeout_minutes)
     session = SessionLocal()
     count = 0
@@ -78,7 +78,7 @@ def recover_stuck_jobs(timeout_minutes: int = 30, dry_run: bool = False) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recover stuck dubbing jobs in the database.")
     parser.add_argument("--dry-run", action="store_true", help="Print stuck jobs without modifying DB.")
-    parser.add_argument("--timeout-minutes", type=int, default=30, help="Threshold in minutes (default: 30).")
+    parser.add_argument("--timeout-minutes", type=int, default=150, help="Threshold in minutes (default: 150).")
     args = parser.parse_args()
 
     recover_stuck_jobs(timeout_minutes=args.timeout_minutes, dry_run=args.dry_run)
