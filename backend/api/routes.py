@@ -1224,7 +1224,10 @@ def download_video(
             direct_candidate = Path(f"outputs/{job_id}/video/{variant_name}")
             if direct_candidate.exists():
                 video_path = str(direct_candidate)
-    else:
+
+    # Agar 360p yoki 1080p varianti hali mavjud bo'lmasa yoki master so'ralgan bo'lsa,
+    # 404 berib videopleerni buzmaslik uchun master videoga (dubbed_final.mp4) fallback qilamiz:
+    if not video_path or not Path(video_path).exists():
         video_path = job.output_video_path
         if not video_path or not Path(video_path).exists():
             candidate = Path(f"outputs/{job.storage_id}/video/dubbed_final.mp4")

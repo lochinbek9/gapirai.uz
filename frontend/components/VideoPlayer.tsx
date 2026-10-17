@@ -290,7 +290,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           setResolutions(res.resolutions);
           const curOpt = res.resolutions.find(r => r.resolution === (initialQuality || "720p"));
           if (curOpt && !curOpt.available) {
-            const fallback = [...res.resolutions].reverse().find(r => r.available);
+            const fallback = [...res.resolutions].reverse().find(r => r.available && r.status === "ready");
             if (fallback) {
               setCurrentQuality(fallback.resolution);
             }
@@ -401,10 +401,16 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
   const effectiveSrc = useMemo(() => {
     if (jobId) {
-      return getVideoUrl(jobId, currentQuality);
+      if (currentQuality && currentQuality !== "720p") {
+        const opt = resolutions.find(r => r.resolution === currentQuality);
+        if (opt && opt.status === "ready") {
+          return getVideoUrl(jobId, currentQuality);
+        }
+      }
+      return getVideoUrl(jobId);
     }
     return src;
-  }, [jobId, currentQuality, src]);
+  }, [jobId, currentQuality, src, resolutions]);
 
   /* ── Cues ─────────────────────────────────────── */
   const cues = useMemo<Cue[]>(() => {
