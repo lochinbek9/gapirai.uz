@@ -1045,8 +1045,9 @@ def retry_job(
     from backend.workers.tasks import process_video
     from backend.services.plans import get_job_queue_v2
     _dur = (job.video_duration or 0) / 60.0
-    queue = get_job_queue_v2(db, current_user.id, _dur)
-    process_video.apply_async(args=[str(job.id)], task_id=str(job.id), queue=queue)
+    # Do not pass task_id=str(job.id) so Celery creates a fresh task ID,
+    # preventing Celery worker from discarding previously revoked tasks.
+    process_video.apply_async(args=[str(job.id)], queue=queue)
 
     return {
         "success": True,

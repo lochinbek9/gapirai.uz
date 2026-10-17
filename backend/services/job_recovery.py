@@ -118,6 +118,6 @@ def trigger_ondemand_recovery(db: Session, job: DubbingJob) -> bool:
     from backend.services.plans import get_job_queue_v2
     _dur = (master_job.video_duration or 0) / 60.0
     queue = get_job_queue_v2(db, master_job.user_id, _dur)
-    process_video.apply_async(args=[master_id], task_id=master_id, queue=queue)
+    process_video.apply_async(args=[master_id], queue=queue)
     logger.info(f"[RECOVERY] Job {master_id} uchun qayta tiklash navbatga qo'yildi (queue={queue}).")
     return True
