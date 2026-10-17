@@ -543,6 +543,118 @@ export async function apiAdminCohorts(
   return res.data
 }
 
+export interface AdminJobCostSummary {
+  total_jobs: number
+  completed_jobs: number
+  failed_jobs: number
+  processing_jobs: number
+  awaiting_payment_jobs: number
+  success_rate_pct: number
+  total_completed_duration_min: number
+  providers: Record<string, number>
+  page_total_cost_usd: number
+  page_total_cost_uzs: number
+  page_avg_job_cost_uzs: number
+}
+
+export interface AdminJobCostItem {
+  id: string
+  video_title: string
+  youtube_url: string
+  youtube_video_id: string | null
+  video_thumbnail: string | null
+  video_duration: number
+  video_duration_min: number
+  status: string
+  status_message: string | null
+  progress: number
+  created_at: string | null
+  completed_at: string | null
+  processing_seconds: number | null
+  subtitle_only: boolean
+  source_language: string | null
+  models: {
+    tts_provider: string
+    voice_name: string | null
+    voice_style: string | null
+    stt_model: string | null
+    translation_model: string | null
+  }
+  costs: {
+    tts_cost_usd: number
+    tts_cost_uzs: number
+    tts_characters: number
+    tts_duration_seconds: number
+    tts_calls_count: number
+    cache_hits_count: number
+    cache_saved_usd: number
+    stt_cost_usd: number
+    llm_cost_usd: number
+    total_cost_usd: number
+    total_cost_uzs: number
+    cost_per_minute_uzs: number
+  }
+  payment: {
+    has_payment: boolean
+    revenue_uzs: number
+    profit_uzs: number | null
+    margin_pct: number | null
+    provider: string | null
+  }
+  user: {
+    id: string | null
+    name: string
+    email: string | null
+    phone: string | null
+    is_internal: boolean
+  }
+  error_code: string | null
+  error_message: string | null
+  qa_summary: {
+    total_segments: number
+    passed_segments: number
+    retried_segments: number
+    avg_score: number | null
+  } | null
+}
+
+export interface AdminJobsCostResponse {
+  summary: AdminJobCostSummary
+  pagination: {
+    page: number
+    page_size: number
+    total_items: number
+    total_pages: number
+  }
+  jobs: AdminJobCostItem[]
+}
+
+export async function apiAdminJobsCost(
+  token: string,
+  page: number = 1,
+  pageSize: number = 25,
+  status?: string,
+  search?: string,
+  ttsProvider?: string,
+  includeInternal: boolean = false,
+  sortBy: string = 'newest'
+): Promise<AdminJobsCostResponse> {
+  const res = await axios.get(`${API_URL}/admin/jobs-cost`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: {
+      page,
+      page_size: pageSize,
+      status: status || undefined,
+      search: search || undefined,
+      tts_provider: ttsProvider || undefined,
+      include_internal: includeInternal,
+      sort_by: sortBy,
+    },
+  })
+  return res.data
+}
+
+
 
 
 

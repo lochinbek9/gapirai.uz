@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import func, or_, and_, select
-from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail
+from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail, TTSUsageLog, JobStatus
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
 from backend.services.auth import get_current_admin_user
@@ -2203,6 +2203,366 @@ def toggle_user_internal(user_id: str, current_user: User = Depends(get_current_
         }
     finally:
         db.close()
+
+
+@router.get("/jobs-cost")
+def admin_jobs_cost(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=5, le=100),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    tts_provider: str | None = Query(default=None),
+    include_internal: bool = Query(default=False),
+    sort_by: str = Query(default="newest"),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Har bir dublyaj job uchun xarajatlar taqsimoti (TTS, STT, LLM) va batafsil statuslar.
+    """
+    import uuid as _uuid
+    db = SessionLocal()
+    try:
+        internal_ids_select = select(User.id).filter(User.is_internal.is_(True))
+
+        # Base query joined with User
+        base_query = db.query(DubbingJob, User).outerjoin(User, DubbingJob.user_id == User.id)
+
+        # Exclude internal accounts unless explicitly requested
+        if not include_internal:
+            base_query = base_query.filter(
+                or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select))
+            )
+
+        # Provider filter
+        if tts_provider and tts_provider.strip().lower() not in ("all", ""):
+            clean_prov = tts_provider.strip().lower()
+            base_query = base_query.filter(func.lower(DubbingJob.tts_provider) == clean_prov)
+
+        # Status filter
+        if status and status.strip().upper() not in ("ALL", ""):
+            clean_status = status.strip().upper()
+            if clean_status == "PROCESSING":
+                base_query = base_query.filter(DubbingJob.status.in_([
+                    JobStatus.DOWNLOADING,
+                    JobStatus.TRANSCRIBING,
+                    JobStatus.TRANSLATING,
+                    JobStatus.SYNTHESIZING,
+                    JobStatus.SYNCING,
+                    JobStatus.MERGING,
+                ]))
+            elif clean_status in ("AWAITING", "AWAITING_PAYMENT"):
+                base_query = base_query.filter(DubbingJob.status.in_([
+                    JobStatus.AWAITING_PAYMENT,
+                    JobStatus.PENDING,
+                ]))
+            else:
+                try:
+                    js = JobStatus(clean_status)
+                    base_query = base_query.filter(DubbingJob.status == js)
+                except ValueError:
+                    base_query = base_query.filter(func.upper(func.cast(DubbingJob.status, func.text)) == clean_status)
+
+        # Search filter
+        if search and search.strip():
+            term = search.strip()
+            s = f"%{term}%"
+            is_valid_uuid = False
+            parsed_uuid = None
+            try:
+                parsed_uuid = _uuid.UUID(term)
+                is_valid_uuid = True
+            except ValueError:
+                is_valid_uuid = False
+
+            if is_valid_uuid and parsed_uuid:
+                base_query = base_query.filter(DubbingJob.id == parsed_uuid)
+            else:
+                base_query = base_query.filter(
+                    or_(
+                        DubbingJob.video_title.ilike(s),
+                        DubbingJob.youtube_url.ilike(s),
+                        DubbingJob.youtube_video_id.ilike(s),
+                        User.email.ilike(s),
+                        User.name.ilike(s),
+                        User.phone.ilike(s),
+                    )
+                )
+
+        # Total count for pagination
+        total_items = base_query.count()
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+
+        # Sorting
+        if sort_by == "oldest":
+            base_query = base_query.order_by(DubbingJob.created_at.asc())
+        elif sort_by == "duration_desc":
+            base_query = base_query.order_by(DubbingJob.video_duration.desc().nullslast(), DubbingJob.created_at.desc())
+        elif sort_by == "duration_asc":
+            base_query = base_query.order_by(DubbingJob.video_duration.asc().nullslast(), DubbingJob.created_at.desc())
+        else:  # "newest"
+            base_query = base_query.order_by(DubbingJob.created_at.desc())
+
+        # Page rows
+        offset = (page - 1) * page_size
+        page_rows = base_query.offset(offset).limit(page_size).all()
+
+        job_ids = [str(job.id) for job, _ in page_rows]
+
+        # Batch load TTSUsageLog for current page
+        tts_data_by_job: dict[str, dict] = {}
+        if job_ids:
+            tts_rows = db.query(
+                TTSUsageLog.video_id,
+                TTSUsageLog.provider,
+                TTSUsageLog.currency,
+                TTSUsageLog.cache_hit,
+                func.sum(TTSUsageLog.characters).label("characters"),
+                func.sum(TTSUsageLog.estimated_cost).label("estimated_cost"),
+                func.sum(TTSUsageLog.duration_seconds).label("duration_seconds"),
+                func.count(TTSUsageLog.id).label("entry_count"),
+            ).filter(
+                TTSUsageLog.video_id.in_(job_ids)
+            ).group_by(
+                TTSUsageLog.video_id,
+                TTSUsageLog.provider,
+                TTSUsageLog.currency,
+                TTSUsageLog.cache_hit,
+            ).all()
+
+            for r in tts_rows:
+                v_id = str(r.video_id)
+                if v_id not in tts_data_by_job:
+                    tts_data_by_job[v_id] = {
+                        "cost_usd": 0.0,
+                        "cost_uzs": 0.0,
+                        "characters": 0,
+                        "duration_seconds": 0.0,
+                        "calls_count": 0,
+                        "cache_hits_count": 0,
+                        "cache_saved_usd": 0.0,
+                        "providers": set(),
+                    }
+                entry = tts_data_by_job[v_id]
+                entry["calls_count"] += (r.entry_count or 0)
+                entry["characters"] += (r.characters or 0)
+                entry["duration_seconds"] += float(r.duration_seconds or 0.0)
+                if r.provider:
+                    entry["providers"].add(r.provider)
+
+                if r.cache_hit:
+                    entry["cache_hits_count"] += (r.entry_count or 0)
+                    entry["cache_saved_usd"] += round((r.characters or 0) / 1000.0 * 0.016, 4)
+                else:
+                    if r.currency == "UZS":
+                        entry["cost_uzs"] += float(r.estimated_cost or 0.0)
+                    else:
+                        entry["cost_usd"] += float(r.estimated_cost or 0.0)
+
+        # Batch load payments for current page
+        payments_by_job: dict[str, dict] = {}
+        if job_ids:
+            pay_rows = db.query(Payment).filter(
+                Payment.job_id.in_(job_ids),
+                Payment.status == PaymentStatus.APPROVED,
+            ).all()
+            for p in pay_rows:
+                if p.job_id:
+                    payments_by_job[str(p.job_id)] = {
+                        "amount_uzs": p.amount,
+                        "provider": p.provider.value if hasattr(p.provider, 'value') else str(p.provider),
+                        "paid_at": p.created_at.isoformat() if p.created_at else None,
+                    }
+
+        USD_TO_UZS = 12800
+
+        # Build job response items
+        items = []
+        for job, user in page_rows:
+            j_id = str(job.id)
+            tts_info = tts_data_by_job.get(j_id, {
+                "cost_usd": 0.0,
+                "cost_uzs": 0.0,
+                "characters": 0,
+                "duration_seconds": 0.0,
+                "calls_count": 0,
+                "cache_hits_count": 0,
+                "cache_saved_usd": 0.0,
+                "providers": set(),
+            })
+
+            dur_sec = float(job.video_duration or 0.0)
+            dur_min = dur_sec / 60.0
+
+            # STT Cost estimation (Whisper $0.006/min; Gemini $0.002/min)
+            stt_model = job.stt_model or "whisper-1"
+            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT):
+                stt_rate = 0.002 if "gemini" in stt_model.lower() else 0.006
+                stt_cost_usd = round(dur_min * stt_rate, 4)
+            else:
+                stt_cost_usd = 0.0
+
+            # LLM Translation Cost estimation (~$0.0005 per 1k characters)
+            llm_model = job.translation_model or "gemini-1.5-flash"
+            llm_cost_usd = 0.0
+            if job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
+                if job.translated_text:
+                    chars = len(job.translated_text)
+                    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
+                elif dur_sec > 0:
+                    chars = int(dur_min * 1200)
+                    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
+
+            tts_usd = round(tts_info["cost_usd"], 4)
+            tts_uzs = round(tts_info["cost_uzs"])
+            total_usd = round(tts_usd + (tts_uzs / USD_TO_UZS) + stt_cost_usd + llm_cost_usd, 4)
+            total_uzs = int(round(total_usd * USD_TO_UZS))
+
+            cost_per_min_uzs = int(round(total_uzs / dur_min)) if dur_min > 0 else 0
+
+            # Payment / margin
+            pay_info = payments_by_job.get(j_id)
+            revenue_uzs = pay_info["amount_uzs"] if pay_info else 0
+            profit_uzs = revenue_uzs - total_uzs if pay_info else None
+            margin_pct = round((profit_uzs / revenue_uzs) * 100.0, 1) if pay_info and revenue_uzs > 0 else None
+
+            # Processing time
+            proc_sec = None
+            if job.completed_at and job.created_at:
+                proc_sec = round((job.completed_at - job.created_at).total_seconds(), 1)
+
+            # Segment QA summary
+            qa_summary = None
+            if job.segment_qa and isinstance(job.segment_qa, dict):
+                qa_dict = job.segment_qa
+                seg_count = len(qa_dict)
+                passed_count = sum(1 for v in qa_dict.values() if isinstance(v, dict) and v.get("score", 0) >= 0.75)
+                retried_count = sum(1 for v in qa_dict.values() if isinstance(v, dict) and v.get("attempts", 1) > 1)
+                scores = [v.get("score", 0) for v in qa_dict.values() if isinstance(v, dict) and "score" in v]
+                avg_score = round(sum(scores) / len(scores), 2) if scores else None
+                qa_summary = {
+                    "total_segments": seg_count,
+                    "passed_segments": passed_count,
+                    "retried_segments": retried_count,
+                    "avg_score": avg_score,
+                }
+
+            items.append({
+                "id": j_id,
+                "video_title": job.video_title or "Nomsiz video",
+                "youtube_url": job.youtube_url,
+                "youtube_video_id": job.youtube_video_id,
+                "video_thumbnail": job.video_thumbnail,
+                "video_duration": dur_sec,
+                "video_duration_min": round(dur_min, 1),
+                "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+                "status_message": job.status_message,
+                "progress": float(job.progress or 0.0),
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "processing_seconds": proc_sec,
+                "subtitle_only": bool(job.subtitle_only),
+                "source_language": job.source_language,
+                "models": {
+                    "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "edge"),
+                    "voice_name": job.voice_name,
+                    "voice_style": job.voice_style,
+                    "stt_model": stt_model,
+                    "translation_model": llm_model,
+                },
+                "costs": {
+                    "tts_cost_usd": tts_usd,
+                    "tts_cost_uzs": tts_uzs,
+                    "tts_characters": tts_info["characters"],
+                    "tts_duration_seconds": round(tts_info["duration_seconds"], 1),
+                    "tts_calls_count": tts_info["calls_count"],
+                    "cache_hits_count": tts_info["cache_hits_count"],
+                    "cache_saved_usd": round(tts_info["cache_saved_usd"], 3),
+                    "stt_cost_usd": stt_cost_usd,
+                    "llm_cost_usd": llm_cost_usd,
+                    "total_cost_usd": total_usd,
+                    "total_cost_uzs": total_uzs,
+                    "cost_per_minute_uzs": cost_per_min_uzs,
+                },
+                "payment": {
+                    "has_payment": pay_info is not None,
+                    "revenue_uzs": revenue_uzs,
+                    "profit_uzs": profit_uzs,
+                    "margin_pct": margin_pct,
+                    "provider": pay_info["provider"] if pay_info else None,
+                },
+                "user": {
+                    "id": str(user.id) if user else None,
+                    "name": user.name if user else "Mehmon (Anonim)",
+                    "email": user.email if user else None,
+                    "phone": user.phone if user else None,
+                    "is_internal": bool(getattr(user, "is_internal", False)) if user else False,
+                },
+                "error_code": job.error_code,
+                "error_message": job.error_message,
+                "qa_summary": qa_summary,
+            })
+
+        # Summary KPIs (fast on DubbingJob table)
+        stat_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select)) if not include_internal else None
+
+        q_stat = db.query(DubbingJob.status, func.count(DubbingJob.id))
+        if stat_filter is not None:
+            q_stat = q_stat.filter(stat_filter)
+        status_counts = dict(q_stat.group_by(DubbingJob.status).all())
+
+        total_all_jobs = sum(status_counts.values())
+        completed_all = status_counts.get(JobStatus.COMPLETED, 0)
+        failed_all = status_counts.get(JobStatus.FAILED, 0)
+        success_rate = round((completed_all / (completed_all + failed_all) * 100.0), 1) if (completed_all + failed_all) > 0 else 0.0
+
+        # Duration sum of completed
+        q_dur = db.query(func.sum(DubbingJob.video_duration))
+        if stat_filter is not None:
+            q_dur = q_dur.filter(stat_filter)
+        total_dur_sec = q_dur.filter(DubbingJob.status == JobStatus.COMPLETED).scalar() or 0.0
+        total_dur_min = round(total_dur_sec / 60.0, 1)
+
+        # Provider breakdown counts
+        q_prov = db.query(DubbingJob.tts_provider, func.count(DubbingJob.id))
+        if stat_filter is not None:
+            q_prov = q_prov.filter(stat_filter)
+        prov_counts = {
+            (k or "boshqa"): v for k, v in q_prov.group_by(DubbingJob.tts_provider).all()
+        }
+
+        # Page-level totals
+        page_total_usd = round(sum(item["costs"]["total_cost_usd"] for item in items), 3)
+        page_total_uzs = sum(item["costs"]["total_cost_uzs"] for item in items)
+        page_avg_job_uzs = round(page_total_uzs / len(items)) if items else 0
+
+        return {
+            "summary": {
+                "total_jobs": total_all_jobs,
+                "completed_jobs": completed_all,
+                "failed_jobs": failed_all,
+                "processing_jobs": sum(status_counts.get(s, 0) for s in [
+                    JobStatus.DOWNLOADING, JobStatus.TRANSCRIBING, JobStatus.TRANSLATING,
+                    JobStatus.SYNTHESIZING, JobStatus.SYNCING, JobStatus.MERGING
+                ]),
+                "awaiting_payment_jobs": status_counts.get(JobStatus.AWAITING_PAYMENT, 0) + status_counts.get(JobStatus.PENDING, 0),
+                "success_rate_pct": success_rate,
+                "total_completed_duration_min": total_dur_min,
+                "providers": prov_counts,
+                "page_total_cost_usd": page_total_usd,
+                "page_total_cost_uzs": page_total_uzs,
+                "page_avg_job_cost_uzs": page_avg_job_uzs,
+            },
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_items,
+                "total_pages": total_pages,
+            },
+            "jobs": items,
+        }
+    finally:
+        db.close()
+
 
 
 

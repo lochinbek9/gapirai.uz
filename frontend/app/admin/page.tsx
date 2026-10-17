@@ -17,6 +17,7 @@ import AdminRetentionManager from '@/components/AdminRetentionManager'
 import AdminBroadcastManager from '@/components/AdminBroadcastManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
+import AdminJobsCostManager from '@/components/AdminJobsCostManager'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -401,7 +402,7 @@ export default function AdminPage() {
             { id: 'sec-cohorts', label: 'Kohortlar', icon: '🧬' },
             { id: 'sec-retention', label: 'Retention', icon: '📊' },
             { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
-            { id: 'sec-jobs', label: 'Dublyaj', icon: '🎬' },
+            { id: 'sec-jobs', label: 'Dublyaj & Xarajatlar', icon: '🎬' },
             { id: 'sec-payments', label: "To'lovlar", icon: '💳' },
             { id: 'sec-management', label: 'Boshqaruv', icon: '⚙️' },
             { id: 'sec-broadcast', label: 'Xabarnoma', icon: '📢' },
@@ -545,29 +546,9 @@ export default function AdminPage() {
           <AdminBroadcastManager token={getToken() || ''} />
         </div>
 
-        {/* Jobs */}
-        <section id="sec-jobs" className="space-y-3 scroll-mt-16">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dublyaj (foydalanish)</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card label="Jami video" value={stats.jobs.total} icon={<Video className="w-5 h-5" />} />
-            <Card label="Ro'yxatdan o'tganlardan" value={stats.jobs.with_registered_user} icon={<Video className="w-5 h-5" />} />
-            <Card label="Tayyor (muvaffaqiyatli)" value={stats.jobs.by_status.COMPLETED || 0} icon={<Video className="w-5 h-5" />} />
-            <Card label="So'nggi 24 soat" value={stats.jobs.last_24h} icon={<Video className="w-5 h-5" />} />
-          </div>
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Holat bo'yicha</p>
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              {Object.entries(stats.jobs.by_status).map(([status, count]) => (
-                <div key={status} className="bg-black/20 border border-white/10 rounded-xl px-3 sm:px-4 py-2 flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{STATUS_LABELS[status] || status}</span>
-                  <span className="text-sm font-bold text-white">{count}</span>
-                </div>
-              ))}
-              {Object.keys(stats.jobs.by_status).length === 0 && (
-                <span className="text-xs text-gray-500">Hali video yo'q</span>
-              )}
-            </div>
-          </div>
+        {/* Jobs & Unit Economics */}
+        <section id="sec-jobs" className="scroll-mt-16">
+          <AdminJobsCostManager token={getToken() || ''} />
         </section>
 
         {/* Payments */}
