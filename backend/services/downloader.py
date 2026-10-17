@@ -568,3 +568,189 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720, max_durat
         "duration": final_duration,
         "uploader": uploader,
     }
+
+
+def _parse_vtt_content(vtt_text: str) -> list[dict]:
+    """Parse WebVTT subtitle text into timestamped segment dictionaries."""
+    segments = []
+    lines = vtt_text.replace("\r", "").split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if "-->" in line:
+            parts = line.split("-->")
+            start_str = parts[0].strip()
+            end_str = parts[1].strip().split(" ")[0]
+
+            def _t2s(t: str) -> float:
+                sp = t.split(":")
+                try:
+                    if len(sp) == 3:
+                        return float(sp[0]) * 3600 + float(sp[1]) * 60 + float(sp[2].replace(",", "."))
+                    elif len(sp) == 2:
+                        return float(sp[0]) * 60 + float(sp[1].replace(",", "."))
+                except Exception:
+                    pass
+                return 0.0
+
+            start = _t2s(start_str)
+            end = _t2s(end_str)
+            text_lines = []
+            i += 1
+            while i < len(lines) and lines[i].strip():
+                cleaned = re.sub(r"<[^>]+>", "", lines[i].strip())
+                if cleaned:
+                    text_lines.append(cleaned)
+                i += 1
+            cue_text = " ".join(text_lines).strip()
+            if cue_text:
+                segments.append({"start": round(start, 2), "end": round(end, 2), "text": cue_text})
+        i += 1
+    return segments
+
+
+def extract_youtube_captions(youtube_url: str, languages: list[str] = None) -> dict | None:
+    """YouTube mavjud subtitrlarini (auto yoki manual) yt-dlp orqali tezkor
+    ajratib oladi -- agar topilsa, audio yuklab olish va Whisper'siz 2 soniyada
+    segmentlar ro'yxatini qaytaradi."""
+    if languages is None:
+        languages = ["en", "ru", "uz", "es", "tr"]
+    try:
+        def _extract_subs(ydl):
+            info = ydl.extract_info(youtube_url, download=False)
+            subs = info.get("subtitles") or {}
+            auto_subs = info.get("automatic_captions") or {}
+
+            chosen_sub_url = None
+            chosen_ext = "vtt"
+            detected_lang = None
+            # Avval manual subtitrlarni tekshiramiz
+            for lang in languages:
+                if lang in subs:
+                    for fmt in subs[lang]:
+                        if fmt.get("ext") in ("vtt", "json3"):
+                            chosen_sub_url = fmt.get("url")
+                            chosen_ext = fmt.get("ext")
+                            detected_lang = lang
+                            break
+                    if chosen_sub_url:
+                        break
+            # Agar yo'q bo'lsa, avtomatik subtitrlarni tekshiramiz
+            if not chosen_sub_url:
+                for lang in languages:
+                    if lang in auto_subs:
+                        for fmt in auto_subs[lang]:
+                            if fmt.get("ext") in ("vtt", "json3"):
+                                chosen_sub_url = fmt.get("url")
+                                chosen_ext = fmt.get("ext")
+                                detected_lang = lang
+                                break
+                        if chosen_sub_url:
+                            break
+            return chosen_sub_url, chosen_ext, detected_lang, info.get("title", ""), float(info.get("duration", 0) or 0)
+
+        sub_url, ext, lang, title, duration = proxy_manager.run_with_proxy_chain(_extract_subs, use_cookies=False)
+        if not sub_url:
+            return None
+
+        resp = requests.get(sub_url, timeout=10)
+        if resp.status_code != 200 or not resp.text:
+            return None
+
+        segments = _parse_vtt_content(resp.text)
+        if len(segments) >= 3:
+            return {
+                "segments": segments,
+                "title": title,
+                "duration": duration,
+                "language": lang,
+            }
+    except Exception as e:
+        logger.warning(f"YouTube subtitrlarini ajratib olishda xatolik (fallback ishlatiladi): {e}")
+    return None
+
+
+def download_audio(youtube_url: str, job_id: str, max_duration_seconds: float | None = None) -> dict:
+    """Faqat audio oqimini yuklab oladi -- video tahlil uchun 720p video yuklash shart emas,
+    10x tezroq va tarmoq xatolariga ancha chidamli."""
+    _rate_limiter.acquire()
+    try:
+        return _do_download_audio(youtube_url, job_id, max_duration_seconds=max_duration_seconds)
+    except Exception:
+        _rate_limiter.mark_failure()
+        raise
+    else:
+        _rate_limiter.mark_success()
+    finally:
+        _rate_limiter.release()
+
+
+def _do_download_audio(youtube_url: str, job_id: str, max_duration_seconds: float | None = None) -> dict:
+    job_dir = Path(settings.OUTPUT_DIR) / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    audio_tpl = str(job_dir / "raw_audio.%(ext)s")
+
+    extra_opts = {
+        "outtmpl": audio_tpl,
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
+    }
+
+    def _do_extract(ydl):
+        info = ydl.extract_info(youtube_url, download=True)
+        return (
+            info.get("title", "Unknown"),
+            float(info.get("duration", 0) or 0),
+            info.get("uploader", "") or info.get("channel", "") or "",
+        )
+
+    try:
+        title, duration, uploader = proxy_manager.run_with_proxy_chain(_do_extract, extra=extra_opts, use_cookies=True)
+        if uploader:
+            _cache_channel_name(youtube_url, uploader)
+    except Exception as e2:
+        code = errcls.classify_text(str(e2))
+        if code == errcls.VIDEO_UNAVAILABLE:
+            raise PermanentError(
+                "Bu videoni yuklab bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                code=errcls.VIDEO_UNAVAILABLE,
+            ) from e2
+        raise RuntimeError(f"Audio yuklashda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
+
+    raw_audio_file = None
+    for f in job_dir.iterdir():
+        if f.is_file() and f.stem == "raw_audio":
+            raw_audio_file = f
+            break
+    if not raw_audio_file:
+        files = [f for f in job_dir.iterdir() if f.is_file() and f.suffix in (".m4a", ".webm", ".opus", ".mp3", ".ogg")]
+        if files:
+            raw_audio_file = files[0]
+        else:
+            raise RuntimeError(f"Yuklangan audio fayl topilmadi: {job_dir}")
+
+    audio_file = job_dir / "audio.wav"
+    ffmpeg_cmd = ["ffmpeg", "-y"]
+    if max_duration_seconds and max_duration_seconds > 0:
+        ffmpeg_cmd.extend(["-t", str(max_duration_seconds)])
+    ffmpeg_cmd.extend([
+        "-i", str(raw_audio_file),
+        "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_file),
+    ])
+    proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"Audio ajratishda xatolik: {proc.stderr[-500:]}")
+
+    try:
+        raw_audio_file.unlink()
+    except Exception:
+        pass
+
+    final_duration = min(duration, max_duration_seconds) if (max_duration_seconds and max_duration_seconds > 0) else duration
+
+    return {
+        "audio_path": str(audio_file),
+        "title": title,
+        "duration": final_duration,
+        "uploader": uploader,
+    }

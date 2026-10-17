@@ -328,7 +328,12 @@ export default function Home() {
   // "Share -> GapirAI" qilinganda havolani oldindan to'ldiramiz.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const shared = new URLSearchParams(window.location.search).get("shared");
+    const params = new URLSearchParams(window.location.search);
+    const shared = params.get("shared") || params.get("url");
+    const requestedMode = params.get("mode");
+    if (requestedMode && (requestedMode === "dub" || requestedMode === "subtitle" || requestedMode === "analyze")) {
+      setMode(requestedMode as any);
+    }
     if (shared && (shared.includes("youtube.com") || shared.includes("youtu.be"))) {
       handleUrlChange(shared);
       window.history.replaceState({}, "", window.location.pathname);

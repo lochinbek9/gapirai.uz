@@ -161,13 +161,28 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         elif audio_path_upload.exists() or audio_path_output.exists():
             _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "skipped")
         else:
-            _update_analysis(db, analysis, AnalysisStatus.DOWNLOADING, 10.0, "YouTube'dan yuklanmoqda...")
-            download_result = downloader.download_video(analysis.youtube_url, analysis_id)
-            analysis.video_title = analysis.video_title or download_result["title"]
-            analysis.video_duration = analysis.video_duration or download_result["duration"]
-            db.commit()
-            audio_path = download_result["audio_path"]
-            _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "ok")
+            _update_analysis(db, analysis, AnalysisStatus.DOWNLOADING, 10.0, "YouTube'dan ma'lumot olinmoqda...")
+            caption_data = None
+            try:
+                caption_data = downloader.extract_youtube_captions(analysis.youtube_url)
+            except Exception as cap_err:
+                logger.warning(f"[ANALYSIS {analysis_id}] Subtitrlarni tekshirishda xatolik: {cap_err}")
+
+            if caption_data and caption_data.get("segments"):
+                analysis.transcript_segments = caption_data["segments"]
+                analysis.video_title = analysis.video_title or caption_data.get("title")
+                analysis.video_duration = analysis.video_duration or caption_data.get("duration")
+                if caption_data.get("language"):
+                    analysis.video_language = normalize_video_language(caption_data.get("language"))
+                db.commit()
+                _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "skipped (captions)")
+            else:
+                download_result = downloader.download_audio(analysis.youtube_url, analysis_id)
+                analysis.video_title = analysis.video_title or download_result["title"]
+                analysis.video_duration = analysis.video_duration or download_result["duration"]
+                db.commit()
+                audio_path = download_result["audio_path"]
+                _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "ok")
 
         # BOSQICH 2: Transkripsiya (mavjud transcriber.py'dan qayta foydalanish)
         # Checkpoint: transcript_segments allaqachon saqlangan bo'lsa, qimmat

@@ -180,6 +180,7 @@ export interface VideoPlayerProps {
   className?: string;
   theaterMode?: boolean;
   onTheaterToggle?: () => void;
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
 // YouTubePlayerHandle (frontend/components/YouTubePlayer.tsx) bilan bir xil
@@ -193,7 +194,7 @@ export interface VideoPlayerHandle {
 /* ── VideoPlayer ──────────────────────────────────── */
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   src, jobId, videoTitle, channelName, youtubeUrl, initialQuality, subtitlesContent, audioDownloadUrl,
-  className = "", theaterMode = false, onTheaterToggle,
+  className = "", theaterMode = false, onTheaterToggle, onTimeUpdate,
 }, ref) => {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -427,7 +428,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onTime  = () => setProgress(v.currentTime);
+    const onTime  = () => {
+      setProgress(v.currentTime);
+      onTimeUpdate?.(v.currentTime);
+    };
     const onDur   = () => setDuration(v.duration);
     const onBuf   = () => v.buffered.length > 0 && setBuffered(v.buffered.end(v.buffered.length - 1));
     const onEnd   = () => setPlaying(false);

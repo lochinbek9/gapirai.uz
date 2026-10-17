@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert, Send } from "lucide-react";
+import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert, Send, Sparkles, Copy, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
-import { useState, useEffect } from "react";
-import VideoPlayer from "@/components/VideoPlayer";
+import { Job, getDownloadUrl, getVideoUrl, formatDuration, getJobSummary, JobSummaryResponse } from "@/lib/api";
+import { useState, useEffect, useRef, useMemo } from "react";
+import VideoPlayer, { VideoPlayerHandle } from "@/components/VideoPlayer";
+import InteractiveTranscript, { CueItem } from "@/components/InteractiveTranscript";
 
 interface Props {
   job: Job;
@@ -14,6 +15,12 @@ interface Props {
 export default function VideoResult({ job, onReset }: Props) {
   const [showText, setShowText] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [summaryData, setSummaryData] = useState<JobSummaryResponse | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryCopied, setSummaryCopied] = useState(false);
+  const playerRef = useRef<VideoPlayerHandle>(null);
+
   const videoUrl = getVideoUrl(job.job_id);
   const downloadUrl = getDownloadUrl(job.job_id);
 
@@ -22,6 +29,61 @@ export default function VideoResult({ job, onReset }: Props) {
       window.scrollTo({ top: 120, behavior: "smooth" });
     }
   }, []);
+
+  // Fetch AI Summary and Key Takeaways
+  useEffect(() => {
+    if (job?.job_id && (job.translated_text || job.transcript_text || job.linked_analysis_id)) {
+      setSummaryLoading(true);
+      getJobSummary(job.job_id)
+        .then((res) => {
+          if (res?.summary || (res?.key_points && res.key_points.length > 0)) {
+            setSummaryData(res);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    }
+  }, [job?.job_id, job?.translated_text, job?.transcript_text, job?.linked_analysis_id]);
+
+  // Parse WebVTT subtitles into cues for InteractiveTranscript
+  const cues = useMemo<CueItem[]>(() => {
+    if (!job.uzbek_srt_content) {
+      if (job.translated_text) {
+        return [{ start: 0, end: job.video_duration || 60, text: job.translated_text }];
+      }
+      return [];
+    }
+    const out: CueItem[] = [];
+    const vttToSec = (t: string) =>
+      t.trim().split(":").reduce((a, p) => a * 60 + parseFloat(p.replace(",", ".")), 0);
+    for (const blk of job.uzbek_srt_content.replace(/\r/g, "").split(/\n\n+/)) {
+      const lines = blk.trim().split("\n");
+      const ti = lines.findIndex((l) => l.includes("-->"));
+      if (ti < 0) continue;
+      const [s, e] = lines[ti].split(" --> ");
+      const text = lines.slice(ti + 1).filter((l) => l.trim()).join(" ");
+      if (text) out.push({ start: vttToSec(s), end: vttToSec(e), text });
+    }
+    return out;
+  }, [job.uzbek_srt_content, job.translated_text, job.video_duration]);
+
+  const handleSeek = (sec: number) => {
+    playerRef.current?.seekTo(sec);
+  };
+
+  const handleCopySummary = async () => {
+    if (!summaryData) return;
+    const parts = [];
+    if (summaryData.summary) parts.push(`📌 Xulosa:\n${summaryData.summary}`);
+    if (summaryData.key_points && summaryData.key_points.length > 0) {
+      parts.push(`💡 Asosiy fikrlar:\n${summaryData.key_points.map((p, i) => `${i + 1}. ${p}`).join("\n")}`);
+    }
+    try {
+      await navigator.clipboard.writeText(parts.join("\n\n"));
+      setSummaryCopied(true);
+      setTimeout(() => setSummaryCopied(false), 2000);
+    } catch {}
+  };
 
   const handleShare = async () => {
     const shareUrl = typeof window !== "undefined"
@@ -83,9 +145,9 @@ export default function VideoResult({ job, onReset }: Props) {
         >
           <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-            Video tayyor va shaxsiy foydalanish uchun mavjud. Ammo kontent siyosatimizga ko'ra
-            (diniy, 18+, zo'ravonlik yoki shunga o'xshash kategoriya) bunday videolarni
-            keyingi safar yubormaslikni so'raymiz.
+            Video tayyor va shaxsiy foydalanish uchun mavjud. Ammo kontent siyosatimizga ko&apos;ra
+            (diniy, 18+, zo&apos;ravonlik yoki shunga o&apos;xshash kategoriya) bunday videolarni
+            keyingi safar yubormaslikni so&apos;raymiz.
           </p>
         </motion.div>
       )}
@@ -98,6 +160,7 @@ export default function VideoResult({ job, onReset }: Props) {
         className="rounded-3xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10"
       >
         <VideoPlayer
+          ref={playerRef}
           key={videoUrl}
           src={videoUrl}
           jobId={job.job_id}
@@ -105,6 +168,7 @@ export default function VideoResult({ job, onReset }: Props) {
           channelName={job.channel_name}
           youtubeUrl={job.youtube_url}
           subtitlesContent={job.uzbek_srt_content}
+          onTimeUpdate={setCurrentTime}
           className="rounded-3xl"
         />
       </motion.div>
@@ -167,7 +231,7 @@ export default function VideoResult({ job, onReset }: Props) {
               <span>🎉 Dublyaj yoqdimi?</span>
             </h4>
             <p className="text-[11px] text-gray-600 dark:text-slate-400">
-              Videoni Telegram'da do'stlaringizga ulashing yoki keyingi videongizni hoziroq tayyorlang!
+              Videoni Telegram&apos;da do&apos;stlaringizga ulashing yoki keyingi videongizni hoziroq tayyorlang!
             </p>
           </div>
           <div className="flex gap-2">
@@ -191,38 +255,78 @@ export default function VideoResult({ job, onReset }: Props) {
         </motion.div>
       </div>
 
-      {/* ── Translation Text Accordion ────────────── */}
-      {job.translated_text && (
-        <div className="glass-input rounded-2xl overflow-hidden border border-black/5 dark:border-white/[0.03] transition-colors">
-          <button 
-            onClick={() => setShowText(!showText)}
-            className="w-full flex items-center justify-between px-6 py-4 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
-          >
-            <div className="flex items-center gap-3">
-               <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest transition-colors">O'zbekcha matn</span>
-            </div>
-            <ChevronDown 
-              size={14} 
-              className={`text-gray-400 dark:text-gray-600 transition-transform duration-300 ${showText ? "rotate-180" : ""}`} 
-            />
-          </button>
-          
-          <AnimatePresence>
-            {showText && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-6 pt-1 text-xs text-gray-600 dark:text-gray-400 leading-relaxed max-h-48 overflow-y-auto">
-                   <p className="whitespace-pre-wrap transition-colors">{job.translated_text}</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {/* ── AI Xulosa & Asosiy Tezislar (Growth Experiment 1) ── */}
+      {summaryLoading ? (
+        <div className="glass-card rounded-[24px] p-5 sm:p-6 border border-blue-500/15 animate-pulse space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-lg bg-blue-500/20" />
+            <div className="h-4 w-40 bg-black/10 dark:bg-white/10 rounded-full" />
+          </div>
+          <div className="h-3 w-full bg-black/5 dark:bg-white/5 rounded-full" />
+          <div className="h-3 w-4/5 bg-black/5 dark:bg-white/5 rounded-full" />
         </div>
+      ) : summaryData && (summaryData.summary || (summaryData.key_points && summaryData.key_points.length > 0)) ? (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-[24px] p-5 sm:p-6 border border-blue-500/20 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-transparent space-y-4 shadow-sm"
+        >
+          <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shadow-inner">
+                <Sparkles size={15} className="text-blue-500" />
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                AI Xulosa & Asosiy Tezislar
+              </h4>
+            </div>
+            <button
+              onClick={handleCopySummary}
+              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition flex items-center gap-1.5"
+            >
+              {summaryCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+              <span>{summaryCopied ? "Nusxalandi" : "Xulosani nusxalash"}</span>
+            </button>
+          </div>
+
+          {summaryData.summary && (
+            <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
+              {summaryData.summary}
+            </p>
+          )}
+
+          {summaryData.key_points && summaryData.key_points.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                Asosiy xulosalar:
+              </span>
+              <div className="grid gap-2">
+                {summaryData.key_points.map((pt, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-xs text-gray-800 dark:text-gray-200"
+                  >
+                    <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    <span className="leading-snug">{pt}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      ) : null}
+
+      {/* ── Interaktiv Transkript (Growth Experiment 3) ── */}
+      {cues.length > 0 && (
+        <InteractiveTranscript
+          cues={cues}
+          currentTime={currentTime}
+          onSeek={handleSeek}
+          videoTitle={job.video_title}
+          jobId={job.job_id}
+        />
       )}
 
       {/* ── Reset Button ──────────────────────────── */}

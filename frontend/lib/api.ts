@@ -152,6 +152,17 @@ export async function getJob(jobId: string): Promise<Job> {
   return res.data
 }
 
+export interface JobSummaryResponse {
+  summary: string | null;
+  key_points: string[];
+  source?: string;
+}
+
+export async function getJobSummary(jobId: string): Promise<JobSummaryResponse> {
+  const res = await apiClient.get(`/api/jobs/${jobId}/summary`)
+  return res.data
+}
+
 // Mirrors backend/api/routes.py's _ALLOWED_UPLOAD_CONTENT_TYPES /
 // MAX_UPLOAD_SIZE_BYTES exactly -- client-side check only, the backend is
 // the real gate. Kept here (not fetched at runtime) to match this

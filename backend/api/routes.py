@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, defer
 from pathlib import Path
 from typing import Optional
 
-from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant
+from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant, VideoAnalysis
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
 from backend.services.downloader import get_video_info
 from backend.config import get_settings
@@ -1151,6 +1151,86 @@ def get_subtitles_txt(job_id: uuid.UUID, db: Session = Depends(get_db)):
             ),
         },
     )
+
+
+@router.get("/jobs/{job_id}/summary")
+def get_job_summary(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Dublyaj qilingan video uchun tezkor AI Xulosa va asosiy fikrlar (3-5 ta tezis).
+    1. Agar linked_analysis mavjud bo'lsa, uning tayyor xulosasini beradi.
+    2. Aks holda Redis keshidan tekshiradi.
+    3. Keshda bo'lmasa, job.translated_text asosida Gemini orqali 1-2 soniyada
+       ixcham xulosa va asosiy fikrlarni generatsiya qiladi va Redis'ga keshlaydi."""
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Ish topilmadi.")
+
+    # 1. Linked VideoAnalysis bor bo'lsa:
+    if job.linked_analysis_id:
+        analysis = db.query(VideoAnalysis).filter(VideoAnalysis.id == job.linked_analysis_id).first()
+        if analysis and (analysis.summary or analysis.key_points):
+            short_sum = (analysis.summary or {}).get("short") or (analysis.summary or {}).get("medium")
+            kps = [kp.get("title", "") for kp in (analysis.key_points or [])[:4] if kp.get("title")]
+            return {
+                "summary": short_sum or (analysis.five_minute_summary or {}).get("why_it_matters"),
+                "key_points": kps,
+                "source": "analysis",
+            }
+
+    # 2. Redis keshini tekshiramiz:
+    redis_key = f"job_summary:{job_id}"
+    r_cli = None
+    try:
+        import redis
+        r_cli = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        cached = r_cli.get(redis_key)
+        if cached:
+            import json
+            return json.loads(cached)
+    except Exception as e:
+        logger.warning(f"Redis get summary error: {e}")
+
+    # 3. Agar matn bo'lmasa:
+    text_to_summarize = job.translated_text or job.transcript_text
+    if not text_to_summarize:
+        return {"summary": None, "key_points": [], "source": "none"}
+
+    # 4. Gemini orqali ixcham xulosa generatsiya qilamiz:
+    try:
+        from backend.services.gemini_quota_manager import call_gemini_json_with_fallback
+        system_prompt = (
+            "Siz professional video tahlilchisiz. Berilgan matn bo'yicha O'zbek tilida aniq, "
+            "tushunarli va qisqa xulosa tuzing. Faqat JSON formatida javob bering."
+        )
+        user_prompt = f"""Quyidagi video matnidan foydalanib:
+1. 'summary': Videoning asl mohiyatini tushuntiruvchi 1-2 jumlali ixcham xulosa.
+2. 'key_points': 3-4 ta eng muhim fikr, maslahat yoki saboq (har biri qisqa, ta'sirli 1 jumla).
+
+Video sarlavhasi: {job.video_title or 'Video'}
+Matn:
+{text_to_summarize[:3500]}
+
+JSON formati:
+{{
+  "summary": "...",
+  "key_points": ["1-asosiy fikr...", "2-asosiy fikr...", "3-asosiy fikr..."]
+}}
+"""
+        res = call_gemini_json_with_fallback(system_prompt, user_prompt)
+        payload = {
+            "summary": res.get("summary"),
+            "key_points": res.get("key_points") or [],
+            "source": "generated",
+        }
+        if r_cli:
+            try:
+                import json
+                r_cli.setex(redis_key, 86400 * 7, json.dumps(payload))
+            except Exception:
+                pass
+        return payload
+    except Exception as exc:
+        logger.warning(f"Error generating summary for job {job_id}: {exc}")
+        return {"summary": None, "key_points": [], "source": "error"}
 
 
 @router.get("/outputs/{job_id}/audio")

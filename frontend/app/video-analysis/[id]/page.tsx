@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn,
+  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
@@ -318,6 +318,35 @@ export default function VideoAnalysisPage() {
               <span className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
                 Tahlil: {displayLanguage(analysis.language)}
               </span>
+            </div>
+
+            {/* ── Dubbing Lead Magnet Banner (Growth Experiment 2) ── */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+              <div className="space-y-1 text-center sm:text-left">
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
+                    🎙️ Ovozli Dublyaj
+                  </span>
+                  <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    Starter: 4,900 so&apos;m
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-extrabold text-white">
+                  Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
+                </h3>
+                <p className="text-xs text-gray-300">
+                  Sun&apos;iy intellekt orqali professional ovozda to&apos;liq tarjima qiling.
+                </p>
+              </div>
+
+              <Link
+                href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+              >
+                <Sparkles size={16} />
+                <span>O&apos;zbekcha dublyaj qilish</span>
+                <ArrowRight size={14} />
+              </Link>
             </div>
 
             <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">

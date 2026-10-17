@@ -107,6 +107,13 @@ export default function AnalysisUrlForm() {
         </motion.div>
       )}
 
+      {/* Feature teaser banner */}
+      <div className="p-3 sm:p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center">
+        <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-300 font-medium">
+          ⚡ <strong>Tezkor rejim:</strong> 15-20 soniyada butun videoning qisqa konspekti, asosiy xulosalari va testini oling.
+        </p>
+      </div>
+
       <motion.button
         type="submit"
         disabled={loading || !url.trim()}
@@ -120,15 +127,15 @@ export default function AnalysisUrlForm() {
         {loading ? (
           <><Loader2 size={18} className="animate-spin" /> Tahlil boshlanmoqda...</>
         ) : (
-          <><Sparkles size={18} /> Video tahlil qilish</>
+          <><Sparkles size={18} /> Tezkor tahlil qilish</>
         )}
       </motion.button>
 
-      <div className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
-        {["Xulosa", "Chapterlar", "Test", "Savol-javob"].map((label, i) => (
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-6 pt-1">
+        {["AI Xulosa", "Asosiy fikrlar", "Transkript", "Konspekt", "Test"].map((label, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">{label}</span>
+            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tighter">{label}</span>
           </div>
         ))}
       </div>
