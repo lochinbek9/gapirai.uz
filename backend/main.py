@@ -126,6 +126,7 @@ def recover_stuck_jobs(redis_conn=None):
             job.status = JobStatus.PENDING
             job.status_message = "Tizim qayta ishga tushgandan so'ng jarayon qayta tiklandi."
             db.commit()
+            _dur = (float(job.video_duration or 0.0)) / 60.0
             process_video.apply_async(args=[str(job.id)], queue=get_job_queue_v2(db, job.user_id, _dur))
     except Exception as e:
         print(f"[RECOVERY ERROR] Error during job recovery: {e}")
