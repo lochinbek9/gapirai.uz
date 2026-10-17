@@ -27,6 +27,7 @@ import {
   X,
   TrendingUp,
   Percent,
+  Calendar,
 } from 'lucide-react'
 import {
   apiAdminJobsCost,
@@ -117,6 +118,48 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formatDateTime = (dateStr: string | null | undefined): { date: string; time: string; full: string } => {
+    if (!dateStr) return { date: '—', time: '', full: '—' }
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return { date: '—', time: '', full: '—' }
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      const year = d.getFullYear()
+      const month = pad(d.getMonth() + 1)
+      const day = pad(d.getDate())
+      const hours = pad(d.getHours())
+      const mins = pad(d.getMinutes())
+      const secs = pad(d.getSeconds())
+      return {
+        date: `${day}.${month}.${year}`,
+        time: `${hours}:${mins}:${secs}`,
+        full: `${day}.${month}.${year} ${hours}:${mins}:${secs}`,
+      }
+    } catch {
+      return { date: '—', time: '', full: '—' }
+    }
+  }
+
+  const getRelativeTime = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return ''
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return ''
+      const diffMs = Date.now() - d.getTime()
+      const diffSec = Math.floor(diffMs / 1000)
+      if (diffSec < 60) return 'Hozirgina'
+      const diffMin = Math.floor(diffSec / 60)
+      if (diffMin < 60) return `${diffMin} daq oldin`
+      const diffHours = Math.floor(diffMin / 60)
+      if (diffHours < 24) return `${diffHours} soat oldin`
+      const diffDays = Math.floor(diffHours / 24)
+      if (diffDays < 30) return `${diffDays} kun oldin`
+      return ''
+    } catch {
+      return ''
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -414,6 +457,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               <tr className="border-b border-white/10 bg-white/[0.02] text-gray-400 text-[11px] font-semibold tracking-wider uppercase">
                 <th className="py-3 px-4">Video & ID</th>
                 <th className="py-3 px-4">Foydalanuvchi</th>
+                <th className="py-3 px-4 whitespace-nowrap">Uringan vaqti</th>
                 <th className="py-3 px-4">Status & Bosqich</th>
                 <th className="py-3 px-4">Modellar</th>
                 <th className="py-3 px-4 text-right">Unit Economics (Xarajat)</th>
@@ -423,14 +467,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
             <tbody className="divide-y divide-white/5">
               {loading && jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">
+                  <td colSpan={7} className="py-12 text-center text-gray-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-400" />
                     <span>Yuklanmoqda...</span>
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">
+                  <td colSpan={7} className="py-12 text-center text-gray-500">
                     Hech qanday dublyaj jobi topilmadi.
                   </td>
                 </tr>
@@ -523,6 +567,31 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             <span className="inline-block mt-0.5 text-[9px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-1 rounded">
                               Dasturchi / Test
                             </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Created At / Attempt Time */}
+                      <td className="py-3.5 px-4 min-w-[140px] whitespace-nowrap">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-xs font-mono font-medium text-white">
+                            <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
+                            <span>{formatDateTime(job.created_at).date}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] text-gray-400 font-mono">
+                            <Clock className="w-2.5 h-2.5 text-gray-500 shrink-0" />
+                            <span>{formatDateTime(job.created_at).time}</span>
+                            {getRelativeTime(job.created_at) && (
+                              <span className="text-[10px] text-blue-400/90 bg-blue-500/10 px-1 rounded ml-1 font-sans">
+                                {getRelativeTime(job.created_at)}
+                              </span>
+                            )}
+                          </div>
+                          {job.completed_at && (
+                            <div className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1" title="Tugallangan vaqti">
+                              <span>✓</span>
+                              <span>{formatDateTime(job.completed_at).time}</span>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -693,9 +762,13 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 )}
                 <div className="space-y-1.5 min-w-0 flex-1">
                   <h4 className="font-semibold text-white text-sm line-clamp-2">{selectedJob.video_title}</h4>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
                     <span>Davomiyligi: <strong className="text-gray-200">{formatDurationBadge(selectedJob.video_duration)}</strong></span>
                     <span>Qayta ishlash: <strong className="text-gray-200">{formatSeconds(selectedJob.processing_seconds)}</strong></span>
+                    <span>Uringan vaqti: <strong className="text-white font-mono">{formatDateTime(selectedJob.created_at).full}</strong></span>
+                    {selectedJob.completed_at && (
+                      <span>Tugallandi: <strong className="text-emerald-400 font-mono">{formatDateTime(selectedJob.completed_at).full}</strong></span>
+                    )}
                   </div>
                   {selectedJob.youtube_url && (
                     <a
