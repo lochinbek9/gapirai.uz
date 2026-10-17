@@ -1295,6 +1295,446 @@ def admin_funnel_stats(
         db.close()
 
 
+@router.get("/cohorts")
+def admin_cohorts_stats(
+    granularity: str = Query(default="weekly"),
+    metric: str = Query(default="activity"),
+    periods_count: int = Query(default=8, ge=4, le=24),
+    include_internal: bool = Query(default=False),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Foydalanuvchilarning aktivatsiya va retention kohortalari tahlili:
+    - Haftalik yoki Oylik kohortalar (Weekly / Monthly)
+    - Ko'rsatkich turi bo'yicha:
+        1. 'activity' — platformaga kirish, video yuborish yoki tahlil
+        2. 'jobs' — kamida bitta video yoki tahlil yaratish (Mahsulot qiymati)
+        3. 'paying' — to'lov qiluvchilar retentioni (Repeat purchase)
+    - Klassik kohorta issiqlik xaritasi (Heatmap matrix) W0, W1, W2...
+    - Aktivatsiya bosqichlari (Tasdiqlangan, D0 24h, D3, Aha! moment, 2+ video, To'lov)
+    - O'rtacha va median birinchi harakat vaqti (Time to first action)
+    - Amaliy tavsiyalar va xulosalar (Actionable insights)
+    """
+    from sqlalchemy import text
+    from datetime import date, datetime, timedelta
+
+    if granularity not in ("weekly", "monthly"):
+        granularity = "weekly"
+    if metric not in ("activity", "jobs", "paying"):
+        metric = "activity"
+
+    db = SessionLocal()
+    try:
+        now_utc = datetime.utcnow()
+        now_tashkent = now_utc + timedelta(hours=5)
+        today = now_tashkent.date()
+        internal_clause = "" if include_internal else "AND u.is_internal = FALSE"
+
+        UZBEK_MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
+
+        # 1. Kohortalar bazasi (Ro'yxatdan o'tgan haftalar/oylar)
+        if granularity == "weekly":
+            cohort_sql = f"""
+                SELECT 
+                    date_trunc('week', u.created_at + interval '5 hours')::date as cohort_start,
+                    (date_trunc('week', u.created_at + interval '5 hours')::date + interval '6 days')::date as cohort_end,
+                    to_char(u.created_at + interval '5 hours', 'IYYY-\"W\"IW') as cohort_id,
+                    count(*) as cohort_size
+                FROM users u
+                WHERE 1=1 {internal_clause}
+                GROUP BY 1, 2, 3
+                ORDER BY cohort_start DESC
+                LIMIT :limit;
+            """
+        else:
+            cohort_sql = f"""
+                SELECT 
+                    date_trunc('month', u.created_at + interval '5 hours')::date as cohort_start,
+                    (date_trunc('month', u.created_at + interval '5 hours') + interval '1 month - 1 day')::date as cohort_end,
+                    to_char(u.created_at + interval '5 hours', 'YYYY-MM') as cohort_id,
+                    count(*) as cohort_size
+                FROM users u
+                WHERE 1=1 {internal_clause}
+                GROUP BY 1, 2, 3
+                ORDER BY cohort_start DESC
+                LIMIT :limit;
+            """
+
+        cohort_rows = db.execute(text(cohort_sql), {"limit": periods_count}).mappings().all()
+        if not cohort_rows:
+            return {
+                "granularity": granularity,
+                "metric": metric,
+                "cohorts": [],
+                "benchmarks": [],
+                "activation": [],
+                "activation_summary": {},
+                "insights": []
+            }
+
+        oldest_cohort_start = cohort_rows[-1]["cohort_start"]
+
+        # 2. Tanlangan ko'rsatkich bo'yicha faollik manbasi (Activity CTE)
+        if metric == "jobs":
+            activity_cte = """
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as act_day 
+                FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT va.user_id, (va.created_at + interval '5 hours')::date as act_day 
+                FROM video_analyses va WHERE va.user_id IS NOT NULL
+            """
+        elif metric == "paying":
+            activity_cte = """
+                SELECT p.user_id, (p.created_at + interval '5 hours')::date as act_day 
+                FROM payments p 
+                WHERE p.user_id IS NOT NULL 
+                  AND p.status = 'APPROVED' 
+                  AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+            """
+        else:  # activity
+            activity_cte = """
+                SELECT v.user_id, v.visit_date as act_day FROM user_daily_visits v
+                UNION
+                SELECT j.user_id, (j.created_at + interval '5 hours')::date as act_day 
+                FROM dubbing_jobs j WHERE j.user_id IS NOT NULL
+                UNION
+                SELECT va.user_id, (va.created_at + interval '5 hours')::date as act_day 
+                FROM video_analyses va WHERE va.user_id IS NOT NULL
+                UNION
+                SELECT p.user_id, (p.created_at + interval '5 hours')::date as act_day 
+                FROM payments p WHERE p.user_id IS NOT NULL AND p.status = 'APPROVED'
+            """
+
+        # 3. Retention Matrix so'rovi (Heatmap jadvali)
+        if granularity == "weekly":
+            matrix_sql = f"""
+                WITH user_cohorts AS (
+                    SELECT 
+                        u.id as user_id,
+                        date_trunc('week', u.created_at + interval '5 hours')::date as cohort_start
+                    FROM users u
+                    WHERE (u.created_at + interval '5 hours')::date >= :oldest_start
+                      {internal_clause}
+                ),
+                activity AS (
+                    {activity_cte}
+                )
+                SELECT 
+                    uc.cohort_start,
+                    FLOOR((date_trunc('week', a.act_day)::date - uc.cohort_start) / 7.0)::int as period_index,
+                    count(DISTINCT uc.user_id) as active_count
+                FROM user_cohorts uc
+                JOIN activity a ON uc.user_id = a.user_id
+                WHERE a.act_day >= uc.cohort_start
+                GROUP BY 1, 2
+                HAVING FLOOR((date_trunc('week', a.act_day)::date - uc.cohort_start) / 7.0)::int BETWEEN 0 AND :max_periods;
+            """
+        else:
+            matrix_sql = f"""
+                WITH user_cohorts AS (
+                    SELECT 
+                        u.id as user_id,
+                        date_trunc('month', u.created_at + interval '5 hours')::date as cohort_start
+                    FROM users u
+                    WHERE (u.created_at + interval '5 hours')::date >= :oldest_start
+                      {internal_clause}
+                ),
+                activity AS (
+                    {activity_cte}
+                )
+                SELECT 
+                    uc.cohort_start,
+                    ((EXTRACT(YEAR FROM a.act_day) - EXTRACT(YEAR FROM uc.cohort_start)) * 12 + 
+                     (EXTRACT(MONTH FROM a.act_day) - EXTRACT(MONTH FROM uc.cohort_start)))::int as period_index,
+                    count(DISTINCT uc.user_id) as active_count
+                FROM user_cohorts uc
+                JOIN activity a ON uc.user_id = a.user_id
+                WHERE a.act_day >= uc.cohort_start
+                GROUP BY 1, 2
+                HAVING ((EXTRACT(YEAR FROM a.act_day) - EXTRACT(YEAR FROM uc.cohort_start)) * 12 + 
+                        (EXTRACT(MONTH FROM a.act_day) - EXTRACT(MONTH FROM uc.cohort_start)))::int BETWEEN 0 AND :max_periods;
+            """
+
+        matrix_rows = db.execute(text(matrix_sql), {
+            "oldest_start": oldest_cohort_start,
+            "max_periods": periods_count - 1
+        }).mappings().all()
+
+        matrix_map = {}
+        for r in matrix_rows:
+            matrix_map[(r["cohort_start"], r["period_index"])] = r["active_count"]
+
+        # Retention satrlarini tuzish
+        retention_rows = []
+        period_sums = {p: [] for p in range(periods_count)}
+        for c in cohort_rows:
+            c_start = c["cohort_start"]
+            c_end = c["cohort_end"]
+            c_size = c["cohort_size"]
+            c_id = c["cohort_id"]
+
+            if granularity == "weekly":
+                label = f"{c_start.strftime('%d.%m')} - {c_end.strftime('%d.%m')}"
+            else:
+                month_name = UZBEK_MONTHS[c_start.month - 1]
+                label = f"{month_name} {c_start.year}"
+
+            periods = []
+            for p in range(periods_count):
+                if granularity == "weekly":
+                    p_start = c_start + timedelta(days=p * 7)
+                else:
+                    m_year = c_start.year + (c_start.month - 1 + p) // 12
+                    m_month = ((c_start.month - 1 + p) % 12) + 1
+                    p_start = date(m_year, m_month, 1)
+
+                is_future = p_start > today
+                if is_future:
+                    periods.append({
+                        "period_index": p,
+                        "label": f"{'W' if granularity == 'weekly' else 'M'}{p}",
+                        "active_count": 0,
+                        "retention_pct": None,
+                        "is_future": True,
+                    })
+                else:
+                    act_count = matrix_map.get((c_start, p), 0)
+                    pct = round(100.0 * act_count / max(1, c_size), 1)
+                    periods.append({
+                        "period_index": p,
+                        "label": f"{'W' if granularity == 'weekly' else 'M'}{p}",
+                        "active_count": act_count,
+                        "retention_pct": pct,
+                        "is_future": False,
+                    })
+                    period_sums[p].append(pct)
+
+            retention_rows.append({
+                "cohort_id": c_id,
+                "cohort_label": label,
+                "cohort_start": c_start.strftime("%Y-%m-%d"),
+                "cohort_end": c_end.strftime("%Y-%m-%d"),
+                "cohort_size": c_size,
+                "periods": periods,
+            })
+
+        # Benchmarks (O'rtacha ko'rsatkichlar)
+        benchmarks = []
+        for p in range(periods_count):
+            vals = period_sums[p]
+            avg_pct = round(sum(vals) / len(vals), 1) if vals else None
+            benchmarks.append({
+                "period_index": p,
+                "label": f"{'W' if granularity == 'weekly' else 'M'}{p}",
+                "avg_retention_pct": avg_pct,
+                "cohorts_count": len(vals),
+            })
+
+        # 4. Aktivatsiya Kohortasi (Activation Milestones & Time-to-First-Action)
+        if granularity == "weekly":
+            date_group = "date_trunc('week', u.created_at + interval '5 hours')::date"
+        else:
+            date_group = "date_trunc('month', u.created_at + interval '5 hours')::date"
+
+        activation_sql = f"""
+            WITH user_first_actions AS (
+                SELECT 
+                    u.id as user_id,
+                    {date_group} as cohort_start,
+                    u.created_at as reg_time,
+                    u.is_verified,
+                    (SELECT MIN(j.created_at) FROM dubbing_jobs j WHERE j.user_id = u.id) as first_job_time,
+                    (SELECT MIN(va.created_at) FROM video_analyses va WHERE va.user_id = u.id) as first_analysis_time,
+                    COALESCE((SELECT count(*) FROM dubbing_jobs j WHERE j.user_id = u.id), 0) +
+                    COALESCE((SELECT count(*) FROM video_analyses va WHERE va.user_id = u.id), 0) as total_actions,
+                    COALESCE((SELECT count(*) FROM dubbing_jobs j WHERE j.user_id = u.id AND j.status = 'COMPLETED'), 0) as completed_jobs,
+                    COALESCE((SELECT count(*) FROM payments p WHERE p.user_id = u.id AND p.status = 'APPROVED' AND (p.is_donation IS FALSE OR p.is_donation IS NULL)), 0) as approved_payments
+                FROM users u
+                WHERE (u.created_at + interval '5 hours')::date >= :oldest_start
+                  {internal_clause}
+            ),
+            user_calc AS (
+                SELECT 
+                    user_id,
+                    cohort_start,
+                    is_verified,
+                    total_actions,
+                    completed_jobs,
+                    approved_payments,
+                    LEAST(first_job_time, first_analysis_time) as first_action_time,
+                    CASE 
+                        WHEN LEAST(first_job_time, first_analysis_time) IS NOT NULL 
+                        THEN EXTRACT(EPOCH FROM (LEAST(first_job_time, first_analysis_time) - reg_time)) / 60.0 
+                        ELSE NULL 
+                    END as minutes_to_action
+                FROM user_first_actions
+            )
+            SELECT 
+                cohort_start,
+                count(*) as total_users,
+                count(CASE WHEN is_verified THEN 1 END) as verified_count,
+                count(CASE WHEN total_actions >= 1 THEN 1 END) as attempted_count,
+                count(CASE WHEN minutes_to_action IS NOT NULL AND minutes_to_action <= 1440 THEN 1 END) as d0_activated_count,
+                count(CASE WHEN minutes_to_action IS NOT NULL AND minutes_to_action <= 4320 THEN 1 END) as d3_activated_count,
+                count(CASE WHEN minutes_to_action IS NOT NULL AND minutes_to_action <= 10080 THEN 1 END) as d7_activated_count,
+                count(CASE WHEN completed_jobs >= 1 THEN 1 END) as completed_job_count,
+                count(CASE WHEN total_actions >= 2 THEN 1 END) as habit_2plus_count,
+                count(CASE WHEN approved_payments >= 1 THEN 1 END) as paid_count,
+                ROUND(AVG(CASE WHEN minutes_to_action IS NOT NULL AND minutes_to_action >= 0 THEN minutes_to_action END)::numeric, 1) as avg_min_to_action,
+                ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY minutes_to_action)::numeric, 1) as median_min_to_action
+            FROM user_calc
+            GROUP BY 1
+            ORDER BY 1 DESC;
+        """
+
+        act_rows = db.execute(text(activation_sql), {"oldest_start": oldest_cohort_start}).mappings().all()
+        act_map = {r["cohort_start"]: r for r in act_rows}
+
+        activation_rows = []
+        total_all_users = 0
+        total_all_verified = 0
+        total_all_d0 = 0
+        total_all_aha = 0
+        total_all_habit = 0
+        total_all_paid = 0
+
+        def calc_pct(part: int, whole: int) -> float:
+            return round(100.0 * part / max(1, whole), 1)
+
+        for c in cohort_rows:
+            c_start = c["cohort_start"]
+            c_end = c["cohort_end"]
+            c_size = c["cohort_size"]
+            c_id = c["cohort_id"]
+
+            if granularity == "weekly":
+                label = f"{c_start.strftime('%d.%m')} - {c_end.strftime('%d.%m')}"
+            else:
+                month_name = UZBEK_MONTHS[c_start.month - 1]
+                label = f"{month_name} {c_start.year}"
+
+            act_data = act_map.get(c_start, {})
+            u_count = act_data.get("total_users", c_size) or c_size
+            verified_c = act_data.get("verified_count", 0) or 0
+            attempted_c = act_data.get("attempted_count", 0) or 0
+            d0_c = act_data.get("d0_activated_count", 0) or 0
+            d3_c = act_data.get("d3_activated_count", 0) or 0
+            d7_c = act_data.get("d7_activated_count", 0) or 0
+            completed_c = act_data.get("completed_job_count", 0) or 0
+            habit_c = act_data.get("habit_2plus_count", 0) or 0
+            paid_c = act_data.get("paid_count", 0) or 0
+            avg_min = float(act_data.get("avg_min_to_action") or 0.0)
+            med_min = float(act_data.get("median_min_to_action") or 0.0)
+
+            total_all_users += u_count
+            total_all_verified += verified_c
+            total_all_d0 += d0_c
+            total_all_aha += completed_c
+            total_all_habit += habit_c
+            total_all_paid += paid_c
+
+            activation_rows.append({
+                "cohort_id": c_id,
+                "cohort_label": label,
+                "cohort_start": c_start.strftime("%Y-%m-%d"),
+                "cohort_end": c_end.strftime("%Y-%m-%d"),
+                "cohort_size": u_count,
+                "verified_count": verified_c,
+                "verified_pct": calc_pct(verified_c, u_count),
+                "attempted_count": attempted_c,
+                "attempted_pct": calc_pct(attempted_c, u_count),
+                "d0_activated_count": d0_c,
+                "d0_activated_pct": calc_pct(d0_c, u_count),
+                "d3_activated_count": d3_c,
+                "d3_activated_pct": calc_pct(d3_c, u_count),
+                "d7_activated_count": d7_c,
+                "d7_activated_pct": calc_pct(d7_c, u_count),
+                "completed_job_count": completed_c,
+                "completed_job_pct": calc_pct(completed_c, u_count),
+                "habit_2plus_count": habit_c,
+                "habit_2plus_pct": calc_pct(habit_c, u_count),
+                "paid_count": paid_c,
+                "paid_pct": calc_pct(paid_c, u_count),
+                "avg_min_to_action": avg_min,
+                "median_min_to_action": med_min,
+            })
+
+        # 5. Aktivatsiya Umumiy Xulosasi (Activation Summary)
+        avg_d0 = calc_pct(total_all_d0, total_all_users)
+        avg_aha = calc_pct(total_all_aha, total_all_users)
+        avg_habit = calc_pct(total_all_habit, total_all_users)
+        avg_paid = calc_pct(total_all_paid, total_all_users)
+        avg_w1_ret = benchmarks[1]["avg_retention_pct"] if len(benchmarks) > 1 else None
+
+        activation_summary = {
+            "total_users_evaluated": total_all_users,
+            "overall_verified_pct": calc_pct(total_all_verified, total_all_users),
+            "overall_d0_activation_pct": avg_d0,
+            "overall_aha_moment_pct": avg_aha,
+            "overall_habit_pct": avg_habit,
+            "overall_paid_pct": avg_paid,
+            "avg_w1_retention_pct": avg_w1_ret,
+            "median_time_to_first_action_min": activation_rows[0]["median_min_to_action"] if activation_rows else 3.0,
+        }
+
+        # 6. Avtomatik Tahlillar va Tavsiyalar (Actionable Insights)
+        insights = []
+        if total_all_users > 0:
+            insights.append({
+                "type": "success",
+                "title": "Tezkor birinchi harakat (Time-to-Value)",
+                "description": f"Foydalanuvchilarning ro'yxatdan o'tgandan birinchi video/tahlilni yuborishgacha bo'lgan median vaqti taxminan {activation_summary['median_time_to_first_action_min']} daqiqani tashkil etmoqda. Onboarding jarayoni tez va tushunarli."
+            })
+            if avg_d0 < 45.0:
+                insights.append({
+                    "type": "warning",
+                    "title": "D0 (24 soatlik) aktivatsiyani oshirish imkoniyati",
+                    "description": f"Yangi foydalanuvchilarning {avg_d0}% qismi birinchi 24 soat ichida video yuborgan. Ro'yxatdan o'tgan zahoti tayyor namunaviy videolarni taklif qilish D0 aktivatsiyasini 55%+ ga yetkazishi mumkin."
+                })
+            else:
+                insights.append({
+                    "type": "success",
+                    "title": "Yuqori D0 aktivatsiya darajasi",
+                    "description": f"Yangi foydalanuvchilarning {avg_d0}% qismi dastlabki 24 soatda faol harakat qilmoqda (Benchmark: 35-40%)."
+                })
+
+            if avg_aha < 30.0:
+                insights.append({
+                    "type": "caution",
+                    "title": "'Aha! moment' (birinchi muvaffaqiyatli video)da yo'qotish",
+                    "description": f"Foydalanuvchilarning faqat {avg_aha}% qismi kamida 1 ta tayyor video olgan. Video tahlil/dublyaj jarayonidagi xatoliklarni kamaytirish va navbatni tezlatish muhim."
+                })
+            else:
+                insights.append({
+                    "type": "info",
+                    "title": "Barqaror asosiy qiymat yetkazilishi",
+                    "description": f"Foydalanuvchilarning {avg_aha}% qismi birinchi videoni muvaffaqiyatli qabul qilib, mahsulotning haqiqiy qiymatini his qilgan."
+                })
+
+            if avg_w1_ret is not None and avg_w1_ret < 10.0:
+                insights.append({
+                    "type": "warning",
+                    "title": "W1 (1-hafta) qaytish ko'rsatkichi",
+                    "description": f"Haftalik qaytish o'rtacha {avg_w1_ret}%. Foydalanuvchilar bilan 3-kuni va 7-kuni Telegram-bot yoki Email orqali foydali yangi funksiyalar va tavsiyalar bilan aloqaga chiqish tavsiya etiladi."
+                })
+
+        return {
+            "granularity": granularity,
+            "metric": metric,
+            "timeframe": {
+                "since_date": oldest_cohort_start.strftime("%Y-%m-%d"),
+                "today": today.strftime("%Y-%m-%d"),
+            },
+            "cohorts": retention_rows,
+            "benchmarks": benchmarks,
+            "activation": activation_rows,
+            "activation_summary": activation_summary,
+            "insights": insights,
+        }
+    finally:
+        db.close()
+
+
+
 # ─────────────────────────────────────────────────────────────
 # Ommaviy xabarnomalar (Broadcast Notifications: Email & Telegram)
 # ─────────────────────────────────────────────────────────────

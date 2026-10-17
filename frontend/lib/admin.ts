@@ -439,6 +439,111 @@ export async function apiAdminFunnel(
   return res.data
 }
 
+// ─────────────────────────────────────────────────────────────
+// Kohortalar (Activation & Retention Cohorts)
+// ─────────────────────────────────────────────────────────────
+
+export interface CohortPeriodItem {
+  period_index: number
+  label: string
+  active_count: number
+  retention_pct: number | null
+  is_future: boolean
+}
+
+export interface RetentionCohortRow {
+  cohort_id: string
+  cohort_label: string
+  cohort_start: string
+  cohort_end: string
+  cohort_size: number
+  periods: CohortPeriodItem[]
+}
+
+export interface CohortBenchmarkItem {
+  period_index: number
+  label: string
+  avg_retention_pct: number | null
+  cohorts_count: number
+}
+
+export interface ActivationCohortRow {
+  cohort_id: string
+  cohort_label: string
+  cohort_start: string
+  cohort_end: string
+  cohort_size: number
+  verified_count: number
+  verified_pct: number
+  attempted_count: number
+  attempted_pct: number
+  d0_activated_count: number
+  d0_activated_pct: number
+  d3_activated_count: number
+  d3_activated_pct: number
+  d7_activated_count: number
+  d7_activated_pct: number
+  completed_job_count: number
+  completed_job_pct: number
+  habit_2plus_count: number
+  habit_2plus_pct: number
+  paid_count: number
+  paid_pct: number
+  avg_min_to_action: number
+  median_min_to_action: number
+}
+
+export interface CohortsActivationSummary {
+  total_users_evaluated: number
+  overall_verified_pct: number
+  overall_d0_activation_pct: number
+  overall_aha_moment_pct: number
+  overall_habit_pct: number
+  overall_paid_pct: number
+  avg_w1_retention_pct: number | null
+  median_time_to_first_action_min: number
+}
+
+export interface CohortInsight {
+  type: 'warning' | 'caution' | 'success' | 'info'
+  title: string
+  description: string
+}
+
+export interface CohortsResponse {
+  granularity: 'weekly' | 'monthly'
+  metric: 'activity' | 'jobs' | 'paying'
+  timeframe: {
+    since_date: string
+    today: string
+  }
+  cohorts: RetentionCohortRow[]
+  benchmarks: CohortBenchmarkItem[]
+  activation: ActivationCohortRow[]
+  activation_summary: CohortsActivationSummary
+  insights: CohortInsight[]
+}
+
+export async function apiAdminCohorts(
+  token: string,
+  granularity: 'weekly' | 'monthly' = 'weekly',
+  metric: 'activity' | 'jobs' | 'paying' = 'activity',
+  periodsCount: number = 8,
+  includeInternal: boolean = false
+): Promise<CohortsResponse> {
+  const res = await axios.get(`${API_URL}/admin/cohorts`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: {
+      granularity,
+      metric,
+      periods_count: periodsCount,
+      include_internal: includeInternal,
+    },
+  })
+  return res.data
+}
+
+
 
 
 

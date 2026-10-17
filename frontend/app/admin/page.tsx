@@ -16,6 +16,7 @@ import AdminCookiesManager from '@/components/AdminCookiesManager'
 import AdminRetentionManager from '@/components/AdminRetentionManager'
 import AdminBroadcastManager from '@/components/AdminBroadcastManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
+import AdminCohortsManager from '@/components/AdminCohortsManager'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -397,10 +398,11 @@ export default function AdminPage() {
           {[
             { id: 'sec-today', label: 'Bugun', icon: '⚡' },
             { id: 'sec-funnel', label: 'Voronka (Funnel)', icon: '📉' },
+            { id: 'sec-cohorts', label: 'Kohortlar', icon: '🧬' },
+            { id: 'sec-retention', label: 'Retention', icon: '📊' },
             { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
             { id: 'sec-jobs', label: 'Dublyaj', icon: '🎬' },
             { id: 'sec-payments', label: "To'lovlar", icon: '💳' },
-            { id: 'sec-retention', label: 'Retention', icon: '📊' },
             { id: 'sec-management', label: 'Boshqaruv', icon: '⚙️' },
             { id: 'sec-broadcast', label: 'Xabarnoma', icon: '📢' },
           ].map((tab) => (
@@ -521,6 +523,11 @@ export default function AdminPage() {
         {/* Funnel Conversion Analytics */}
         <div id="sec-funnel" className="scroll-mt-16">
           <AdminFunnelManager token={getToken() || ''} />
+        </div>
+
+        {/* Activation & Retention Cohorts Analytics */}
+        <div id="sec-cohorts" className="scroll-mt-16">
+          <AdminCohortsManager token={getToken() || ''} />
         </div>
 
         {/* User Retention & Activity Analytics */}
