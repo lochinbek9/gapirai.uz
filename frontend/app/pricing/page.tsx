@@ -226,7 +226,7 @@ export default function PricingPage() {
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> dublyaj</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> 1 video — maksimal 120 daqiqa</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Tabiiy AI ovoz (Gemini, Azure zaxirasi)</li>
+                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Tabiiy, tiniq AI ovozlar</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Yuklab olish sifati: {plan.max_resolution} gacha</li>
                     <li className="flex items-center gap-2"><Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" /> Video tahlil — cheklovsiz</li>
                   </ul>

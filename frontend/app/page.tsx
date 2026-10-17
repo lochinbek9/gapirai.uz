@@ -91,7 +91,7 @@ function Logo() {
           ⚡ 100% Avtomatik
         </span>
         <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1">
-          🎙️ Tiniq Gemini AI ovozlari
+          🎙️ Tiniq AI ovozlari
         </span>
         <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1 text-violet-600 dark:text-violet-400">
           🎁 Har oy 5 daqiqa bepul

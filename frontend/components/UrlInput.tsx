@@ -200,7 +200,7 @@ export default function UrlInput({
       {isProUser && isGemini && voiceGender !== "auto" && (
         <div className="space-y-1.5 pt-1">
           <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
-            Gemini ovozini tanlang:
+            Ovoz variantini tanlang:
           </span>
           <div className="grid grid-cols-3 gap-1.5">
             {(voiceGender === "male" ? maleVoices : femaleVoices).map((v) => {

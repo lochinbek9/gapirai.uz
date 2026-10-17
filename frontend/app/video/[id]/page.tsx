@@ -703,7 +703,7 @@ export default function VideoPage() {
                       <Mic2 className="w-4 h-4 text-violet-600 dark:text-indigo-400" />
                       {(() => {
                         const prov = (job.tts_provider || 'azure').toLowerCase();
-                        const provLabel = prov === 'gemini' ? 'Gemini AI' : prov === 'edge' ? 'Edge TTS' : 'Azure Neural';
+                        const provLabel = prov === 'gemini' ? 'GapirAI HD' : prov === 'edge' ? 'Standart' : 'Neural HD';
                         const voiceName = (job.voice_name || (prov === 'gemini' ? (job.speaker_gender === 'female' ? 'Autonoe' : 'Charon') : (job.speaker_gender === 'female' ? 'Madina' : 'Sardor'))).replace('uz-UZ-', '').replace('Neural', '');
                         return `${job.speaker_gender === 'female' ? 'Ayol ovozi' : 'Erkak ovozi'} (${voiceName} • ${provLabel})`;
                       })()}
@@ -859,7 +859,7 @@ export default function VideoPage() {
                       <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
                     )}
                     {job.tts_provider && (
-                      <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ Gemini AI' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Edge TTS' : '🔷 Azure Neural'} />
+                      <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ GapirAI HD' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Standart' : '🔷 Neural HD'} />
                     )}
                     {job.voice_name && (
                       <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
@@ -924,7 +924,7 @@ export default function VideoPage() {
                   <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? '👩 Ayol' : '👨 Erkak'} />
                 )}
                 {job.tts_provider && (
-                  <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ Gemini AI' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Edge TTS' : '🔷 Azure Neural'} />
+                  <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? '✨ GapirAI HD' : job.tts_provider.toLowerCase() === 'edge' ? '⚡ Standart' : '🔷 Neural HD'} />
                 )}
                 {job.voice_name && (
                   <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
@@ -1055,7 +1055,7 @@ export default function VideoPage() {
             <div className="space-y-4 relative z-10">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-violet-600 dark:text-indigo-400 uppercase tracking-wider">
-                  Ovoz jinsi (Gemini AI)
+                  Ovoz jinsi
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[

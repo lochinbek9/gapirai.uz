@@ -252,7 +252,7 @@ function VideoCard({
               ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-500/30'
               : 'bg-sky-900/80 text-sky-200 border border-sky-500/30'
           }`}>
-            {prov === 'gemini' ? 'Gemini' : prov === 'edge' ? 'Edge' : 'Azure'}
+            {prov === 'gemini' ? 'HD' : prov === 'edge' ? 'Standart' : 'Neural'}
           </span>
         </div>
       </div>
@@ -274,7 +274,7 @@ function VideoCard({
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
               : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
           }`}>
-            {prov === 'gemini' ? 'Gemini AI' : prov === 'edge' ? 'Edge TTS' : 'Azure Neural'}
+            {prov === 'gemini' ? 'GapirAI HD' : prov === 'edge' ? 'Standart' : 'Neural HD'}
           </span>
           <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
             {voiceDisplayName} ({genderDisplayName})
