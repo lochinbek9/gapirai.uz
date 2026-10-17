@@ -424,6 +424,35 @@ def _refund_job_quota_or_flag_payment(job_id: str, is_recovery_job: bool = False
             refund_db.close()
 
 
+def _verify_output_files_exist(final_output: str | None, dubbed_audio_path: str | None, job_id: str) -> None:
+    """Yakuniy dublyaj video fayli haqiqatan mavjud va bo'sh emasligini (st_size > 0)
+    COMPLETED holatiga o'tkazishdan oldin tekshiradi.
+    Agar fayl topilmasa yoki 0 bayt bo'lsa, istisno ko'taradi — job hech qachon
+    soxta/faylsiz COMPLETED bo'lib qolmasligi uchun."""
+    settings = get_settings()
+    if settings.AWS_BUCKET_NAME:
+        from backend.services.storage import s3_object_exists
+        s3_video_key = f"dubber/{job_id}/dubbed_final.mp4"
+        if s3_object_exists(s3_video_key):
+            return
+
+    if not final_output:
+        raise RuntimeError(f"[JOB {job_id}] Yakuniy video fayl yo'li (output_video_path) mavjud emas.")
+
+    out_p = Path(final_output)
+    if not out_p.exists():
+        fallback = Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4"
+        if fallback.exists() and fallback.is_file() and fallback.stat().st_size > 0:
+            return
+        raise RuntimeError(f"[JOB {job_id}] Yakuniy dublyaj video fayli diskda topilmadi: {final_output}")
+
+    if not out_p.is_file():
+        raise RuntimeError(f"[JOB {job_id}] Yakuniy video yo'li fayl emas: {final_output}")
+
+    if out_p.stat().st_size == 0:
+        raise RuntimeError(f"[JOB {job_id}] Yakuniy dublyaj video fayli bo'sh (0 bayt): {final_output}")
+
+
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
@@ -897,6 +926,9 @@ def process_video(self: Task, job_id: str) -> dict:
             except Exception:
                 logger.exception(f"[JOB {job_id}] Subtitr kuelarini qurishda xato -- gap darajasidagi VTT ishlatiladi")
                 job.uzbek_srt_content = _segments_to_vtt(translated_segments)
+            if not job.uzbek_srt_content or not job.uzbek_srt_content.strip():
+                raise RuntimeError(f"[JOB {job_id}] Subtitr matni (VTT) yaratilmadi yoki bo'sh.")
+
             _update_job(db, job, JobStatus.COMPLETED, 100.0, "Subtitr tayyor!")
             job.completed_at = datetime.utcnow()
             db.commit()
@@ -1014,6 +1046,11 @@ def process_video(self: Task, job_id: str) -> dict:
                 output_path=final_output,
             )
 
+            # Birlashtirishdan so'ng darhol yakuniy video fayli tekshiriladi
+            out_p = Path(final_output) if final_output else None
+            if not out_p or not out_p.exists() or not out_p.is_file() or out_p.stat().st_size == 0:
+                raise RuntimeError(f"[JOB {job_id}] Birlashtirishdan so'ng yakuniy video fayli yaratilmadi yoki bo'sh ({final_output})")
+
             job.output_video_path = final_output
             job.output_video_url = f"/outputs/{job_id}/video/dubbed_final.mp4"
             db.commit()
@@ -1063,6 +1100,9 @@ def process_video(self: Task, job_id: str) -> dict:
                     pass
         except Exception as s3_err:
             logger.error(f"S3 upload failed for job {job_id}: {s3_err}")
+
+        # COMPLETED holatiga o'tkazishdan OLDIN yakuniy natija fayllari mavjudligi tekshiriladi
+        _verify_output_files_exist(final_output, dubbed_audio_path, job_id)
 
         _update_job(db, job, JobStatus.COMPLETED, 100.0, "Dublyaj tayyor!")
         job.completed_at = datetime.utcnow()

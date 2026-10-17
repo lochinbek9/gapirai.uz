@@ -65,6 +65,9 @@ def generate_360p(job) -> str:
     if result.returncode != 0:
         raise RuntimeError(f"360p kichraytirishda ffmpeg xatoligi:\n{result.stderr[-1500:]}")
 
+    if not Path(local_out).exists() or not Path(local_out).is_file() or Path(local_out).stat().st_size == 0:
+        raise RuntimeError(f"360p video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
+
     s3_key = f"dubber/{job_id}/dubbed_360p.mp4"
     if settings.AWS_BUCKET_NAME:
         if not upload_file_to_s3(local_out, s3_key):
@@ -168,6 +171,9 @@ def generate_1080p(job) -> str:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
             if res.returncode != 0:
                 raise RuntimeError(f"1080p yaratishda ffmpeg xatoligi:\n{res.stderr[-1500:]}")
+
+        if not Path(local_out).exists() or not Path(local_out).is_file() or Path(local_out).stat().st_size == 0:
+            raise RuntimeError(f"1080p video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
 
         s3_key = f"dubber/{job_id}/dubbed_1080p.mp4"
         if settings.AWS_BUCKET_NAME:

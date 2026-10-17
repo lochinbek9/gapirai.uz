@@ -88,7 +88,18 @@ def _cached_job_files_exist(cached_job: DubbingJob) -> bool:
     if settings.AWS_BUCKET_NAME:
         return s3_object_exists(f"dubber/{storage_id}/dubbed_final.mp4")
     video_path = cached_job.output_video_path
-    return bool(video_path) and Path(video_path).exists()
+    if not video_path:
+        return False
+    p = Path(video_path)
+    if not p.exists():
+        return False
+    try:
+        sz = p.stat().st_size
+        if isinstance(sz, (int, float)):
+            return sz > 0
+    except (AttributeError, TypeError, OSError):
+        pass
+    return True
 
 
 Outcome = Literal[

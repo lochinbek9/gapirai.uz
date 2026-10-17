@@ -47,17 +47,49 @@ def _get_redis() -> Redis:
 
 def is_output_video_missing(job: DubbingJob) -> bool:
     """Tekshiradi: agar job video yaratishi kerak bo'lgan job bo'lsa (subtitle_only emas),
-    lekin uning diskdagi dubbed_final.mp4 fayli mavjud bo'lmasa True qaytaradi."""
+    lekin uning diskdagi dubbed_final.mp4 fayli mavjud bo'lmasa yoki 0 bayt bo'lsa True qaytaradi."""
     if job.subtitle_only:
         return False
 
-    if job.output_video_path and Path(job.output_video_path).exists():
-        return False
+    if job.output_video_path:
+        p = Path(job.output_video_path)
+        try:
+            sz = p.stat().st_size
+            if isinstance(sz, (int, float)):
+                if p.exists() and p.is_file() and sz > 0:
+                    return False
+            elif p.exists():
+                return False
+        except (AttributeError, TypeError, OSError):
+            if p.exists():
+                return False
 
     storage_id = str(job.storage_id or job.id)
-    candidate = Path(f"outputs/{storage_id}/video/dubbed_final.mp4")
-    if candidate.exists():
-        return False
+    out_dir = getattr(_settings, "OUTPUT_DIR", "outputs") or "outputs"
+    candidate = Path(out_dir) / storage_id / "video" / "dubbed_final.mp4"
+    try:
+        sz = candidate.stat().st_size
+        if isinstance(sz, (int, float)):
+            if candidate.exists() and candidate.is_file() and sz > 0:
+                return False
+        elif candidate.exists():
+            return False
+    except (AttributeError, TypeError, OSError):
+        if candidate.exists():
+            return False
+
+    if out_dir != "outputs":
+        candidate2 = Path(f"outputs/{storage_id}/video/dubbed_final.mp4")
+        try:
+            sz = candidate2.stat().st_size
+            if isinstance(sz, (int, float)):
+                if candidate2.exists() and candidate2.is_file() and sz > 0:
+                    return False
+            elif candidate2.exists():
+                return False
+        except (AttributeError, TypeError, OSError):
+            if candidate2.exists():
+                return False
 
     return True
 

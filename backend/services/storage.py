@@ -108,8 +108,8 @@ def s3_object_exists(object_name: str) -> bool:
     if not s3_client:
         return False
     try:
-        s3_client.head_object(Bucket=bucket, Key=object_name)
-        return True
+        resp = s3_client.head_object(Bucket=bucket, Key=object_name)
+        return resp.get("ContentLength", 0) > 0
     except ClientError:
         return False
     except Exception as e:

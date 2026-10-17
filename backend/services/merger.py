@@ -67,7 +67,7 @@ def _build_audio_filtergraph(target_dur: float | None = None) -> str:
     # asosiy trek (0:a)ni ham uzatishni to'xtatadi. Agar video audio dan uzun bo'lsa,
     # dub tugaganidan keyin original fon musiqa/ovoz uzilib qolmasligi uchun
     # dub trekini video oxirigacha sukunat bilan to'ldiramiz (apad).
-    dub_pad = f"apad=whole_dur={target_dur:.3f}," if target_dur and target_dur > 0 else ""
+    dub_pad = f"apad=whole_dur={target_dur:.3f}," if isinstance(target_dur, (int, float)) and target_dur > 0 else ""
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,volume={orig_vol}[orig];"
         f"[1:a]{dub_pad}aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
@@ -240,5 +240,9 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
 
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg xatoligi:\n{result.stderr[-1500:]}")
+
+    out_p = Path(output_path)
+    if not out_p.exists() or not out_p.is_file() or out_p.stat().st_size == 0:
+        raise RuntimeError(f"FFmpeg yakunlandi, lekin chiqish video fayli yaratilmadi yoki bo'sh (0 bayt): {output_path}")
 
     return output_path
