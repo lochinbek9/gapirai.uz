@@ -280,54 +280,93 @@ export default function PricingPage() {
               Oylik byudjetingiz tugasa sotib oling. Bir martalik to'lov — tugamaydi, keyingi oyga o'tadi.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {packs.map((p) => (
-              <div key={p.minutes} className={`rounded-2xl border ${p.minutes === 15 ? 'border-emerald-500/40 bg-emerald-500/[0.04]' : p.minutes === 70 ? 'border-violet-500/40 bg-violet-500/[0.04]' : 'border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03]'} backdrop-blur p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center relative`}>
-                {p.minutes === 15 && (
-                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                    Starter
-                  </span>
-                )}
-                {p.minutes === 70 && (
-                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30">
-                    Mashhur
-                  </span>
-                )}
-                <span className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">+{p.minutes}</span>
-                <span className="text-[10px] sm:text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500">daqiqa</span>
-                <span className="text-xs sm:text-sm font-bold text-violet-600 dark:text-violet-400">{p.price.toLocaleString('uz-UZ')} so'm</span>
-                <button
-                  onClick={() => handleBuyPack(p.minutes, 'click')}
-                  disabled={buyingPack === p.minutes}
-                  className="mt-1 w-full py-2 rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-stretch">
+            {packs.map((p) => {
+              const isStarter = p.minutes === 15;
+              const isPopular = p.minutes === 70;
+              const isAlreadyBought = Boolean(isStarter && p.already_purchased);
+
+              return (
+                <div
+                  key={p.minutes}
+                  className={`rounded-2xl border ${
+                    isStarter
+                      ? 'border-emerald-500/40 bg-emerald-500/[0.04]'
+                      : isPopular
+                      ? 'border-violet-500/40 bg-violet-500/[0.04]'
+                      : 'border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03]'
+                  } backdrop-blur p-4 flex flex-col justify-between items-center text-center relative h-full`}
                 >
-                  {buyingPack === p.minutes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Sotib olish'}
-                </button>
-                <div className="grid grid-cols-3 w-full gap-1">
-                  <button
-                    onClick={() => handleBuyPack(p.minutes, 'payme')}
-                    disabled={buyingPack === p.minutes}
-                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
-                  >
-                    Payme
-                  </button>
-                  <button
-                    onClick={() => handleBuyPack(p.minutes, 'uzum')}
-                    disabled={buyingPack === p.minutes}
-                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
-                  >
-                    Uzum
-                  </button>
-                  <button
-                    onClick={() => handleBuyPack(p.minutes, 'paynet')}
-                    disabled={buyingPack === p.minutes}
-                    className="py-1 sm:py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate"
-                  >
-                    Paynet
-                  </button>
+                  {/* Top Badge area with uniform fixed height so numbers ALWAYS align */}
+                  <div className="h-6 flex items-center justify-center w-full mb-1">
+                    {isStarter ? (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        Starter (1 marta)
+                      </span>
+                    ) : isPopular ? (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30">
+                        Mashhur
+                      </span>
+                    ) : (
+                      <span className="h-4 block" aria-hidden="true" />
+                    )}
+                  </div>
+
+                  {/* Value and Price (Perfect vertical alignment across all cards) */}
+                  <div className="flex flex-col items-center justify-center my-auto py-2">
+                    <span className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                      +{p.minutes}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500 font-semibold mt-0.5">
+                      daqiqa
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold text-violet-600 dark:text-violet-400 mt-2">
+                      {p.price.toLocaleString('uz-UZ')} so'm
+                    </span>
+                  </div>
+
+                  {/* Bottom Action Buttons (Uniformly pinned to the bottom) */}
+                  <div className="w-full space-y-1.5 mt-auto pt-2">
+                    <button
+                      onClick={() => handleBuyPack(p.minutes, 'click')}
+                      disabled={buyingPack === p.minutes || isAlreadyBought}
+                      className="w-full py-2.5 rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    >
+                      {buyingPack === p.minutes ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : isAlreadyBought ? (
+                        'Xarid qilingan'
+                      ) : (
+                        'Sotib olish'
+                      )}
+                    </button>
+                    <div className="grid grid-cols-3 w-full gap-1">
+                      <button
+                        onClick={() => handleBuyPack(p.minutes, 'payme')}
+                        disabled={buyingPack === p.minutes || isAlreadyBought}
+                        className="py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Payme
+                      </button>
+                      <button
+                        onClick={() => handleBuyPack(p.minutes, 'uzum')}
+                        disabled={buyingPack === p.minutes || isAlreadyBought}
+                        className="py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Uzum
+                      </button>
+                      <button
+                        onClick={() => handleBuyPack(p.minutes, 'paynet')}
+                        disabled={buyingPack === p.minutes || isAlreadyBought}
+                        className="py-1.5 px-0.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Paynet
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

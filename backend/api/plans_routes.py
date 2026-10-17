@@ -8,7 +8,14 @@ from backend.models.database import get_db, User
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user, get_optional_user
 from backend.services.click_service import generate_payment_url
-from backend.services.plans import PLANS, MINUTE_PACKS, get_or_create_subscription, get_minute_balance
+from backend.services.plans import (
+    PLANS,
+    MINUTE_PACKS,
+    STARTER_PACK_MINUTES,
+    has_purchased_starter_pack,
+    get_or_create_subscription,
+    get_minute_balance,
+)
 from backend.config import get_settings
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
@@ -22,7 +29,9 @@ def list_plans(
     # Narxlarni har kim ko'ra oladi (marketing/pricing sahifasi) — faqat
     # obuna bo'lish (subscribe) uchun login talab qilinadi.
     current = None
+    has_starter = False
     if current_user:
+        has_starter = has_purchased_starter_pack(db, current_user.id)
         sub = get_or_create_subscription(db, current_user.id)
         bal = get_minute_balance(db, current_user.id)
         from backend.services.plans import is_user_admin
@@ -43,7 +52,15 @@ def list_plans(
             }
             for p in PLANS.values()
         ],
-        "minute_packs": [{"minutes": m, "price": price} for m, price in sorted(MINUTE_PACKS.items())],
+        "minute_packs": [
+            {
+                "minutes": m,
+                "price": price,
+                "one_time": m == STARTER_PACK_MINUTES,
+                "already_purchased": has_starter if m == STARTER_PACK_MINUTES else False,
+            }
+            for m, price in sorted(MINUTE_PACKS.items())
+        ],
         "current": current,
     }
 

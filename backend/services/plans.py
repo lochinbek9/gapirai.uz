@@ -45,13 +45,26 @@ MAX_JOB_MINUTES = 120
 # byudjeti tugaganda shulardan birini sotib oladi (backend/api/minutes_routes.py).
 # Sotib olingan daqiqalar Subscription.purchased_minutes'ga qo'shiladi va
 # hech qachon tugamaydi.
+STARTER_PACK_MINUTES = 15
+
 MINUTE_PACKS: dict[int, int] = {
-    15: 4_900,
+    STARTER_PACK_MINUTES: 4_900,
     35: 15_000,
     70: 25_000,
     140: 45_000,
     350: 100_000,
 }
+
+def has_purchased_starter_pack(db, user_id) -> bool:
+    """Foydalanuvchi avval 1 martalik Starter paketini (15 daqiqa) sotib olganmi tekshiradi."""
+    if not user_id:
+        return False
+    from backend.models.payment import Payment, PaymentStatus
+    return db.query(Payment).filter(
+        Payment.user_id == user_id,
+        Payment.minutes_purchased == STARTER_PACK_MINUTES,
+        Payment.status == PaymentStatus.APPROVED,
+    ).first() is not None
 
 LEGACY_MINUTE_PACKS: dict[int, int] = {
     30: 15_000,

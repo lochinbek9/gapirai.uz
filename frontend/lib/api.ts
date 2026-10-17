@@ -338,6 +338,8 @@ export interface MinuteBalance {
 export interface MinutePack {
   minutes: number
   price: number
+  one_time?: boolean
+  already_purchased?: boolean
 }
 
 export interface CurrentSubscription {

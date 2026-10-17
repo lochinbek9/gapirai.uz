@@ -16,7 +16,13 @@ from sqlalchemy.orm import Session
 from backend.models.database import get_db, User
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.auth import get_current_user
-from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS, get_minute_balance
+from backend.services.plans import (
+    MINUTE_PACKS,
+    LEGACY_MINUTE_PACKS,
+    STARTER_PACK_MINUTES,
+    has_purchased_starter_pack,
+    get_minute_balance,
+)
 from backend.services.click_service import generate_payment_url
 from backend.config import get_settings
 
@@ -30,9 +36,18 @@ def minute_balance(
 ) -> dict:
     """Dashboard uchun: {monthly_cap, monthly_used, monthly_remaining,
     purchased, total_available} + sotib olsa bo'ladigan paketlar."""
+    has_starter = has_purchased_starter_pack(db, current_user.id)
     return {
         "balance": get_minute_balance(db, current_user.id),
-        "packs": [{"minutes": m, "price": p} for m, p in sorted(MINUTE_PACKS.items())],
+        "packs": [
+            {
+                "minutes": m,
+                "price": p,
+                "one_time": m == STARTER_PACK_MINUTES,
+                "already_purchased": has_starter if m == STARTER_PACK_MINUTES else False,
+            }
+            for m, p in sorted(MINUTE_PACKS.items())
+        ],
     }
 
 
@@ -60,6 +75,13 @@ def purchase_minutes(
     all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
     if req.pack not in all_packs:
         raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
+    
+    if req.pack == STARTER_PACK_MINUTES and has_purchased_starter_pack(db, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Starter paketi (15 daqiqa) bir martalik maxsus taklif hisoblanadi va siz uni allaqachon xarid qilgansiz. Iltimos, boshqa paketlarni tanlang.",
+        )
+
     amount = all_packs[req.pack]
     settings = get_settings()
 

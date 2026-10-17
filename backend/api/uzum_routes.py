@@ -214,10 +214,15 @@ def initiate_minutes_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS
+    from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS, STARTER_PACK_MINUTES, has_purchased_starter_pack
     all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
     if req.pack not in all_packs:
         raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
+    if req.pack == STARTER_PACK_MINUTES and has_purchased_starter_pack(db, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Starter paketi (15 daqiqa) bir martalik maxsus taklif hisoblanadi va siz uni allaqachon xarid qilgansiz. Iltimos, boshqa paketlarni tanlang.",
+        )
     amount = all_packs[req.pack]
 
     payment = db.query(Payment).filter(
