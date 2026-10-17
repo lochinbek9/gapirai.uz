@@ -394,7 +394,7 @@ def _cache_channel_name(youtube_url: str, uploader: str) -> None:
         if m:
             import redis
             r_cli = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-            r_cli.setex(f"yt:chan:{m.group(1)}", 86400 * 30, uploader)
+            r_cli.set(f"yt:chan:{m.group(1)}", uploader, ex=86400 * 30)
     except Exception:
         pass
 

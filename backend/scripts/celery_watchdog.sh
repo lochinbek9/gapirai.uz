@@ -48,3 +48,14 @@ log "worker o'ziga ping'ga javob bermayapti -- qayta ishga tushirilmoqda"
 cd "$COMPOSE_DIR"
 docker compose restart worker >> "$LOG" 2>&1
 log "restart yuborildi"
+
+# Adminlarga Telegram orqali ogohlantirish yuborish
+sleep 3
+docker exec "$CONTAINER" python -c "
+try:
+    from backend.services.telegram_notify import send_worker_restart_alert
+    send_worker_restart_alert('$CONTAINER', 'Ping tekshiruviga javob bermadi (worker muzlab qolgan)')
+except Exception as e:
+    pass
+" 2>/dev/null || true
+

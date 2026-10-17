@@ -64,7 +64,7 @@ def _get_token(force_refresh: bool = False) -> str | None:
 
     token = _login_to_eskiz()
     if token:
-        r.setex(_TOKEN_KEY, _TOKEN_TTL_SECONDS, token)
+        r.set(_TOKEN_KEY, token, ex=_TOKEN_TTL_SECONDS)
     return token
 
 

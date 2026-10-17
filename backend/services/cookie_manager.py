@@ -104,7 +104,7 @@ def cookies_are_fresh() -> bool:
     return expiry > time.time() + COOKIE_FRESH_DAYS * 86400
 
 
-def check_cookie_health() -> dict:
+def check_cookie_health(notify_on_alert: bool = True) -> dict:
     """
     Cookie faylining holatini batafsil tekshirish.
     Qaytaradi: {
@@ -118,6 +118,12 @@ def check_cookie_health() -> dict:
     """
     target = get_effective_cookies_path()
     if not os.path.exists(target):
+        if notify_on_alert:
+            try:
+                from backend.services.telegram_notify import send_cookie_expiry_alert
+                send_cookie_expiry_alert(0, is_missing=True)
+            except Exception:
+                pass
         return {
             "exists": False,
             "path": target,
@@ -146,7 +152,7 @@ def check_cookie_health() -> dict:
     except Exception:
         pass
 
-    return {
+    res = {
         "exists": size > 50,
         "path": target,
         "size": size,
@@ -156,6 +162,18 @@ def check_cookie_health() -> dict:
         "updated_at": updated_at,
         "cookie_count": cookie_count,
     }
+
+    if notify_on_alert:
+        try:
+            from backend.services.telegram_notify import send_cookie_expiry_alert
+            if not res["exists"]:
+                send_cookie_expiry_alert(0, is_missing=True)
+            elif days_remaining <= 3:
+                send_cookie_expiry_alert(int(days_remaining), is_missing=False)
+        except Exception as e:
+            logger.debug(f"Cookie alert yuborilmadi: {e}")
+
+    return res
 
 
 def save_uploaded_cookies(content: str) -> dict:

@@ -1337,6 +1337,20 @@ def process_video(self: Task, job_id: str) -> dict:
         _refund_job_quota_or_flag_payment(job_id, is_recovery_job)
 
         try:
+            from backend.services.telegram_notify import send_job_max_retries_failed_alert
+            u = getattr(job, "user", None)
+            u_info = f"{getattr(u, 'name', '')} ({getattr(u, 'email', '') or getattr(u, 'phone', '')})".strip() if u else None
+            send_job_max_retries_failed_alert(
+                job_id=job_id,
+                stage=current_stage,
+                exc=exc,
+                video_title=getattr(job, "video_title", None),
+                user_info=u_info,
+            )
+        except Exception as alert_exc:
+            logger.warning(f"[JOB {job_id}] Fatal job Telegram alert yuborilmadi: {alert_exc}")
+
+        try:
             if job.user_id and job.user and job.user.telegram_chat_id:
                 send_telegram_message(
                     job.user.telegram_chat_id,

@@ -42,6 +42,65 @@ def send_telegram_message(chat_id: str, text: str, reply_markup: dict | None = N
         return False
 
 
+def should_throttle_alert(alert_key: str, throttle_seconds: int = 600) -> bool:
+    """Tekshiradi: agar shu alert_key so'nggi `throttle_seconds` soniya ichida
+    allaqachon yuborilgan bo'lsa True qaytaradi (adminlarni spam qilmaslik uchun).
+    Aks holda Redis kalitini belgilab False qaytaradi."""
+    if not alert_key:
+        return False
+    try:
+        from redis import Redis
+        settings = get_settings()
+        redis_url = getattr(settings, "REDIS_URL", None)
+        if not redis_url or not isinstance(redis_url, str):
+            return False
+        r = Redis.from_url(redis_url, decode_responses=True, socket_timeout=3)
+        key = f"alert_throttle:{alert_key}"
+        # set nx=True returns True if key was set, None if key already exists
+        is_new = r.set(key, "1", ex=throttle_seconds, nx=True)
+        return not bool(is_new)
+    except Exception as e:
+        logger.debug(f"Alert throttle tekshirishda xatolik (e'tiborsiz qoldirildi): {e}")
+        return False
+
+
+def send_alert_to_admins(
+    text: str,
+    *,
+    alert_key: str | None = None,
+    throttle_seconds: int = 600,
+    reply_markup: dict | None = None,
+) -> bool:
+    """Barcha adminlarga tezkor ogohlantirish xabarini yuboradi.
+    Agar `alert_key` ko'rsatilgan bo'lsa, xabarlar takrorlanishidan (spam)
+    saqlash uchun `throttle_seconds` oralig'ida faqat bir marta yuboriladi."""
+    if alert_key and should_throttle_alert(alert_key, throttle_seconds):
+        logger.info(f"Admin ogohlantirishi cheklandi (throttled): {alert_key}")
+        return False
+
+    settings = get_settings()
+    if not settings.ADMIN_TG_IDS:
+        return False
+
+    admin_ids = [
+        id.strip().strip('"').strip("'")
+        for id in settings.ADMIN_TG_IDS.split(",")
+        if id.strip().strip('"').strip("'")
+    ]
+    if not admin_ids:
+        return False
+
+    success = False
+    for admin_id in admin_ids:
+        try:
+            if send_telegram_message(admin_id, text, reply_markup=reply_markup):
+                success = True
+        except Exception as e:
+            logger.error(f"Admin ({admin_id}) ga ogohlantirish yuborilmadi: {e}")
+
+    return success
+
+
 def save_error_log(
     error_id: str,
     exc: Exception,
@@ -81,7 +140,7 @@ def save_error_log(
             "traceback": raw_tb,
             "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
-        r.setex(f"errlog:{error_id}", 7 * 86400, json.dumps(data, ensure_ascii=False))
+        r.set(f"errlog:{error_id}", json.dumps(data, ensure_ascii=False), ex=7 * 86400)
         frontend_url = getattr(settings, "FRONTEND_URL", "https://gapirai.uz")
         base_url = (frontend_url if isinstance(frontend_url, str) else "https://gapirai.uz").rstrip("/")
         return f"{base_url}/api/errors/{error_id}"
@@ -128,6 +187,12 @@ def send_error_to_admins(
         or "nutq topilmadi" in err_str
         or "kontent siyosati" in err_str
     ):
+        return
+
+    # Bir xil xatolik ketma-ket takrorlanganda adminlarni flood qilmaslik uchun throttle
+    err_sig = f"{stage or 'unknown'}:{err_name}:{str(exc)[:60]}"
+    if should_throttle_alert(f"err_{err_sig}", throttle_seconds=300):
+        logger.info(f"Admin xatolik xabari cheklandi (throttled): {err_sig}")
         return
 
     # Extract job_id from context_msg if not explicitly provided
@@ -322,3 +387,80 @@ def send_content_blocked_to_admins(
             send_telegram_message(admin_id, text, reply_markup=reply_markup)
         except Exception as e:
             logger.error(f"Admin ({admin_id}) ga moderatsiya xabari yuborilmadi: {e}")
+
+
+def send_disk_space_alert(free_gb: float, total_gb: float, used_pct: float) -> bool:
+    """Disk bo'sh joyi kritik darajaga yetganda (<5GB yoki >90% to'lganda)
+    adminlarga Telegram orqali ogohlantirish yuboradi. Har 6 soatda ko'pi bilan 1 marta."""
+    text = (
+        f"🚨 <b>DIQQAT: Server diski to'lib bormoqda!</b>\n\n"
+        f"💾 <b>Bo'sh joy:</b> <code>{free_gb:.1f} GB</code> / {total_gb:.1f} GB\n"
+        f"📊 <b>Band qilingan:</b> <code>{used_pct:.1f}%</code>\n\n"
+        f"<i>⚠️ Disk to'lib qolsa, yangi videolarni yuklab olish yoki ffmpeg render "
+        f"jarayoni to'xtab qolishi mumkin. Iltimos, server diskini tozalang!</i>"
+    )
+    return send_alert_to_admins(text, alert_key="disk_space_critical", throttle_seconds=6 * 3600)
+
+
+def send_cookie_expiry_alert(days_remaining: int, is_missing: bool = False) -> bool:
+    """YouTube cookies.txt fayli eskirganda yoki tugashiga kam qolganda
+    adminlarga Telegram orqali ogohlantirish yuboradi. Har 24 soatda ko'pi bilan 1 marta."""
+    if is_missing:
+        text = (
+            f"🍪 <b>DIQQAT: YouTube cookies.txt topilmadi!</b>\n\n"
+            f"Serverda YouTube cookie fayli mavjud emas yoki bo'sh. "
+            f"Foydalanuvchilar YouTube videolarini yuklab olishda 'Sign in to confirm you\\'re not a bot' "
+            f"xatoligiga uchrashlari mumkin.\n\n"
+            f"<i>👉 Admin panel orqali yangi cookies.txt faylini yuklang!</i>"
+        )
+        key = "cookie_missing"
+    else:
+        text = (
+            f"🍪 <b>OGOHLANTIRISH: YouTube cookie muddati oz qoldi!</b>\n\n"
+            f"⏳ <b>Qolgan muddat:</b> <code>{days_remaining} kun</code>\n\n"
+            f"<i>Cookie muddati tugasa, YouTube yuklashlari to'xtab qolishi mumkin. "
+            f"Iltimos, admin paneldan cookies.txt ni yangilang!</i>"
+        )
+        key = f"cookie_expiry_{days_remaining}"
+
+    return send_alert_to_admins(text, alert_key=key, throttle_seconds=24 * 3600)
+
+
+def send_worker_restart_alert(worker_name: str, reason: str = "Javob bermay qoldi (ping timeout)") -> bool:
+    """Watchdog Celery worker'ni qotib qolgani sababli qayta ishga tushirganda
+    adminlarga Telegram orqali xabar beradi. Har 15 daqiqada ko'pi bilan 1 marta."""
+    text = (
+        f"⚠️ <b>Celery Worker avtomatik qayta ishga tushirildi!</b>\n\n"
+        f"⚙️ <b>Worker:</b> <code>{worker_name}</code>\n"
+        f"📌 <b>Sabab:</b> {reason}\n\n"
+        f"<i>Watchdog tizimi worker muzlab qolganini aniqladi va xizmatni uzluksiz ushlab "
+        f"turish uchun konteynerni restart qildi.</i>"
+    )
+    return send_alert_to_admins(text, alert_key=f"worker_restart_{worker_name}", throttle_seconds=900)
+
+
+def send_job_max_retries_failed_alert(
+    job_id: str,
+    stage: str,
+    exc: Exception,
+    video_title: str | None = None,
+    user_info: str | None = None,
+) -> bool:
+    """Job barcha retry urinishlaridan keyin butunlay to'xtaganda (FAILED)
+    adminlarga Telegram orqali yakuniy xabar beradi."""
+    import html
+    safe_title = html.escape(video_title or "Video")
+    safe_exc = html.escape(str(exc)[:250])
+    lines = [
+        f"🚨 <b>Dublyaj barcha urinishlardan so'ng to'xtadi (FAILED)!</b>\n",
+        f"🆔 <b>Job ID:</b> <code>{job_id}</code>",
+        f"🎬 <b>Video:</b> {safe_title}",
+        f"📍 <b>Bosqich:</b> <code>{stage}</code>",
+        f"⚠️ <b>Yakuniy xatolik:</b> <code>{safe_exc}</code>",
+    ]
+    if user_info:
+        lines.append(f"👤 <b>Foydalanuvchi:</b> {html.escape(user_info)}")
+    lines.append("\n<i>Kvota foydalanuvchiga qaytarildi yoki to'lov tekshiruvi belgilandi.</i>")
+    text = "\n".join(lines)
+    return send_alert_to_admins(text, alert_key=f"job_fatal_{job_id}", throttle_seconds=3600)
+

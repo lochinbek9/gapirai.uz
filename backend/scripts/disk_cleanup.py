@@ -63,6 +63,19 @@ def main() -> int:
         f"uploads: {up_removed} o'chirildi / {up_kept} qoldi "
         f"(>{s.DISK_CLEANUP_UPLOAD_HOURS}soat)"
     )
+
+    try:
+        usage = shutil.disk_usage(s.OUTPUT_DIR)
+        free_gb = usage.free / (1024 ** 3)
+        total_gb = usage.total / (1024 ** 3)
+        used_pct = (usage.used / usage.total) * 100.0
+        print(f"[disk_cleanup] disk: {free_gb:.1f}GB bo'sh / {total_gb:.1f}GB jami ({used_pct:.1f}% band)")
+        if free_gb < 5.0 or used_pct > 90.0:
+            from backend.services.telegram_notify import send_disk_space_alert
+            send_disk_space_alert(free_gb, total_gb, used_pct)
+    except Exception as e:
+        print(f"[disk_cleanup] Disk holatini tekshirishda xatolik: {e}")
+
     return 0
 
 

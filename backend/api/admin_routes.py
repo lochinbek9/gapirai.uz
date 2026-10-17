@@ -642,6 +642,13 @@ def admin_delete_cookies(current_user: User = Depends(get_current_admin_user)):
     }
 
 
+@router.get("/system-health")
+def admin_system_health(current_user: User = Depends(get_current_admin_user)):
+    """Admin panel uchun tizim salomatligi (DB, Redis, Disk, Celery, Cookie) monitoringi."""
+    from backend.services.health_check import check_system_health
+    return check_system_health(detailed=True)
+
+
 @router.get("/retention")
 def admin_retention_stats(
     days: int = Query(default=7, ge=0, le=365),

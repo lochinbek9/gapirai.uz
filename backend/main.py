@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -406,5 +406,14 @@ app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs"
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok", "service": "GapirAI.uz"}
+def health(detailed: bool = False, response: Response = None):
+    """
+    Tizim salomatligi monitoringi endpointi.
+    Standart holatda (monitoring botlar va uptime checkerlar uchun tezkor): DB va Redis tekshiriladi.
+    `?detailed=true`: DB, Redis, Disk bo'sh joyi, Celery workerlar va YouTube cookies to'liq tekshiriladi.
+    """
+    from backend.services.health_check import check_system_health
+    res = check_system_health(detailed=detailed)
+    if res.get("status") == "unhealthy" and response is not None:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return res
