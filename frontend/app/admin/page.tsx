@@ -18,6 +18,7 @@ import AdminBroadcastManager from '@/components/AdminBroadcastManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
 import AdminJobsCostManager from '@/components/AdminJobsCostManager'
+import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -399,6 +400,7 @@ export default function AdminPage() {
           {[
             { id: 'sec-today', label: 'Bugun', icon: '⚡' },
             { id: 'sec-funnel', label: 'Voronka (Funnel)', icon: '📉' },
+            { id: 'sec-unactivated', label: 'Aktivlashmaganlar', icon: '🎯' },
             { id: 'sec-cohorts', label: 'Kohortlar', icon: '🧬' },
             { id: 'sec-retention', label: 'Retention', icon: '📊' },
             { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
@@ -524,6 +526,11 @@ export default function AdminPage() {
         {/* Funnel Conversion Analytics */}
         <div id="sec-funnel" className="scroll-mt-16">
           <AdminFunnelManager token={getToken() || ''} />
+        </div>
+
+        {/* Unactivated / First Dubbing Drop-off Users Research */}
+        <div id="sec-unactivated" className="scroll-mt-16">
+          <AdminUnactivatedUsersManager token={getToken() || ''} />
         </div>
 
         {/* Activation & Retention Cohorts Analytics */}

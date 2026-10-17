@@ -305,7 +305,7 @@ export interface BroadcastCreatePayload {
   title: string
   message: string
   channel: 'both' | 'telegram' | 'email'
-  target_filter: 'all' | 'telegram_users' | 'email_users' | 'paid_users' | 'free_users'
+  target_filter: 'all' | 'unactivated_users' | 'telegram_users' | 'email_users' | 'paid_users' | 'free_users'
   button_text?: string
   button_url?: string
 }
@@ -653,6 +653,79 @@ export async function apiAdminJobsCost(
   })
   return res.data
 }
+
+export interface UnactivatedUserItem {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  telegram_chat_id: string | null
+  is_verified: boolean
+  registered_at: string | null
+  attempt_count: number
+  category: 'never_attempted' | 'failed_attempt' | 'awaiting_payment'
+  last_job: {
+    id: string
+    video_title: string
+    youtube_url: string
+    video_duration: number | null
+    status: string
+    error_code: string | null
+    error_message: string | null
+    created_at: string | null
+  } | null
+}
+
+export interface UnactivatedUsersResponse {
+  summary: {
+    total_users: number
+    completed_users: number
+    completed_pct: number
+    unactivated_users: number
+    unactivated_pct: number
+    never_attempted_users: number
+    never_attempted_pct: number
+    failed_attempt_users: number
+    failed_attempt_pct: number
+    awaiting_payment_users: number
+    awaiting_payment_pct: number
+  }
+  top_reasons: {
+    code: string
+    label: string
+    count: number
+    pct: number
+  }[]
+  pagination: {
+    page: number
+    page_size: number
+    total_items: number
+    total_pages: number
+  }
+  users: UnactivatedUserItem[]
+}
+
+export async function apiGetUnactivatedUsers(
+  token: string,
+  page: number = 1,
+  pageSize: number = 25,
+  filterType: string = 'all',
+  search?: string,
+  sortBy: string = 'newest'
+): Promise<UnactivatedUsersResponse> {
+  const res = await axios.get(`${API_URL}/admin/unactivated-users`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: {
+      page,
+      page_size: pageSize,
+      filter_type: filterType,
+      search: search || undefined,
+      sort_by: sortBy,
+    },
+  })
+  return res.data
+}
+
 
 
 

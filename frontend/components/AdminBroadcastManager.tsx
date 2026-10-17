@@ -37,7 +37,7 @@ export default function AdminBroadcastManager({ token }: Props) {
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [channel, setChannel] = useState<'both' | 'telegram' | 'email'>('both')
-  const [targetFilter, setTargetFilter] = useState<'all' | 'telegram_users' | 'email_users' | 'paid_users' | 'free_users'>('all')
+  const [targetFilter, setTargetFilter] = useState<'all' | 'unactivated_users' | 'telegram_users' | 'email_users' | 'paid_users' | 'free_users'>('all')
   const [buttonText, setButtonText] = useState('')
   const [buttonUrl, setButtonUrl] = useState('')
   const [showButton, setShowButton] = useState(false)
@@ -311,6 +311,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition"
               >
                 <option value="all">Barcha faol foydalanuvchilar (hammasi)</option>
+                <option value="unactivated_users">🎯 Birinchi dublyajni tugatmaganlar (Aktivlashmaganlar)</option>
                 <option value="email_users">Faqat Email pochtasi borlar</option>
                 <option value="telegram_users">Faqat Telegram boti ulanganlar</option>
                 <option value="paid_users">Faqat pullik obunachilar (PREMIUM / PRO)</option>

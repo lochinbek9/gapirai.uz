@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import func, or_, and_, select
+from sqlalchemy import func, or_, and_, select, case, distinct, text
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail, TTSUsageLog, JobStatus
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
@@ -1793,6 +1793,15 @@ def _process_broadcast_campaign(campaign_id: str):
                 Subscription.status == "active"
             ).subquery()
             q = q.filter(User.id.notin_(paid_sub_user_ids))
+        elif campaign.target_filter == "unactivated_users":
+            completed_sub = db.query(DubbingJob.user_id).filter(
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.user_id.isnot(None)
+            ).subquery()
+            q = q.filter(
+                User.id.notin_(completed_sub),
+                or_(User.is_internal.is_(False), User.is_internal.is_(None))
+            )
 
         users = q.all()
         recipient_data = [
@@ -1915,6 +1924,15 @@ def get_broadcast_audience(
                 Subscription.status == "active"
             ).subquery()
             q = q.filter(User.id.notin_(paid_sub_user_ids))
+        elif target_filter == "unactivated_users":
+            completed_sub = db.query(DubbingJob.user_id).filter(
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.user_id.isnot(None)
+            ).subquery()
+            q = q.filter(
+                User.id.notin_(completed_sub),
+                or_(User.is_internal.is_(False), User.is_internal.is_(None))
+            )
 
         users = q.all()
         total_matched = len(users)
@@ -2562,6 +2580,256 @@ def admin_jobs_cost(
         }
     finally:
         db.close()
+
+
+@router.get("/unactivated-users")
+def get_unactivated_users(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=5, le=100),
+    filter_type: str = Query(default="all"),
+    search: str | None = Query(default=None),
+    sort_by: str = Query(default="newest"),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """
+    Birinchi dublyajni tugatmagan (unactivated / drop-off) foydalanuvchilar tahlili va ro'yxati.
+    """
+    db = SessionLocal()
+    try:
+        # 1. Muvaffaqiyatli dublyajga ega bo'lgan foydalanuvchilar
+        completed_user_ids_sub = (
+            db.query(distinct(DubbingJob.user_id))
+            .filter(DubbingJob.status == JobStatus.COMPLETED, DubbingJob.user_id.isnot(None))
+            .subquery()
+        )
+
+        internal_ids_sub = select(User.id).filter(User.is_internal.is_(True))
+
+        base_unactivated = db.query(User).filter(
+            or_(User.is_internal.is_(False), User.is_internal.is_(None)),
+            User.id.notin_(completed_user_ids_sub),
+            User.id.notin_(internal_ids_sub)
+        )
+
+        total_unactivated = base_unactivated.count()
+
+        total_real_users = db.query(User).filter(
+            or_(User.is_internal.is_(False), User.is_internal.is_(None)),
+            User.id.notin_(internal_ids_sub)
+        ).count()
+
+        completed_users_count = max(0, total_real_users - total_unactivated)
+
+        # Foydalanuvchilar urinishlari agregatsiyasi
+        user_jobs_agg = (
+            db.query(
+                DubbingJob.user_id.label("uid"),
+                func.count(DubbingJob.id).label("total_jobs"),
+                func.count(case((DubbingJob.status.in_([JobStatus.AWAITING_PAYMENT, JobStatus.PENDING]), 1))).label("awaiting_jobs"),
+                func.count(case((DubbingJob.status == JobStatus.FAILED, 1))).label("failed_jobs"),
+                func.max(DubbingJob.created_at).label("last_job_at"),
+            )
+            .filter(DubbingJob.user_id.isnot(None))
+            .group_by(DubbingJob.user_id)
+            .subquery()
+        )
+
+        never_attempted_count = db.query(User.id).outerjoin(
+            user_jobs_agg, User.id == user_jobs_agg.c.uid
+        ).filter(
+            or_(User.is_internal.is_(False), User.is_internal.is_(None)),
+            User.id.notin_(completed_user_ids_sub),
+            User.id.notin_(internal_ids_sub),
+            or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
+        ).count()
+
+        attempted_count = max(0, total_unactivated - never_attempted_count)
+
+        awaiting_payment_count = db.query(User.id).join(
+            user_jobs_agg, User.id == user_jobs_agg.c.uid
+        ).filter(
+            or_(User.is_internal.is_(False), User.is_internal.is_(None)),
+            User.id.notin_(completed_user_ids_sub),
+            User.id.notin_(internal_ids_sub),
+            user_jobs_agg.c.awaiting_jobs > 0,
+            user_jobs_agg.c.failed_jobs == 0
+        ).count()
+
+        failed_attempt_count = max(0, attempted_count - awaiting_payment_count)
+
+        # Top error reasons among failed first jobs
+        error_reasons_sql = """
+            WITH first_jobs AS (
+                SELECT 
+                    j.user_id,
+                    j.error_code,
+                    j.status,
+                    ROW_NUMBER() OVER(PARTITION BY j.user_id ORDER BY j.created_at ASC) as rn
+                FROM dubbing_jobs j
+                JOIN users u ON u.id = j.user_id
+                WHERE (u.is_internal IS FALSE OR u.is_internal IS NULL)
+                  AND j.user_id NOT IN (SELECT DISTINCT user_id FROM dubbing_jobs WHERE status = 'COMPLETED' AND user_id IS NOT NULL)
+            )
+            SELECT 
+                COALESCE(error_code, CASE WHEN status IN ('AWAITING_PAYMENT', 'PENDING') THEN 'AWAITING_PAYMENT' ELSE 'UNKNOWN' END) as code,
+                count(*) as count
+            FROM first_jobs
+            WHERE rn = 1
+            GROUP BY 1
+            ORDER BY count DESC
+            LIMIT 8;
+        """
+        reason_rows = db.execute(text(error_reasons_sql)).fetchall()
+        top_reasons = []
+        reason_labels = {
+            "AUTH_ERROR": "YouTube sessiya / blokirovka",
+            "credit_balance_exhausted": "Tashqi AI kvotasi tugagan",
+            "DOWNLOAD_FAILED": "Video yuklab olishda xatolik",
+            "HTTP_403": "YouTube server 403 blokirovkasi",
+            "AWAITING_PAYMENT": "Paywall (>10 daqiqalik video)",
+            "USER_CANCELLED": "Foydalanuvchi bekor qilgan",
+            "PROXY_BILLING_ERROR": "Proksi tarmog'i xatosi",
+            "NO_SPEECH_FOUND": "Videoda nutq topilmadi",
+            "UPLOADED_SOURCE_MISSING": "Yuklangan fayl topilmadi",
+            "UNKNOWN": "Noma'lum xatolik",
+        }
+        for r in reason_rows:
+            top_reasons.append({
+                "code": r[0],
+                "label": reason_labels.get(r[0], r[0]),
+                "count": r[1],
+                "pct": round(100.0 * r[1] / max(1, attempted_count), 1) if attempted_count > 0 else 0.0
+            })
+
+        # 2. Foydalanuvchilarni qidirish va filtrlash
+        q_users = db.query(
+            User,
+            user_jobs_agg.c.total_jobs,
+            user_jobs_agg.c.awaiting_jobs,
+            user_jobs_agg.c.failed_jobs,
+            user_jobs_agg.c.last_job_at
+        ).outerjoin(
+            user_jobs_agg, User.id == user_jobs_agg.c.uid
+        ).filter(
+            or_(User.is_internal.is_(False), User.is_internal.is_(None)),
+            User.id.notin_(completed_user_ids_sub),
+            User.id.notin_(internal_ids_sub)
+        )
+
+        if filter_type == "never_attempted":
+            q_users = q_users.filter(
+                or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
+            )
+        elif filter_type == "failed_attempt":
+            q_users = q_users.filter(user_jobs_agg.c.failed_jobs > 0)
+        elif filter_type == "awaiting_payment":
+            q_users = q_users.filter(
+                user_jobs_agg.c.awaiting_jobs > 0,
+                user_jobs_agg.c.failed_jobs == 0
+            )
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            q_users = q_users.filter(
+                or_(
+                    User.email.ilike(term),
+                    User.name.ilike(term),
+                    User.phone.ilike(term)
+                )
+            )
+
+        total_filtered = q_users.count()
+        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+
+        if sort_by == "oldest":
+            q_users = q_users.order_by(User.created_at.asc())
+        elif sort_by == "most_attempts":
+            q_users = q_users.order_by(user_jobs_agg.c.total_jobs.desc().nullslast(), User.created_at.desc())
+        else: # newest
+            q_users = q_users.order_by(User.created_at.desc())
+
+        offset = (page - 1) * page_size
+        user_rows = q_users.offset(offset).limit(page_size).all()
+
+        page_user_ids = [u.id for u, _, _, _, _ in user_rows]
+        latest_jobs_by_user = {}
+        if page_user_ids:
+            latest_jobs = (
+                db.query(DubbingJob)
+                .filter(DubbingJob.user_id.in_(page_user_ids))
+                .order_by(DubbingJob.created_at.desc())
+                .all()
+            )
+            for j in latest_jobs:
+                if j.user_id not in latest_jobs_by_user:
+                    latest_jobs_by_user[j.user_id] = j
+
+        items = []
+        for u, t_jobs, a_jobs, f_jobs, last_at in user_rows:
+            tot = t_jobs or 0
+            cat = "never_attempted"
+            if tot > 0:
+                if (a_jobs or 0) > 0 and (f_jobs or 0) == 0:
+                    cat = "awaiting_payment"
+                else:
+                    cat = "failed_attempt"
+
+            last_job_obj = latest_jobs_by_user.get(u.id)
+            last_job_data = None
+            if last_job_obj:
+                last_job_data = {
+                    "id": str(last_job_obj.id),
+                    "video_title": last_job_obj.video_title or "Nomsiz video",
+                    "youtube_url": last_job_obj.youtube_url,
+                    "video_duration": last_job_obj.video_duration,
+                    "status": last_job_obj.status.value if hasattr(last_job_obj.status, "value") else str(last_job_obj.status),
+                    "error_code": last_job_obj.error_code,
+                    "error_message": last_job_obj.error_message,
+                    "created_at": last_job_obj.created_at.isoformat() if last_job_obj.created_at else None,
+                }
+
+            items.append({
+                "id": str(u.id),
+                "name": u.name or "Nomsiz",
+                "email": u.email,
+                "phone": u.phone,
+                "telegram_chat_id": u.telegram_chat_id,
+                "is_verified": bool(u.is_verified),
+                "registered_at": u.created_at.isoformat() if u.created_at else None,
+                "attempt_count": tot,
+                "category": cat,
+                "last_job": last_job_data,
+            })
+
+        def calc_pct(part, whole):
+            return round(100.0 * part / max(1, whole), 1)
+
+        return {
+            "summary": {
+                "total_users": total_real_users,
+                "completed_users": completed_users_count,
+                "completed_pct": calc_pct(completed_users_count, total_real_users),
+                "unactivated_users": total_unactivated,
+                "unactivated_pct": calc_pct(total_unactivated, total_real_users),
+                "never_attempted_users": never_attempted_count,
+                "never_attempted_pct": calc_pct(never_attempted_count, total_real_users),
+                "failed_attempt_users": failed_attempt_count,
+                "failed_attempt_pct": calc_pct(failed_attempt_count, total_real_users),
+                "awaiting_payment_users": awaiting_payment_count,
+                "awaiting_payment_pct": calc_pct(awaiting_payment_count, total_real_users),
+            },
+            "top_reasons": top_reasons,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_items": total_filtered,
+                "total_pages": total_pages,
+            },
+            "users": items,
+        }
+    finally:
+        db.close()
+
 
 
 
