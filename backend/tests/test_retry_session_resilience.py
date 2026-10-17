@@ -159,7 +159,7 @@ class TestProcessVideoRetrySessionResilience(unittest.TestCase):
         # at all -- the second unhandled OperationalError skipped every
         # write in the except block).
         self.assertTrue(row.error_code, "error_code must be populated, not silently blank")
-        self.assertIn("1/5", row.status_message)
+        self.assertIn(f"1/{process_video.max_retries}", row.status_message)
         self.assertIsNone(row.processing_claim_token, "claim must not be left held after a failed initial fetch")
 
     # 2 & 3. retryable error mid-pipeline (DOWNLOAD stage), original session
@@ -194,7 +194,7 @@ class TestProcessVideoRetrySessionResilience(unittest.TestCase):
         fresh = SessionLocal()
         row = fresh.query(DubbingJob).filter(DubbingJob.id == self.job_id).first()
         fresh.close()
-        self.assertIn("1/5", row.status_message)
+        self.assertIn(f"1/{process_video.max_retries}", row.status_message)
         self.assertIsNotNone(row.error_code)
         self.assertIsNone(row.processing_claim_token)
 
@@ -223,7 +223,7 @@ class TestProcessVideoRetrySessionResilience(unittest.TestCase):
         fresh = SessionLocal()
         row = fresh.query(DubbingJob).filter(DubbingJob.id == self.job_id).first()
         fresh.close()
-        self.assertIn("3/5", row.status_message)  # self.request.retries + 1
+        self.assertIn(f"3/{process_video.max_retries}", row.status_message)  # self.request.retries + 1
 
     # 8. non-retryable error behavior unchanged -- must NOT touch the new
     #    retry-branch code path at all; goes straight to FAILED as before.
@@ -334,7 +334,7 @@ class TestAnalyzeVideoTaskRetrySessionResilience(unittest.TestCase):
         fresh = SessionLocal()
         row = fresh.query(VideoAnalysis).filter(VideoAnalysis.id == self.analysis_id).first()
         fresh.close()
-        self.assertIn("1/5", row.status_message)
+        self.assertIn(f"1/{analyze_video_task.max_retries}", row.status_message)
         self.assertIsNotNone(row.error_code)
         self.assertIsNone(row.processing_claim_token)
 

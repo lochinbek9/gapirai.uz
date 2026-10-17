@@ -381,7 +381,7 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
-    max_retries=5,
+    max_retries=3,
     default_retry_delay=60,
     soft_time_limit=7800,  # 130 daqiqa — 120 daqiqalik videolar uchun ogohlantirish
     time_limit=8000,       # 133 daqiqa — worker'ni majburan to'xtatadi (hard limit)
@@ -1247,7 +1247,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # qolgan edi — batafsili izoh _mark_job_failed'ning o'zida).
         _mark_job_failed(job_id, exc, current_stage)
 
-        # Kvota qaytarish -- bepul/kvota bilan boshlangan job 5 marta
+        # Kvota qaytarish -- bepul/kvota bilan boshlangan job 3 marta
         # urinib ham muvaffaqiyatsiz tugasa, sarflangan kvota userga qaytadi
         # (2026-08-19, foydalanuvchi so'rovi). Pullik (Click) job'lar uchun
         # avtomatik pul qaytarish integratsiyasi yo'q -- Payment.needs_refund
