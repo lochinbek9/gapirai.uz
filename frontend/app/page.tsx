@@ -17,7 +17,8 @@ import Footer from "@/components/Footer";
 import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import PreviewOfferModal from "@/components/PreviewOfferModal";
-import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard } from "lucide-react";
+import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
+import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle } from "lucide-react";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -665,27 +666,77 @@ export default function Home() {
               </motion.div>
             )}
 
-            {phase === "error" && job && (
-              <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-2">
-                  <div className="w-8 h-8 text-blue-500">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 transition-colors">
-                  <h3 className="text-blue-500 dark:text-blue-400 font-bold mb-2">Xatolik yuz berdi</h3>
-                  <p className="text-sm text-blue-500/60 dark:text-blue-400/60 leading-relaxed">{job.error_message}</p>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
-                >
-                  Qayta boshlash
-                </button>
-              </motion.div>
-            )}
+            {phase === "error" && job && (() => {
+              const isYouTubeRestricted =
+                job.error_code === 'AUTH_ERROR' ||
+                job.error_code === 'DOWNLOAD_FAILED' ||
+                job.error_code === 'HTTP_403' ||
+                job.error_code === 'PO_TOKEN_REQUIRED' ||
+                job.error_message?.toLowerCase().includes('bot') ||
+                job.error_message?.toLowerCase().includes('sign in') ||
+                job.error_message?.toLowerCase().includes('ruxsat') ||
+                job.error_message?.toLowerCase().includes('private');
+
+              return (
+                <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
+                  {isYouTubeRestricted ? (
+                    <div className="space-y-4 text-left">
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-6 sm:p-7 space-y-4 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                            <AlertTriangle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                              YouTube Cheklovi Aniqlondi
+                            </span>
+                            <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+                              Ushbu video YouTube himoyasi bilan cheklangan
+                            </h3>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
+                          YouTube bot yoki yosh/mintaqaviy cheklov sababli ushbu videoni avtomatik yuklashga ruxsat bermadi. 
+                          Lekin uni <strong>fayl sifatida yuklasangiz, dublyaj 100% muvaffaqiyatli ishlaydi!</strong>
+                        </p>
+
+                        <div className="bg-white/60 dark:bg-black/20 rounded-2xl p-4 border border-amber-500/20">
+                          <UploadRecoveryPrompt jobId={job.job_id} />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleReset}
+                        className="w-full py-3.5 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
+                      >
+                        Boshqa video kiritish
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-2">
+                        <div className="w-8 h-8 text-blue-500">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 transition-colors">
+                        <h3 className="text-blue-500 dark:text-blue-400 font-bold mb-2">Xatolik yuz berdi</h3>
+                        <p className="text-sm text-blue-500/60 dark:text-blue-400/60 leading-relaxed">{job.error_message}</p>
+                      </div>
+                      <button
+                        onClick={handleReset}
+                        className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
+                      >
+                        Qayta boshlash
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              );
+            })()}
           </AnimatePresence>
         </motion.div>
       </div>

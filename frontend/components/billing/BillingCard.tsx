@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 
 const PACK_LABELS: Record<number, string> = {
+  15: '+15 daq (Starter)',
   30: '+30 daq', 35: '+35 daq',
   60: '+60 daq', 70: '+70 daq',
   120: '+120 daq', 140: '+140 daq',

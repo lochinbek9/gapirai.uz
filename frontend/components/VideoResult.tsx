@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert } from "lucide-react";
+import { Download, RotateCcw, ChevronDown, CheckCircle2, Share2, Check, ShieldAlert, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job, getDownloadUrl, getVideoUrl, formatDuration } from "@/lib/api";
 import { useState, useEffect } from "react";
@@ -154,6 +154,41 @@ export default function VideoResult({ job, onReset }: Props) {
           <Download size={18} />
           Videoni yuklab olish
         </motion.a>
+
+        {/* ── Viral Retention & Share Card ─────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="p-5 rounded-[24px] bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-purple-500/10 border border-blue-500/20 text-center space-y-3"
+        >
+          <div className="space-y-1">
+            <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white flex items-center justify-center gap-1.5">
+              <span>🎉 Dublyaj yoqdimi?</span>
+            </h4>
+            <p className="text-[11px] text-gray-600 dark:text-slate-400">
+              Videoni Telegram'da do'stlaringizga ulashing yoki keyingi videongizni hoziroq tayyorlang!
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <a
+              href={`https://t.me/share/url?url=${encodeURIComponent(typeof window !== "undefined" ? `${window.location.origin}/video/${job.job_id}` : `https://gapirai.uz/video/${job.job_id}`)}&text=${encodeURIComponent(`Men ushbu videoni GapirAI.uz orqali o'zbek tiliga dublyaj qildim! Ko'ring:`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-3 px-4 bg-[#229ED9] hover:bg-[#1E8BC0] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md shadow-sky-500/20"
+            >
+              <Send size={14} />
+              Telegramda ulashish
+            </a>
+            <button
+              onClick={handleShare}
+              className="py-3 px-4 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-gray-700 dark:text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+            >
+              {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
+              <span>{copied ? "Nusxalandi" : "Havola"}</span>
+            </button>
+          </div>
+        </motion.div>
       </div>
 
       {/* ── Translation Text Accordion ────────────── */}

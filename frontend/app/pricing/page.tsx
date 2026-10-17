@@ -75,8 +75,6 @@ export default function PricingPage() {
     if (!isLoggedIn) { router.push('/login'); return }
     setBuyingPack(pack)
     setError(null)
-    // Uzum/Paynet'da redirect yo'q -- popup ochmaymiz.
-    const w = provider !== 'uzum' && provider !== 'paynet' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
       const res =
         provider === 'uzum' ? await purchaseMinutesUzum(pack)
@@ -87,14 +85,11 @@ export default function PricingPage() {
       } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
         setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
-        if (w) w.location.href = res.payment_url
-        else window.location.href = res.payment_url
+        window.location.assign(res.payment_url)
       } else {
-        if (w) w.close()
         setError("To'lov havolasini yaratishda xatolik yuz berdi.")
       }
     } catch {
-      if (w) w.close()
       setError("To'lov havolasini yaratishda xatolik yuz berdi.")
     } finally {
       setBuyingPack(null)
@@ -108,7 +103,6 @@ export default function PricingPage() {
     }
     setSubscribing(planId)
     setError(null)
-    const paymentWindow = provider !== 'uzum' && provider !== 'paynet' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
     try {
       const res =
         provider === 'uzum' ? await subscribeToPlanUzum(planId)
@@ -120,14 +114,11 @@ export default function PricingPage() {
       } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
         setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
       } else if (res.success && 'payment_url' in res && res.payment_url) {
-        if (paymentWindow) paymentWindow.location.href = res.payment_url
-        else window.location.href = res.payment_url
+        window.location.assign(res.payment_url)
       } else {
-        if (paymentWindow) paymentWindow.close()
         setError("To'lov havolasini yaratishda xatolik yuz berdi.")
       }
     } catch {
-      if (paymentWindow) paymentWindow.close()
       setError("To'lov havolasini yaratishda xatolik yuz berdi.")
     } finally {
       setSubscribing(null)
@@ -289,9 +280,19 @@ export default function PricingPage() {
               Oylik byudjetingiz tugasa sotib oling. Bir martalik to'lov — tugamaydi, keyingi oyga o'tadi.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {packs.map((p) => (
-              <div key={p.minutes} className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center">
+              <div key={p.minutes} className={`rounded-2xl border ${p.minutes === 15 ? 'border-emerald-500/40 bg-emerald-500/[0.04]' : p.minutes === 70 ? 'border-violet-500/40 bg-violet-500/[0.04]' : 'border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03]'} backdrop-blur p-3.5 sm:p-4 flex flex-col items-center gap-2 text-center relative`}>
+                {p.minutes === 15 && (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    Starter
+                  </span>
+                )}
+                {p.minutes === 70 && (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30">
+                    Mashhur
+                  </span>
+                )}
                 <span className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">+{p.minutes}</span>
                 <span className="text-[10px] sm:text-[11px] uppercase tracking-widest text-gray-400 dark:text-slate-500">daqiqa</span>
                 <span className="text-xs sm:text-sm font-bold text-violet-600 dark:text-violet-400">{p.price.toLocaleString('uz-UZ')} so'm</span>
