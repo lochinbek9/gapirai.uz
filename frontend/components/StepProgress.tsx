@@ -131,9 +131,13 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                  <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
-                 <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
-                   {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
-                 </p>
+                 {job.status === 'pending' || (job.progress || 0) <= 0 ? (
+                   <span className="text-base font-bold text-amber-500 animate-pulse">Navbatda...</span>
+                 ) : (
+                   <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
+                     {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
+                   </p>
+                 )}
                  <div className="py-1 px-3 rounded-full bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex items-center gap-2 transition-colors">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse transition-colors"></div>
                     <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 transition-colors">{formatElapsed(elapsed)}</span>

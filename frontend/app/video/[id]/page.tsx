@@ -728,27 +728,65 @@ export default function VideoPage() {
               );
             })() : (
               <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[380px]">
-                <div className="space-y-5 max-w-md w-full z-10">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
-                    <Loader2 className="w-8 h-8 animate-spin" />
+                <div className="space-y-6 max-w-md w-full z-10">
+                  {/* Ko'zni toliqtirmaydigan yumshoq pulsatsiya */}
+                  <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
+                    <div className="absolute inset-0 rounded-full bg-violet-500/15 animate-ping opacity-40 pointer-events-none" />
+                    <Sparkles className="w-8 h-8 text-violet-600 dark:text-violet-400 animate-pulse" />
                   </div>
 
-                  <div className="space-y-3">
-                    <p className="text-gray-900 dark:text-white font-bold text-lg sm:text-xl">
+                  <div className="space-y-4">
+                    <p className="text-gray-900 dark:text-white font-bold text-lg sm:text-xl leading-snug">
                       {job.status_message || 'Qayta ishlanmoqda...'}
                     </p>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">
-                        <span>Jarayon</span>
-                        <span className="text-violet-600 dark:text-violet-400 font-bold tabular-nums">
-                          {Math.round(job.progress || 0)}%
+
+                    {/* Progress Bar & Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 font-semibold tracking-wide">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${job.status === 'pending' || (job.progress || 0) <= 0 ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                          {job.status === 'pending' || (job.progress || 0) <= 0 ? "Tayyorlanmoqda" : "Jarayon"}
                         </span>
+                        {job.status === 'pending' || (job.progress || 0) <= 0 ? (
+                          <span className="text-amber-500 font-semibold text-xs animate-pulse">
+                            Navbatda...
+                          </span>
+                        ) : (
+                          <span className="text-violet-600 dark:text-violet-400 font-bold tabular-nums">
+                            {Math.round(job.progress || 0)}%
+                          </span>
+                        )}
                       </div>
-                      <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500 transition-[width] duration-700 ease-out shadow-sm"
-                          style={{ width: `${Math.max(3, Math.min(100, job.progress || 0))}%` }}
-                        />
+
+                      <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative">
+                        {job.status === 'pending' || (job.progress || 0) <= 0 ? (
+                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-600/30 via-violet-500 to-indigo-500/30 animate-pulse" />
+                        ) : (
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500 transition-[width] duration-700 ease-out shadow-sm"
+                            style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bosqichlar ko'rinishi -- foydalanuvchiga har bir qadam tushunarli bo'lishi uchun */}
+                    <div className="pt-1 grid grid-cols-4 gap-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 5 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
+                        <div className="text-base mb-0.5">📥</div>
+                        <div className="truncate">Yuklash</div>
+                      </div>
+                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 20 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
+                        <div className="text-base mb-0.5">📝</div>
+                        <div className="truncate">Matn</div>
+                      </div>
+                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 60 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
+                        <div className="text-base mb-0.5">🎙️</div>
+                        <div className="truncate">Ovoz</div>
+                      </div>
+                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 85 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
+                        <div className="text-base mb-0.5">🎬</div>
+                        <div className="truncate">Video</div>
                       </div>
                     </div>
                   </div>
@@ -767,7 +805,7 @@ export default function VideoPage() {
                     </div>
                   )}
 
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button
                       onClick={handleCancel}
                       disabled={cancelLoading}
