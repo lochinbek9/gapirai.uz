@@ -348,12 +348,16 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
 
 def refund_quota(db, user_id, duration_minutes: float) -> None:
     """consume_quota() bilan sarflangan daqiqalarni qaytaradi -- job pipeline
-    5 marta urinib ham muvaffaqiyatsiz tugasa (backend/workers/tasks.py).
+    muvaffaqiyatsiz tugasa (backend/workers/tasks.py) yoki bekor qilinsa.
     consume'ning teskarisi: avval sotib olingan daqiqalarga (agar shu jobda
-    ishlatilган bo'lsa), keyin oylikка qaytaradi -- soddaroq qilib, hammasini
+    ishlatilgan bo'lsa), keyin oylikka qaytaradi -- soddaroq qilib, hammasini
     oylik hisoblagichdan ayiramiz, purchased qoldig'i esa faqat oylik 0'ga
-    yetganда oshadi."""
-    sub = get_or_create_subscription(db, user_id)
+    yetganda oshadi."""
+    if not user_id or duration_minutes <= 0:
+        return
+    if is_user_admin(db, user_id):
+        return
+    sub = get_or_create_subscription(db, user_id, for_update=True)
     used = sub.monthly_minutes_used or 0.0
     give_back_to_monthly = min(duration_minutes, used)
     remainder = duration_minutes - give_back_to_monthly

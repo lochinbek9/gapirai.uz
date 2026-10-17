@@ -378,6 +378,52 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
     logger.critical(f"[JOB {job_id}] FAILED holatiga HECH QANDAY usulda o'tkazib bo'lmadi — job eski holatida abadiy qotib qolishi mumkin!")
 
 
+def _refund_job_quota_or_flag_payment(job_id: str, is_recovery_job: bool = False) -> None:
+    """Job muvaffaqiyatsiz bo'lganda (NoSpeechFoundError, PermanentError, yoki
+    barcha retry'lar tugaganda) sarflangan kvotani userga qaytaradi yoki
+    pullik bo'lsa Payment.needs_refund=True belgisini qo'yadi.
+    Doim mustaqil SessionLocal() sessiyasi orqali ishlaydi."""
+    refund_db = None
+    try:
+        refund_db = SessionLocal()
+        fresh_job = refund_db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+        if not fresh_job:
+            return
+
+        # Agar bu eski completed job'ning on-demand qayta tiklanishi bo'lsa,
+        # foydalanuvchiga allaqachon avval video yetkazilgan, kvota qaytarilmaydi.
+        if is_recovery_job or fresh_job.completed_at is not None:
+            return
+
+        if fresh_job.quota_consumed and fresh_job.user_id:
+            from backend.services.plans import refund_quota
+            duration_minutes = (fresh_job.video_duration or 0.0) / 60.0
+            if duration_minutes > 0:
+                refund_quota(refund_db, fresh_job.user_id, duration_minutes)
+            fresh_job.quota_consumed = False
+            refund_db.commit()
+            logger.info(f"[JOB {job_id}] Muvaffaqiyatsiz job uchun {duration_minutes:.2f} daqiqa kvota qaytarildi (user_id={fresh_job.user_id}).")
+        else:
+            from backend.models.payment import Payment, PaymentStatus
+            paid = refund_db.query(Payment).filter(
+                Payment.job_id == job_id, Payment.status == PaymentStatus.APPROVED
+            ).first()
+            if paid:
+                paid.needs_refund = True
+                refund_db.commit()
+                logger.info(f"[JOB {job_id}] Muvaffaqiyatsiz pullik job uchun needs_refund=True belgilandi.")
+    except Exception as refund_exc:
+        logger.error(f"[JOB {job_id}] Kvota/to'lov qaytarishda xatolik: {refund_exc}")
+        if refund_db is not None:
+            try:
+                refund_db.rollback()
+            except Exception:
+                pass
+    finally:
+        if refund_db is not None:
+            refund_db.close()
+
+
 @celery_app.task(
     bind=True,
     name="backend.workers.tasks.process_video",
@@ -398,7 +444,7 @@ def process_video(self: Task, job_id: str) -> dict:
         if not job:
             raise ValueError(f"Job topilmadi: {job_id}")
 
-        is_recovery_job = bool(job.completed_at is not None or job.translated_segments)
+        is_recovery_job = bool(job.completed_at is not None)
 
         # 2026-08-26 audit: bir xil task_id ikki worker'da bir vaqtda faol
         # bo'lishi productionda LIVE kuzatilgan (Celery/Redis qayta
@@ -1093,6 +1139,7 @@ def process_video(self: Task, job_id: str) -> dict:
     except NoSpeechFoundError as exc:
         # User xatoligi (videoda inson nutqi yo'q) -- bu tizim nosozligi EMAS, adminlarga xabar yuborilmaydi!
         _mark_job_failed(job_id, exc, current_stage)
+        _refund_job_quota_or_flag_payment(job_id, is_recovery_job)
         try:
             if job.user_id and job.user and job.user.telegram_chat_id:
                 v_title = getattr(job, "video_title", None) or "Video"
@@ -1130,6 +1177,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # Status-o'tkazish endi mustaqil, yangi sessiya bilan (_mark_job_failed) —
         # eski `db` sessiyasi shu paytda qanday holatda bo'lishidan qat'i nazar.
         _mark_job_failed(job_id, exc, current_stage)
+        _refund_job_quota_or_flag_payment(job_id, is_recovery_job)
         try:
             if job.user_id and job.user and job.user.telegram_chat_id:
                 err_code = getattr(exc, "code", None) or getattr(job, "error_code", None)
@@ -1246,34 +1294,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # (2026-08-21/22 productionda haqiqiy job shu sabab bilan abadiy qotib
         # qolgan edi — batafsili izoh _mark_job_failed'ning o'zida).
         _mark_job_failed(job_id, exc, current_stage)
-
-        # Kvota qaytarish -- bepul/kvota bilan boshlangan job 3 marta
-        # urinib ham muvaffaqiyatsiz tugasa, sarflangan kvota userga qaytadi
-        # (2026-08-19, foydalanuvchi so'rovi). Pullik (Click) job'lar uchun
-        # avtomatik pul qaytarish integratsiyasi yo'q -- Payment.needs_refund
-        # true qilinadi, admin panelda qo'lda qaytarish uchun ko'rsatiladi.
-        # O'z alohida sessiyasi va try/except bilan — bu yerdagi xato endi
-        # yuqoridagi status-o'tkazishga ta'sir qilmaydi.
-        refund_db = None
-        try:
-            refund_db = SessionLocal()
-            if job.quota_consumed and job.user_id and not is_recovery_job:
-                from backend.services.plans import refund_quota
-                refund_quota(refund_db, job.user_id, (job.video_duration or 0.0) / 60.0)
-                refund_db.query(DubbingJob).filter(DubbingJob.id == job_id).update({"quota_consumed": False})
-            else:
-                from backend.models.payment import Payment, PaymentStatus
-                paid = refund_db.query(Payment).filter(
-                    Payment.job_id == job_id, Payment.status == PaymentStatus.APPROVED
-                ).first()
-                if paid:
-                    paid.needs_refund = True
-            refund_db.commit()
-        except Exception as refund_exc:
-            logger.error(f"[JOB {job_id}] Kvota/to'lov qaytarish belgisini qo'yishda xatolik: {refund_exc}")
-        finally:
-            if refund_db is not None:
-                refund_db.close()
+        _refund_job_quota_or_flag_payment(job_id, is_recovery_job)
 
         try:
             if job.user_id and job.user and job.user.telegram_chat_id:

@@ -74,14 +74,15 @@ class TestMinuteQuota(unittest.TestCase):
         self.assertAlmostEqual(sub.monthly_minutes_used, 0.0)
         self.assertAlmostEqual(sub.purchased_minutes, 5.0)
 
-    def test_pro_plan_400_minutes(self):
+    def test_pro_plan_minutes(self):
         sub = plans.get_or_create_subscription(self.db, self.user.id)
         sub.plan = PlanTier.PRO
         sub.expires_at = datetime.utcnow() + timedelta(days=30)
         self.db.commit()
-        covered, short = plans.check_quota(self.db, self.user.id, 390.0)
+        cap = plans.PLANS["pro"].monthly_minutes
+        covered, short = plans.check_quota(self.db, self.user.id, cap - 10.0)
         self.assertTrue(covered)
-        covered, short = plans.check_quota(self.db, self.user.id, 420.0)
+        covered, short = plans.check_quota(self.db, self.user.id, cap + 20.0)
         self.assertFalse(covered)
         self.assertEqual(short, 20)
 
