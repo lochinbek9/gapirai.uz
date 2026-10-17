@@ -102,6 +102,34 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
     }
 
 
+@router.get("")
+def list_user_analyses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """Foydalanuvchining barcha video tahlillarini ro'yxati (yangi yaratilganlari birinchi)."""
+    analyses = (
+        db.query(VideoAnalysis)
+        .filter(VideoAnalysis.user_id == current_user.id)
+        .order_by(VideoAnalysis.created_at.desc())
+        .all()
+    )
+    return [_analysis_to_dict(a) for a in analyses]
+
+
+@router.delete("/{analysis_id}")
+def delete_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Foydalanuvchining video tahlilini o'chirish."""
+    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    db.delete(analysis)
+    db.commit()
+    return {"success": True}
+
+
 @router.post("", status_code=201, dependencies=[Depends(rate_limit("video_analysis_create", 8, 600))])
 async def create_analysis(
     request: CreateAnalysisRequest,

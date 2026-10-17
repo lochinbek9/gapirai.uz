@@ -3,13 +3,19 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl, getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats } from '@/lib/api'
+import {
+  listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl,
+  getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats,
+  listUserAnalyses, deleteAnalysis, VideoAnalysis,
+} from '@/lib/api'
+import { extractYouTubeId } from '@/lib/youtube'
 import PushOptIn from '@/components/PushOptIn'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
-  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert
+  Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
+  Sparkles, FileText,
 } from 'lucide-react'
 
 const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
@@ -363,6 +369,172 @@ function VideoCard({
   )
 }
 
+function AnalysisCard({
+  analysis,
+  onDelete,
+  isDeleting = false,
+}: {
+  analysis: VideoAnalysis
+  onDelete: (id: string) => void
+  isDeleting?: boolean
+}) {
+  const ytId = extractYouTubeId(analysis.youtube_url)
+  const thumbnail =
+    analysis.video_thumbnail ||
+    (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
+  const duration = analysis.video_duration ? formatDuration(analysis.video_duration) : null
+  const isReady = analysis.status === 'completed'
+  const isFailed = analysis.status === 'failed'
+
+  const summaryText =
+    analysis.summary?.short ||
+    analysis.five_minute_summary?.why_it_matters ||
+    analysis.status_message ||
+    ''
+
+  return (
+    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-violet-500/20 rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between">
+      <div>
+        {/* Thumbnail */}
+        <div className="relative aspect-video bg-black/10 dark:bg-slate-900/60 overflow-hidden">
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={analysis.video_title || 'Video tahlili'}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/[0.02]">
+              <Sparkles className="w-12 h-12 text-violet-400" />
+            </div>
+          )}
+
+          {/* Duration badge */}
+          {duration && (
+            <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-lg font-mono font-bold tracking-tighter">
+              {duration}
+            </div>
+          )}
+
+          {/* Top-left: AI Tahlil badge */}
+          <div className="absolute top-2.5 left-2.5 bg-violet-950/80 text-violet-200 border border-violet-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm shadow-md">
+            <Sparkles className="w-3 h-3 text-violet-400" />
+            <span>AI Tahlil</span>
+          </div>
+
+          {/* Top-right: Language badge */}
+          <div className="absolute top-2.5 right-2.5">
+            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-md bg-black/75 text-white border border-white/10">
+              {analysis.language.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Hover overlay */}
+          <Link
+            href={`/video-analysis/${analysis.id}`}
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm"
+          >
+            <div className="px-3.5 py-2 bg-white text-gray-900 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg transition transform translate-y-1 group-hover:translate-y-0">
+              <Play className="w-4 h-4 fill-gray-900 ml-0.5" />
+              <span>Tahlilni ko'rish</span>
+            </div>
+          </Link>
+
+          {/* Progress bar for in-progress analyses */}
+          {!isReady && !isFailed && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-300"
+                style={{ width: `${Math.max(5, Math.min(100, analysis.progress || 0))}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-1.5 min-h-[2.5rem]">
+            <Link
+              href={`/video-analysis/${analysis.id}`}
+              className="hover:text-violet-600 dark:hover:text-violet-400 transition"
+            >
+              {analysis.video_title || 'YouTube video tahlili'}
+            </Link>
+          </h3>
+
+          {summaryText && (
+            <p className="text-gray-500 dark:text-gray-400 text-xs line-clamp-2 mb-3 leading-relaxed">
+              {summaryText}
+            </p>
+          )}
+
+          {/* Chips */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[10px]">
+            {analysis.chapters && analysis.chapters.length > 0 && (
+              <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+                {analysis.chapters.length} ta bob
+              </span>
+            )}
+            {analysis.key_points && analysis.key_points.length > 0 && (
+              <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+                {analysis.key_points.length} asosiy fikr
+              </span>
+            )}
+            {analysis.notes && (
+              <span className="px-2 py-0.5 rounded-md font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                Konspekt mavjud
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer / Status */}
+      <div className="p-4 pt-0 border-t border-black/5 dark:border-white/5 mt-2 flex items-center justify-between">
+        <div>
+          {isReady ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+              <CheckCircle2 className="w-3 h-3" />
+              Tayyor
+            </span>
+          ) : isFailed ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+              <XCircle className="w-3 h-3" />
+              Xatolik
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {analysis.status_message || 'Tahlil qilinmoqda'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/video-analysis/${analysis.id}`}
+            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold"
+          >
+            Ko'rish →
+          </Link>
+          <button
+            onClick={() => onDelete(analysis.id)}
+            disabled={isDeleting}
+            className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+            title="O'chirish"
+          >
+            {isDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MeshBackground() {
   return (
     <div className="mesh-gradient">
@@ -376,8 +548,12 @@ function MeshBackground() {
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'dubbing' | 'analysis'>('dubbing')
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
+  const [analyses, setAnalyses] = useState<VideoAnalysis[]>([])
+  const [analysesLoading, setAnalysesLoading] = useState(true)
+  const [deletingAnalysisId, setDeletingAnalysisId] = useState<string | null>(null)
   const [jobsStats, setJobsStats] = useState<JobsStats | null>(null)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
   const [renewing, setRenewing] = useState(false)
@@ -393,16 +569,41 @@ export default function DashboardPage() {
         .catch(console.error)
         .finally(() => setJobsLoading(false))
 
+      listUserAnalyses()
+        .then((data) => {
+          setAnalyses(data)
+          // Agar foydalanuvchida dublyaj yo'q lekin tahlil bo'lsa, avtomatik tahlil tabini ko'rsatish
+          if (jobs.length === 0 && data.length > 0) {
+            setActiveTab('analysis')
+          }
+        })
+        .catch(console.error)
+        .finally(() => setAnalysesLoading(false))
+
       getJobsStats().then(setJobsStats).catch(console.error)
       getPlans().then((res) => setSubscription(res.current)).catch(console.error)
 
       const interval = setInterval(() => {
         listJobs().then(setJobs).catch(console.error)
+        listUserAnalyses().then(setAnalyses).catch(console.error)
         getJobsStats().then(setJobsStats).catch(console.error)
       }, 5000)
       return () => clearInterval(interval)
     }
   }, [user])
+
+  async function handleDeleteAnalysis(id: string) {
+    if (!confirm("Ushbu video tahlilini o'chirishni tasdiqlaysizmi?")) return
+    setDeletingAnalysisId(id)
+    try {
+      await deleteAnalysis(id)
+      setAnalyses((prev) => prev.filter((a) => a.id !== id))
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Tahlilni o'chirishda xatolik yuz berdi.")
+    } finally {
+      setDeletingAnalysisId(null)
+    }
+  }
 
   async function handleRenew() {
     if (!subscription || subscription.plan === 'free') return
@@ -534,35 +735,100 @@ export default function DashboardPage() {
         <PushOptIn />
         <DonateCTA className="mb-6" />
 
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-6 transition-colors">Mening videolarim</h1>
+        {/* Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-fit">
+            <button
+              onClick={() => setActiveTab('dubbing')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                activeTab === 'dubbing'
+                  ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Youtube className="w-4 h-4 text-rose-500" />
+              <span>Dublyaj videolarim</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 font-mono">
+                {jobs.length}
+              </span>
+            </button>
 
-        {/* Grid */}
-        {jobsLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <button
+              onClick={() => setActiveTab('analysis')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                activeTab === 'analysis'
+                  ? 'bg-white dark:bg-white/10 text-violet-600 dark:text-violet-400 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              <span>Video tahlillari</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 font-mono font-bold">
+                {analyses.length}
+              </span>
+            </button>
           </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
-            <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
-            <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
-            <Link href="/" className="text-blue-500 hover:underline text-xs font-bold uppercase tracking-wider">
-              Birinchi videoni dublyaj qiling →
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {jobs.map((job) => (
-              <VideoCard
-                key={job.job_id}
-                job={job}
-                onDelete={handleDelete}
-                onRetry={handleRetry}
-                isRetrying={retryingId === job.job_id}
-                isDeleting={deletingId === job.job_id}
-                isAdmin={user?.role === 'admin'}
-              />
-            ))}
-          </div>
+        </div>
+
+        {/* Content by active tab */}
+        {activeTab === 'dubbing' && (
+          jobsLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
+              <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
+              <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
+              <Link href="/" className="text-blue-500 hover:underline text-xs font-bold uppercase tracking-wider">
+                Birinchi videoni dublyaj qiling →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {jobs.map((job) => (
+                <VideoCard
+                  key={job.job_id}
+                  job={job}
+                  onDelete={handleDelete}
+                  onRetry={handleRetry}
+                  isRetrying={retryingId === job.job_id}
+                  isDeleting={deletingId === job.job_id}
+                  isAdmin={user?.role === 'admin'}
+                />
+              ))}
+            </div>
+          )
+        )}
+
+        {activeTab === 'analysis' && (
+          analysesLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+            </div>
+          ) : analyses.length === 0 ? (
+            <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
+              <Sparkles className="w-16 h-16 text-violet-300 dark:text-violet-900/60 mx-auto mb-4 animate-pulse" />
+              <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video tahlil qilinmagan</p>
+              <p className="text-xs text-gray-400 mb-4 max-w-sm mx-auto">
+                YouTube videoning xulosasi, asosiy fikrlari va transkriptini bir necha soniyada oling.
+              </p>
+              <Link href="/" className="text-violet-500 hover:underline text-xs font-bold uppercase tracking-wider">
+                Video tahlil qilish →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {analyses.map((analysis) => (
+                <AnalysisCard
+                  key={analysis.id}
+                  analysis={analysis}
+                  onDelete={handleDeleteAnalysis}
+                  isDeleting={deletingAnalysisId === analysis.id}
+                />
+              ))}
+            </div>
+          )
         )}
       </main>
     </div>

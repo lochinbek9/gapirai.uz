@@ -707,6 +707,16 @@ export async function createAnalysis(youtube_url: string, language: string = 'uz
   return res.data
 }
 
+export async function listUserAnalyses(): Promise<VideoAnalysis[]> {
+  const res = await apiClient.get('/api/video-analysis')
+  return res.data
+}
+
+export async function deleteAnalysis(analysisId: string): Promise<{ success: boolean }> {
+  const res = await apiClient.delete(`/api/video-analysis/${analysisId}`)
+  return res.data
+}
+
 export async function getAnalysis(analysisId: string): Promise<VideoAnalysis> {
   const res = await apiClient.get(`/api/video-analysis/${analysisId}`)
   return res.data
