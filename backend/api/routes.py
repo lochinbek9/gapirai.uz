@@ -153,12 +153,13 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
             live_progress = max(live_progress, min(sub, ceiling))
 
     expected_end_time = None
-    if status_str not in ("completed", "failed", "awaiting_payment"):
-        duration = job.video_duration or 300.0
-        baseline_dt = job.updated_at or job.created_at
+    if status_str not in ("completed", "failed", "awaiting_payment", "pending") and live_progress > 0:
+        duration = float(job.video_duration or 300.0)
         remaining_factor = max(0.1, (100.0 - live_progress) / 100.0)
-        est_seconds = (30 + 0.3 * duration) * remaining_factor
-        expected_dt = baseline_dt + timedelta(seconds=est_seconds)
+        # Taxminiy qolgan vaqt to'g'ridan-to'g'ri joriy vaqtdan (now) hisoblanadi,
+        # shunda navbatda kutgan vaqt hisob-kitobni buzib 0 soniya/noto'g'ri ko'rsatmaydi.
+        est_remaining_seconds = max(15.0, (20.0 + 0.35 * duration) * remaining_factor)
+        expected_dt = datetime.utcnow() + timedelta(seconds=est_remaining_seconds)
         expected_end_time = to_tashkent_iso(expected_dt)
 
     channel_name = getattr(job, "channel_name", None)

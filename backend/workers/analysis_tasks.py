@@ -294,7 +294,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             try:
                 analysis = retry_session.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
                 if analysis:
-                    analysis.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
+                    analysis.status_message = "Qayta ishlanmoqda (biroz kuting)..."
                     _, analysis.error_message = _safe_persisted_error(exc, current_stage)
                     analysis.error_code = error_code
                     analysis.updated_at = datetime.utcnow()

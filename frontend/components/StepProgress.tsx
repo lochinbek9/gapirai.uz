@@ -155,7 +155,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         </div>
       </div>
 
-      {job.expected_end_time && !isFailed && (
+      {job.expected_end_time && !isFailed && job.status !== 'pending' && (job.progress || 0) > 0 && (
         <div className="bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl p-4 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1 transition-colors">
           <p className="font-bold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
           <p className="text-gray-950 dark:text-white font-mono text-base font-black">

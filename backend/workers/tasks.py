@@ -995,9 +995,8 @@ def process_video(self: Task, job_id: str) -> dict:
                 job.voice_style = "neutral"
             db.commit()
 
-            prov_title = {"azure": "Azure", "edge": "Edge", "gemini": "Gemini"}.get(tts_provider, tts_provider)
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
-                        f"O'zbek ovozi yaratilmoqda ({prov_title} • {'ayol' if gender == 'female' else 'erkak'})...")
+                        f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'} ovozi)...")
             tts_dir = str(output_dir / "audio" / "tts_segments")
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
@@ -1304,7 +1303,7 @@ def process_video(self: Task, job_id: str) -> dict:
             try:
                 job = retry_session.query(DubbingJob).filter(DubbingJob.id == job_id).first()
                 if job:
-                    job.status_message = f"Vaqtinchalik xatolik (qayta urinish {self.request.retries + 1}/{self.max_retries})..."
+                    job.status_message = "Qayta ishlanmoqda (biroz kuting)..."
                     _, job.error_message = _safe_persisted_error(exc, current_stage)
                     job.error_code = error_code
                     job.updated_at = datetime.utcnow()

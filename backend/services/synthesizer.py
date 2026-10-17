@@ -180,18 +180,17 @@ def _synthesize_text(
         logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
         raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    # Gemini tanlanganda foydalanuvchi aynan Gemini ovozini talab qiladi — Azure/Edge fallback qat'iyan taqiqlangan:
+    # Gemini TTS kvota yoki rate limit tufayli ishlamasa, butun jarayon to'xtab qolmasligi uchun
+    # ishonchli zaxira (Edge/Azure) orqali ovoz yaratishni davom ettiramiz:
     if primary.name == "gemini" or provider_name == "gemini":
-        logger.error(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — Azure/Edge fallback foydalanuvchi talabi bo'yicha taqiqlangan.")
-        raise RuntimeError("Gemini TTS audio yarata olmadi (kalitlar limiti tugagan). Foydalanuvchi sozlamasi bo'yicha Azure/Edge fallback taqiqlangan.")
+        logger.warning(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — zaxira provayderga (Edge/Azure) xavfsiz fallback qilinmoqda.")
 
-    # --- Fallback: 2-o'rinda Azure, so'ng oxirgi chora Edge ---
-    fallback_name = getattr(settings, "TTS_FALLBACK_PROVIDER", "azure") or "azure"
-    logger.warning(f"{primary.name} TTS muvaffaqiyatsiz — fallback {fallback_name} (2-o'rin) ga o'tilmoqda.")
-
-    fallback_chain = [fallback_name]
-    if "edge" not in fallback_chain:
-        fallback_chain.append("edge")
+    # --- Fallback zanjiri: Azure (kalit mavjud bo'lsa), so'ng har doim tayyor Edge ---
+    fallback_chain = []
+    az = get_provider("azure")
+    if getattr(az, "subscription_key", None) or getattr(az, "key", None):
+        fallback_chain.append("azure")
+    fallback_chain.append("edge")
 
     for fb_candidate in fallback_chain:
         try:

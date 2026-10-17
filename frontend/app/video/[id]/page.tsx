@@ -753,7 +753,7 @@ export default function VideoPage() {
                     </div>
                   </div>
 
-                  {job.expected_end_time && (
+                  {job.expected_end_time && job.status !== 'pending' && (job.progress || 0) > 0 && (
                     <div className="glass-input rounded-2xl p-4 text-xs space-y-1.5 border border-gray-200/60 dark:border-white/10">
                       <p className="font-semibold text-gray-500 dark:text-gray-400">Taxminiy yakunlanish vaqti:</p>
                       <p className="text-gray-900 dark:text-white font-mono text-base font-bold">
