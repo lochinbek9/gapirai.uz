@@ -434,7 +434,11 @@ export default function Home() {
       setPreviewOffer((prev) => ({ ...prev, isOpen: false }));
       router.push(`/video/${job_id}`);
     } catch (err: any) {
-      alert(err?.response?.data?.detail?.message || "Sinov dublyajini boshlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+      const rawDetail = err?.response?.data?.detail;
+      const message = typeof rawDetail === "string"
+        ? rawDetail
+        : (rawDetail?.message || "Sinov dublyajini boshlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+      alert(message);
     } finally {
       setPreviewLoading(false);
     }
