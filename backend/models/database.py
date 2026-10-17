@@ -109,6 +109,8 @@ class DubbingJob(Base):
     # transkripsiya+tarjima+vaqt kodlari kerak, dublyaj audiosi/videosi
     # yaratilmaydi -- tezroq va TTS xarajatisiz.
     subtitle_only = Column(Boolean, nullable=False, default=False)
+    # 2026-10-17: 2 daqiqalik bepul sinov dublyaji rejimi
+    is_preview = Column(Boolean, nullable=False, default=False)
     # 2026-09-20: "Subtitr" rejimida video tili. "uz" -- nutq o'zbekcha STT bilan matnga aylantiriladi
     # va TARJIMA QILINMAYDI; NULL -- eski xatti-harakat (chet tildagi video -> o'zbekchaga tarjima).
     # DIQQAT: ustun qo'lda `ALTER TABLE` bilan qo'shiladi (create_tables'ga tegilmaydi, pastga qarang) va

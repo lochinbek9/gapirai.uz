@@ -53,6 +53,7 @@ class CreateJobRequest(BaseModel):
     voice_name: Optional[str] = None
     voice_style: Optional[str] = None
     force_new: Optional[bool] = False
+    is_preview: Optional[bool] = False
 
 
 class RegenerateJobRequest(BaseModel):
@@ -110,6 +111,7 @@ class JobResponse(BaseModel):
     # uzunroq bo'lgandagina to'ldiriladi (backend/services/queue_load.py).
     queue_position: Optional[int] = None
     queue_eta_minutes: Optional[int] = None
+    is_preview: bool = False
 
 
 # YouTube yuklab olish DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan (video
@@ -225,6 +227,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         # noto'g'ri chetlab qo'ygan edi (2026-08-23 aniqlangan).
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
+        is_preview=bool(getattr(job, "is_preview", False)),
     )
 
 
@@ -330,6 +333,7 @@ async def create_job(
         voice_name=request.voice_name,
         voice_style=request.voice_style,
         force_new=bool(request.force_new),
+        is_preview=bool(request.is_preview),
     )
 
     _raise_for_outcome(result)

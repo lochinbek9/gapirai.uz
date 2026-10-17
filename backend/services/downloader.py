@@ -447,10 +447,10 @@ def get_video_info(youtube_url: str) -> dict:
         raise RuntimeError(f"Video ma'lumot olishda xatolik [{code}]: {errcls.scrub_secrets(str(e2))}") from e2
 
 
-def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
+def download_video(youtube_url: str, job_id: str, max_height: int = 720, max_duration_seconds: float | None = None) -> dict:
     _rate_limiter.acquire()
     try:
-        return _do_download(youtube_url, job_id, max_height=max_height)
+        return _do_download(youtube_url, job_id, max_height=max_height, max_duration_seconds=max_duration_seconds)
     except Exception:
         _rate_limiter.mark_failure()
         raise
@@ -460,7 +460,7 @@ def download_video(youtube_url: str, job_id: str, max_height: int = 720) -> dict
         _rate_limiter.release()
 
 
-def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
+def _do_download(youtube_url: str, job_id: str, max_height: int = 720, max_duration_seconds: float | None = None) -> dict:
     job_dir = Path(settings.OUTPUT_DIR) / job_id
     video_dir = job_dir / "video"
     video_dir.mkdir(parents=True, exist_ok=True)
@@ -548,18 +548,23 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720) -> dict:
         )
 
     audio_file = job_dir / "audio.wav"
-    ffmpeg_cmd = [
-        "ffmpeg", "-y", "-i", str(video_file),
+    ffmpeg_cmd = ["ffmpeg", "-y"]
+    if max_duration_seconds and max_duration_seconds > 0:
+        ffmpeg_cmd.extend(["-t", str(max_duration_seconds)])
+    ffmpeg_cmd.extend([
+        "-i", str(video_file),
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_file),
-    ]
+    ])
     proc = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"Audio ajratishda xatolik: {proc.stderr[-500:]}")
+
+    final_duration = min(duration, max_duration_seconds) if (max_duration_seconds and max_duration_seconds > 0) else duration
 
     return {
         "video_path": str(video_file),
         "audio_path": str(audio_file),
         "title": title,
-        "duration": duration,
+        "duration": final_duration,
         "uploader": uploader,
     }

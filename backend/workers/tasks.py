@@ -657,7 +657,8 @@ def process_video(self: Task, job_id: str) -> dict:
                 else:
                     target_audio.parent.mkdir(parents=True, exist_ok=True)
                     from backend.services.job_creation import _extract_audio_wav
-                    if not _extract_audio_wav(Path(video_path), target_audio):
+                    max_sec = 120.0 if getattr(job, "is_preview", False) else None
+                    if not _extract_audio_wav(Path(video_path), target_audio, max_duration_seconds=max_sec):
                         raise PermanentError(
                             "Video faylidan audio ajratib bo'lmadi.",
                             code="AUDIO_EXTRACTION_FAILED",
@@ -690,7 +691,8 @@ def process_video(self: Task, job_id: str) -> dict:
                     code="UPLOADED_SOURCE_MISSING",
                 )
             _update_job(db, job, JobStatus.DOWNLOADING, 5.0, "YouTube'dan yuklanmoqda...")
-            download_result = downloader.download_video(job.youtube_url, job_id)
+            max_sec = 120.0 if getattr(job, "is_preview", False) else None
+            download_result = downloader.download_video(job.youtube_url, job_id, max_duration_seconds=max_sec)
             job.video_title = download_result["title"]
             job.video_duration = download_result["duration"]
             job.original_video_path = download_result["video_path"]
@@ -1040,10 +1042,12 @@ def process_video(self: Task, job_id: str) -> dict:
             final_output_dir.mkdir(parents=True, exist_ok=True)
             final_output = str(final_output_dir / "dubbed_final.mp4")
 
+            max_dur = 120.0 if getattr(job, "is_preview", False) else None
             merger.merge_video_audio(
                 video_path=video_path,
                 dubbed_audio_path=dubbed_audio_path,
                 output_path=final_output,
+                max_duration=max_dur,
             )
 
             # Birlashtirishdan so'ng darhol yakuniy video fayli tekshiriladi

@@ -16,6 +16,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
+import PreviewOfferModal from "@/components/PreviewOfferModal";
 import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard } from "lucide-react";
 
 
@@ -197,6 +198,18 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mode, setMode] = useState<"dub" | "subtitle" | "analyze">("dub");
+  const [previewOffer, setPreviewOffer] = useState<{
+    isOpen: boolean;
+    videoMinutes: number;
+    minutesShort: number;
+    availableMinutes: number;
+  }>({
+    isOpen: false,
+    videoMinutes: 15,
+    minutesShort: 10,
+    availableMinutes: 5,
+  });
+  const [previewLoading, setPreviewLoading] = useState(false);
   const startRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -383,11 +396,17 @@ export default function Home() {
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 402 && detail && typeof detail === "object" && detail.error === "insufficient_minutes") {
-        // Matnli xabar ko'rsatib qo'ymasdan — to'g'ridan-to'g'ri /pricing'ga
-        // yetishmayotgan daqiqa va davomiylik bilan o'tkazamiz (2026-09-14).
-        const short = detail.minutes_short ?? '';
-        const dur = detail.video_minutes ?? '';
-        router.push(`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(short)}&duration=${encodeURIComponent(dur)}`);
+        // Yangi foydalanuvchini birdaniga /pricing'ga haydab yo'qotmaslik uchun --
+        // bepul 2 daqiqalik sinov dublyaji modalini ko'rsatamiz!
+        const short = Number(detail.minutes_short) || 0;
+        const dur = Number(detail.video_minutes) || 15;
+        const available = Math.max(0, Math.round(dur - short));
+        setPreviewOffer({
+          isOpen: true,
+          videoMinutes: dur,
+          minutesShort: short,
+          availableMinutes: available,
+        });
         return;
       } else {
         setError((typeof detail === "string" ? detail : detail?.message) || "Xatolik yuz berdi. Qayta urinib ko'ring.");
@@ -395,6 +414,37 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStartPreview = async () => {
+    if (!url.trim()) return;
+    setPreviewLoading(true);
+    try {
+      const { job_id } = await createJob(
+        url,
+        voiceGender,
+        false,
+        "auto",
+        ttsProvider || "gemini",
+        voiceName || undefined,
+        undefined,
+        false,
+        true // is_preview = true (2 daqiqalik bepul sinov)
+      );
+      setPreviewOffer((prev) => ({ ...prev, isOpen: false }));
+      router.push(`/video/${job_id}`);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail?.message || "Sinov dublyajini boshlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleGoToPricingFromPreview = () => {
+    const short = previewOffer.minutesShort;
+    const dur = previewOffer.videoMinutes;
+    setPreviewOffer((prev) => ({ ...prev, isOpen: false }));
+    router.push(`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(short)}&duration=${encodeURIComponent(dur)}`);
   };
 
   const handleReset = () => {
@@ -419,6 +469,17 @@ export default function Home() {
       <MeshBackground />
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
+      <PreviewOfferModal
+        isOpen={previewOffer.isOpen}
+        videoInfo={videoInfo}
+        videoMinutes={previewOffer.videoMinutes}
+        minutesShort={previewOffer.minutesShort}
+        availableMinutes={previewOffer.availableMinutes}
+        loading={previewLoading}
+        onClose={() => setPreviewOffer((prev) => ({ ...prev, isOpen: false }))}
+        onStartPreview={handleStartPreview}
+        onGoToPricing={handleGoToPricingFromPreview}
+      />
       {/* Top Header Bar bounded in max-w-7xl container */}
       <header className="absolute top-0 left-0 right-0 z-50 w-full pointer-events-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex items-center justify-between relative gap-4">

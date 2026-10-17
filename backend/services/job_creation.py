@@ -197,6 +197,7 @@ async def create_dubbing_job(
     voice_name: str | None = None,
     voice_style: str | None = None,
     force_new: bool = False,
+    is_preview: bool = False,
 ) -> JobCreationResult:
     """Web (routes.py) va bot ikkalasi ham chaqiradigan yagona kirish nuqtasi.
     HTTPException ko'tarmaydi -- chaqiruvchi outcome'ga qarab o'zi (HTTP javob
@@ -389,20 +390,25 @@ async def create_dubbing_job(
             ))
             db.commit()
 
-    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
-        return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
+    if is_preview:
+        # 2 daqiqalik bepul preview rejimi (Blocker 2 paywall drop-off yechimi)
+        billable_minutes = min(2.0, duration_minutes)
+        covered, minutes_short = _quota_or_autotopup(db, user.id, billable_minutes)
+    else:
+        if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+            return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
 
-    from backend.services.plans import check_quota, consume_quota, get_job_queue_v2
-    covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
-    if not covered:
-        # Daqiqa yetmadi -- job yaratilmaydi. Frontend "Buy additional minutes"
-        # CTA'sini ko'rsatadi (backend/api/minutes_routes.py orqali paket sotib olinadi).
-        return JobCreationResult(
-            outcome="insufficient_minutes",
-            video_title=title,
-            duration_minutes=duration_minutes,
-            minutes_short=minutes_short,
-        )
+        from backend.services.plans import check_quota, consume_quota, get_job_queue_v2
+        covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
+        if not covered:
+            # Daqiqa yetmadi -- job yaratilmaydi. Frontend "Buy additional minutes"
+            # CTA'sini ko'rsatadi (backend/api/minutes_routes.py orqali paket sotib olinadi).
+            return JobCreationResult(
+                outcome="insufficient_minutes",
+                video_title=title,
+                duration_minutes=duration_minutes,
+                minutes_short=minutes_short,
+            )
 
     # Original video fayl diskda mavjud bo'lsa, uni ham qayta ishlatamiz
     reused_video_path = None
@@ -435,13 +441,14 @@ async def create_dubbing_job(
         youtube_url=youtube_url,
         youtube_video_id=video_id,
         video_title=title,
-        video_duration=duration,
+        video_duration=min(120.0, float(duration or 120.0)) if is_preview else duration,
         video_thumbnail=thumbnail,
         voice_gender_setting=voice_gender,
         speaker_gender=voice_gender if voice_gender in ("male", "female") else (donor_job.speaker_gender if donor_job else None),
         tts_provider=clean_provider,
         voice_name=voice_name,
         voice_style=voice_style or "neutral",
+        is_preview=is_preview,
         status=JobStatus.PENDING,
         progress=0.0,
         status_message="Navbatga qo'shildi (tayyor matnlar asosida)" if donor_job else "Navbatga qo'shildi",
@@ -482,12 +489,17 @@ def _media_duration_seconds(path: Path) -> float | None:
         return None
 
 
-def _extract_audio_wav(video_path: Path, audio_path: Path) -> bool:
+def _extract_audio_wav(video_path: Path, audio_path: Path, max_duration_seconds: float | None = None) -> bool:
     """api/routes.py:upload_video_fallback bilan bir xil ffmpeg buyrug'i --
     transkripsiya aynan shu formatdagi WAV faylni kutadi (16kHz mono PCM).
+    max_duration_seconds berilsa (masalan 2 daqiqalik preview), audio shu vaqtda qirqiladi.
     Muvaffaqiyatsiz bo'lsa False (fayl buzilgan/qo'llab-quvvatlanmaydigan)."""
+    cmd = ["ffmpeg", "-y"]
+    if max_duration_seconds and max_duration_seconds > 0:
+        cmd.extend(["-t", str(max_duration_seconds)])
+    cmd.extend(["-i", str(video_path), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_path)])
     proc = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(video_path), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_path)],
+        cmd,
         capture_output=True, text=True,
     )
     return proc.returncode == 0

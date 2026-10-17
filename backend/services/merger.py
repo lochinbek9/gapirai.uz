@@ -127,7 +127,7 @@ def _get_video_dimensions(file_path: str) -> tuple[int, int]:
 WATERMARK_PATH = Path(__file__).resolve().parent.parent / "assets" / "watermark_gapirai.png"
 
 
-def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str) -> str:
+def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str, max_duration: float | None = None) -> str:
     """
     Original video + O'zbekcha dublyaj → Tayyor video, kino-dublyaji uslubida
     aralashtirilgan (original musiqa/SFX/ambient saqlanadi, faqat dub
@@ -235,6 +235,10 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str)
                 "-movflags", "+faststart",
                 output_path,
             ]
+
+    if max_duration and max_duration > 0:
+        cmd.insert(-1, "-t")
+        cmd.insert(-1, str(max_duration))
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=8000)
 

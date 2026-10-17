@@ -3,6 +3,7 @@
 import { ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { VideoInfo, formatDuration } from "@/lib/api";
+import SampleVideosSection, { SampleVideo } from "@/components/SampleVideosSection";
 
 interface Props {
   url: string;
@@ -99,6 +100,14 @@ export default function UrlInput({
     } catch {}
   };
 
+  const handleSampleSelect = (sample: SampleVideo) => {
+    onChange(sample.url);
+    handleGenderSelect(sample.gender);
+    if (sample.recommendedVoice) {
+      onVoiceNameChange?.(sample.recommendedVoice);
+    }
+  };
+
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       {/* URL input */}
@@ -146,21 +155,8 @@ export default function UrlInput({
         )}
       </AnimatePresence>
 
-      {/* Sample Video Suggestions */}
-      <div className="pt-1 space-y-1.5">
-        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider ml-1">
-          💡 Namuna havolalardan birini sinab ko'ring:
-        </span>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onChange("https://youtu.be/UwMS0J2eTXE")}
-            className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-blue-500/10 hover:text-blue-500 border border-black/5 dark:border-white/5 transition-all text-gray-600 dark:text-gray-400 flex items-center gap-1.5"
-          >
-            <span>🎯</span> Qo'rquvni yengish (58s)
-          </button>
-        </div>
-      </div>
+      {/* 1-Click Sample Videos Carousel */}
+      <SampleVideosSection onSelect={handleSampleSelect} activeUrl={url} />
 
 
       {/* Gender selector */}

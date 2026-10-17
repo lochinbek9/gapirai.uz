@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert, X, CircleSlash, Download
+  MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
@@ -57,6 +57,14 @@ function getFriendlyErrorMessage(errorCode?: string | null, errorMessage?: strin
   }
   if (errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent') || errorMessage?.toLowerCase().includes('taqiqlangan')) {
     return "Video xavfsizlik va kontent siyosatimiz talablariga mos kelmagani sababli to'xtatildi."
+  }
+  if (
+    errorCode === 'AUTH_ERROR' ||
+    errorMessage?.toLowerCase().includes('bot') ||
+    errorMessage?.toLowerCase().includes('sign in') ||
+    errorMessage?.toLowerCase().includes('ruxsat')
+  ) {
+    return "YouTube bot himoyasi yoki yosh cheklovi sababli videoni avtomatik yuklab bo'lmadi. Videoni fayl sifatida yuklashingiz mumkin."
   }
   if (errorCode === 'TTS_FAILED') {
     return "Ovoz sintez qilish (TTS) xizmatida texnik uzilish yuz berdi. Iltimos, qaytadan urinib ko'ring."
@@ -391,18 +399,43 @@ export default function VideoPage() {
           {/* Player */}
           <div className={theaterMode ? 'w-full' : 'lg:col-span-2 space-y-4'}>
             {job.status === 'completed' ? (
-              <VideoPlayer
-                src={videoSrc}
-                jobId={id}
-                videoTitle={job.video_title}
-                channelName={job.channel_name}
-                youtubeUrl={job.youtube_url}
-                subtitlesContent={job.uzbek_srt_content}
-                audioDownloadUrl={audioUrl}
-                theaterMode={theaterMode}
-                onTheaterToggle={() => setTheaterMode(m => !m)}
-                className={theaterMode ? '' : 'rounded-2xl'}
-              />
+              <div className="space-y-4">
+                {job.is_preview && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-600/15 via-purple-600/10 to-indigo-600/15 border border-violet-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-violet-700 dark:text-violet-300">
+                          ✨ 2 Daqiqalik Bepul Sinov Dublyaji Tayyor!
+                        </div>
+                        <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                          Ovoz sifati ma'qul keldimi? Butun videoni to'liq dublyaj qilish uchun tarifingizni faollashtiring.
+                        </div>
+                      </div>
+                    </div>
+                    <Link
+                      href="/pricing"
+                      className="btn-premium px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap shadow-md shrink-0 self-end sm:self-auto"
+                    >
+                      To'liq ochish (Tariflar) →
+                    </Link>
+                  </div>
+                )}
+                <VideoPlayer
+                  src={videoSrc}
+                  jobId={id}
+                  videoTitle={job.video_title}
+                  channelName={job.channel_name}
+                  youtubeUrl={job.youtube_url}
+                  subtitlesContent={job.uzbek_srt_content}
+                  audioDownloadUrl={audioUrl}
+                  theaterMode={theaterMode}
+                  onTheaterToggle={() => setTheaterMode(m => !m)}
+                  className={theaterMode ? '' : 'rounded-2xl'}
+                />
+              </div>
             ) : job.status === 'awaiting_payment' ? (
               <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[380px]">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
@@ -585,6 +618,69 @@ export default function VideoPage() {
                         className="btn-premium w-full py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2"
                       >
                         Boshqa video tanlash
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              const isYouTubeRestricted =
+                job.error_code === 'AUTH_ERROR' ||
+                job.error_code === 'DOWNLOAD_FAILED' ||
+                job.error_code === 'HTTP_403' ||
+                job.error_code === 'PO_TOKEN_REQUIRED' ||
+                job.error_message?.toLowerCase().includes('bot') ||
+                job.error_message?.toLowerCase().includes('sign in') ||
+                job.error_message?.toLowerCase().includes('ruxsat');
+
+              if (isYouTubeRestricted) {
+                return (
+                  <div className="glass-card rounded-[28px] p-6 sm:p-10 flex flex-col items-center justify-center text-center space-y-6 border border-amber-500/30 dark:border-amber-500/20 shadow-2xl relative overflow-hidden min-h-[400px]">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 mx-auto shadow-inner">
+                      <ShieldAlert className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full">
+                        YouTube Cheklovi
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white pt-1">
+                        Ushbu video YouTube himoyasi bilan cheklangan
+                      </h3>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                        YouTube bot himoyasi (Sign-in check), yosh chegarasi yoki hududiy cheklov sababli videoni avtomatik yuklab bo&apos;lmadi.
+                        Lekin dublyaj qilishning 2 ta oson va kafolatlangan usuli bor:
+                      </p>
+                    </div>
+
+                    {/* Solution 1: Direct File Upload */}
+                    <div className="max-w-md w-full bg-black/[0.02] dark:bg-white/[0.02] p-4 rounded-2xl border border-black/5 dark:border-white/10 space-y-3">
+                      <div className="text-left">
+                        <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                          <span>📁 1-Yechim:</span> Videoni fayl sifatida yuklash (100% ishlaydi)
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          Faylni to&apos;g&apos;ridan-to&apos;g&apos;ri yuklaganda YouTube blokirovkalari umuman bo&apos;lmaydi.
+                        </div>
+                      </div>
+                      <UploadRecoveryPrompt jobId={id} />
+                    </div>
+
+                    {/* Solution 2: Try a verified sample or retry */}
+                    <div className="flex flex-col sm:flex-row gap-3 pt-1 max-w-md w-full">
+                      <button
+                        onClick={handleGoHome}
+                        className="btn-premium flex-1 py-3 px-5 text-xs font-bold rounded-2xl shadow-lg inline-flex items-center justify-center gap-2"
+                      >
+                        🎬 Boshqa ochiq videoni sinash
+                      </button>
+                      <button
+                        onClick={handleRetry}
+                        disabled={retryLoading}
+                        className="glass-input flex-1 py-3 px-5 text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-2xl transition border border-gray-200/60 dark:border-white/10 inline-flex items-center justify-center gap-2"
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 ${retryLoading ? 'animate-spin' : ''}`} />
+                        Qayta urinish
                       </button>
                     </div>
                   </div>

@@ -64,6 +64,7 @@ export interface Job {
   stt_model?: string | null
   translation_model?: string | null
   tts_model?: string | null
+  is_preview?: boolean
 }
 
 export type JobStatus =
@@ -115,6 +116,7 @@ export async function createJob(
   voice_name?: string,
   voice_style?: string,
   force_new?: boolean,
+  is_preview?: boolean,
 ): Promise<{ job_id: string; status: string }> {
   const res = await apiClient.post('/api/jobs', {
     youtube_url,
@@ -126,6 +128,7 @@ export async function createJob(
     voice_name,
     voice_style,
     force_new,
+    is_preview: Boolean(is_preview),
   })
   return res.data
 }
