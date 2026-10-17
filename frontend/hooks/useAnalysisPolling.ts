@@ -21,9 +21,18 @@ export function useAnalysisPolling(analysisId: string | null) {
         timerRef.current = setTimeout(poll, POLL_INTERVAL);
       }
     } catch (err: any) {
-      if (err?.response?.status === 404) {
+      const status = err?.response?.status;
+      if (status === 404) {
         setIs404(true);
-        setError("Tahlil topilmadi.");
+        setError("not_found");
+        return;
+      }
+      if (status === 401) {
+        setError("auth_required");
+        return;
+      }
+      if (status === 403) {
+        setError("forbidden");
         return;
       }
       setError("Server bilan aloqa yo'q. Qayta urinilmoqda...");

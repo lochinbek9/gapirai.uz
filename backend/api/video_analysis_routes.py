@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import get_db, VideoAnalysis, AnalysisStatus, User
 from backend.services.downloader import get_video_info
-from backend.services.auth import get_current_user
+import uuid
+from backend.services.auth import get_current_user, get_optional_user_id
 from backend.services.video_analysis import VideoAnalysisService, find_cached_analysis, clone_analysis_for_user
 from backend.services.job_creation import extract_youtube_video_id
 from backend.services.rate_limiter import rate_limit
@@ -44,6 +45,35 @@ def _get_owned_analysis(analysis_id: str, db: Session, current_user: User) -> Vi
     if analysis.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Bu tahlilga kirish huquqingiz yo'q.")
     return analysis
+
+
+def _get_accessible_analysis(
+    analysis_id: str,
+    db: Session,
+    current_user_id: Optional[uuid.UUID] = None,
+) -> VideoAnalysis:
+    """Tahlilni ko'rish/o'qish huquqini tekshirish.
+    - Agar tahlil tugallangan (COMPLETED) bo'lsa -> har qanday foydalanuvchi
+      (shu jumladan anonim / Telegram / iPhone orqali havola ochgan mehmonlar) ko'ra oladi.
+    - Agar jarayonda yoki xato bo'lsa -> egasi (authenticated) ko'ra oladi.
+    - Anonim yoki boshqa foydalanuvchi bo'lsa:
+      - Anonim -> 401 ("Ushbu tahlilni ko'rish uchun tizimga kiring.")
+      - Boshqa foydalanuvchi -> 403 ("Bu tahlilga kirish huquqingiz yo'q.")
+    """
+    analysis = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Tahlil topilmadi.")
+
+    if analysis.status == AnalysisStatus.COMPLETED:
+        return analysis
+
+    is_owner = current_user_id is not None and analysis.user_id == current_user_id
+    if is_owner:
+        return analysis
+
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Ushbu tahlilni ko'rish uchun tizimga kiring.")
+    raise HTTPException(status_code=403, detail="Bu tahlilga kirish huquqingiz yo'q.")
 
 
 def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
@@ -137,9 +167,9 @@ async def create_analysis(
 def get_analysis(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     return _analysis_to_dict(analysis)
 
 
@@ -174,9 +204,9 @@ def retry_analysis(
 def get_transcript(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     return {"segments": analysis.transcript_segments or []}
 
 
@@ -184,9 +214,9 @@ def get_transcript(
 def get_chapters(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     return {"chapters": analysis.chapters or []}
 
 
@@ -195,9 +225,9 @@ def ask_question(
     analysis_id: str,
     request: QuestionRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not request.question.strip():
@@ -222,9 +252,9 @@ def ask_question(
 def get_or_generate_quiz(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.quiz:
@@ -237,9 +267,9 @@ def get_or_generate_quiz(
 def get_or_generate_bilingual(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.bilingual_segments:
@@ -260,9 +290,9 @@ def get_or_generate_bilingual(
 def get_or_generate_notes(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.notes:
@@ -276,9 +306,9 @@ def search_transcript(
     analysis_id: str,
     q: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
-    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     query = q.strip().lower()
     if not query:
         return {"results": []}
