@@ -466,6 +466,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     resetHideTimer();
   };
 
+  const skipAhead = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 10);
+    resetHideTimer();
+  };
+
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
     const v = videoRef.current;
     if (!v || !duration) return;
@@ -517,9 +524,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       onMouseMove={resetHideTimer}
       onMouseLeave={() => playing && setShowControls(false)}
       onKeyDown={e => {
-        if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+        if (e.code === "Space" || e.key === "k") { e.preventDefault(); togglePlay(); }
         if (e.code === "ArrowRight") { if (videoRef.current) videoRef.current.currentTime += 5; }
         if (e.code === "ArrowLeft")  { if (videoRef.current) videoRef.current.currentTime -= 5; }
+        if (e.key === "l" || e.key === "L") { skipAhead(); }
       }}
       tabIndex={0}
     >
