@@ -639,12 +639,11 @@ export default function Home() {
             )}
 
             {phase === "loading" && (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-4">
-                <div className="relative flex items-center justify-center">
-                  <div className="absolute w-12 h-12 rounded-full border-t-2 border-blue-500 animate-spin" />
-                  <div className="w-8 h-8 rounded-full border-t-2 border-violet-400 animate-spin-slow" />
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-violet-500/15 border border-blue-500/20 text-blue-500 flex items-center justify-center shadow-inner">
+                  <Sparkles className="w-6 h-6 text-blue-500" />
                 </div>
-                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse">Server bilan bog'lanilmoqda...</p>
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-wide">Video ma&apos;lumotlari tekshirilmoqda...</p>
               </motion.div>
             )}
 

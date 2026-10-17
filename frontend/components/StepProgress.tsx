@@ -93,7 +93,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                       className="relative flex items-center justify-center w-full h-full"
                     >
                        <span className="text-lg z-10">{step.icon}</span>
-                       <div className="absolute inset-0 rounded-2xl border-2 border-white/20 border-t-white dark:border-white/20 animate-spin"></div>
+                       <div className="absolute inset-0 rounded-2xl ring-2 ring-blue-500/40 bg-blue-500/10 transition-all duration-500"></div>
                     </motion.div>
                   ) : (
                     <motion.span key="icon" className="text-gray-400 dark:text-gray-600 opacity-60 grayscale transition-colors">{step.icon}</motion.span>
@@ -157,6 +157,9 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
             <div className="absolute inset-0 shimmer-anim"></div>
           </motion.div>
         </div>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center font-medium">
+          Odatda 1–2 daqiqa davom etadi. Tayyor bo&apos;lgach video avtomatik ochiladi.
+        </p>
       </div>
 
       {job.expected_end_time && !isFailed && job.status !== 'pending' && (job.progress || 0) > 0 && (

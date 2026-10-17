@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import SubtitleResult from '@/components/SubtitleResult'
 
@@ -29,7 +29,9 @@ export default function SubtitlePage() {
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-16">Job topilmadi.</p>
         ) : !job ? (
           <div className="flex flex-col items-center gap-3 py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
+            <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-500 flex items-center justify-center shadow-inner">
+              <Sparkles className="w-5 h-5 text-violet-500" />
+            </div>
             <p className="text-xs text-gray-400">{error || 'Yuklanmoqda...'}</p>
           </div>
         ) : job.status === 'completed' ? (
@@ -49,15 +51,17 @@ export default function SubtitlePage() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute w-12 h-12 rounded-full border-t-2 border-violet-500 animate-spin" />
-              <div className="w-8 h-8 rounded-full border-t-2 border-indigo-400 animate-spin-slow" />
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-violet-500/10 to-indigo-500/15 border border-violet-500/20 text-violet-500 flex items-center justify-center shadow-inner">
+              <span className="text-2xl">📝</span>
             </div>
             {job.video_title && (
               <h2 className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{job.video_title}</h2>
             )}
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-              {job.status_message || 'Subtitr yaratilmoqda...'}
+            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {job.status_message || 'Subtitr tayyorlanmoqda...'}
+            </p>
+            <p className="text-[11px] text-gray-400 max-w-xs">
+              Bu odatda 30-60 soniya davom etadi. Tayyor bo&apos;lgach avtomatik ochiladi.
             </p>
           </div>
         )}

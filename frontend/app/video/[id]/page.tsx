@@ -44,6 +44,39 @@ function formatRemainingTime(seconds: number): string {
   return `${s} soniya`
 }
 
+function getElapsedSeconds(job?: Job | null, currentTime?: number): number {
+  if (!job?.created_at) return 0
+  const start = new Date(job.created_at).getTime()
+  if (isNaN(start)) return 0
+  return Math.max(0, Math.floor(((currentTime || Date.now()) - start) / 1000))
+}
+
+function formatElapsedTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+function getActivePipelineStage(job: Job): {
+  stageIndex: number;
+  icon: string;
+  badgeLabel: string;
+} {
+  const status = job.status?.toLowerCase() || '';
+  const progress = job.progress || 0;
+
+  if (status === 'pending' || status === 'downloading' || progress < 15) {
+    return { stageIndex: 0, icon: '📥', badgeLabel: "Yuklanmoqda" };
+  }
+  if (status === 'transcribing' || status === 'translating' || status === 'syncing' || progress < 50) {
+    return { stageIndex: 1, icon: '📝', badgeLabel: "Matn tayyorlanmoqda" };
+  }
+  if (status === 'synthesizing' || progress < 85) {
+    return { stageIndex: 2, icon: '🎙️', badgeLabel: "Ovoz yozilmoqda" };
+  }
+  return { stageIndex: 3, icon: '🎬', badgeLabel: "Montaj qilinmoqda" };
+}
+
 function getFriendlyErrorMessage(errorCode?: string | null, errorMessage?: string | null): string {
   if (
     errorCode === 'USER_CANCELLED' ||
@@ -322,10 +355,10 @@ export default function VideoPage() {
       <div className="min-h-screen relative flex items-center justify-center p-6 transition-colors duration-300">
         <MeshBackground />
         <div className="glass-card rounded-[28px] p-8 max-w-sm w-full text-center space-y-4 border border-gray-200/60 dark:border-white/10 shadow-2xl z-10">
-          <div className="w-14 h-14 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-inner">
-            <Loader2 className="w-7 h-7 animate-spin" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/15 to-indigo-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center mx-auto shadow-inner border border-violet-500/20">
+            <Sparkles className="w-6 h-6 text-violet-500" />
           </div>
-          <p className="text-sm font-bold text-gray-900 dark:text-white">Video ma&apos;lumotlari yuklanmoqda...</p>
+          <p className="text-sm font-bold text-gray-900 dark:text-white">Video ma&apos;lumotlari ochilmoqda...</p>
         </div>
       </div>
     )
@@ -726,98 +759,139 @@ export default function VideoPage() {
                   </div>
                 </div>
               );
-            })() : (
-              <div className="glass-card rounded-[28px] p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[380px]">
-                <div className="space-y-6 max-w-md w-full z-10">
-                  {/* Ko'zni toliqtirmaydigan yumshoq pulsatsiya */}
-                  <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto shadow-inner">
-                    <div className="absolute inset-0 rounded-full bg-violet-500/15 animate-ping opacity-40 pointer-events-none" />
-                    <Sparkles className="w-8 h-8 text-violet-600 dark:text-violet-400 animate-pulse" />
-                  </div>
+            })() : (() => {
+              const activeStage = getActivePipelineStage(job);
+              const elapsedSec = getElapsedSeconds(job, currentTime);
+              const isQueued = job.status === 'pending' || (job.progress || 0) <= 0;
 
-                  <div className="space-y-4">
-                    <p className="text-gray-900 dark:text-white font-bold text-lg sm:text-xl leading-snug">
-                      {job.status_message || 'Qayta ishlanmoqda...'}
-                    </p>
+              const stages = [
+                { id: 0, label: "Yuklab olish", icon: "📥", desc: "Video serverga yuklanmoqda" },
+                { id: 1, label: "Matn & Tarjima", icon: "📝", desc: "Nutq o'zbek tiliga o'girilmoqda" },
+                { id: 2, label: "Ovoz yaratish", icon: "🎙️", desc: "Tabiiy o'zbekcha ovoz yozilmoqda" },
+                { id: 3, label: "Montaj", icon: "🎬", desc: "Video va ovoz birlashtirilmoqda" },
+              ];
+
+              return (
+                <div className="glass-card rounded-[28px] p-6 sm:p-10 flex flex-col items-center justify-center text-center space-y-6 border border-gray-200/60 dark:border-white/10 shadow-2xl relative overflow-hidden min-h-[400px]">
+                  <div className="space-y-6 max-w-lg w-full z-10">
+                    {/* Yuqori xotirjam ko'rsatkich (Ko'zni charchatadigan aylanuvchi spinnerlarsiz) */}
+                    <div className="flex items-center justify-between px-2 text-xs">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold shadow-sm">
+                        <span className={`w-2 h-2 rounded-full ${isQueued ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                        <span>{isQueued ? "Navbatda turibdi" : "Sun'iy intellekt ishlamoqda"}</span>
+                      </div>
+                      
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200/60 dark:border-white/10 text-gray-500 dark:text-gray-400 font-mono text-[11px] font-bold">
+                        <span>⏱️</span>
+                        <span>{formatElapsedTimer(elapsedSec)}</span>
+                      </div>
+                    </div>
+
+                    {/* Markaziy xotirjam vizual belgi */}
+                    <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500/10 via-indigo-500/10 to-purple-500/15 border border-violet-500/20 mx-auto shadow-inner">
+                      <span className="text-3xl select-none">{activeStage.icon}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-gray-900 dark:text-white font-black text-lg sm:text-xl leading-snug">
+                        {job.status_message || (isQueued ? "Video navbatda kutilmoqda..." : "Video qayta ishlanmoqda...")}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+                        Odatda 1–2 daqiqa vaqt oladi. Sahifani yopmasdan boshqa oynaga o&apos;tishingiz mumkin — video tayyor bo&apos;lgach avtomatik ochiladi.
+                      </p>
+                    </div>
 
                     {/* Progress Bar & Status */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 text-left">
                       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 font-semibold tracking-wide">
-                        <span className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${job.status === 'pending' || (job.progress || 0) <= 0 ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
-                          {job.status === 'pending' || (job.progress || 0) <= 0 ? "Tayyorlanmoqda" : "Jarayon"}
+                        <span className="text-gray-700 dark:text-gray-300 font-bold">
+                          {isQueued ? "Tayyorgarlik" : `Bosqich ${activeStage.stageIndex + 1}/4: ${activeStage.badgeLabel}`}
                         </span>
-                        {job.status === 'pending' || (job.progress || 0) <= 0 ? (
-                          <span className="text-amber-500 font-semibold text-xs animate-pulse">
-                            Navbatda...
+                        {isQueued ? (
+                          <span className="text-amber-500 font-semibold text-xs">
+                            Tez orada boshlanadi
                           </span>
                         ) : (
-                          <span className="text-violet-600 dark:text-violet-400 font-bold tabular-nums">
+                          <span className="text-violet-600 dark:text-violet-400 font-black tabular-nums text-sm">
                             {Math.round(job.progress || 0)}%
                           </span>
                         )}
                       </div>
 
                       <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative">
-                        {job.status === 'pending' || (job.progress || 0) <= 0 ? (
-                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-600/30 via-violet-500 to-indigo-500/30 animate-pulse" />
+                        {isQueued ? (
+                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-500/20 via-violet-500/40 to-indigo-500/20" />
                         ) : (
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-500 transition-[width] duration-700 ease-out shadow-sm"
+                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-emerald-500 transition-[width] duration-700 ease-out shadow-sm"
                             style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
                           />
                         )}
                       </div>
                     </div>
 
-                    {/* Bosqichlar ko'rinishi -- foydalanuvchiga har bir qadam tushunarli bo'lishi uchun */}
-                    <div className="pt-1 grid grid-cols-4 gap-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 5 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
-                        <div className="text-base mb-0.5">📥</div>
-                        <div className="truncate">Yuklash</div>
-                      </div>
-                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 20 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
-                        <div className="text-base mb-0.5">📝</div>
-                        <div className="truncate">Matn</div>
-                      </div>
-                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 60 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
-                        <div className="text-base mb-0.5">🎙️</div>
-                        <div className="truncate">Ovoz</div>
-                      </div>
-                      <div className={`p-2 rounded-xl border transition-all ${ (job.progress || 0) >= 85 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold' : 'border-transparent bg-gray-100/60 dark:bg-white/[0.03]' }`}>
-                        <div className="text-base mb-0.5">🎬</div>
-                        <div className="truncate">Video</div>
-                      </div>
+                    {/* 4 Bosqichli aniq xarita — "cheksiz" tuyg'usini yo'qotadi */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+                      {stages.map((st) => {
+                        const isDone = activeStage.stageIndex > st.id && !isQueued;
+                        const isCurrent = activeStage.stageIndex === st.id && !isQueued;
+                        return (
+                          <div
+                            key={st.id}
+                            className={`p-2.5 rounded-2xl border transition-all text-xs flex flex-col justify-between ${
+                              isDone
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                : isCurrent
+                                ? 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200 ring-2 ring-violet-500/20 shadow-sm'
+                                : 'border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] text-gray-400 dark:text-gray-500 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-base">{st.icon}</span>
+                              {isDone ? (
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">✓ Tayyor</span>
+                              ) : isCurrent ? (
+                                <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 bg-violet-500/20 px-1.5 py-0.5 rounded-full">Bajarilmoqda</span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400">Kutilmoqda</span>
+                              )}
+                            </div>
+                            <div className="font-bold text-[11px] leading-tight line-clamp-1">{st.label}</div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
 
-                  {job.expected_end_time && job.status !== 'pending' && (job.progress || 0) > 0 && (
-                    <div className="glass-input rounded-2xl p-4 text-xs space-y-1.5 border border-gray-200/60 dark:border-white/10">
-                      <p className="font-semibold text-gray-500 dark:text-gray-400">Taxminiy yakunlanish vaqti:</p>
-                      <p className="text-gray-900 dark:text-white font-mono text-base font-bold">
-                        {formatTashkentTime(job.expected_end_time)}
-                      </p>
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
-                        {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
-                          ? "(tez orada yakunlanadi...)"
-                          : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
-                      </p>
+                    {job.expected_end_time && !isQueued && (
+                      <div className="glass-input rounded-2xl p-4 text-xs space-y-1 border border-gray-200/60 dark:border-white/10">
+                        <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 font-semibold">
+                          <span>Taxminiy yakunlanish:</span>
+                          <span className="text-gray-900 dark:text-white font-mono font-bold">
+                            {formatTashkentTime(job.expected_end_time)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                          {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
+                            ? "(tez orada yakunlanadi...)"
+                            : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-1">
+                      <button
+                        onClick={handleCancel}
+                        disabled={cancelLoading}
+                        className="glass-input hover:text-red-600 dark:hover:text-red-400 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition duration-200 disabled:opacity-50 border border-gray-200/60 dark:border-white/10"
+                      >
+                        {cancelLoading ? <span className="text-xs">...</span> : null}
+                        Jarayonni bekor qilish
+                      </button>
                     </div>
-                  )}
-
-                  <div className="pt-1">
-                    <button
-                      onClick={handleCancel}
-                      disabled={cancelLoading}
-                      className="glass-input hover:text-red-600 dark:hover:text-red-400 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition duration-200 disabled:opacity-50 border border-gray-200/60 dark:border-white/10"
-                    >
-                      {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                      Jarayonni bekor qilish
-                    </button>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Title & info (below player, padded in theater mode) */}
             <div className={theaterMode ? 'max-w-6xl mx-auto px-6 pt-6 space-y-4' : 'space-y-4'}>
