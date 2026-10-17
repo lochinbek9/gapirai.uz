@@ -976,6 +976,325 @@ def admin_retention_stats(
         db.close()
 
 
+@router.get("/funnel")
+def admin_funnel_stats(
+    days: int = Query(default=30, ge=0, le=365),
+    include_internal: bool = Query(default=False),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Ro'yxatdan o'tishdan to'lovgacha bo'lgan to'liq konversiya voronkasi (Funnel):
+    - 1. Ro'yxatdan o'tganlar (Registered)
+    - 2. Tasdiqlangan hisoblar (Verified: Email / Google / Phone)
+    - 3. Kamida bitta video yuborganlar (Attempted first job)
+    - 4. Muvaffaqiyatli dublyaj olganlar (Completed job)
+    - 5. Limitga duch kelgan / Faol foydalanuvchilar (2+ video yoki 5+ daqiqa)
+    - 6. To'lovni boshlaganlar (Checkout initiated / Pending payment)
+    - 7. Muvaffaqiyatli to'lov qilganlar (Approved payment / Paid customers)
+    """
+    from sqlalchemy import text
+    from datetime import date
+    db = SessionLocal()
+    try:
+        now_utc = datetime.utcnow()
+        now_tashkent = now_utc + timedelta(hours=5)
+        today = now_tashkent.date()
+        project_start_date = date(2026, 7, 27)
+
+        if days == 0:
+            since_date = project_start_date
+        else:
+            since_date = today - timedelta(days=max(0, days - 1))
+
+        internal_u_where = "" if include_internal else "AND u.is_internal = FALSE"
+        internal_where_base = "" if include_internal else "WHERE is_internal = FALSE"
+
+        # 1. Voronka asosiy ko'rsatkichlari (Funnel Stages)
+        funnel_row = db.execute(text(f"""
+            WITH user_base AS (
+                SELECT 
+                    u.id,
+                    u.is_verified,
+                    u.created_at,
+                    COALESCE((
+                        SELECT count(*) FROM dubbing_jobs j WHERE j.user_id = u.id
+                    ), 0) as job_count,
+                    COALESCE((
+                        SELECT count(*) FROM dubbing_jobs j WHERE j.user_id = u.id AND j.status = 'COMPLETED'
+                    ), 0) as completed_job_count,
+                    COALESCE((
+                        SELECT sum(j.video_duration) FROM dubbing_jobs j WHERE j.user_id = u.id
+                    ), 0) / 60.0 as total_video_minutes,
+                    COALESCE((
+                        SELECT count(*) FROM payments p 
+                        WHERE p.user_id = u.id AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+                    ), 0) as payment_attempts,
+                    COALESCE((
+                        SELECT count(*) FROM payments p 
+                        WHERE p.user_id = u.id AND p.status = 'APPROVED' AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+                    ), 0) as approved_payments,
+                    COALESCE((
+                        SELECT sum(p.amount) FROM payments p 
+                        WHERE p.user_id = u.id AND p.status = 'APPROVED' AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+                    ), 0) as user_total_spent
+                FROM users u
+                WHERE (u.created_at + interval '5 hours')::date >= :since
+                  AND (u.created_at + interval '5 hours')::date <= :today
+                  {internal_u_where}
+            )
+            SELECT 
+                count(*) as registered,
+                count(CASE WHEN is_verified THEN 1 END) as verified,
+                count(CASE WHEN job_count >= 1 THEN 1 END) as attempted_job,
+                count(CASE WHEN completed_job_count >= 1 THEN 1 END) as completed_job,
+                count(CASE WHEN job_count >= 2 OR total_video_minutes >= 5.0 THEN 1 END) as reached_paywall,
+                count(CASE WHEN payment_attempts >= 1 THEN 1 END) as checkout_initiated,
+                count(CASE WHEN approved_payments >= 1 THEN 1 END) as paid
+            FROM user_base;
+        """), {"since": since_date, "today": today}).mappings().first()
+
+        registered = (funnel_row["registered"] if funnel_row else 0) or 0
+        verified = (funnel_row["verified"] if funnel_row else 0) or 0
+        attempted_job = (funnel_row["attempted_job"] if funnel_row else 0) or 0
+        completed_job = (funnel_row["completed_job"] if funnel_row else 0) or 0
+        reached_paywall = (funnel_row["reached_paywall"] if funnel_row else 0) or 0
+        checkout_initiated = (funnel_row["checkout_initiated"] if funnel_row else 0) or 0
+        paid = (funnel_row["paid"] if funnel_row else 0) or 0
+
+        # Konversiya foizlari (Conversion & Drop-off rates)
+        def pct(part: int, whole: int) -> float:
+            return round(100.0 * part / max(1, whole), 1)
+
+        reg_to_verified_pct = pct(verified, registered)
+        verified_to_job_pct = pct(attempted_job, verified)
+        job_to_completed_pct = pct(completed_job, attempted_job)
+        completed_to_paywall_pct = pct(reached_paywall, completed_job)
+        paywall_to_checkout_pct = pct(checkout_initiated, reached_paywall)
+        checkout_to_paid_pct = pct(paid, checkout_initiated)
+        overall_conversion_pct = pct(paid, registered)
+
+        # 2. Moliyaviy ko'rsatkichlar (Financial stats for the period)
+        internal_pay_clause = "" if include_internal else "AND (u.id IS NULL OR u.is_internal = FALSE)"
+        revenue_row = db.execute(text(f"""
+            SELECT 
+                count(*) as approved_count,
+                COALESCE(sum(p.amount), 0) as total_revenue,
+                COALESCE(sum(CASE WHEN p.plan IS NOT NULL AND p.plan != '' THEN p.amount ELSE 0 END), 0) as subscription_revenue,
+                COALESCE(sum(CASE WHEN p.minutes_purchased IS NOT NULL THEN p.amount ELSE 0 END), 0) as minute_packs_revenue,
+                count(CASE WHEN p.plan IS NOT NULL AND p.plan != '' THEN 1 END) as subscription_count,
+                count(CASE WHEN p.minutes_purchased IS NOT NULL THEN 1 END) as minute_packs_count
+            FROM payments p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.status = 'APPROVED'
+              AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+              AND (p.created_at + interval '5 hours')::date >= :since
+              AND (p.created_at + interval '5 hours')::date <= :today
+              {internal_pay_clause}
+        """), {"since": since_date, "today": today}).mappings().first()
+
+        total_rev = (revenue_row["total_revenue"] if revenue_row else 0) or 0
+        sub_rev = (revenue_row["subscription_revenue"] if revenue_row else 0) or 0
+        min_rev = (revenue_row["minute_packs_revenue"] if revenue_row else 0) or 0
+        app_count = (revenue_row["approved_count"] if revenue_row else 0) or 0
+        aov = round(total_rev / max(1, app_count), 0)
+
+        # 3. To'lov tizimlari taqsimoti (Provider breakdown)
+        provider_rows = db.execute(text(f"""
+            SELECT 
+                p.provider,
+                count(*) as count,
+                COALESCE(sum(p.amount), 0) as total_amount
+            FROM payments p
+            LEFT JOIN users u ON p.user_id = u.id
+            WHERE p.status = 'APPROVED'
+              AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+              AND (p.created_at + interval '5 hours')::date >= :since
+              AND (p.created_at + interval '5 hours')::date <= :today
+              {internal_pay_clause}
+            GROUP BY p.provider
+            ORDER BY total_amount DESC;
+        """), {"since": since_date, "today": today}).mappings().all()
+
+        providers = [
+            {
+                "provider": (r["provider"].value if hasattr(r["provider"], "value") else str(r["provider"])).upper(),
+                "count": r["count"],
+                "total_uzs": r["total_amount"],
+                "pct": pct(r["total_amount"], total_rev),
+            }
+            for r in provider_rows
+        ]
+
+        # 4. So'nggi to'lovlar (Recent Conversions)
+        recent_pay_rows = db.execute(text(f"""
+            SELECT 
+                p.id,
+                p.amount,
+                p.provider,
+                p.plan,
+                p.minutes_purchased,
+                p.created_at + interval '5 hours' as created_at_tashkent,
+                u.id as user_id,
+                u.name as user_name,
+                u.email as user_email,
+                u.phone as user_phone
+            FROM payments p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.status = 'APPROVED'
+              AND (p.is_donation IS FALSE OR p.is_donation IS NULL)
+              {internal_u_where}
+            ORDER BY p.created_at DESC
+            LIMIT 10;
+        """)).mappings().all()
+
+        recent_conversions = [
+            {
+                "payment_id": str(r["id"]),
+                "user_id": str(r["user_id"]),
+                "user_name": r["user_name"] or "Noma'lum",
+                "user_email": r["user_email"] or "",
+                "user_phone": r["user_phone"] or "",
+                "item_type": "subscription" if r["plan"] else ("minute_pack" if r["minutes_purchased"] else "other"),
+                "item_label": f"Tarif: {r['plan']}" if r["plan"] else (f"+{r['minutes_purchased']} daqiqa" if r["minutes_purchased"] else "Xarid"),
+                "amount_uzs": r["amount"],
+                "provider": (r["provider"].value if hasattr(r["provider"], "value") else str(r["provider"])).upper(),
+                "paid_at": r["created_at_tashkent"].strftime("%Y-%m-%d %H:%M") if r["created_at_tashkent"] else None,
+            }
+            for r in recent_pay_rows
+        ]
+
+        # 5. Avtomatik tahlil va xulosalar (Actionable Insights)
+        insights = []
+        if registered > 0:
+            if reg_to_verified_pct < 70.0:
+                insights.append({
+                    "stage": "verification",
+                    "type": "warning",
+                    "title": "Email tasdiqlashda yo'qotish yuqori",
+                    "description": f"Ro'yxatdan o'tganlarning faqat {reg_to_verified_pct}% qismi hisobini tasdiqlagan. OTP kod yetib borishini tekshirish yoki Google Sign-In ni ko'proq targ'ib qilish tavsiya etiladi."
+                })
+            if verified_to_job_pct < 60.0:
+                insights.append({
+                    "stage": "activation",
+                    "type": "warning",
+                    "title": "Birinchi videoga o'tish sekin",
+                    "description": f"Tasdiqlangan foydalanuvchilarning {verified_to_job_pct}% qismi video yuborgan. Bosh sahifada tayyor namunaviy videolar yoki qulayroq onboard tavsiya etiladi."
+                })
+            if checkout_to_paid_pct < 60.0 and checkout_initiated > 0:
+                insights.append({
+                    "stage": "checkout",
+                    "type": "caution",
+                    "title": "To'lov bosqichida tashlab ketish bor",
+                    "description": f"To'lovni boshlaganlarning faqat {checkout_to_paid_pct}% qismi to'lovni muvaffaqiyatli yakunlagan. Click/Payme oynasiga o'tishdagi xatoliklar yoki qulaylikni tekshiring."
+                })
+            if overall_conversion_pct >= 5.0:
+                insights.append({
+                    "stage": "overall",
+                    "type": "success",
+                    "title": "A'lo darajadagi umumiy konversiya",
+                    "description": f"Ro'yxatdan to'lovgacha umumiy konversiya {overall_conversion_pct}% ni tashkil etmoqda (SaaS o'rtachasi: 2-4%)."
+                })
+            elif overall_conversion_pct > 0:
+                insights.append({
+                    "stage": "overall",
+                    "type": "info",
+                    "title": "Barqaror konversiya",
+                    "description": f"Umumiy konversiya ko'rsatkichi {overall_conversion_pct}%. Daqiqa paketlari taklifini kuchaytirish orqali o'stirish mumkin."
+                })
+            else:
+                insights.append({
+                    "stage": "overall",
+                    "type": "info",
+                    "title": "To'lovlar kutilmoqda",
+                    "description": "Tanlangan davrda to'lovlar mavjud emas. Foydalanuvchilarga daqiqa paketlarini qulayroq ko'rsatish tavsiya etiladi."
+                })
+
+        return {
+            "timeframe": {
+                "days": days,
+                "since_date": since_date.strftime("%Y-%m-%d"),
+                "today": today.strftime("%Y-%m-%d"),
+            },
+            "stages": [
+                {
+                    "key": "registered",
+                    "label": "Ro'yxatdan o'tganlar",
+                    "count": registered,
+                    "pct_of_top": 100.0,
+                    "conversion_from_prev": 100.0,
+                    "drop_pct": 0.0,
+                    "icon": "UserPlus",
+                },
+                {
+                    "key": "verified",
+                    "label": "Tasdiqlangan hisoblar",
+                    "count": verified,
+                    "pct_of_top": pct(verified, registered),
+                    "conversion_from_prev": reg_to_verified_pct,
+                    "drop_pct": round(100.0 - reg_to_verified_pct, 1),
+                    "icon": "UserCheck",
+                },
+                {
+                    "key": "attempted_job",
+                    "label": "Kamida 1 video yuborganlar",
+                    "count": attempted_job,
+                    "pct_of_top": pct(attempted_job, registered),
+                    "conversion_from_prev": verified_to_job_pct,
+                    "drop_pct": round(100.0 - verified_to_job_pct, 1),
+                    "icon": "Video",
+                },
+                {
+                    "key": "completed_job",
+                    "label": "Muvaffaqiyatli dublyaj olganlar",
+                    "count": completed_job,
+                    "pct_of_top": pct(completed_job, registered),
+                    "conversion_from_prev": job_to_completed_pct,
+                    "drop_pct": round(100.0 - job_to_completed_pct, 1),
+                    "icon": "CheckCircle2",
+                },
+                {
+                    "key": "reached_paywall",
+                    "label": "Limitga duch kelgan / Faollar (2+ video / 5+ daq)",
+                    "count": reached_paywall,
+                    "pct_of_top": pct(reached_paywall, registered),
+                    "conversion_from_prev": completed_to_paywall_pct,
+                    "drop_pct": round(100.0 - completed_to_paywall_pct, 1),
+                    "icon": "Zap",
+                },
+                {
+                    "key": "checkout_initiated",
+                    "label": "To'lovni boshlaganlar",
+                    "count": checkout_initiated,
+                    "pct_of_top": pct(checkout_initiated, registered),
+                    "conversion_from_prev": paywall_to_checkout_pct,
+                    "drop_pct": round(100.0 - paywall_to_checkout_pct, 1),
+                    "icon": "CreditCard",
+                },
+                {
+                    "key": "paid",
+                    "label": "Muvaffaqiyatli to'lov qilganlar",
+                    "count": paid,
+                    "pct_of_top": overall_conversion_pct,
+                    "conversion_from_prev": checkout_to_paid_pct,
+                    "drop_pct": round(100.0 - checkout_to_paid_pct, 1),
+                    "icon": "Award",
+                },
+            ],
+            "metrics": {
+                "overall_conversion_pct": overall_conversion_pct,
+                "total_revenue_uzs": total_rev,
+                "subscription_revenue_uzs": sub_rev,
+                "minute_packs_revenue_uzs": min_rev,
+                "average_order_value_uzs": aov,
+                "approved_transactions_count": app_count,
+            },
+            "providers": providers,
+            "recent_conversions": recent_conversions,
+            "insights": insights,
+        }
+    finally:
+        db.close()
+
+
 # ─────────────────────────────────────────────────────────────
 # Ommaviy xabarnomalar (Broadcast Notifications: Email & Telegram)
 # ─────────────────────────────────────────────────────────────

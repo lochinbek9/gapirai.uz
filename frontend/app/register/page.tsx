@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -27,15 +27,32 @@ export default function RegisterPage() {
   const [code, setCode] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
+  const [returnUrl, setReturnUrl] = useState('')
   const { register, verifyCode, resendCode, googleAuth } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const r = new URLSearchParams(window.location.search).get('returnUrl')
+      if (r) setReturnUrl(r)
+    }
+  }, [])
+
+  const getDestination = () => {
+    if (typeof window === 'undefined') return '/dashboard'
+    const params = new URLSearchParams(window.location.search)
+    const r = params.get('returnUrl')
+    if (r && r.startsWith('/')) return r
+    if (sessionStorage.getItem('pending_dub_job')) return '/'
+    return '/dashboard'
+  }
 
   const handleGoogleCredential = async (credential: string) => {
     setError('')
     setLoading(true)
     try {
       await googleAuth(credential)
-      router.push('/')
+      router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
     } finally {
@@ -63,7 +80,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await verifyCode(email, code)
-      router.push('/dashboard')
+      router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
     } finally {
@@ -249,7 +266,10 @@ export default function RegisterPage() {
           {step === 'form' && (
             <p className="text-center text-gray-500 dark:text-gray-400 text-xs font-bold mt-8">
               Hisobingiz bormi?{' '}
-              <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <Link
+                href={returnUrl ? `/login?returnUrl=${encodeURIComponent(returnUrl)}` : '/login'}
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
                 Kiring
               </Link>
             </p>

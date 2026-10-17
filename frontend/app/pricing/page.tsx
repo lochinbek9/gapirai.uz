@@ -33,12 +33,18 @@ export default function PricingPage() {
   // sahifani Suspense chegarasiz build vaqtida buzishi mumkin, bu sahifa esa
   // hozircha (loading holatisiz) statik sifatida yig'iladi.
   const [showInsufficientMinutes, setShowInsufficientMinutes] = useState(false)
+  const [shortfallMinutes, setShortfallMinutes] = useState<number | null>(null)
+  const [videoDurationMinutes, setVideoDurationMinutes] = useState<number | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     if (params.get('reason') === 'insufficient_minutes') {
       setShowInsufficientMinutes(true)
+      const s = parseFloat(params.get('short') || '')
+      const d = parseFloat(params.get('duration') || '')
+      if (!isNaN(s) && s > 0) setShortfallMinutes(Math.ceil(s))
+      if (!isNaN(d) && d > 0) setVideoDurationMinutes(Math.round(d * 10) / 10)
       window.history.replaceState({}, '', '/pricing')
     }
   }, [])
@@ -371,18 +377,63 @@ export default function PricingPage() {
               <AlertCircle className="h-6 w-6" />
             </div>
             <h3 className="text-lg font-black text-gray-900 dark:text-white">Daqiqangiz yetarli emas</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-              Bu videoni dublyaj qilish uchun oylik byudjetingiz yetmayapti. Qo'shimcha daqiqa paketini sotib oling — tugamaydi, keyingi oyga o'tadi.
-            </p>
+            {videoDurationMinutes && shortfallMinutes ? (
+              <div className="mt-2 space-y-2 text-sm text-gray-600 dark:text-slate-300">
+                <p className="text-xs">
+                  Siz tanlagan video: <strong className="text-gray-900 dark:text-white">{videoDurationMinutes} daqiqa</strong>
+                </p>
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-medium">
+                  Yetishmayotgan daqiqa: <strong>{shortfallMinutes} daqiqa</strong>
+                </div>
+                {(() => {
+                  const rec = shortfallMinutes ? (packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]) : packs[0];
+                  return rec ? (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Tavsiya etilgan paket: <strong className="text-violet-600 dark:text-violet-400">+{rec.minutes} daqiqa</strong> ({rec.price.toLocaleString('uz-UZ')} so'm). Ortib qolgan daqiqalar kuymaydi!
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+                Bu videoni dublyaj qilish uchun oylik byudjetingiz yetmayapti. Qo'shimcha daqiqa paketini sotib oling — tugamaydi, keyingi oyga o'tadi.
+              </p>
+            )}
+
+            {(() => {
+              const rec = shortfallMinutes ? (packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]) : (packs.length > 0 ? packs[0] : null);
+              if (rec) {
+                return (
+                  <button
+                    onClick={() => {
+                      setShowInsufficientMinutes(false)
+                      handleBuyPack(rec.minutes, 'click')
+                    }}
+                    className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90 shadow-lg shadow-violet-500/20"
+                  >
+                    +{rec.minutes} daqiqa olish ({rec.price.toLocaleString('uz-UZ')} UZS)
+                  </button>
+                )
+              }
+              return (
+                <button
+                  onClick={scrollToPacks}
+                  className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                >
+                  Qo'shimcha daqiqa sotib olish
+                </button>
+              )
+            })()}
+
             <button
               onClick={scrollToPacks}
-              className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90"
+              className="mt-2 w-full rounded-2xl bg-black/5 dark:bg-white/10 py-2.5 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/20 transition"
             >
-              Qo'shimcha daqiqa sotib olish
+              Barcha paketlar va tariflarni ko'rish
             </button>
             <button
               onClick={() => setShowInsufficientMinutes(false)}
-              className="mt-2 w-full rounded-2xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
+              className="mt-1 w-full py-2 text-xs text-gray-400 dark:text-slate-500 hover:underline"
             >
               Yopish
             </button>

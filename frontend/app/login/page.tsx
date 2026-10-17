@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -30,8 +30,25 @@ export default function LoginPage() {
   const [resendMessage, setResendMessage] = useState('')
   const [phone, setPhone] = useState('+998')
   const [phoneCode, setPhoneCode] = useState('')
+  const [returnUrl, setReturnUrl] = useState('')
   const { login, verifyCode, resendCode, googleAuth, requestPhoneCode, verifyPhoneCode } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const r = new URLSearchParams(window.location.search).get('returnUrl')
+      if (r) setReturnUrl(r)
+    }
+  }, [])
+
+  const getDestination = () => {
+    if (typeof window === 'undefined') return '/dashboard'
+    const params = new URLSearchParams(window.location.search)
+    const r = params.get('returnUrl')
+    if (r && r.startsWith('/')) return r
+    if (sessionStorage.getItem('pending_dub_job')) return '/'
+    return '/dashboard'
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,7 +59,7 @@ export default function LoginPage() {
       if (res?.pending_verification) {
         setStep('code')
       } else {
-        router.push('/dashboard')
+        router.push(getDestination())
       }
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Xatolik yuz berdi.')
@@ -57,7 +74,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyCode(email, code)
-      router.push('/dashboard')
+      router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
     } finally {
@@ -84,7 +101,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await googleAuth(credential)
-      router.push('/')
+      router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
     } finally {
@@ -116,7 +133,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await verifyPhoneCode(phone, phoneCode)
-      router.push('/dashboard')
+      router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
     } finally {
@@ -410,7 +427,10 @@ export default function LoginPage() {
           {step === 'form' && (
             <p className="text-center text-gray-500 dark:text-gray-400 text-xs font-bold mt-8">
               Hisobingiz yo'qmi?{' '}
-              <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <Link
+                href={returnUrl ? `/register?returnUrl=${encodeURIComponent(returnUrl)}` : '/register'}
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
                 Ro'yxatdan o'ting
               </Link>
             </p>

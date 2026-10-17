@@ -322,11 +322,43 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mehmon foydalanuvchi kiritgan video havolasini login/ro'yxatdan o'tgach avtomatik tiklash
+  useEffect(() => {
+    if (typeof window === "undefined" || authLoading) return;
+    const pendingRaw = sessionStorage.getItem("pending_dub_job");
+    if (pendingRaw) {
+      try {
+        const pending = JSON.parse(pendingRaw);
+        if (pending?.url) {
+          handleUrlChange(pending.url);
+          if (pending.voiceGender) setVoiceGender(pending.voiceGender);
+          if (pending.ttsProvider) setTtsProvider(pending.ttsProvider);
+          if (pending.voiceName) setVoiceName(pending.voiceName);
+          sessionStorage.removeItem("pending_dub_job");
+        }
+      } catch {
+        sessionStorage.removeItem("pending_dub_job");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isLoggedIn]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
     if (!isLoggedIn) {
-      router.push('/login');
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "pending_dub_job",
+          JSON.stringify({
+            url: url.trim(),
+            voiceGender,
+            ttsProvider,
+            voiceName,
+          })
+        );
+      }
+      router.push('/login?returnUrl=/');
       return;
     }
     setLoading(true);
@@ -352,8 +384,10 @@ export default function Home() {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 402 && detail && typeof detail === "object" && detail.error === "insufficient_minutes") {
         // Matnli xabar ko'rsatib qo'ymasdan — to'g'ridan-to'g'ri /pricing'ga
-        // o'tkazamiz, u yerda "yetarli daqiqa yo'q" modali chiqadi (2026-09-14).
-        router.push("/pricing?reason=insufficient_minutes");
+        // yetishmayotgan daqiqa va davomiylik bilan o'tkazamiz (2026-09-14).
+        const short = detail.minutes_short ?? '';
+        const dur = detail.video_minutes ?? '';
+        router.push(`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(short)}&duration=${encodeURIComponent(dur)}`);
         return;
       } else {
         setError((typeof detail === "string" ? detail : detail?.message) || "Xatolik yuz berdi. Qayta urinib ko'ring.");

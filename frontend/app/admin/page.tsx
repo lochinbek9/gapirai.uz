@@ -15,6 +15,7 @@ import AdminUsersManager from '@/components/AdminUsersManager'
 import AdminCookiesManager from '@/components/AdminCookiesManager'
 import AdminRetentionManager from '@/components/AdminRetentionManager'
 import AdminBroadcastManager from '@/components/AdminBroadcastManager'
+import AdminFunnelManager from '@/components/AdminFunnelManager'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -395,6 +396,7 @@ export default function AdminPage() {
         <div className="sticky top-2 z-30 bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl">
           {[
             { id: 'sec-today', label: 'Bugun', icon: '⚡' },
+            { id: 'sec-funnel', label: 'Voronka (Funnel)', icon: '📉' },
             { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
             { id: 'sec-jobs', label: 'Dublyaj', icon: '🎬' },
             { id: 'sec-payments', label: "To'lovlar", icon: '💳' },
@@ -515,6 +517,11 @@ export default function AdminPage() {
         </section>
 
         {/* YouTube Cookies Management -- nofaol qilingan (Edge orqali barqaror yuklangan) */}
+
+        {/* Funnel Conversion Analytics */}
+        <div id="sec-funnel" className="scroll-mt-16">
+          <AdminFunnelManager token={getToken() || ''} />
+        </div>
 
         {/* User Retention & Activity Analytics */}
         <div id="sec-retention" className="scroll-mt-16">

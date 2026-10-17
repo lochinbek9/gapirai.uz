@@ -364,5 +364,82 @@ export async function apiListBroadcasts(
 }
 
 
+// ─────────────────────────────────────────────────────────────
+// Funnel (Voronka) Konversiya Tahlili
+// ─────────────────────────────────────────────────────────────
+
+export interface FunnelStageItem {
+  key: string
+  label: string
+  count: number
+  pct_of_top: number
+  conversion_from_prev: number
+  drop_pct: number
+  icon: string
+}
+
+export interface FunnelFinancialMetrics {
+  overall_conversion_pct: number
+  total_revenue_uzs: number
+  subscription_revenue_uzs: number
+  minute_packs_revenue_uzs: number
+  average_order_value_uzs: number
+  approved_transactions_count: number
+}
+
+export interface FunnelProviderItem {
+  provider: string
+  count: number
+  total_uzs: number
+  pct: number
+}
+
+export interface FunnelRecentConversion {
+  payment_id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  user_phone: string
+  item_type: string
+  item_label: string
+  amount_uzs: number
+  provider: string
+  paid_at: string | null
+}
+
+export interface FunnelInsight {
+  stage: string
+  type: 'warning' | 'caution' | 'success' | 'info'
+  title: string
+  description: string
+}
+
+export interface FunnelStatsResponse {
+  timeframe: {
+    days: number
+    since_date: string
+    today: string
+  }
+  stages: FunnelStageItem[]
+  metrics: FunnelFinancialMetrics
+  providers: FunnelProviderItem[]
+  recent_conversions: FunnelRecentConversion[]
+  insights: FunnelInsight[]
+}
+
+export async function apiAdminFunnel(
+  token: string,
+  days: number = 30,
+  includeInternal: boolean = false
+): Promise<FunnelStatsResponse> {
+  const res = await axios.get(`${API_URL}/admin/funnel`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { days, include_internal: includeInternal },
+  })
+  return res.data
+}
+
+
+
 
 
