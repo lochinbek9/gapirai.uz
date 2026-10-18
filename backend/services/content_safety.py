@@ -211,15 +211,16 @@ def check_safety(text: str) -> SafetyResult:
     if not settings.CONTENT_SAFETY_ENABLED or not text.strip():
         return SafetyResult(allowed=True)
 
+    openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not openai_ok
 
     if prefer_gemini and gemini_available:
         try:
             return _gemini_safety_check(text)
         except Exception as e:
             logger.warning(f"Gemini kontent xavfsizligi tekshiruvida xatolik ({e}) — OpenAI'ga o'tilmoqda.")
-            if settings.OPENAI_API_KEY:
+            if openai_ok:
                 try:
                     return _ai_classify(text)
                 except Exception as e2:
@@ -227,8 +228,8 @@ def check_safety(text: str) -> SafetyResult:
             return SafetyResult(allowed=True)
 
     try:
-        if not settings.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY sozlanmagan")
+        if not openai_ok:
+            raise RuntimeError("OpenAI o'chirilgan yoki kalit sozlanmagan")
         return _ai_classify(text)
     except Exception as e:
         logger.warning(f"OpenAI kontent xavfsizligi tekshiruvida xatolik ({e}) — Gemini'ga o'tilmoqda.")

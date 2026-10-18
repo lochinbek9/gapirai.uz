@@ -23,6 +23,7 @@ import {
   apiAdminAddMinutes,
   apiAdminSetPlan,
 } from '@/lib/admin'
+import { formatTashkentDate } from '@/lib/timestamp'
 import { getToken } from '@/lib/auth'
 
 interface ErrorBoundaryProps {
@@ -376,7 +377,7 @@ function AdminUsersManagerInner() {
                       {u.expires_at ? (
                         <span className="flex items-center gap-1 text-gray-300">
                           <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                          {new Date(u.expires_at).toLocaleDateString('uz-UZ')}
+                          {formatTashkentDate(u.expires_at)}
                         </span>
                       ) : (
                         <span className="text-gray-500">—</span>

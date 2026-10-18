@@ -25,6 +25,7 @@ from backend.services.auth import get_current_user
 from backend.services.card_providers import CardProviderError
 from backend.services.plans import PLANS, MINUTE_PACKS, LEGACY_MINUTE_PACKS, STARTER_PACK_MINUTES, get_or_create_subscription, get_minute_balance
 from backend.services import recurring
+from backend.services.timezone_utils import to_tashkent_iso
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -43,7 +44,7 @@ def _card_json(c: PaymentCard) -> dict:
         "is_default": c.is_default,
         "phone_hint": c.phone_hint,
         "last_error": c.last_error if not c.is_active else None,
-        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "created_at": to_tashkent_iso(c.created_at),
     }
 
 
@@ -74,7 +75,7 @@ def overview(db: Session = Depends(get_db), current_user: User = Depends(get_cur
             "auto_topup_enabled": sub.auto_topup_enabled,
             "auto_topup_pack": sub.auto_topup_pack,
             "in_grace": in_grace,
-            "grace_until": sub.grace_until.isoformat() if sub.grace_until else None,
+            "grace_until": to_tashkent_iso(sub.grace_until),
             "renew_failed_attempts": sub.renew_failed_attempts or 0,
         },
         "minute_balance": get_minute_balance(db, current_user.id),

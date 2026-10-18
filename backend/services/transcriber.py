@@ -692,7 +692,7 @@ def _transcribe_provider_order(primary: str) -> list[str]:
     """
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
-    openai_ok = bool(settings.OPENAI_API_KEY)
+    openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
 
     if primary == "azure":
         order = ["azure", "gemini", "openai"]

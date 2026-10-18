@@ -34,6 +34,7 @@ import {
   AdminJobsCostResponse,
   AdminJobCostItem,
 } from '@/lib/admin'
+import { formatTashkentDateTimeObj, getTashkentRelativeTime } from '@/lib/timestamp'
 
 interface AdminJobsCostManagerProps {
   token: string
@@ -120,47 +121,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const formatDateTime = (dateStr: string | null | undefined): { date: string; time: string; full: string } => {
-    if (!dateStr) return { date: '—', time: '', full: '—' }
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return { date: '—', time: '', full: '—' }
-      const pad = (n: number) => n.toString().padStart(2, '0')
-      const year = d.getFullYear()
-      const month = pad(d.getMonth() + 1)
-      const day = pad(d.getDate())
-      const hours = pad(d.getHours())
-      const mins = pad(d.getMinutes())
-      const secs = pad(d.getSeconds())
-      return {
-        date: `${day}.${month}.${year}`,
-        time: `${hours}:${mins}:${secs}`,
-        full: `${day}.${month}.${year} ${hours}:${mins}:${secs}`,
-      }
-    } catch {
-      return { date: '—', time: '', full: '—' }
-    }
-  }
+  const formatDateTime = (dateStr: string | null | undefined) => formatTashkentDateTimeObj(dateStr)
 
-  const getRelativeTime = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return ''
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return ''
-      const diffMs = Date.now() - d.getTime()
-      const diffSec = Math.floor(diffMs / 1000)
-      if (diffSec < 60) return 'Hozirgina'
-      const diffMin = Math.floor(diffSec / 60)
-      if (diffMin < 60) return `${diffMin} daq oldin`
-      const diffHours = Math.floor(diffMin / 60)
-      if (diffHours < 24) return `${diffHours} soat oldin`
-      const diffDays = Math.floor(diffHours / 24)
-      if (diffDays < 30) return `${diffDays} kun oldin`
-      return ''
-    } catch {
-      return ''
-    }
-  }
+  const getRelativeTime = (dateStr: string | null | undefined): string => getTashkentRelativeTime(dateStr)
 
   const getStatusBadge = (status: string) => {
     switch (status) {

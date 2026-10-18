@@ -31,7 +31,7 @@ class OpenAIProvider(TTSProvider):
         voice_name: str | None = None,
     ) -> bool:
         api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY", "")
-        if not api_key:
+        if not api_key or not getattr(settings, "OPENAI_ENABLED", True):
             return False
 
         clean_text = re.sub(r"<[^>]+>", "", text).strip()

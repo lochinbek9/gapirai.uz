@@ -17,6 +17,7 @@ import {
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
   Sparkles, FileText,
 } from 'lucide-react'
+import { formatTashkentDate } from '@/lib/timestamp'
 
 const PLAN_NAMES: Record<string, string> = { free: 'Bepul', standard: 'Standart', pro: 'Pro' }
 
@@ -71,7 +72,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
           )}
           {sub.plan !== 'free' && sub.expires_at && !isAdmin && (
             <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
-              {new Date(sub.expires_at).toLocaleDateString('uz-UZ')} gacha
+              {formatTashkentDate(sub.expires_at)} gacha
             </p>
           )}
         </div>

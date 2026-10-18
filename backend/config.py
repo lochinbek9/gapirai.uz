@@ -179,6 +179,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     OPENAI_API_KEY: str = ""
+    OPENAI_ENABLED: bool = False  # Balans 0 bo'lgani sababli vaqtinchalik nofaol (Gemini/Azure ishlatiladi)
     # Dublajdan oldingi kontent xavfsizligi tekshiruvi (Safety Gate) —
     # backend/services/content_safety.py. Diniy/terroristik/pornografik/
     # zo'ravonlik kontentini job yaratilishidan oldin (metadata) va

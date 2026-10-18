@@ -36,6 +36,7 @@ import {
   apiGetUnactivatedUsers,
   apiAdminAddMinutes,
 } from '@/lib/admin'
+import { formatTashkentDateTimeObj } from '@/lib/timestamp'
 
 interface Props {
   token: string
@@ -95,27 +96,7 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
     loadData()
   }, [loadData])
 
-  const formatDateTime = (dateStr: string | null | undefined): { date: string; time: string; full: string } => {
-    if (!dateStr) return { date: '—', time: '', full: '—' }
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return { date: '—', time: '', full: '—' }
-      const pad = (n: number) => n.toString().padStart(2, '0')
-      const day = pad(d.getDate())
-      const month = pad(d.getMonth() + 1)
-      const year = d.getFullYear()
-      const hours = pad(d.getHours())
-      const mins = pad(d.getMinutes())
-      const secs = pad(d.getSeconds())
-      return {
-        date: `${day}.${month}.${year}`,
-        time: `${hours}:${mins}:${secs}`,
-        full: `${day}.${month}.${year} ${hours}:${mins}:${secs}`,
-      }
-    } catch {
-      return { date: '—', time: '', full: '—' }
-    }
-  }
+  const formatDateTime = (dateStr: string | null | undefined) => formatTashkentDateTimeObj(dateStr)
 
   const formatDuration = (sec: number | null | undefined): string => {
     if (!sec || sec <= 0) return '00:00'

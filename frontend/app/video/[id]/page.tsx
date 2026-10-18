@@ -15,7 +15,7 @@ import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
-import { formatTashkentDateTime, formatTashkentTime } from '@/lib/timestamp'
+import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -46,8 +46,8 @@ function formatRemainingTime(seconds: number): string {
 
 function getElapsedSeconds(job?: Job | null, currentTime?: number): number {
   if (!job?.created_at) return 0
-  const start = new Date(job.created_at).getTime()
-  if (isNaN(start)) return 0
+  const start = parseApiDate(job.created_at)?.getTime() ?? 0
+  if (!start) return 0
   return Math.max(0, Math.floor(((currentTime || Date.now()) - start) / 1000))
 }
 
@@ -871,9 +871,9 @@ export default function VideoPage() {
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
-                          {Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000) <= 0
+                          {Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000) <= 0
                             ? "(tez orada yakunlanadi...)"
-                            : `(taxminan ${formatRemainingTime(Math.ceil((new Date(job.expected_end_time).getTime() - currentTime) / 1000))} qoldi)`}
+                            : `(taxminan ${formatRemainingTime(Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000))} qoldi)`}
                         </p>
                       </div>
                     )}

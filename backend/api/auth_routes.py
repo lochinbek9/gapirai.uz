@@ -455,10 +455,11 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> 
 
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)) -> dict:
+    from backend.services.timezone_utils import to_tashkent_iso
     return {
         "id": str(current_user.id),
         "name": current_user.name,
         "email": current_user.email,
         "role": current_user.role,
-        "created_at": current_user.created_at.isoformat(),
+        "created_at": to_tashkent_iso(current_user.created_at),
     }

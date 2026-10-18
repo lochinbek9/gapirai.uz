@@ -25,6 +25,7 @@ import {
   apiCreateBroadcast,
   apiListBroadcasts,
 } from '@/lib/admin'
+import { formatTashkentDateTime } from '@/lib/timestamp'
 
 interface Props {
   token: string
@@ -590,7 +591,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                       <div className="flex items-center gap-4 text-[11px] text-gray-500 pt-1 flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {camp.created_at ? new Date(camp.created_at).toLocaleString('uz-UZ') : ''}
+                          {camp.created_at ? formatTashkentDateTime(camp.created_at) : ''}
                         </span>
                         <span>Admin: {camp.admin?.name || 'Admin'}</span>
                         {camp.button_url && (

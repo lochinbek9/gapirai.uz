@@ -19,6 +19,7 @@ import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
 import AdminJobsCostManager from '@/components/AdminJobsCostManager'
 import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
+import { formatTashkentDateTime } from '@/lib/timestamp'
 
 const CATEGORY_LABELS: Record<string, string> = {
   sexual_explicit: "Pornografik / 18+ kontent",
@@ -678,7 +679,7 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-400">{u.email || u.phone || '—'}</td>
                         <td className="px-4 py-3 text-red-300 font-semibold">{u.violation_count}</td>
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                          {u.last_violation_at ? new Date(u.last_violation_at).toLocaleString('uz-UZ') : '—'}
+                          {formatTashkentDateTime(u.last_violation_at) || '—'}
                         </td>
                       </tr>
                     ))}
@@ -701,7 +702,7 @@ export default function AdminPage() {
                     {blocked.recent_violations.map((v) => (
                       <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                          {new Date(v.created_at).toLocaleString('uz-UZ')}
+                          {formatTashkentDateTime(v.created_at)}
                         </td>
                         <td className="px-4 py-3 text-gray-200 truncate max-w-[280px]" title={v.video_title || undefined}>
                           {v.video_title || '—'}
@@ -785,7 +786,7 @@ export default function AdminPage() {
                     <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                       <td className="px-4 py-3 text-gray-200 truncate max-w-[280px] font-mono text-xs">{u.email}</td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                        {u.created_at ? new Date(u.created_at).toLocaleString('uz-UZ') : '—'}
+                        {formatTashkentDateTime(u.created_at) || '—'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {u.is_verified ? (
@@ -836,7 +837,7 @@ export default function AdminPage() {
                     return (
                       <tr key={j.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                         <td className="px-3 sm:px-4 py-3 text-gray-400 whitespace-nowrap text-xs font-mono">
-                          {j.created_at ? new Date(j.created_at).toLocaleString('uz-UZ') : '—'}
+                          {formatTashkentDateTime(j.created_at) || '—'}
                         </td>
                         <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[240px] truncate" title={j.video_title || j.youtube_url}>
                           <a href={j.youtube_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 hover:underline">

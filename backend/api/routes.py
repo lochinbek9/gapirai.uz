@@ -1048,8 +1048,12 @@ def retry_job(
     db.commit()
 
     from backend.workers.tasks import process_video
-    from backend.services.plans import get_job_queue_v2
+    from backend.services.plans import get_job_queue_v2, LOCAL_UPLOAD_QUEUE
     _dur = (job.video_duration or 0) / 60.0
+    if not job.youtube_url and job.original_video_path:
+        queue = LOCAL_UPLOAD_QUEUE
+    else:
+        queue = get_job_queue_v2(db, job.user_id or current_user.id, _dur)
     # Do not pass task_id=str(job.id) so Celery creates a fresh task ID,
     # preventing Celery worker from discarding previously revoked tasks.
     process_video.apply_async(args=[str(job.id)], queue=queue)

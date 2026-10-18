@@ -10,10 +10,13 @@ services:
       POSTGRES_DB: dubber_db
       POSTGRES_USER: dubber
       POSTGRES_PASSWORD: dubber123
+      TZ: Asia/Tashkent
+      PGTZ: Asia/Tashkent
     ports:
       - "${COMPOSE_HOST_IP:-127.0.0.1}:5439:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat /dev/null > /dev/tcp/localhost/5432' 2>/dev/null && echo ok || exit 1"]
       interval: 10s

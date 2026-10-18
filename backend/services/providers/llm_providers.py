@@ -47,6 +47,9 @@ class OpenAILLMProvider(LLMProvider):
         return self._client
 
     def is_available(self) -> bool:
+        from backend.config import get_settings
+        if not getattr(get_settings(), "OPENAI_ENABLED", True):
+            return False
         return bool(self.api_key)
 
     def health_check(self) -> ProviderHealth:

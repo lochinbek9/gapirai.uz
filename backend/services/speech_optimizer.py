@@ -25,7 +25,7 @@ from backend.services.speech_normalizer import normalize_apostrophes, _make_norm
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-_client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
+_client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if (settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True)) else None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ def optimize_segments(segments: list[dict], use_llm: bool = False) -> list[dict]
         return rule_based
 
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-    use_openai = _client and not settings.FREE_MODE
+    use_openai = _client and not settings.FREE_MODE and getattr(settings, "OPENAI_ENABLED", True)
     if not use_openai and not gemini_available:
         return rule_based
 

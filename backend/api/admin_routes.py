@@ -7,6 +7,7 @@ from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
 from backend.services.auth import get_current_admin_user
 from backend.services.plans import get_or_create_subscription, get_minute_balance, PLANS
+from backend.services.timezone_utils import to_tashkent_iso
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
@@ -120,7 +121,7 @@ def admin_stats(
         if user_filter is not None:
             recent_u_q = recent_u_q.filter(user_filter)
         recent_users = [
-            {"email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None, "is_verified": u.is_verified}
+            {"email": u.email, "created_at": to_tashkent_iso(u.created_at), "is_verified": u.is_verified}
             for u in recent_u_q.order_by(User.created_at.desc()).limit(10).all()
         ]
 
@@ -136,7 +137,7 @@ def admin_stats(
         recent_jobs = [
             {
                 "id": str(job.id),
-                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "created_at": to_tashkent_iso(job.created_at),
                 "video_title": job.video_title,
                 "youtube_url": job.youtube_url,
                 "user_email": email,
@@ -325,7 +326,7 @@ def blocked_users(current_user: User = Depends(get_current_admin_user)):
                 "email": r.email,
                 "phone": r.phone,
                 "violation_count": r.violation_count,
-                "last_violation_at": r.last_violation_at.isoformat() if r.last_violation_at else None,
+                "last_violation_at": to_tashkent_iso(r.last_violation_at),
             }
             for r in rows
         ]
@@ -344,7 +345,7 @@ def blocked_users(current_user: User = Depends(get_current_admin_user)):
                 "stage": v.stage,
                 "category": v.category,
                 "reason": v.reason,
-                "created_at": v.created_at.isoformat(),
+                "created_at": to_tashkent_iso(v.created_at),
             }
             for v in recent
         ]
@@ -384,7 +385,7 @@ def refunds_needed(current_user: User = Depends(get_current_admin_user)):
                 "video_title": j.video_title if j else None,
                 "error_message": j.error_message if j else None,
                 "click_transaction_id": p.click_transaction_id,
-                "paid_at": p.updated_at.isoformat() if p.updated_at else None,
+                "paid_at": to_tashkent_iso(p.updated_at),
             }
             for p, u, j in rows
         ]
@@ -458,9 +459,9 @@ def admin_list_users(
                 "role": u.role,
                 "is_internal": getattr(u, "is_internal", False),
                 "is_verified": u.is_verified,
-                "created_at": u.created_at.isoformat() if u.created_at else None,
+                "created_at": to_tashkent_iso(u.created_at),
                 "plan": sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan),
-                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                "expires_at": to_tashkent_iso(sub.expires_at),
                 "monthly_minutes_used": sub.monthly_minutes_used or 0.0,
                 "purchased_minutes": sub.purchased_minutes or 0.0,
                 "balance": bal,
@@ -590,7 +591,7 @@ def admin_set_plan(
             "success": True,
             "message": f"Tarif {plan_key.upper()} ga o'zgartirildi ({req.days} kun)",
             "plan": sub.plan.value,
-            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "expires_at": to_tashkent_iso(sub.expires_at),
             "balance": bal,
         }
     finally:
@@ -2097,8 +2098,8 @@ def list_broadcast_campaigns(
                 "telegram_sent": c.telegram_sent or 0,
                 "telegram_failed": c.telegram_failed or 0,
                 "error_message": c.error_message,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-                "completed_at": c.completed_at.isoformat() if c.completed_at else None,
+                "created_at": to_tashkent_iso(c.created_at),
+                "completed_at": to_tashkent_iso(c.completed_at),
                 "admin": {
                     "name": admin_name or "Admin",
                     "email": admin_email or "",
@@ -2136,7 +2137,7 @@ def list_excluded_emails(current_user: User = Depends(get_current_admin_user)):
                 "id": str(item.id),
                 "email": item.email,
                 "reason": item.reason,
-                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "created_at": to_tashkent_iso(item.created_at),
             }
             for item in items
         ]
@@ -2388,7 +2389,7 @@ def admin_jobs_cost(
                     payments_by_job[str(p.job_id)] = {
                         "amount_uzs": p.amount,
                         "provider": p.provider.value if hasattr(p.provider, 'value') else str(p.provider),
-                        "paid_at": p.created_at.isoformat() if p.created_at else None,
+                        "paid_at": to_tashkent_iso(p.created_at),
                     }
 
         USD_TO_UZS = 12800
@@ -2412,7 +2413,7 @@ def admin_jobs_cost(
             dur_min = dur_sec / 60.0
 
             # STT Cost estimation (Whisper $0.006/min; Gemini $0.002/min)
-            stt_model = job.stt_model or "whisper-1"
+            stt_model = job.stt_model or "gemini-3.8-flash"
             if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT):
                 stt_rate = 0.002 if "gemini" in stt_model.lower() else 0.006
                 stt_cost_usd = round(dur_min * stt_rate, 4)
@@ -2475,8 +2476,8 @@ def admin_jobs_cost(
                 "status": job.status.value if hasattr(job.status, "value") else str(job.status),
                 "status_message": job.status_message,
                 "progress": float(job.progress or 0.0),
-                "created_at": job.created_at.isoformat() if job.created_at else None,
-                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "created_at": to_tashkent_iso(job.created_at),
+                "completed_at": to_tashkent_iso(job.completed_at),
                 "processing_seconds": proc_sec,
                 "subtitle_only": bool(job.subtitle_only),
                 "source_language": job.source_language,
@@ -2785,7 +2786,7 @@ def get_unactivated_users(
                     "status": last_job_obj.status.value if hasattr(last_job_obj.status, "value") else str(last_job_obj.status),
                     "error_code": last_job_obj.error_code,
                     "error_message": last_job_obj.error_message,
-                    "created_at": last_job_obj.created_at.isoformat() if last_job_obj.created_at else None,
+                    "created_at": to_tashkent_iso(last_job_obj.created_at),
                 }
 
             items.append({
@@ -2795,7 +2796,7 @@ def get_unactivated_users(
                 "phone": u.phone,
                 "telegram_chat_id": u.telegram_chat_id,
                 "is_verified": bool(u.is_verified),
-                "registered_at": u.created_at.isoformat() if u.created_at else None,
+                "registered_at": to_tashkent_iso(u.created_at),
                 "attempt_count": tot,
                 "category": cat,
                 "last_job": last_job_data,

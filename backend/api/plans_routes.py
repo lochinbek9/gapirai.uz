@@ -34,10 +34,10 @@ def list_plans(
         has_starter = has_purchased_starter_pack(db, current_user.id)
         sub = get_or_create_subscription(db, current_user.id)
         bal = get_minute_balance(db, current_user.id)
-        from backend.services.plans import is_user_admin
+        from backend.services.timezone_utils import to_tashkent_iso
         current = {
             "plan": sub.plan.value,
-            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "expires_at": to_tashkent_iso(sub.expires_at),
             "minutes": bal,  # {monthly_cap, monthly_used, monthly_remaining, purchased, total_available}
             "is_admin": is_user_admin(db, current_user.id),
         }

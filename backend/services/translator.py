@@ -13,7 +13,7 @@ from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if settings.OPENAI_API_KEY else None
+client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=5) if (settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True)) else None
 
 # OpenAI'ning krediti tugaganda qayta urinish befoyda — darhol Gemini'ga
 # o'tish uchun aniqlanadi (translate_segments()'dagi avtomatik fallback).

@@ -15,6 +15,7 @@ from backend.services.job_creation import extract_youtube_video_id
 from backend.services.rate_limiter import rate_limit
 from backend.workers.analysis_tasks import analyze_video_task
 from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
+from backend.services.timezone_utils import to_tashkent_iso
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
         "qa_history": analysis.qa_history or [],
         "error_message": analysis.error_message,
         "error_code": analysis.error_code,
-        "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+        "created_at": to_tashkent_iso(analysis.created_at),
     }
 
 
@@ -269,7 +270,7 @@ def ask_question(
         "question": request.question.strip(),
         "answer": result["answer"],
         "timestamps": result["timestamps"],
-        "asked_at": datetime.utcnow().isoformat(),
+        "asked_at": to_tashkent_iso(datetime.utcnow()),
     }
     analysis.qa_history = qa_history + [entry]
     db.commit()

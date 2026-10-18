@@ -189,7 +189,8 @@ def _detect_gender(transcript_text: str) -> str:
 
     snippet = transcript_text[:1000]
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not settings.OPENAI_API_KEY
+    openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
+    prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not openai_ok
 
     def _call_gemini():
         from google.genai import types
@@ -214,8 +215,8 @@ def _detect_gender(transcript_text: str) -> str:
         raise last_e or RuntimeError("Gemini gender detection failed")
 
     def _call_openai():
-        if not settings.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY not set")
+        if not openai_ok:
+            raise RuntimeError("OpenAI o'chirilgan yoki kalit sozlanmagan")
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         resp = client.chat.completions.create(
             model=settings.OPENAI_LIGHT_MODEL,
