@@ -45,10 +45,19 @@ def _tracking_get_yt_dlp(call_log, side_effect=None):
 
 class ProxyManagerTestCase(unittest.TestCase):
     def setUp(self):
+        self._patchers = [
+            patch.object(settings, "YOUTUBE_PROXY_ENABLED", False),
+            patch.object(settings, "YOUTUBE_PROXY_URL", ""),
+            patch.object(settings, "YOUTUBE_RESIDENTIAL_PROXY_URL", ""),
+        ]
+        for p in self._patchers:
+            p.start()
         _flush_proxy_keys()
 
     def tearDown(self):
         _flush_proxy_keys()
+        for p in reversed(self._patchers):
+            p.stop()
 
 
 class TestDirectOnlyDefault(ProxyManagerTestCase):

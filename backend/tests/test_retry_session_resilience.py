@@ -324,11 +324,13 @@ class TestAnalyzeVideoTaskRetrySessionResilience(unittest.TestCase):
             holder["session"].poison()
             raise Exception("simulated: server closed the connection unexpectedly")
 
-        with patch("backend.workers.analysis_tasks.SessionLocal", side_effect=self._patched_session_local(holder)):
-            with patch("backend.workers.analysis_tasks.downloader.download_video", side_effect=download_side_effect):
-                with patch.object(analyze_video_task, "retry", new=_fake_retry(captured)):
-                    with self.assertRaises(Retry):
-                        analyze_video_task.run(str(self.analysis_id))
+        with patch("backend.workers.analysis_tasks.SessionLocal", side_effect=self._patched_session_local(holder)), \
+             patch("backend.workers.analysis_tasks.downloader.extract_youtube_captions", return_value=None), \
+             patch("backend.workers.analysis_tasks.downloader.download_audio", side_effect=download_side_effect), \
+             patch("backend.workers.analysis_tasks.downloader.download_video", side_effect=download_side_effect):
+            with patch.object(analyze_video_task, "retry", new=_fake_retry(captured)):
+                with self.assertRaises(Retry):
+                    analyze_video_task.run(str(self.analysis_id))
 
         self.assertIsNotNone(captured.get("countdown"))
         fresh = SessionLocal()
@@ -340,8 +342,10 @@ class TestAnalyzeVideoTaskRetrySessionResilience(unittest.TestCase):
 
     def test_non_retryable_error_still_goes_straight_to_failed(self):
         self._make_analysis(status=AnalysisStatus.PENDING)
-        with patch("backend.workers.analysis_tasks.downloader.download_video",
-                   side_effect=Exception("ERROR: [youtube] xyz: Private video. Sign in if you've been granted access to this video")):
+        err = Exception("ERROR: [youtube] xyz: Private video. Sign in if you've been granted access to this video")
+        with patch("backend.workers.analysis_tasks.downloader.extract_youtube_captions", return_value=None), \
+             patch("backend.workers.analysis_tasks.downloader.download_audio", side_effect=err), \
+             patch("backend.workers.analysis_tasks.downloader.download_video", side_effect=err):
             with self.assertRaises(Exception):
                 analyze_video_task.run(str(self.analysis_id))
 

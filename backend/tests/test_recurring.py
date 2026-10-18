@@ -92,10 +92,10 @@ class TestAutoTopup(_Base):
             return True, p
         mock_charge.side_effect = _fake_charge
 
-        ok = recurring.try_auto_topup(self.db, self.user.id, 40)  # 40 -> 60 paket
+        ok = recurring.try_auto_topup(self.db, self.user.id, 40)  # 40 -> 70 paket
         self.assertTrue(ok)
-        self.assertEqual(mock_charge.call_args.kwargs["minutes_purchased"], 60)
-        self.assertAlmostEqual(self._sub().purchased_minutes, 60.0)
+        self.assertEqual(mock_charge.call_args.kwargs["minutes_purchased"], 70)
+        self.assertAlmostEqual(self._sub().purchased_minutes, 70.0)
 
     @patch("backend.services.recurring.charge_card")
     def test_daily_limit_blocks_further(self, mock_charge):
@@ -114,11 +114,11 @@ class TestAutoTopup(_Base):
         mock_charge.assert_not_called()
 
     def test_pick_pack(self):
-        self.assertEqual(recurring._pick_pack(None, 10), 30)
-        self.assertEqual(recurring._pick_pack(None, 40), 60)
-        self.assertEqual(recurring._pick_pack(None, 200), 300)
-        self.assertEqual(recurring._pick_pack(120, 40), 120)   # afzal ko'rilgan, qoplaydi
-        self.assertEqual(recurring._pick_pack(30, 40), 60)     # afzal ko'rilgan qoplamaydi -> eng kichik mos
+        self.assertEqual(recurring._pick_pack(None, 10), 15)
+        self.assertEqual(recurring._pick_pack(None, 40), 70)
+        self.assertEqual(recurring._pick_pack(None, 200), 350)
+        self.assertEqual(recurring._pick_pack(140, 40), 140)   # afzal ko'rilgan, qoplaydi
+        self.assertEqual(recurring._pick_pack(35, 40), 70)     # afzal ko'rilgan qoplamaydi -> eng kichik mos
 
 
 class TestAutoRenew(_Base):

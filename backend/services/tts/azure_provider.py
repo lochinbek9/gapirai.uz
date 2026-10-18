@@ -4,7 +4,12 @@ import time
 import xml.sax.saxutils as saxutils
 import re
 
-import azure.cognitiveservices.speech as speechsdk
+try:
+    import azure.cognitiveservices.speech as speechsdk
+    _AUDIO_FORMAT = speechsdk.SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm
+except ImportError:
+    speechsdk = None
+    _AUDIO_FORMAT = None
 
 from backend.services.tts.base import TTSProvider
 from backend.config import get_settings
@@ -12,7 +17,6 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_AUDIO_FORMAT = speechsdk.SpeechSynthesisOutputFormat.Riff24Khz16BitMonoPcm
 
 
 # Tabiiy urg'u beriladigan so'zlar — raqamlar va inkor iboralari (odatda

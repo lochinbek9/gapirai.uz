@@ -167,7 +167,8 @@ def split_segments_into_chunks(
         assigned = False
         for i, chunk in enumerate(video_chunks):
             # Overlap bilan: chunk.start - overlap <= seg_start < chunk.end
-            chunk_start = chunk.start_sec - settings.CHUNK_OVERLAP_SEC if i > 0 else chunk.start_sec
+            overlap = getattr(settings, "CHUNK_OVERLAP_SEC", 0)
+            chunk_start = chunk.start_sec - overlap if i > 0 else chunk.start_sec
             if chunk_start <= seg_mid < chunk.end_sec:
                 chunk_segments[i].append(seg)
                 assigned = True

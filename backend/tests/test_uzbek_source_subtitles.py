@@ -14,7 +14,9 @@ from backend.workers.tasks import is_uzbek_source
 class TestProviderOrder(unittest.TestCase):
     def _order(self, primary, gemini):
         with patch.object(transcriber.settings, "GEMINI_API_KEY", "k" if gemini else ""), \
-             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False):
+             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False), \
+             patch.object(transcriber.settings, "AZURE_SPEECH_KEY", ""), \
+             patch.object(transcriber.settings, "OPENAI_ENABLED", True):
             return transcriber._transcribe_provider_order(primary)
 
     def test_default_is_openai_then_gemini(self):
@@ -51,7 +53,9 @@ class TestChunkFallbackUsesTheOrder(unittest.TestCase):
              patch.object(transcriber, "_transcribe_chunk_gemini", fake_gemini), \
              patch.object(transcriber, "_chunk_audio", return_value=["/tmp/x.mp3"]), \
              patch.object(transcriber.settings, "GEMINI_API_KEY", "k"), \
-             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False):
+             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False), \
+             patch.object(transcriber.settings, "AZURE_SPEECH_KEY", ""), \
+             patch.object(transcriber.settings, "OPENAI_ENABLED", True):
             try:
                 result = transcriber._transcribe_via_api("/tmp/a.wav", "uz", primary)
             except Exception as exc:
@@ -202,7 +206,9 @@ class TestTurkishOutputFallsThrough(unittest.TestCase):
              patch.object(transcriber, "_transcribe_chunk_gemini", make("gemini")), \
              patch.object(transcriber, "_chunk_audio", return_value=["/tmp/x.mp3"]), \
              patch.object(transcriber.settings, "GEMINI_API_KEY", "k"), \
-             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False):
+             patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False), \
+             patch.object(transcriber.settings, "AZURE_SPEECH_KEY", ""), \
+             patch.object(transcriber.settings, "OPENAI_ENABLED", True):
             try:
                 return calls, transcriber._transcribe_via_api("/tmp/a.wav", "uz", primary)
             except Exception as exc:
@@ -220,8 +226,10 @@ class TestTurkishOutputFallsThrough(unittest.TestCase):
 
     def test_english_mode_never_runs_the_turkish_check(self):
         with patch.object(transcriber, "_transcribe_chunk", lambda p, offset_seconds, language="en": ([{"start": 0, "end": 1, "text": TURKISH}], TURKISH, "en")), \
-             patch.object(transcriber, "_chunk_audio", return_value=["/tmp/x.mp3"]):
-            result = transcriber._transcribe_via_api("/tmp/a.wav", "en")
+             patch.object(transcriber, "_chunk_audio", return_value=["/tmp/x.mp3"]), \
+             patch.object(transcriber.settings, "AZURE_SPEECH_KEY", ""), \
+             patch.object(transcriber.settings, "OPENAI_ENABLED", True):
+            result = transcriber._transcribe_via_api("/tmp/a.wav", "en", primary="openai")
         self.assertEqual(result["text"], TURKISH)
 
 

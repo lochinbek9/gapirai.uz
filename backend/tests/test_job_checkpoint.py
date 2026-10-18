@@ -194,7 +194,7 @@ class TestCrossHostCheckpointResume(unittest.TestCase):
 
         download_call_count = {"n": 0}
 
-        def fake_download(url, job_id):
+        def fake_download(url, job_id, *args, **kwargs):
             download_call_count["n"] += 1
             return {"title": "t", "duration": 10.0, "video_path": video_path, "audio_path": audio_path}
 
@@ -266,7 +266,7 @@ class TestCrossHostCheckpointResume(unittest.TestCase):
 
         download_call_count = {"n": 0}
 
-        def fake_download(url, job_id):
+        def fake_download(url, job_id, *args, **kwargs):
             download_call_count["n"] += 1
             return {"title": "t", "duration": 10.0, "video_path": video_path, "audio_path": audio_path}
 
@@ -323,7 +323,7 @@ class TestCrossHostCheckpointResume(unittest.TestCase):
         def fail_if_called(*a, **kw):
             raise AssertionError("a telegram:// job must never reach the YouTube downloader")
 
-        def fake_extract(v_path, a_path):
+        def fake_extract(v_path, a_path, *args, **kwargs):
             Path(a_path).write_bytes(b"fake-wav-content")
             return True
 

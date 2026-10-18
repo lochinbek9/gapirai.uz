@@ -11,9 +11,9 @@ from backend.main import app
 from backend.models.database import get_db
 from backend.services import subtitle_cues as sc
 
-LONG_UZ = ("Odamlar bu bosqichga kelib shunday boʻlishi kerak, shunday boʻlishi kerak, "
-           "shunday boʻlishi kerak, deyishadi va men ham, ehtimol, siz uchun borishim mumkin, "
-           "lekin men uchun yoʻq.")
+LONG_UZ = ("Odamlar bu bosqichga kelib shunday bo'lishi kerak, shunday bo'lishi kerak, "
+           "shunday bo'lishi kerak, deyishadi va men ham, ehtimol, siz uchun borishim mumkin, "
+           "lekin men uchun yo'q.")
 
 
 def assert_well_formed(tc: unittest.TestCase, cues, max_line=sc.MAX_LINE_CHARS):

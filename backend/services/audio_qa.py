@@ -22,6 +22,8 @@ import subprocess
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 
+from backend.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 _SILENCE_THRESH_DB = -40
@@ -125,7 +127,11 @@ def _measure_loudness_range(video_path: str) -> float | None:
         return None
 
 
-def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None = None) -> dict:
+def check_final_mix_quality(
+    video_path: str,
+    actual_timings: list[dict] | None = None,
+    audio_mix_mode: str | None = None,
+) -> dict:
     """
     Yakuniy aralashtirilgan videoni (merger.py'ning natijasi) signal
     darajasida tekshiradi — STT'siz, xuddi check_audio_quality() kabi.
@@ -159,6 +165,13 @@ def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None =
             "background_rms_dbfs": float | None,
         }
     """
+    if audio_mix_mode is None:
+        try:
+            s = get_settings()
+            audio_mix_mode = getattr(s, "AUDIO_MIX_MODE", "ducked_mix")
+        except Exception:
+            audio_mix_mode = "ducked_mix"
+
     try:
         audio = AudioSegment.from_file(video_path)
     except Exception as exc:
@@ -202,7 +215,10 @@ def check_final_mix_quality(video_path: str, actual_timings: list[dict] | None =
             prev_end_ms = max(prev_end_ms, end_ms)
 
     dub_rms = sum(dub_rms_values) / len(dub_rms_values) if dub_rms_values else None
-    bg_rms = sum(bg_rms_values) / len(bg_rms_values) if bg_rms_values else None
+    if audio_mix_mode == "dubbed_only":
+        bg_rms = None
+    else:
+        bg_rms = sum(bg_rms_values) / len(bg_rms_values) if bg_rms_values else None
 
     if dub_rms is not None and dub_rms < _MIN_DUB_ABSOLUTE_DBFS:
         flags.append("dub_not_audible")

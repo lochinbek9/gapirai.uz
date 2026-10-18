@@ -112,6 +112,14 @@ class JobResponse(BaseModel):
     queue_position: Optional[int] = None
     queue_eta_minutes: Optional[int] = None
     is_preview: bool = False
+    audio_mix_mode: Optional[str] = None
+
+
+def _normalize_audio_mix_mode(mode: str | None) -> str:
+    """Validate and normalize audio mix mode to supported options."""
+    if mode in ("dubbed_only", "ducked_mix"):
+        return mode
+    return "dubbed_only"
 
 
 # YouTube yuklab olish DOWNLOAD bosqichida muvaffaqiyatsiz bo'lgan (video
@@ -138,6 +146,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     # transkript, baho/fikr) YASHIRILADI -- get_job() shu bayroqni beradi.
     raw_status = job.status.value if hasattr(job.status, "value") else job.status
     status_str = str(raw_status).lower() if raw_status else "pending"
+
 
     # Jonli (bosqich ichidagi) progress -- DubbingJob.progress qo'pol sakraydi
     # (5/20/40/60/85), shuning uchun uzun videoda bar daqiqalab qotib turadi.
@@ -167,7 +176,6 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         try:
             import redis
             import re
-            from backend.config import settings
             m = re.search(r"(?:youtu\.be/|v=|/shorts/|/embed/)([A-Za-z0-9_-]{11})", job.youtube_url)
             if m:
                 r_cli = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -204,21 +212,22 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         feedback_voice_ok=None if redact else job.feedback_voice_ok,
         feedback_translation_ok=None if redact else job.feedback_translation_ok,
         feedback_speed_ok=None if redact else job.feedback_speed_ok,
-        content_flagged=job.content_flagged,
-        linked_analysis_id=str(job.linked_analysis_id) if job.linked_analysis_id else None,
-        subtitle_only=bool(job.subtitle_only),
-        source_language=job.source_language,
-        tts_provider=job.tts_provider,
-        voice_name=job.voice_name,
-        voice_style=job.voice_style,
-        stt_model=job.stt_model,
-        translation_model=job.translation_model,
-        tts_model=job.tts_model or (
-            f"gemini-3.8-flash-tts ({job.voice_name or 'Charon'})" if job.tts_provider == 'gemini'
-            else (f"edge-tts ({job.voice_name or 'uz-UZ-SardorNeural'})" if job.tts_provider == 'edge'
-            else (f"azure-neural ({job.voice_name or 'uz-UZ-SardorNeural'})" if (job.tts_provider == 'azure' or (job.voice_name and 'Neural' in str(job.voice_name)))
+        content_flagged=getattr(job, "content_flagged", False),
+        linked_analysis_id=str(job.linked_analysis_id) if getattr(job, "linked_analysis_id", None) else None,
+        subtitle_only=bool(getattr(job, "subtitle_only", False)),
+        source_language=getattr(job, "source_language", None),
+        tts_provider=getattr(job, "tts_provider", None),
+        voice_name=getattr(job, "voice_name", None),
+        voice_style=getattr(job, "voice_style", None),
+        stt_model=getattr(job, "stt_model", None),
+        translation_model=getattr(job, "translation_model", None),
+        tts_model=getattr(job, "tts_model", None) or (
+            f"gemini-3.8-flash-tts ({getattr(job, 'voice_name', None) or 'Charon'})" if getattr(job, "tts_provider", None) == 'gemini'
+            else (f"edge-tts ({getattr(job, 'voice_name', None) or 'uz-UZ-SardorNeural'})" if getattr(job, "tts_provider", None) == 'edge'
+            else (f"azure-neural ({getattr(job, 'voice_name', None) or 'uz-UZ-SardorNeural'})" if (getattr(job, "tts_provider", None) == 'azure' or (getattr(job, "voice_name", None) and 'Neural' in str(job.voice_name)))
             else None))
         ),
+
         # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
         # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
         # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
@@ -229,7 +238,9 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
         is_preview=bool(getattr(job, "is_preview", False)),
+        audio_mix_mode=_normalize_audio_mix_mode(getattr(job, "audio_mix_mode", None) or getattr(settings, "AUDIO_MIX_MODE", "dubbed_only")),
     )
+
 
 
 @router.get("/video-info", dependencies=[Depends(rate_limit("video_info", 20, 600))])

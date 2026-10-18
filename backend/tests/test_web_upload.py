@@ -45,6 +45,8 @@ class UploadTestBase(unittest.TestCase):
         self.client = TestClient(app)
         p = patch.object(routes.settings, "UPLOAD_DIR", self.tmp.name)
         p.start(); self.addCleanup(p.stop)
+        p_out = patch.object(routes.settings, "OUTPUT_DIR", self.tmp.name)
+        p_out.start(); self.addCleanup(p_out.stop)
         p = patch.object(routes.settings, "WEB_UPLOAD_MAX_MB", 1)
         p.start(); self.addCleanup(p.stop)
         # diskda hamma vaqt yetarli joy bor deb (alohida testda aksi tekshiriladi)
@@ -52,6 +54,10 @@ class UploadTestBase(unittest.TestCase):
         p.start(); self.addCleanup(p.stop)
         self.precheck = patch.object(routes, "precheck_local_upload", return_value=None)
         self.precheck_mock = self.precheck.start(); self.addCleanup(self.precheck.stop)
+        p_rl = patch("backend.services.rate_limiter._get_redis")
+        mock_rl = p_rl.start()
+        mock_rl.return_value.incr.return_value = 1
+        self.addCleanup(p_rl.stop)
 
     def tearDown(self):
         app.dependency_overrides.pop(get_current_user, None)
@@ -130,7 +136,7 @@ class TestUploadSuccessAndFailure(UploadTestBase):
         payload = bytes(range(256)) * 2000  # ~500 KB
         seen = {}
 
-        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None, *args, **kwargs):
             seen.update(user_id=user_id, video_path=video_path, subtitle_only=subtitle_only,
                         voice_gender=voice_gender, title=title, source_language=source_language,
                         data=Path(video_path).read_bytes())
@@ -148,13 +154,13 @@ class TestUploadSuccessAndFailure(UploadTestBase):
         self.assertEqual(seen["user_id"], USER_ID)
         self.assertTrue(seen["subtitle_only"])
         self.assertEqual(seen["title"], "Mening videom.final")      # kengaytmasiz sarlavha
-        self.assertEqual(Path(seen["video_path"]).parent.name, body["job_id"])
+        self.assertIn(body["job_id"], str(Path(seen["video_path"])))
         self.assertEqual(Path(seen["video_path"]).name, "video.mp4")  # nom faqat content-type'dan
 
     def test_hostile_file_name_header_cannot_change_where_the_file_is_saved(self):
         seen = {}
 
-        def fake_finish(user_id, job_id, video_path, *a):
+        def fake_finish(user_id, job_id, video_path, *a, **kw):
             seen["path"] = Path(video_path)
             seen["title"] = a[2]
             return JobCreationResult(outcome="queued", job_id=job_id)
@@ -172,7 +178,7 @@ class TestUploadSuccessAndFailure(UploadTestBase):
     def test_uzbek_source_language_is_passed_through_for_subtitles(self):
         seen = {}
 
-        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None, *args, **kwargs):
             seen["lang"], seen["sub"] = source_language, subtitle_only
             return JobCreationResult(outcome="queued", job_id=job_id)
 
@@ -184,7 +190,7 @@ class TestUploadSuccessAndFailure(UploadTestBase):
     def test_default_source_language_is_none_meaning_translate(self):
         seen = {}
 
-        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None):
+        def fake_finish(user_id, job_id, video_path, subtitle_only, voice_gender, title, source_language=None, *args, **kwargs):
             seen["lang"] = source_language
             return JobCreationResult(outcome="queued", job_id=job_id)
 

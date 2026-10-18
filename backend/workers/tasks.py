@@ -1304,7 +1304,7 @@ def process_video(self: Task, job_id: str) -> dict:
             try:
                 job = retry_session.query(DubbingJob).filter(DubbingJob.id == job_id).first()
                 if job:
-                    job.status_message = "Qayta ishlanmoqda (biroz kuting)..."
+                    job.status_message = f"Qayta ishlanmoqda ({self.request.retries + 1}/{self.max_retries}, biroz kuting)..."
                     _, job.error_message = _safe_persisted_error(exc, current_stage)
                     job.error_code = error_code
                     job.updated_at = datetime.utcnow()

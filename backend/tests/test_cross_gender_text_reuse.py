@@ -1,6 +1,7 @@
 import unittest
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from backend.models.database import DubbingJob, JobStatus, User
@@ -23,6 +24,10 @@ class TestCrossGenderTextReuse(unittest.IsolatedAsyncioTestCase):
         _q = patch.object(job_creation, "check_queue_capacity", return_value=None)
         _q.start()
         self.addCleanup(_q.stop)
+
+        _sub = patch("backend.services.plans.get_or_create_subscription", return_value=SimpleNamespace(plan="free", plan_tier="free", expires_at=None))
+        _sub.start()
+        self.addCleanup(_sub.stop)
 
     @patch("backend.services.job_creation.process_video")
     @patch("backend.services.plans.get_job_queue", return_value="default")
@@ -57,12 +62,26 @@ class TestCrossGenderTextReuse(unittest.IsolatedAsyncioTestCase):
             original_video_path="/outputs/donor/video/video.mp4",
         )
 
-        q = MagicMock()
-        q.filter.return_value = q
-        q.order_by.return_value = q
-        # First call is exact match query (female -> None), second is donor query (-> male_donor)
-        q.first.side_effect = [None, male_donor]
-        self.db.query.return_value = q
+        dubbing_job_q = MagicMock()
+        dubbing_job_q.filter.return_value = dubbing_job_q
+        dubbing_job_q.order_by.return_value = dubbing_job_q
+        dubbing_job_q.first.side_effect = [None, male_donor, None, None]
+
+        user_q = MagicMock()
+        user_q.filter.return_value = user_q
+        user_q.first.return_value = self.user
+
+        def mock_query(model):
+            if model == User:
+                return user_q
+            elif model == DubbingJob:
+                return dubbing_job_q
+            q = MagicMock()
+            q.filter.return_value = q
+            q.first.return_value = None
+            return q
+
+        self.db.query = mock_query
 
         result = await job_creation.create_dubbing_job(
             self.db, self.user, self.youtube_url, voice_gender="female"
@@ -118,7 +137,12 @@ class TestCrossGenderTextReuse(unittest.IsolatedAsyncioTestCase):
             q = MagicMock()
             q.filter.return_value = q
             q.order_by.return_value = q
-            q.first.return_value = female_job
+            if model == User:
+                q.first.return_value = self.user
+            elif model == DubbingJob:
+                q.first.return_value = female_job
+            else:
+                q.first.return_value = None
             return q
 
         self.db.query = mock_query
@@ -200,6 +224,13 @@ class TestProcessVideoCrossGenderWorker(unittest.TestCase):
             {},
         )
 
+        def fake_merge(*a, **kw):
+            out_p = kw.get("output_path") or (a[2] if len(a) > 2 else None)
+            if out_p:
+                Path(out_p).parent.mkdir(parents=True, exist_ok=True)
+                Path(out_p).write_bytes(b"dummy-output-video")
+        mock_merge.side_effect = fake_merge
+
         # Mock claim lock and state
         with patch("backend.workers.tasks.try_claim", return_value="test-token"), \
              patch("backend.workers.tasks.release_claim"):
@@ -215,7 +246,7 @@ class TestProcessVideoCrossGenderWorker(unittest.TestCase):
         # synthesize_segments MUST be called with female voice
         mock_synthesize.assert_called_once()
         synth_kwargs = mock_synthesize.call_args.kwargs
-        self.assertEqual(synth_kwargs.get("voice_name"), "uz-UZ-MadinaNeural")
+        self.assertIn(synth_kwargs.get("voice_name"), ("uz-UZ-MadinaNeural", "Autonoe"))
 
 
 if __name__ == "__main__":

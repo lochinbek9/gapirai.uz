@@ -58,7 +58,8 @@ def _clean(text: str | None) -> str:
     t = html.unescape(text)
     t = t.replace("&quot;", '"').replace("&#39;", "'").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     t = t.replace("`", "'").replace("ʻ", "'").replace("ʼ", "'")
-    return _WS.sub(" ", t).strip()
+    lines = [re.sub(r"[^\S\r\n]+", " ", line).strip() for line in t.splitlines()]
+    return "\n".join(line for line in lines if line)
 
 
 # ── manba (Whisper) vaqtlarini aniqlashtirish ────────────────────────────

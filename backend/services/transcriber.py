@@ -696,11 +696,13 @@ def _transcribe_provider_order(primary: str) -> list[str]:
 
     if primary == "azure":
         order = ["azure", "gemini", "openai"]
+    elif primary == "gemini":
+        order = ["gemini", "azure", "openai"]
     elif primary == "openai":
         order = ["openai", "gemini", "azure"]
     else:
-        # Standart: Gemini 1-o'rin, Azure 2-o'rinda
-        order = ["gemini", "azure", "openai"]
+        # Default order: openai first if enabled, else gemini
+        order = ["openai", "gemini", "azure"] if getattr(settings, "OPENAI_ENABLED", True) else ["gemini", "azure", "openai"]
 
     active = []
     for name in order:

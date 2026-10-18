@@ -186,10 +186,12 @@ def get_tts_provider_for_job(db, job) -> str:
     """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
     Default tanlov barcha foydalanuvchilar uchun — gemini.
     """
-    if getattr(job, "tts_provider", None):
-        return job.tts_provider.lower().strip()
+    tts = getattr(job, "tts_provider", None)
+    if isinstance(tts, str) and tts.strip():
+        return tts.lower().strip()
 
     return "gemini"
+
 
 
 def get_max_resolution_for_user(db, user_id) -> str:

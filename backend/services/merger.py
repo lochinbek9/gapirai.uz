@@ -4,10 +4,54 @@ from pathlib import Path
 
 from backend.config import get_settings
 
+from functools import lru_cache
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _MIX_SAMPLE_RATE = 44100
+
+
+@lru_cache(maxsize=1)
+def _has_nvenc() -> bool:
+    """Check if NVENC GPU encoder is available in ffmpeg."""
+    if not getattr(settings, "ENABLE_NVENC", False):
+        return False
+    try:
+        res = subprocess.run(["ffmpeg", "-encoders"], capture_output=True, text=True, check=True)
+        if "h264_nvenc" not in res.stdout:
+            return False
+        test_res = subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=1", "-c:v", "h264_nvenc", "-f", "null", "-"],
+            capture_output=True,
+            timeout=5,
+        )
+        return test_res.returncode == 0
+    except Exception:
+        return False
+
+
+def _get_video_codec() -> tuple[str, list[str]]:
+    """Get video encoder codec and arguments based on NVENC availability."""
+    if _has_nvenc():
+        return "h264_nvenc", [
+            "-preset", getattr(settings, "NVENC_PRESET", "p1"),
+            "-tune", getattr(settings, "NVENC_TUNE", "hq"),
+            "-rc", getattr(settings, "NVENC_RC", "vbr"),
+            "-cq", str(getattr(settings, "NVENC_CQ", 28)),
+            "-b:v", "0",
+        ]
+    return "libx264", [
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-tune", "zerolatency",
+        "-threads", "0",
+    ]
+
+
+def _get_video_codec_for_chunk(chunk_index: int = 0) -> tuple[str, list[str]]:
+    return _get_video_codec()
+
 
 
 def _get_duration(file_path: str) -> float:
@@ -27,46 +71,42 @@ def _get_duration(file_path: str) -> float:
         return 0.0
 
 
-def _build_audio_filtergraph(target_dur: float | None = None) -> str:
+def _build_dubbed_only_filtergraph(target_dur: float | None = None) -> str:
+    """Process the TTS track without feeding the original speech into the mix."""
+    s = settings
+    dub_pad = f"apad=whole_dur={target_dur:.3f}," if isinstance(target_dur, (int, float)) and target_dur > 0 else ""
+    return (
+        f"[1:a]{dub_pad}aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
+        f"highpass=f={s.VOICE_HIGHPASS_HZ},"
+        f"equalizer=f={s.VOICE_EQ_FREQ_HZ}:width_type=q:width=1:g={s.VOICE_EQ_GAIN_DB},"
+        f"acompressor=threshold=0.1:ratio={s.VOICE_COMPRESSOR_RATIO}:attack=20:release=250:makeup=1,"
+        f"deesser=i=0.2:m=0.5:f=0.5,"
+        f"volume={s.VOICE_GAIN_BOOST_DB}dB,"
+        f"alimiter=limit={s.VOICE_LIMITER_LIMIT}:attack=5:release=50,"
+        f"loudnorm=I={s.FINAL_LOUDNORM_I}:TP={s.FINAL_LOUDNORM_TP}:LRA={s.FINAL_LOUDNORM_LRA}[final]"
+    )
+
+
+def _build_audio_filtergraph(target_dur: float | None | str = None, audio_mix_mode: str | None = None) -> str:
     """
     Original audio (musiqa/SFX/ambient) va o'zbekcha dublyajni professional
     kino-dublyaji uslubida aralashtiradi — original TO'LIQ o'chirilmaydi.
-
-    [0:a] (original) va [1:a] (dublyaj) bir xil formatga keltiriladi, so'ng:
-    - sidechaincompress: dublyaj trekining o'zi "trigger" bo'lib, original
-      FAQAT dub gapirayotgan joyda pasayadi — moslashuvchan (baland original
-      ko'proq, past original kamroq pasayadi), tekis fade bilan (attack/
-      release), gap-gap qo'lda hisoblangan oraliqlar emas. IKKI marta ketma-
-      ket qo'llaniladi (2026-08-14, real production videosini tinglab
-      tasdiqlangan muammo: bitta bosqich original ovozni yetarlicha
-      bosolmadi, dublyaj ovozi eshitilmay qolgan edi) — ffmpeg bitta
-      sidechaincompress chaqiruvida ratio'ni 20dan oshirishga ruxsat
-      bermaydi, shuning uchun ikkinchi bosqich effektiv bosishni
-      chuqurlashtiradi.
-    - dublyaj eshittirishdan oldin ovoz protsessing zanjiridan o'tadi (xirillash
-      kesiladi, aniqlik uchun subtle EQ, dinamika siqiladi, "s" tovushlari
-      yumshatiladi, keyin baland qilinadi — VOICE_GAIN_BOOST_DB — va nihoyat
-      limiter cho'qqilarni xavfsiz ushlab qoladi) — shunda "TTS videoning
-      ustiga yopishtirilgandek" emas, videoning o'z ovoz treki kabi eshitiladi
-      va fondan sezilarli darajada ajralib turadi.
-    - Yakuniy aralashma EBU R128 bo'yicha normallashtiriladi.
     """
+    if isinstance(target_dur, str):
+        audio_mix_mode = target_dur
+        target_dur = None
+
+    mode = audio_mix_mode or getattr(settings, "AUDIO_MIX_MODE", "ducked_mix")
+    if mode == "dubbed_only":
+        return _build_dubbed_only_filtergraph(target_dur)
+
     s = settings
-    # ffmpeg'ning sidechaincompress filtri ratio uchun faqat [1, 20] oralig'ini
-    # qabul qiladi — chegaradan tashqari qiymat butun ffmpeg jarayonini xato
-    # bilan to'xtatadi (2026-08-12 productionda haqiqiy job orqali aniqlangan:
-    # "Value 30.0 for parameter 'ratio' out of range [1 - 20]"). Config'dagi
-    # qiymat noto'g'ri sozlansa ham job qulamasligi uchun shu yerda cheklanadi.
     ducking_ratio = max(1.0, min(20.0, s.DUCKING_RATIO))
     duck_stage = (
         f"sidechaincompress=threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
         f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1"
     )
     orig_vol = getattr(s, "ORIGINAL_AUDIO_VOLUME", 0.22)
-    # FFmpeg sidechaincompress filtri sidechain (1:a) trekida EOF bo'lishi bilan
-    # asosiy trek (0:a)ni ham uzatishni to'xtatadi. Agar video audio dan uzun bo'lsa,
-    # dub tugaganidan keyin original fon musiqa/ovoz uzilib qolmasligi uchun
-    # dub trekini video oxirigacha sukunat bilan to'ldiramiz (apad).
     dub_pad = f"apad=whole_dur={target_dur:.3f}," if isinstance(target_dur, (int, float)) and target_dur > 0 else ""
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,volume={orig_vol}[orig];"
@@ -85,7 +125,8 @@ def _build_audio_filtergraph(target_dur: float | None = None) -> str:
     )
 
 
-def _get_video_codec(file_path: str) -> str:
+
+def _probe_video_codec(file_path: str) -> str:
     """FFprobe orqali video codec nomini olish (masalan 'h264', 'av1', 'vp9')."""
     try:
         result = subprocess.run(
@@ -101,6 +142,7 @@ def _get_video_codec(file_path: str) -> str:
         return result.stdout.strip().lower()
     except Exception:
         return ""
+
 
 
 def _get_video_dimensions(file_path: str) -> tuple[int, int]:
@@ -150,8 +192,9 @@ def merge_video_audio(video_path: str, dubbed_audio_path: str, output_path: str,
     target_dur = video_dur if audio_dur <= video_dur else None
     audio_filter = _build_audio_filtergraph(target_dur=target_dur)
 
-    vcodec = _get_video_codec(video_path)
+    vcodec = _probe_video_codec(video_path)
     needs_transcode = vcodec not in ("h264", "avc1")
+
 
     use_watermark = WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
 

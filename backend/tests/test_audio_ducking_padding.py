@@ -1,5 +1,8 @@
+import os
+import tempfile
+from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from backend.services import merger
 
 
@@ -20,16 +23,24 @@ class TestMergerAudioPadding(unittest.TestCase):
     def test_merge_video_audio_passes_target_dur_when_audio_shorter(self, mock_run, mock_codec, mock_dur):
         # Video is 26s, audio is 12s
         mock_dur.side_effect = [26.0, 12.0]
-        mock_run.return_value.returncode = 0
 
-        merger.merge_video_audio("dummy_video.mp4", "dummy_audio.wav", "dummy_out.mp4")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = os.path.join(tmpdir, "dummy_out.mp4")
 
-        self.assertTrue(mock_run.called)
-        cmd = mock_run.call_args[0][0]
-        # Filter complex flag should include apad=whole_dur=26.000
-        fc_idx = cmd.index("-filter_complex")
-        filter_str = cmd[fc_idx + 1]
-        self.assertIn("apad=whole_dur=26.000", filter_str)
+            def create_file(*args, **kwargs):
+                Path(out_path).write_bytes(b"dummy video")
+                return MagicMock(returncode=0)
+
+            mock_run.side_effect = create_file
+
+            merger.merge_video_audio("dummy_video.mp4", "dummy_audio.wav", out_path)
+
+            self.assertTrue(mock_run.called)
+            cmd = mock_run.call_args[0][0]
+            # Filter complex flag should include apad=whole_dur=26.000
+            fc_idx = cmd.index("-filter_complex")
+            filter_str = cmd[fc_idx + 1]
+            self.assertIn("apad=whole_dur=26.000", filter_str)
 
 
 if __name__ == "__main__":

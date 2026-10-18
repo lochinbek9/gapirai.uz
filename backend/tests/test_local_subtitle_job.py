@@ -63,6 +63,8 @@ class TestCreateLocalSubtitleJob(unittest.TestCase):
             p.start(); self.addCleanup(p.stop)
         p = patch("backend.services.plans.consume_quota")
         self.consume = p.start(); self.addCleanup(p.stop)
+        p = patch("backend.services.plans.get_or_create_subscription", return_value=SimpleNamespace(plan="pro", plan_tier="pro"))
+        p.start(); self.addCleanup(p.stop)
         p = patch.object(jc.process_video, "apply_async")
         self.apply_async = p.start(); self.addCleanup(p.stop)
 
