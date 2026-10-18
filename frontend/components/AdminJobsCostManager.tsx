@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import {
   apiAdminJobsCost,
+  apiAdminRetryJob,
   AdminJobsCostResponse,
   AdminJobCostItem,
 } from '@/lib/admin'
@@ -58,6 +59,26 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   // Detail Modal State
   const [selectedJob, setSelectedJob] = useState<AdminJobCostItem | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [retryMessage, setRetryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const handleRetryJob = async (jobId: string) => {
+    try {
+      setRetryingId(jobId)
+      setRetryMessage(null)
+      const res = await apiAdminRetryJob(token, jobId)
+      setRetryMessage({ type: 'success', text: res.message || 'Job muvaffaqiyatli qayta navbatga qo‘yildi!' })
+      await loadData()
+    } catch (err: any) {
+      setRetryMessage({
+        type: 'error',
+        text: err?.response?.data?.detail || err?.message || 'Qayta ishga tushirishda xatolik yuz berdi',
+      })
+    } finally {
+      setRetryingId(null)
+      setTimeout(() => setRetryMessage(null), 6000)
+    }
+  }
 
   // Search debounce
   useEffect(() => {
@@ -412,6 +433,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         </div>
       )}
 
+      {/* Retry Feedback Banner */}
+      {retryMessage && (
+        <div
+          className={`p-4 rounded-xl text-xs flex items-center gap-2 font-medium border ${
+            retryMessage.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+          }`}
+        >
+          {retryMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          )}
+          <span>{retryMessage.text}</span>
+        </div>
+      )}
+
+
       {/* Data Table */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
@@ -640,14 +680,28 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => setSelectedJob(job)}
-                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-blue-400 hover:text-blue-300 text-xs font-medium transition border border-white/10"
-                        >
-                          Batafsil
-                        </button>
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {job.status === 'FAILED' && (
+                            <button
+                              onClick={() => handleRetryJob(job.id)}
+                              disabled={retryingId === job.id}
+                              title="Qayta ishga tushirish (Retry)"
+                              className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${retryingId === job.id ? 'animate-spin' : ''}`} />
+                              <span>Qayta urinish</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setSelectedJob(job)}
+                            className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-blue-400 hover:text-blue-300 text-xs font-medium transition border border-white/10"
+                          >
+                            Batafsil
+                          </button>
+                        </div>
                       </td>
+
                     </tr>
                   )
                 })
@@ -890,7 +944,23 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-white/10 flex justify-end">
+            <div className="p-4 border-t border-white/10 flex items-center justify-between">
+              <div>
+                {selectedJob.status === 'FAILED' && (
+                  <button
+                    onClick={() => {
+                      const id = selectedJob.id
+                      setSelectedJob(null)
+                      handleRetryJob(id)
+                    }}
+                    disabled={retryingId === selectedJob.id}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${retryingId === selectedJob.id ? 'animate-spin' : ''}`} />
+                    <span>Qayta ishga tushirish (Retry)</span>
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedJob(null)}
                 className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition"
@@ -898,6 +968,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 Yopish
               </button>
             </div>
+
           </div>
         </div>
       )}

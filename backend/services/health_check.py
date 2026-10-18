@@ -144,11 +144,85 @@ def check_youtube_cookies(notify_if_expiring: bool = True) -> dict[str, Any]:
         return {"status": "warning", "error": str(exc)[:200]}
 
 
-def check_system_health(detailed: bool = False) -> dict[str, Any]:
+def check_ai_providers() -> dict[str, Any]:
+    """Tizimda sozlangan AI provayderlar (Gemini, Azure, OpenAI, Edge) holatini tekshiradi."""
+    settings = get_settings()
+    gemini_key = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+    azure_key = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
+    openai_enabled = bool(getattr(settings, "OPENAI_ENABLED", True))
+    openai_key = bool(settings.OPENAI_API_KEY)
+
+    return {
+        "gemini": {
+            "status": "healthy" if gemini_key else "warning",
+            "name": "Google Gemini",
+            "enabled": True,
+            "configured": gemini_key,
+            "models": {
+                "general": settings.GEMINI_MODEL,
+                "stt": settings.GEMINI_STT_MODEL,
+                "tts": settings.GEMINI_TTS_MODEL,
+            },
+            "note": "Asosiy AI dvigateli (STT, tarjima va TTS)",
+        },
+        "azure": {
+            "status": "healthy" if azure_key else "warning",
+            "name": "Microsoft Azure Speech",
+            "enabled": True,
+            "configured": azure_key,
+            "region": settings.AZURE_SPEECH_REGION,
+            "note": "Yuqori sifatli ovoz sintezi (TTS)",
+        },
+        "openai": {
+            "status": "disabled" if not openai_enabled else ("healthy" if openai_key else "warning"),
+            "name": "OpenAI (GPT-4o & Whisper)",
+            "enabled": openai_enabled,
+            "configured": openai_key,
+            "note": "Vaqtinchalik nofaol (Balans 0). Zaxira Gemini/Azure ishlamoqda." if not openai_enabled else "Faol",
+        },
+        "edge_tts": {
+            "status": "healthy",
+            "name": "Edge TTS",
+            "enabled": True,
+            "configured": True,
+            "note": "Bepul zaxira ovoz tizimi",
+        },
+    }
+
+
+def check_celery_queues() -> dict[str, Any]:
+    """Redis brokeridagi Celery navbatlar uzunligini tekshiradi."""
+    settings = get_settings()
+    try:
+        from redis import Redis
+        r = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
+        q_video = r.llen("video_processing")
+        q_local = r.llen("local_upload")
+        q_default = r.llen("celery")
+        return {
+            "status": "healthy",
+            "video_processing": q_video,
+            "local_upload": q_local,
+            "celery": q_default,
+            "total_queued": q_video + q_local + q_default,
+        }
+    except Exception as exc:
+        return {
+            "status": "warning",
+            "video_processing": 0,
+            "local_upload": 0,
+            "celery": 0,
+            "total_queued": 0,
+            "error": str(exc)[:200],
+        }
+
+
+def check_system_health(detailed: bool = False, notify: bool = False) -> dict[str, Any]:
     """
     Tizim komponentlarining to'liq yoki tezkor salomatligini tekshiradi.
     `detailed=False`: faqat asosiy DB va Redis (tezkor monitoring so'rovlari uchun).
-    `detailed=True`: DB, Redis, Disk, Celery va YouTube Cookies holati to'liq tekshiriladi.
+    `detailed=True`: DB, Redis, Disk, Celery, YouTube Cookies, AI Providers va Navbatlar to'liq tekshiriladi.
+    `notify=False`: admin panel tekshiruvlarida telegramga ortiqcha ogohlantirish xabarlari yuborilmaydi.
     """
     db_res = check_db()
     redis_res = check_redis()
@@ -159,9 +233,11 @@ def check_system_health(detailed: bool = False) -> dict[str, Any]:
     }
 
     if detailed:
-        components["disk"] = check_disk(notify_if_low=True)
+        components["disk"] = check_disk(notify_if_low=notify)
         components["celery"] = check_celery_workers()
-        components["youtube_cookies"] = check_youtube_cookies(notify_if_expiring=True)
+        components["youtube_cookies"] = check_youtube_cookies(notify_if_expiring=notify)
+        components["ai_providers"] = check_ai_providers()
+        components["queues"] = check_celery_queues()
 
     # Umumiy holatni aniqlash
     # 1. Asosiy DB yoki Redis ishlamasa -> unhealthy
@@ -182,3 +258,4 @@ def check_system_health(detailed: bool = False) -> dict[str, Any]:
         "service": "GapirAI.uz",
         "components": components,
     }
+

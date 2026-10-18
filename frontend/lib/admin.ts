@@ -726,10 +726,101 @@ export async function apiGetUnactivatedUsers(
   return res.data
 }
 
+export interface SystemHealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  timestamp: string
+  service: string
+  components: {
+    database: {
+      status: string
+      latency_ms?: number
+      error?: string
+    }
+    redis: {
+      status: string
+      latency_ms?: number
+      error?: string
+    }
+    disk?: {
+      status: string
+      free_gb?: number
+      total_gb?: number
+      used_gb?: number
+      used_percent?: number
+      error?: string
+    }
+    celery?: {
+      status: string
+      worker_count?: number
+      workers?: string[]
+      error?: string
+      message?: string
+    }
+    youtube_cookies?: {
+      status: string
+      exists?: boolean
+      days_remaining?: number
+      is_fresh?: boolean
+      message?: string
+      error?: string
+    }
+    ai_providers?: {
+      gemini: {
+        status: string
+        name: string
+        enabled: boolean
+        configured: boolean
+        models?: {
+          general?: string
+          stt?: string
+          tts?: string
+        }
+        note?: string
+      }
+      azure: {
+        status: string
+        name: string
+        enabled: boolean
+        configured: boolean
+        region?: string
+        note?: string
+      }
+      openai: {
+        status: string
+        name: string
+        enabled: boolean
+        configured: boolean
+        note?: string
+      }
+      edge_tts: {
+        status: string
+        name: string
+        enabled: boolean
+        configured: boolean
+        note?: string
+      }
+    }
+    queues?: {
+      status: string
+      video_processing: number
+      local_upload: number
+      celery: number
+      total_queued: number
+      error?: string
+    }
+  }
+}
 
+export async function apiAdminSystemHealth(token: string): Promise<SystemHealthResponse> {
+  const res = await axios.get(`${API_URL}/admin/system-health`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
 
-
-
-
-
-
+export async function apiAdminRetryJob(token: string, jobId: string): Promise<{ success: boolean; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}

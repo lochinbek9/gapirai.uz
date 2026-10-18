@@ -441,14 +441,21 @@ def admin_list_users(
         total = query.count()
         users = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
+        user_ids = [u.id for u in users]
+        existing_subs = {
+            s.user_id: s
+            for s in db.query(Subscription).filter(Subscription.user_id.in_(user_ids)).all()
+        } if user_ids else {}
+
         result = []
         for u in users:
-            sub = db.query(Subscription).filter(Subscription.user_id == u.id).first()
+            sub = existing_subs.get(u.id)
             if not sub:
                 sub = Subscription(user_id=u.id, plan=PlanTier.FREE, period_started_at=datetime.utcnow())
                 db.add(sub)
                 db.commit()
                 db.refresh(sub)
+                existing_subs[u.id] = sub
 
             bal = get_minute_balance(db, u.id)
             result.append({
@@ -645,9 +652,24 @@ def admin_delete_cookies(current_user: User = Depends(get_current_admin_user)):
 
 @router.get("/system-health")
 def admin_system_health(current_user: User = Depends(get_current_admin_user)):
-    """Admin panel uchun tizim salomatligi (DB, Redis, Disk, Celery, Cookie) monitoringi."""
+    """Admin panel uchun tizim salomatligi (DB, Redis, Disk, Celery, Cookie, AI Providers, Queues) monitoringi."""
     from backend.services.health_check import check_system_health
-    return check_system_health(detailed=True)
+    return check_system_health(detailed=True, notify=False)
+
+
+@router.post("/jobs/{job_id}/retry")
+def admin_retry_job(
+    job_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel orqali xatolikka uchragan yoki to'xtab qolgan job'ni bevosita qayta navbatga qo'yish."""
+    from backend.api.routes import retry_job
+    db = SessionLocal()
+    try:
+        return retry_job(job_id=job_id, payload=None, db=db, current_user=current_user)
+    finally:
+        db.close()
+
 
 
 @router.get("/retention")

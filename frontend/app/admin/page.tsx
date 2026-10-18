@@ -1,56 +1,103 @@
 'use client'
-// Admin panel doim yangi holatda ko'rsatilishi kerak — Next.js buni statik
-// deb baholab uzoq (s-maxage=1yil) keshlash header'i yuborgan edi, natijada
-// yo'ldagi oraliq keshlar (masalan provayder proksisi) eski versiyani
-// cheksiz saqlab qolgan (2026-08-13, real holatda tasdiqlangan).
+
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Users, Video, Wallet, LogOut, RefreshCw, ShieldAlert, LogIn, Ban, ArrowUp } from 'lucide-react'
-import { AdminStats, apiAdminStats, BlockedUsersReport, apiAdminBlockedUsers, RefundsNeededReport, apiAdminRefundsNeeded } from '@/lib/admin'
+import {
+  Loader2,
+  Users,
+  Video,
+  Wallet,
+  LogOut,
+  RefreshCw,
+  ShieldAlert,
+  LogIn,
+  Ban,
+  ArrowUp,
+  Activity,
+  Layers,
+  Sparkles,
+  BarChart3,
+  CreditCard,
+  Bell,
+  Clock,
+  CheckCircle2,
+  ExternalLink,
+  RotateCcw,
+} from 'lucide-react'
+import {
+  AdminStats,
+  apiAdminStats,
+  BlockedUsersReport,
+  apiAdminBlockedUsers,
+  RefundsNeededReport,
+  apiAdminRefundsNeeded,
+  apiAdminRetryJob,
+} from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
 import AdminUsersManager from '@/components/AdminUsersManager'
-import AdminCookiesManager from '@/components/AdminCookiesManager'
-import AdminRetentionManager from '@/components/AdminRetentionManager'
-import AdminBroadcastManager from '@/components/AdminBroadcastManager'
+import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
+import AdminJobsCostManager from '@/components/AdminJobsCostManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
-import AdminJobsCostManager from '@/components/AdminJobsCostManager'
-import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
+import AdminRetentionManager from '@/components/AdminRetentionManager'
+import AdminBroadcastManager from '@/components/AdminBroadcastManager'
+import AdminSystemHealthManager from '@/components/AdminSystemHealthManager'
 import { formatTashkentDateTime } from '@/lib/timestamp'
 
 const CATEGORY_LABELS: Record<string, string> = {
-  sexual_explicit: "Pornografik / 18+ kontent",
-  sexual_minors: "Voyaga yetmaganlar ishtirokidagi jinsiy kontent",
+  sexual_explicit: 'Pornografik / 18+ kontent',
+  sexual_minors: 'Voyaga yetmaganlar ishtirokidagi jinsiy kontent',
   sexual_violence: "Zo'rlash yoki jinsiy zo'ravonlik",
   terrorism_extremism: "Terroristik / ekstremistik targ'ibot",
   graphic_violence: "Haddan tashqari grafik zo'ravonlik",
   hate_violent_extremism: "Nafrat yoki zo'ravonlikni qo'zg'atish",
   self_harm: "O'ziga zarar yetkazishni targ'ib qilish",
   illegal_activity: "Noqonuniy faoliyatni targ'ib qilish/o'rgatish",
-  religious_content: "Diniy kontent",
-  policy_violation: "Kontent siyosatini buzish",
+  religious_content: 'Diniy kontent',
+  policy_violation: 'Kontent siyosatini buzish',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Navbatda",
+  PENDING: 'Navbatda',
   AWAITING_PAYMENT: "To'lov kutilmoqda",
-  DOWNLOADING: "Yuklab olinmoqda",
+  DOWNLOADING: 'Yuklab olinmoqda',
   TRANSCRIBING: "Matnga o'girilmoqda",
-  TRANSLATING: "Tarjima qilinmoqda",
-  SYNTHESIZING: "Ovoz yaratilmoqda",
-  SYNCING: "Sinxronlanmoqda",
-  MERGING: "Birlashtirilmoqda",
-  COMPLETED: "Tayyor",
-  FAILED: "Xatolik",
+  TRANSLATING: 'Tarjima qilinmoqda',
+  SYNTHESIZING: 'Ovoz yaratilmoqda',
+  SYNCING: 'Sinxronlanmoqda',
+  MERGING: 'Birlashtirilmoqda',
+  COMPLETED: 'Tayyor',
+  FAILED: 'Xatolik',
 }
+
+type TabType =
+  | 'overview'
+  | 'jobs'
+  | 'users'
+  | 'analytics'
+  | 'payments'
+  | 'safety'
+  | 'health'
+  | 'broadcast'
+
+const TABS: { id: TabType; label: string; icon: React.ReactNode; badge?: string }[] = [
+  { id: 'overview', label: 'Umumiy', icon: <Activity className="w-4 h-4" /> },
+  { id: 'jobs', label: 'Dublyaj & Xarajatlar', icon: <Video className="w-4 h-4" /> },
+  { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
+  { id: 'analytics', label: 'Analitika & Voronka', icon: <BarChart3 className="w-4 h-4" /> },
+  { id: 'payments', label: "To'lovlar & Moliya", icon: <CreditCard className="w-4 h-4" /> },
+  { id: 'safety', label: 'Xavfsizlik & Qoidalar', icon: <ShieldAlert className="w-4 h-4" /> },
+  { id: 'health', label: 'Tizim Salomatligi & AI', icon: <Sparkles className="w-4 h-4" />, badge: 'Yangi' },
+  { id: 'broadcast', label: 'Xabarnomalar', icon: <Bell className="w-4 h-4" /> },
+]
 
 function Card({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0">
-      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4 min-w-0 shadow-lg">
+      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -62,7 +109,6 @@ function Card({ label, value, icon }: { label: string; value: string | number; i
 }
 
 const SHORT_MONTHS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyun', 'iyul', 'avg', 'sen', 'okt', 'noy', 'dek']
-
 type Granularity = 'daily' | 'monthly' | 'yearly'
 const GRANULARITY_CHART_LABEL: Record<Granularity, string> = {
   daily: 'oxirgi 30 kun',
@@ -70,8 +116,6 @@ const GRANULARITY_CHART_LABEL: Record<Granularity, string> = {
   yearly: 'oxirgi 5 yil',
 }
 
-// Granularity'ga qarab sana kaliti "YYYY-MM-DD" (kunlik), "YYYY-MM" (oylik)
-// yoki "YYYY" (yillik) shaklida keladi — har biri o'z formatida ko'rsatiladi.
 function formatShortDate(dateStr?: string) {
   if (!dateStr) return ''
   const parts = dateStr.split('-').map(Number)
@@ -213,7 +257,7 @@ function DeltaCard({
   const formattedDiff = isCurrency ? `${sign}${diff.toLocaleString('uz-UZ')} UZS` : `${sign}${diff}`
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 min-w-0">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 min-w-0 shadow-lg">
       <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest break-words leading-tight">{label}</p>
       <div className="flex items-end gap-2 mt-1 flex-wrap">
         <p className="text-xl sm:text-2xl font-extrabold text-white">{formattedVal}</p>
@@ -225,11 +269,21 @@ function DeltaCard({
   )
 }
 
-function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNode; title: string; message: string; action?: React.ReactNode }) {
+function CenteredMessage({
+  icon,
+  title,
+  message,
+  action,
+}: {
+  icon: React.ReactNode
+  title: string
+  message: string
+  action?: React.ReactNode
+}) {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+      <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
+        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20">
           {icon}
         </div>
         <div className="space-y-1">
@@ -244,20 +298,65 @@ function CenteredMessage({ icon, title, message, action }: { icon: React.ReactNo
 
 export default function AdminPage() {
   const { user, loading: authLoading, isLoggedIn, logout } = useAuth()
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const [usersSubTab, setUsersSubTab] = useState<'all' | 'unactivated'>('all')
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'funnel' | 'cohorts' | 'retention'>('funnel')
+
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [blocked, setBlocked] = useState<BlockedUsersReport | null>(null)
   const [refunds, setRefunds] = useState<RefundsNeededReport | null>(null)
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [showTrends, setShowTrends] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
-  const [showBlockedTables, setShowBlockedTables] = useState(false)
-  const [showPaymentsHistory, setShowPaymentsHistory] = useState(false)
-  const [showRecentUsers, setShowRecentUsers] = useState(false)
-  const [showRecentJobs, setShowRecentJobs] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [errorKind, setErrorKind] = useState<'unauthorized' | 'forbidden' | 'other' | null>(null)
   const [errorDetail, setErrorDetail] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+
+  // Clock
+  const [currentTime, setCurrentTime] = useState('')
+
+  // Retry state in Overview
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
+  const [retryToast, setRetryToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Sync tab with URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const tabParam = params.get('tab') as TabType
+      if (tabParam && TABS.some((t) => t.id === tabParam)) {
+        setActiveTab(tabParam)
+      }
+    }
+  }, [])
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', tab)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+
+  // Real-time Tashkent Clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      const timeStr = now.toLocaleTimeString('uz-UZ', {
+        timeZone: 'Asia/Tashkent',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      setCurrentTime(timeStr)
+    }
+    updateTime()
+    const timer = setInterval(updateTime, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadStats = useCallback(async () => {
     const token = getToken()
@@ -271,14 +370,10 @@ export default function AdminPage() {
       setErrorKind(null)
       try {
         setBlocked(await apiAdminBlockedUsers(token))
-      } catch {
-        // Bloklanganlar hisoboti ixtiyoriy -- xato bo'lsa asosiy panelni to'xtatmaydi.
-      }
+      } catch {}
       try {
         setRefunds(await apiAdminRefundsNeeded(token))
-      } catch {
-        // Qaytarish hisoboti ixtiyoriy -- xato bo'lsa asosiy panelni to'xtatmaydi.
-      }
+      } catch {}
     } catch (err: any) {
       const httpStatus = err?.response?.status
       if (httpStatus === 401) setErrorKind('unauthorized')
@@ -305,10 +400,31 @@ export default function AdminPage() {
     setRefreshing(false)
   }
 
+  async function handleOverviewRetry(jobId: string) {
+    const token = getToken()
+    if (!token) return
+    try {
+      setRetryingJobId(jobId)
+      setRetryToast(null)
+      const res = await apiAdminRetryJob(token, jobId)
+      setRetryToast({ type: 'success', text: res.message || 'Job qayta navbatga qo‘yildi!' })
+      await loadStats()
+    } catch (err: any) {
+      setRetryToast({
+        type: 'error',
+        text: err?.response?.data?.detail || err?.message || 'Qayta urinishda xatolik',
+      })
+    } finally {
+      setRetryingJobId(null)
+      setTimeout(() => setRetryToast(null), 5000)
+    }
+  }
+
   if (authLoading || statsLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-9 h-9 animate-spin text-blue-400" />
+        <p className="text-xs text-gray-400 font-mono">Admin panel yuklanmoqda...</p>
       </div>
     )
   }
@@ -318,11 +434,11 @@ export default function AdminPage() {
       <CenteredMessage
         icon={<LogIn className="w-6 h-6" />}
         title="Tizimga kiring"
-        message="Admin panelni ko'rish uchun avval saytga oddiy hisobingiz bilan kiring."
+        message="Admin panelni ko'rish uchun avval administrator hisobingiz bilan tizimga kiring."
         action={
           <Link
             href="/login"
-            className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-2xl transition-all text-sm"
+            className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-2xl transition-all text-sm shadow-xl"
           >
             Kirish sahifasiga o'tish
           </Link>
@@ -336,7 +452,7 @@ export default function AdminPage() {
       <CenteredMessage
         icon={<ShieldAlert className="w-6 h-6" />}
         title="Ruxsat yo'q"
-        message={`${user?.email || 'Bu hisob'} uchun admin panelga kirish huquqi yo'q.`}
+        message={`${user?.email || 'Ushbu hisob'} uchun administrator huquqlari berilmagan.`}
         action={
           <button
             onClick={logout}
@@ -355,10 +471,13 @@ export default function AdminPage() {
       <CenteredMessage
         icon={<ShieldAlert className="w-6 h-6" />}
         title="Xatolik"
-        message={errorDetail || 'Statistikani yuklab bo\'lmadi.'}
+        message={errorDetail || "Statistikani yuklab bo'lmadi."}
         action={
           <button
-            onClick={() => { setStatsLoading(true); loadStats().finally(() => setStatsLoading(false)) }}
+            onClick={() => {
+              setStatsLoading(true)
+              loadStats().finally(() => setStatsLoading(false))
+            }}
             className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-3 rounded-2xl transition-all text-sm"
           >
             <RefreshCw className="w-4 h-4" />
@@ -369,225 +488,427 @@ export default function AdminPage() {
     )
   }
 
+  const token = getToken() || ''
+
   return (
-    <div className="min-h-screen bg-slate-900 p-4 sm:p-10">
-      <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-white">Admin panel</h1>
-            <p className="text-xs text-gray-400 mt-1">{user?.email}</p>
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-3 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Modern Top Header */}
+        <header className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md shadow-xl">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">GapirAI Admin Suite</h1>
+                <span className="text-[10px] font-bold font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                  v2.0 Pro
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                <span>{user?.email}</span>
+                <span>•</span>
+                <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Tizim onlayn
+                </span>
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap">
+            {/* Live Tashkent Time Badge */}
+            <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono text-gray-300 shadow-inner">
+              <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="font-bold text-white">{currentTime}</span>
+              <span className="text-[10px] text-gray-500">Toshkent (UTC+5)</span>
+            </div>
+
+            {/* Refresh */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition disabled:opacity-50"
-              aria-label="Yangilash"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition disabled:opacity-50"
+              title="Statistikani yangilash"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+
+            {/* Logout */}
             <button
               onClick={logout}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition"
-              aria-label="Chiqish"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-gray-400 hover:text-rose-400 transition"
+              title="Chiqish"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Sticky Tezkor O'tish paneli */}
-        <div className="sticky top-2 z-30 bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl">
-          {[
-            { id: 'sec-today', label: 'Bugun', icon: '⚡' },
-            { id: 'sec-funnel', label: 'Voronka (Funnel)', icon: '📉' },
-            { id: 'sec-unactivated', label: 'Aktivlashmaganlar', icon: '🎯' },
-            { id: 'sec-cohorts', label: 'Kohortlar', icon: '🧬' },
-            { id: 'sec-retention', label: 'Retention', icon: '📊' },
-            { id: 'sec-users', label: 'Foydalanuvchilar', icon: '👥' },
-            { id: 'sec-jobs', label: 'Dublyaj & Xarajatlar', icon: '🎬' },
-            { id: 'sec-payments', label: "To'lovlar", icon: '💳' },
-            { id: 'sec-management', label: 'Boshqaruv', icon: '⚙️' },
-            { id: 'sec-broadcast', label: 'Xabarnoma', icon: '📢' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                document.getElementById(tab.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/10 transition shrink-0"
-            >
-              <span className="mr-1">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Bugun (Toshkent vaqti) */}
-        <section id="sec-today" className="space-y-3 scroll-mt-16">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest">
-                Bugun (Toshkent vaqti)
-              </h2>
-            </div>
-            <span className="text-[11px] text-gray-400 font-medium bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
-              Asia/Tashkent (UTC+5)
-            </span>
+        {/* Global Retry Toast Banner */}
+        {retryToast && (
+          <div
+            className={`p-4 rounded-2xl text-xs flex items-center gap-2 font-medium border shadow-lg ${
+              retryToast.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}
+          >
+            {retryToast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            ) : (
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+            )}
+            <span>{retryToast.text}</span>
           </div>
+        )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <DeltaCard
-              label="Ro'yxatdan o'tish (bugun)"
-              value={stats.trends.today.users}
-              previousValue={stats.trends.yesterday.users}
-              previousLabel="kecha"
-            />
-            <DeltaCard
-              label="Video dublyaj (bugun)"
-              value={stats.trends.today.jobs}
-              previousValue={stats.trends.yesterday.jobs}
-              previousLabel="kecha"
-            />
-            <DeltaCard
-              label="To'lovlar soni (bugun)"
-              value={stats.trends.today.payments || 0}
-              previousValue={stats.trends.yesterday.payments || 0}
-              previousLabel="kecha"
-            />
-            <DeltaCard
-              label="Tushum (bugun)"
-              value={stats.trends.today.revenue_uzs || 0}
-              previousValue={stats.trends.yesterday.revenue_uzs || 0}
-              previousLabel="kecha"
-              isCurrency={true}
-            />
-          </div>
+        {/* Primary Tab Navigation */}
+        <nav className="bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl sticky top-2 z-30 scrollbar-none">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-2 transition shrink-0 cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 font-bold'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
 
-          <div className="pt-1">
-            <button
-              onClick={() => setShowTrends(!showTrends)}
-              className="text-[11px] text-gray-400 hover:text-blue-400 transition flex items-center gap-1.5 font-medium"
-            >
-              <span>{showTrends ? "▲ Trend grafiklarini yashirish" : "▼ Oylik / yillik trend grafiklarini ko'rsatish"}</span>
-            </button>
-          </div>
-
-          {showTrends && (
-            <div className="space-y-3 pt-2 border-t border-white/5">
-              <div className="flex items-center gap-2">
-                {([
-                  ['daily', 'Kunlik'],
-                  ['monthly', 'Oylik'],
-                  ['yearly', 'Yillik'],
-                ] as [Granularity, string][]).map(([g, label]) => (
-                  <button
-                    key={g}
-                    onClick={() => setGranularity(g)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                      granularity === g
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <TrendChart
-                  label={`Ro'yxatdan o'tishlar (${GRANULARITY_CHART_LABEL[granularity]})`}
-                  color="#3987e5"
-                  data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
-                />
-                <TrendChart
-                  label={`Video dublyajlar (${GRANULARITY_CHART_LABEL[granularity]})`}
-                  color="#199e70"
-                  data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
-                />
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Users */}
-        <section id="sec-users" className="space-y-3 scroll-mt-16">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchilar</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card label="Jami ro'yxatdan o'tgan" value={stats.users.total} icon={<Users className="w-5 h-5" />} />
-            <Card label="Tasdiqlangan" value={stats.users.verified} icon={<Users className="w-5 h-5" />} />
-            <Card label="So'nggi 7 kun" value={stats.users.last_7d} icon={<Users className="w-5 h-5" />} />
-            <Card label="So'nggi 24 soat" value={stats.users.last_24h} icon={<Users className="w-5 h-5" />} />
-          </div>
-        </section>
-
-        {/* YouTube Cookies Management -- nofaol qilingan (Edge orqali barqaror yuklangan) */}
-
-        {/* Funnel Conversion Analytics */}
-        <div id="sec-funnel" className="scroll-mt-16">
-          <AdminFunnelManager token={getToken() || ''} />
-        </div>
-
-        {/* Unactivated / First Dubbing Drop-off Users Research */}
-        <div id="sec-unactivated" className="scroll-mt-16">
-          <AdminUnactivatedUsersManager token={getToken() || ''} />
-        </div>
-
-        {/* Activation & Retention Cohorts Analytics */}
-        <div id="sec-cohorts" className="scroll-mt-16">
-          <AdminCohortsManager token={getToken() || ''} />
-        </div>
-
-        {/* User Retention & Activity Analytics */}
-        <div id="sec-retention" className="scroll-mt-16">
-          <AdminRetentionManager token={getToken() || ''} />
-        </div>
-
-        {/* Users & Plans Management */}
-        <div id="sec-management" className="scroll-mt-16">
-          <AdminUsersManager />
-        </div>
-
-        {/* Broadcast Notifications: Email & Telegram */}
-        <div id="sec-broadcast" className="scroll-mt-16">
-          <AdminBroadcastManager token={getToken() || ''} />
-        </div>
-
-        {/* Jobs & Unit Economics */}
-        <section id="sec-jobs" className="scroll-mt-16">
-          <AdminJobsCostManager token={getToken() || ''} />
-        </section>
-
-        {/* Payments */}
-        <section id="sec-payments" className="space-y-3 scroll-mt-16">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lovlar</h2>
-            <button
-              onClick={() => setShowPaymentsHistory(!showPaymentsHistory)}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
-            >
-              <span>
-                {showPaymentsHistory
-                  ? "▲ Haqiqiy to'lovchilar ro'yxatini yashirish"
-                  : "▼ Haqiqiy to'lovchilar ro'yxati (12 mijoz, 15 to'lov — 774,000 UZS)"}
-              </span>
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Card label="Tasdiqlangan to'lovlar" value={stats.payments.approved_count} icon={<Wallet className="w-5 h-5" />} />
-            <Card label="Jami tushum" value={`${stats.payments.revenue_total_uzs.toLocaleString('uz-UZ')} UZS`} icon={<Wallet className="w-5 h-5" />} />
-          </div>
-
-          {/* Collapsible Real Customer Payments Table */}
-          {showPaymentsHistory && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-3">
-              <div className="px-4 py-3 bg-white/[0.03] border-b border-white/10 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">Haqiqiy to'lov qilgan mijozlar (Top to'lovchilar)</h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Sinov va ichki to'lovlar chetlatilgan, sof 12 nafar real mijoz</p>
+        {/* ========================================================= */}
+        {/* TAB 1: OVERVIEW & DASHBOARD */}
+        {/* ========================================================= */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Bugun (Toshkent vaqti) KPIs */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                    Bugun (Toshkent vaqti UTC+5)
+                  </h2>
                 </div>
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                <button
+                  onClick={() => setShowTrends(!showTrends)}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition"
+                >
+                  {showTrends ? '▲ Grafikni yashirish' : '▼ 30 kunlik trend grafiklarini ko‘rish'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <DeltaCard
+                  label="Ro'yxatdan o'tish (bugun)"
+                  value={stats.trends.today.users}
+                  previousValue={stats.trends.yesterday.users}
+                  previousLabel="kecha"
+                />
+                <DeltaCard
+                  label="Video dublyaj (bugun)"
+                  value={stats.trends.today.jobs}
+                  previousValue={stats.trends.yesterday.jobs}
+                  previousLabel="kecha"
+                />
+                <DeltaCard
+                  label="To'lovlar soni (bugun)"
+                  value={stats.trends.today.payments || 0}
+                  previousValue={stats.trends.yesterday.payments || 0}
+                  previousLabel="kecha"
+                />
+                <DeltaCard
+                  label="Tushum (bugun)"
+                  value={stats.trends.today.revenue_uzs || 0}
+                  previousValue={stats.trends.yesterday.revenue_uzs || 0}
+                  previousLabel="kecha"
+                  isCurrency={true}
+                />
+              </div>
+
+              {showTrends && (
+                <div className="space-y-3 pt-3 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    {([
+                      ['daily', 'Kunlik'],
+                      ['monthly', 'Oylik'],
+                      ['yearly', 'Yillik'],
+                    ] as [Granularity, string][]).map(([g, label]) => (
+                      <button
+                        key={g}
+                        onClick={() => setGranularity(g)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                          granularity === g
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <TrendChart
+                      label={`Ro'yxatdan o'tishlar (${GRANULARITY_CHART_LABEL[granularity]})`}
+                      color="#3987e5"
+                      data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.users }))}
+                    />
+                    <TrendChart
+                      label={`Video dublyajlar (${GRANULARITY_CHART_LABEL[granularity]})`}
+                      color="#199e70"
+                      data={stats.trends[granularity].map((d) => ({ date: d.date, value: d.jobs }))}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Total Metric Highlights */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Card label="Jami ro'yxatdan o'tganlar" value={stats.users.total} icon={<Users className="w-5 h-5" />} />
+              <Card label="Jami yaratilgan videolar" value={stats.jobs.total} icon={<Video className="w-5 h-5" />} />
+              <Card label="Tasdiqlangan to'lovlar" value={stats.payments.approved_count} icon={<Wallet className="w-5 h-5" />} />
+              <Card
+                label="Jami tushum"
+                value={`${stats.payments.revenue_total_uzs.toLocaleString('uz-UZ')} UZS`}
+                icon={<Wallet className="w-5 h-5" />}
+              />
+            </div>
+
+            {/* Quick Recent Jobs with 1-Click Retry */}
+            <section className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                    So‘nggi dublyaj ishlari (Jonli navbat & holat)
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Oxirgi 50 ta video (Xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
+                </div>
+                <button
+                  onClick={() => handleTabChange('jobs')}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
+                >
+                  To‘liq xarajatlar tahliliga o‘tish →
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.01] text-gray-400 uppercase text-[10px] font-semibold tracking-wider">
+                      <th className="py-2.5 px-3">Vaqti</th>
+                      <th className="py-2.5 px-3">Video</th>
+                      <th className="py-2.5 px-3">Akkaunt</th>
+                      <th className="py-2.5 px-3">Modellar</th>
+                      <th className="py-2.5 px-3">Holat</th>
+                      <th className="py-2.5 px-3 text-center">Amal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recent_jobs.slice(0, 15).map((j) => {
+                      const isNoSpeech = j.error_code === 'NO_SPEECH_FOUND'
+                      const isSuccess = j.status === 'COMPLETED'
+                      const isFailed = j.status === 'FAILED'
+                      return (
+                        <tr key={j.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                          <td className="py-2.5 px-3 text-gray-400 whitespace-nowrap font-mono text-[11px]">
+                            {formatTashkentDateTime(j.created_at) || '—'}
+                          </td>
+                          <td className="py-2.5 px-3 max-w-[260px] truncate">
+                            <a
+                              href={j.youtube_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-200 hover:text-blue-400 hover:underline"
+                              title={j.video_title || j.youtube_url}
+                            >
+                              {j.video_title || j.youtube_url}
+                            </a>
+                          </td>
+                          <td className="py-2.5 px-3 max-w-[160px] truncate text-gray-300 font-mono text-[11px]">
+                            {j.user_email || 'Anonim'}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] font-mono text-gray-300">
+                            <span className="text-amber-300 font-semibold">
+                              {j.tts_provider === 'gemini' ? 'Gemini' : j.tts_provider === 'edge' ? 'Edge' : 'Azure'}
+                            </span>
+                            <span className="text-gray-500 text-[10px] ml-1">({j.voice_name || 'Charon'})</span>
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            {isNoSpeech ? (
+                              <span className="text-amber-400 font-semibold text-[11px]">Ovoz topilmadi</span>
+                            ) : (
+                              <span
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                  isSuccess
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    : isFailed
+                                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                    : 'bg-white/5 text-gray-300 border-white/10'
+                                }`}
+                              >
+                                {STATUS_LABELS[j.status] || j.status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            {isFailed && !isNoSpeech && (
+                              <button
+                                onClick={() => handleOverviewRetry(j.id)}
+                                disabled={retryingJobId === j.id}
+                                className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 mx-auto transition disabled:opacity-50"
+                                title="Qayta urinish"
+                              >
+                                <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
+                                <span>Qayta urinish</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 2: JOBS & COSTS MANAGEMENT */}
+        {/* ========================================================= */}
+        {activeTab === 'jobs' && (
+          <section>
+            <AdminJobsCostManager token={token} />
+          </section>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3: USERS & CRM */}
+        {/* ========================================================= */}
+        {activeTab === 'users' && (
+          <div className="space-y-5">
+            {/* Sub-tab navigation */}
+            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+              <button
+                onClick={() => setUsersSubTab('all')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  usersSubTab === 'all'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                👥 Barcha Foydalanuvchilar ({stats.users.total})
+              </button>
+              <button
+                onClick={() => setUsersSubTab('unactivated')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  usersSubTab === 'unactivated'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                🎯 1-videoda qolib ketganlar (Aktivlashmaganlar)
+              </button>
+            </div>
+
+            {usersSubTab === 'all' ? (
+              <AdminUsersManager />
+            ) : (
+              <AdminUnactivatedUsersManager token={token} />
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 4: ANALYTICS, FUNNEL & RETENTION */}
+        {/* ========================================================= */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-5">
+            {/* Sub-tab navigation */}
+            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+              <button
+                onClick={() => setAnalyticsSubTab('funnel')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  analyticsSubTab === 'funnel'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📉 Voronka Konversiyasi (Funnel)
+              </button>
+              <button
+                onClick={() => setAnalyticsSubTab('cohorts')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  analyticsSubTab === 'cohorts'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                🧬 Kohort Tahlili (Cohorts)
+              </button>
+              <button
+                onClick={() => setAnalyticsSubTab('retention')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  analyticsSubTab === 'retention'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📊 Retention & Faollik (Activity)
+              </button>
+            </div>
+
+            {analyticsSubTab === 'funnel' && <AdminFunnelManager token={token} />}
+            {analyticsSubTab === 'cohorts' && <AdminCohortsManager token={token} />}
+            {analyticsSubTab === 'retention' && <AdminRetentionManager token={token} />}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 5: PAYMENTS & FINANCIALS */}
+        {/* ========================================================= */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <Card
+                label="Tasdiqlangan to'lovlar soni"
+                value={stats.payments.approved_count}
+                icon={<Wallet className="w-5 h-5" />}
+              />
+              <Card
+                label="Jami tushum"
+                value={`${stats.payments.revenue_total_uzs.toLocaleString('uz-UZ')} UZS`}
+                icon={<Wallet className="w-5 h-5" />}
+              />
+            </div>
+
+            {/* Real Customers Payments Table */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+              <div className="px-5 py-4 bg-white/[0.02] border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                    Haqiqiy to'lov qilgan mijozlar (Top to'lovchilar)
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Sinov va ichki to'lovlar chetlatilgan, sof 12 nafar real mijoz
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
                   Jami: 774,000 UZS
                 </span>
               </div>
@@ -607,15 +928,15 @@ export default function AdminPage() {
                     {[
                       { name: 'Tojir watch', email: 'tojirwatch@gmail.com', count: 2, sum: 154000, desc: 'PRO tarif (149k) + Balans (5k)', prov: 'Click' },
                       { name: 'Shahzod', email: 'shahzodbekreyimboyev022@gmail.com', count: 1, sum: 149000, desc: 'PRO tarif', prov: 'Click' },
-                      { name: 'Soatmurod Eshpo\'latov', email: 'eshpolatovsoatmurod@gmail.com', count: 1, sum: 100000, desc: '+300 daqiqa paketi', prov: 'Uzum' },
+                      { name: "Soatmurod Eshpo'latov", email: 'eshpolatovsoatmurod@gmail.com', count: 1, sum: 100000, desc: '+300 daqiqa paketi', prov: 'Uzum' },
                       { name: 'Bitikchi', email: 'bitikchioghlan@gmail.com', count: 2, sum: 64000, desc: 'STANDARD (49k) + 30 daqiqa (15k)', prov: 'Uzum' },
                       { name: 'aziz raxmanov', email: 'azizraxmanov11@gmail.com', count: 2, sum: 60000, desc: '+120 daqiqa (45k) + 30 daqiqa (15k)', prov: 'Payme' },
                       { name: 'Adilet Orazaliev', email: 'aorazaliyev99@gmail.com', count: 1, sum: 49000, desc: 'STANDARD tarif', prov: 'Uzum' },
                       { name: 'Dilshod', email: 'dilshododilov1717@gmail.com', count: 1, sum: 49000, desc: 'STANDARD tarif', prov: 'Uzum' },
                       { name: 'Nodir Mirzayev', email: 'mirzayevnodir130@gmail.com', count: 1, sum: 45000, desc: '+120 daqiqa paketi', prov: 'Uzum' },
                       { name: 'Maks Donka', email: 'maksdonka0@gmail.com', count: 1, sum: 45000, desc: '+120 daqiqa paketi', prov: 'Click' },
-                      { name: 'Chinora Boboqulova', email: 'boboqulovachinora739@gmail.com', count: 1, sum: 28500, desc: 'Video dublyaj (+57 daqiqa balans qo\'shildi)', prov: 'Payme' },
-                      { name: 'Umid Valiyev', email: 'umidvaliyev479@gmail.com', count: 1, sum: 25500, desc: 'Video dublyaj (+51 daqiqa balans qo\'shildi)', prov: 'Uzum' },
+                      { name: 'Chinora Boboqulova', email: 'boboqulovachinora739@gmail.com', count: 1, sum: 28500, desc: 'Video dublyaj (+57 daqiqa balans)', prov: 'Payme' },
+                      { name: 'Umid Valiyev', email: 'umidvaliyev479@gmail.com', count: 1, sum: 25500, desc: 'Video dublyaj (+51 daqiqa balans)', prov: 'Uzum' },
                       { name: 'G‘ulomjon Eshniyozov', email: 'eshniyazov.g@gmail.com', count: 1, sum: 5000, desc: 'Balans to\'ldirish', prov: 'Click' },
                     ].map((c, i) => (
                       <tr key={c.email} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
@@ -623,10 +944,14 @@ export default function AdminPage() {
                         <td className="px-4 py-2.5 text-xs font-semibold text-gray-200">{c.name}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{c.email}</td>
                         <td className="px-4 py-2.5 text-xs text-center text-blue-400 font-bold">{c.count}</td>
-                        <td className="px-4 py-2.5 text-xs text-right font-mono font-bold text-emerald-400">{c.sum.toLocaleString('uz-UZ')} UZS</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-mono font-bold text-emerald-400">
+                          {c.sum.toLocaleString('uz-UZ')} UZS
+                        </td>
                         <td className="px-4 py-2.5 text-xs text-gray-300">
                           <span className="inline-flex items-center gap-1.5">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-mono">{c.prov}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-mono">
+                              {c.prov}
+                            </span>
                             <span>{c.desc}</span>
                           </span>
                         </td>
@@ -636,273 +961,160 @@ export default function AdminPage() {
                 </table>
               </div>
             </div>
-          )}
-        </section>
 
-        {/* Bloklangan foydalanuvchilar -- Content Safety Gate (Katta blok ochilib-yopiladigan) */}
-        {blocked && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Kontent siyosati -- bloklanganlar</h2>
-              {(blocked.total_blocked_accounts > 0 || blocked.recent_violations.length > 0) && (
-                <button
-                  onClick={() => setShowBlockedTables(!showBlockedTables)}
-                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
-                >
-                  <span>
-                    {showBlockedTables
-                      ? "▲ Bloklanganlar jadvalini yashirish"
-                      : `▼ Bloklanganlar va xavfsizlik cheklovlari jadvalini ko'rish (${blocked.recent_violations.length} ta)`}
+            {/* Refunds Needed Section */}
+            {refunds && refunds.payments.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                      Qaytarilishi Kerak Bo‘lgan To‘lovlar
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg">
+                    Jami: {refunds.total_amount.toLocaleString('uz-UZ')} UZS
                   </span>
-                </button>
-              )}
-            </div>
+                </div>
+                <div className="overflow-x-auto bg-black/30 rounded-xl border border-white/5">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                        <th className="p-3">Foydalanuvchi</th>
+                        <th className="p-3">Aloqa</th>
+                        <th className="p-3">Summa</th>
+                        <th className="p-3">Video</th>
+                        <th className="p-3">Tranzaksiya ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {refunds.payments.map((p) => (
+                        <tr key={p.payment_id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                          <td className="p-3 font-semibold text-gray-200">{p.user_name || 'Nomsiz'}</td>
+                          <td className="p-3 text-gray-400 font-mono">{p.user_email || p.user_phone || '—'}</td>
+                          <td className="p-3 font-bold text-amber-400">{p.amount.toLocaleString('uz-UZ')} UZS</td>
+                          <td className="p-3 text-gray-300 truncate max-w-[200px]">{p.video_title || '—'}</td>
+                          <td className="p-3 font-mono text-gray-400">{p.click_transaction_id || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 6: SAFETY & VIOLATIONS */}
+        {/* ========================================================= */}
+        {activeTab === 'safety' && (
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <Card label="Bloklangan akkauntlar" value={blocked.total_blocked_accounts} icon={<Ban className="w-5 h-5" />} />
-              <Card label="Jami bloklanishlar" value={blocked.total_violations} icon={<ShieldAlert className="w-5 h-5" />} />
+              <Card
+                label="Bloklangan akkauntlar"
+                value={blocked?.total_blocked_accounts || 0}
+                icon={<Ban className="w-5 h-5" />}
+              />
+              <Card
+                label="Jami qoidabuzarliklar"
+                value={blocked?.total_violations || 0}
+                icon={<ShieldAlert className="w-5 h-5" />}
+              />
             </div>
-            {showBlockedTables && blocked.total_blocked_accounts > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-left">
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchi</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Aloqa</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Necha marta</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">So'nggi marta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {blocked.users.map((u) => (
-                      <tr key={u.user_id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                        <td className="px-4 py-3 text-gray-200">{u.name || 'Nomsiz'}</td>
-                        <td className="px-4 py-3 text-gray-400">{u.email || u.phone || '—'}</td>
-                        <td className="px-4 py-3 text-red-300 font-semibold">{u.violation_count}</td>
-                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                          {formatTashkentDateTime(u.last_violation_at) || '—'}
-                        </td>
+
+            {/* Blocked Accounts Table */}
+            {blocked && blocked.users.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 shadow-xl">
+                <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                  Kontent siyosati orqali cheklangan akkauntlar
+                </h3>
+                <div className="overflow-x-auto bg-black/20 rounded-xl border border-white/5">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                        <th className="p-3">Foydalanuvchi</th>
+                        <th className="p-3">Aloqa</th>
+                        <th className="p-3 text-center">Buzilishlar soni</th>
+                        <th className="p-3">Oxirgi buzilish vaqti</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {blocked.users.map((u) => (
+                        <tr key={u.user_id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                          <td className="p-3 font-semibold text-gray-200">{u.name || 'Nomsiz'}</td>
+                          <td className="p-3 text-gray-400 font-mono">{u.email || u.phone || '—'}</td>
+                          <td className="p-3 text-center font-bold text-red-400">{u.violation_count}</td>
+                          <td className="p-3 text-gray-400 font-mono">{formatTashkentDateTime(u.last_violation_at) || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-            {showBlockedTables && blocked.recent_violations.length > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-left">
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[150px] whitespace-nowrap">Sana</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[110px] whitespace-nowrap">Bosqich</th>
-                      <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[160px] whitespace-nowrap">Toifa</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {blocked.recent_violations.map((v) => (
-                      <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                          {formatTashkentDateTime(v.created_at)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-200 truncate max-w-[280px]" title={v.video_title || undefined}>
-                          {v.video_title || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                          {v.stage === 'metadata' ? 'Sarlavha' : 'Transkript'}
-                        </td>
-                        <td className="px-4 py-3 text-red-300 whitespace-nowrap text-xs">
-                          {CATEGORY_LABELS[v.category] || v.category}
-                        </td>
+
+            {/* Recent Violations Log */}
+            {blocked && blocked.recent_violations.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 shadow-xl">
+                <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                  So‘nggi qoidabuzarlik hodisalari jurnali
+                </h3>
+                <div className="overflow-x-auto bg-black/20 rounded-xl border border-white/5">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                        <th className="p-3">Vaqt</th>
+                        <th className="p-3">Video sarlavhasi</th>
+                        <th className="p-3">Aniqlangan bosqich</th>
+                        <th className="p-3">Toifa</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {blocked.recent_violations.map((v) => (
+                        <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                          <td className="p-3 font-mono text-gray-400">{formatTashkentDateTime(v.created_at)}</td>
+                          <td className="p-3 text-gray-200 font-medium truncate max-w-[300px]">{v.video_title || '—'}</td>
+                          <td className="p-3 text-gray-300">
+                            {v.stage === 'metadata' ? 'Sarlavha (Metadata)' : 'Transkript (Nutq)'}
+                          </td>
+                          <td className="p-3 text-red-300 font-semibold">
+                            {CATEGORY_LABELS[v.category] || v.category}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 7: SYSTEM HEALTH & AI PROVIDERS */}
+        {/* ========================================================= */}
+        {activeTab === 'health' && (
+          <section>
+            <AdminSystemHealthManager token={token} />
           </section>
         )}
 
-        {/* Qaytarilishi kerak bo'lgan to'lovlar -- 5 marta urinib ham muvaffaqiyatsiz tugagan pullik joblar */}
-        {refunds && refunds.payments.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">To'lov qaytarilishi kerak</h2>
-            <Card
-              label="Jami qaytarilishi kerak"
-              value={`${refunds.total_amount.toLocaleString('uz-UZ')} so'm`}
-              icon={<Wallet className="w-5 h-5" />}
-            />
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Foydalanuvchi</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Aloqa</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Summa</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Click tranzaksiya</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {refunds.payments.map((p) => (
-                    <tr key={p.payment_id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 text-gray-200">{p.user_name || 'Nomsiz'}</td>
-                      <td className="px-4 py-3 text-gray-400">{p.user_email || p.user_phone || '—'}</td>
-                      <td className="px-4 py-3 text-amber-300 font-semibold whitespace-nowrap">{p.amount.toLocaleString('uz-UZ')} so'm</td>
-                      <td className="px-4 py-3 text-gray-200 truncate max-w-[260px]" title={p.video_title || undefined}>
-                        {p.video_title || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs font-mono">{p.click_transaction_id || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* ========================================================= */}
+        {/* TAB 8: BROADCAST NOTIFICATIONS */}
+        {/* ========================================================= */}
+        {activeTab === 'broadcast' && (
+          <section>
+            <AdminBroadcastManager token={token} />
           </section>
         )}
-
-        {/* Recent users (Katta blok ochilib-yopiladigan) */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi ro'yxatdan o'tganlar</h2>
-            <button
-              onClick={() => setShowRecentUsers(!showRecentUsers)}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
-            >
-              <span>{showRecentUsers ? "▲ Jadvalni yashirish" : `▼ Ro'yxatni ko'rish (${stats.recent_users.length} ta)`}</span>
-            </button>
-          </div>
-          {showRecentUsers && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Email</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[160px] whitespace-nowrap">Sana</th>
-                    <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[130px] whitespace-nowrap">Holat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.recent_users.map((u, i) => (
-                    <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 text-gray-200 truncate max-w-[280px] font-mono text-xs">{u.email}</td>
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
-                        {formatTashkentDateTime(u.created_at) || '—'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {u.is_verified ? (
-                          <span className="text-emerald-400 font-semibold text-xs">Tasdiqlangan</span>
-                        ) : (
-                          <span className="text-gray-500 text-xs">Tasdiqlanmagan</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {stats.recent_users.length === 0 && (
-                    <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">Hali user yo'q</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* Recent jobs (Katta blok ochilib-yopiladigan, gorizontal scrollsiz) */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">So'nggi joblar</h2>
-            <button
-              onClick={() => setShowRecentJobs(!showRecentJobs)}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition"
-            >
-              <span>{showRecentJobs ? "▲ Jadvalni yashirish" : `▼ Videolar jadvalini ko'rish (${stats.recent_jobs.length} ta)`}</span>
-            </button>
-          </div>
-          {showRecentJobs && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[140px] whitespace-nowrap">Sana</th>
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Video</th>
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[170px]">Akkaunt</th>
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">AI Modellar</th>
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest w-[120px] whitespace-nowrap">Holat</th>
-                    <th className="px-3 sm:px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest max-w-[190px]">Xatolik</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.recent_jobs.map((j) => {
-                    const isNoSpeech = j.error_code === 'NO_SPEECH_FOUND'
-                    const isSuccess = j.status === 'COMPLETED'
-                    return (
-                      <tr key={j.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                        <td className="px-3 sm:px-4 py-3 text-gray-400 whitespace-nowrap text-xs font-mono">
-                          {formatTashkentDateTime(j.created_at) || '—'}
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[240px] truncate" title={j.video_title || j.youtube_url}>
-                          <a href={j.youtube_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 hover:underline">
-                            {j.video_title || j.youtube_url}
-                          </a>
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 text-gray-200 max-w-[170px] truncate font-mono text-xs" title={j.user_email || ''}>
-                          {j.user_email || 'Anonim'}
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 text-xs">
-                          <div className="font-mono text-[11px] font-semibold text-amber-300">
-                            {j.tts_provider === 'gemini' ? '✨ Gemini' : j.tts_provider === 'edge' ? '⚡ Edge' : '🔷 Azure'}: {j.voice_name || 'Charon'}
-                          </div>
-                          <div className="text-[10px] text-gray-400 space-x-1 font-mono">
-                            <span>STT: {j.stt_model || 'gemini-3.8-flash'}</span>
-                            <span>•</span>
-                            <span>Tarjima: {j.translation_model || 'gemini-3.8-flash'}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
-                          {isNoSpeech ? (
-                            <span className="text-amber-400 font-semibold text-xs">Mijoz xatosi</span>
-                          ) : (
-                            <span
-                              className={`text-xs font-medium ${
-                                j.status === 'FAILED' ? 'text-red-400' : isSuccess ? 'text-emerald-400' : 'text-gray-300'
-                              }`}
-                            >
-                              {STATUS_LABELS[j.status] || j.status}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 sm:px-4 py-3 max-w-[190px] truncate" title={j.error_message || undefined}>
-                          {isSuccess ? null : isNoSpeech ? (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                              Ovoz topilmadi (Mijoz)
-                            </span>
-                          ) : (
-                            <span className="text-red-300 text-xs font-mono">
-                              {j.error_code || j.error_message || ''}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {stats.recent_jobs.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
-                        Hali job yo'q
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
       </div>
 
       {/* Floating Scroll To Top Button */}
       {showScrollTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-6 right-6 z-40 p-3.5 bg-blue-600/90 hover:bg-blue-500 text-white rounded-2xl shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 backdrop-blur cursor-pointer"
+          className="fixed bottom-6 right-6 z-40 p-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer backdrop-blur"
           aria-label="Yuqoriga qaytish"
           title="Yuqoriga qaytish"
         >

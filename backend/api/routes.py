@@ -885,13 +885,24 @@ def retry_job(
 
     duration_minutes = max(0.1, round((duration_seconds or 60.0) / 60.0, 2))
 
-    has_quota, shortfall = check_and_consume_quota(db, current_user.id, duration_minutes)
-    if not has_quota:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
-        )
-    job.quota_consumed = True
+    # 2. Balansdan daqiqa yechish:
+    # - Admin uchun bepul (is_user_admin).
+    # - Agar job avval FAILED bo'lgan bo'lsa va undan daqiqa yechilgan bo'lsa (quota_consumed=True),
+    #   qayta urinish uchun ikkinchi marta daqiqa yechilmaydi!
+    # - Faqat COMPLETED videoni qayta yaratish (regenerate) yoki avval daqiqa yechilmagan holatda yechiladi.
+    needs_quota = is_regenerate or not getattr(job, "quota_consumed", False)
+    if needs_quota and not is_user_admin(db, current_user.id):
+        target_user_id = job.user_id or current_user.id
+        has_quota, shortfall = check_and_consume_quota(db, target_user_id, duration_minutes)
+        if not has_quota:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
+            )
+        job.quota_consumed = True
+    elif not getattr(job, "quota_consumed", False):
+        job.quota_consumed = True
+
 
     # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
     video_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
