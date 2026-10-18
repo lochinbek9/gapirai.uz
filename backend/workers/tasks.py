@@ -144,6 +144,9 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
     job.status = status
     job.progress = progress
     job.status_message = message
+    if status == JobStatus.COMPLETED:
+        job.error_message = None
+        job.error_code = None
     job.updated_at = datetime.utcnow()
     db.commit()
 
@@ -1048,6 +1051,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 dubbed_audio_path=dubbed_audio_path,
                 output_path=final_output,
                 max_duration=max_dur,
+                audio_mix_mode=getattr(job, "audio_mix_mode", None),
             )
 
             # Birlashtirishdan so'ng darhol yakuniy video fayli tekshiriladi
@@ -1108,9 +1112,32 @@ def process_video(self: Task, job_id: str) -> dict:
         # COMPLETED holatiga o'tkazishdan OLDIN yakuniy natija fayllari mavjudligi tekshiriladi
         _verify_output_files_exist(final_output, dubbed_audio_path, job_id)
 
+        job.error_message = None
+        job.error_code = None
         _update_job(db, job, JobStatus.COMPLETED, 100.0, "Dublyaj tayyor!")
         job.completed_at = datetime.utcnow()
         db.commit()
+
+        # Agar job dastlabki xatolikdan so'ng qayta urinishda muvaffaqiyatli yakunlansa, adminlarga xabar berish
+        if getattr(self.request, "retries", 0) > 0:
+            try:
+                from backend.services.telegram_notify import send_telegram_message
+                if getattr(settings, "ADMIN_TG_IDS", None):
+                    v_title = getattr(job, "video_title", None) or "Video"
+                    fe_url = (getattr(settings, "FRONTEND_URL", None) or "https://gapirai.uz").rstrip("/")
+                    for a_id in settings.ADMIN_TG_IDS.split(","):
+                        a_id = a_id.strip().strip('"').strip("'")
+                        if a_id:
+                            send_telegram_message(
+                                a_id,
+                                f"✅ <b>Job qayta urinishda muvaffaqiyatli yakunlandi!</b>\n\n"
+                                f"🆔 Job: <code>{job_id}</code>\n"
+                                f"🎬 Video: {v_title}\n"
+                                f"🔄 Urinish: {self.request.retries}/{self.max_retries}\n"
+                                f"🔗 <a href=\"{fe_url}/video/{job_id}\">Natijani ko'rish</a>",
+                            )
+            except Exception as notify_exc:
+                logger.warning(f"[JOB {job_id}] Admin muvaffaqiyat xabari yuborilmadi: {notify_exc}")
 
         # On-demand tiklash Redis lock'ini tozalash
         try:
