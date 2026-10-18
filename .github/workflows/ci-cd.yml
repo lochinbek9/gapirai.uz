@@ -113,7 +113,27 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             set -e
-            echo "=== Pulling latest changes on production ==="
-            cd /home/kai/projects/gapirai.uz
+            echo "=== Finding project directory on production ==="
+            TARGET_DIR=""
+            for dir in "/home/gapirai/gapirai.uz" "$HOME/gapirai.uz" "/home/gapirai/ai-dubber" "$HOME/ai-dubber" "$HOME/projects/gapirai.uz" "/opt/xadichai"; do
+              if [ -d "$dir/.git" ]; then
+                TARGET_DIR="$dir"
+                break
+              fi
+            done
+
+            if [ -z "$TARGET_DIR" ]; then
+              TARGET_DIR=$(find "$HOME" -maxdepth 3 -name ".git" 2>/dev/null | head -n 1 | xargs -r dirname)
+            fi
+
+            if [ -z "$TARGET_DIR" ]; then
+              echo "Error: Could not locate git repository under $HOME"
+              exit 1
+            fi
+
+            echo "=== Found project repository at $TARGET_DIR ==="
+            cd "$TARGET_DIR"
             git pull origin main
+            echo "=== Restarting application services ==="
+            docker restart dubber_backend dubber_worker 2>/dev/null || true
             echo "=== Successfully updated production repository ==="
