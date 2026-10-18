@@ -388,6 +388,13 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
                     is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
                     is_not_found = "404" in err_str or "NOT_FOUND" in err_str
                     is_bad_json = isinstance(e, json.JSONDecodeError)
+                    is_auth_error = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str
+
+                    if is_auth_error:
+                        logger.warning(f"Gemini tarjima ({model_name}) autentifikatsiya xatosi (401): {e} — kalit cooldown'ga olinmoqda.")
+                        if api_key:
+                            mark_model_cooldown(api_key, model_name, 86400.0, reason=f"401: {e}")
+                        break
 
                     if is_not_found:
                         logger.warning(f"Gemini tarjima ({model_name}) mavjud emas (404): {e} — tashlab ketilmoqda.")
