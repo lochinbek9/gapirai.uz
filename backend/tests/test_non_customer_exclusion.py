@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 def test_non_customer_exclusion_model():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine, tables=[User.__table__, ExcludedEmail.__table__])
     Session = sessionmaker(bind=engine)
     db = Session()
 
