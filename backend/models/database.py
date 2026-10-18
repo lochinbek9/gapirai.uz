@@ -526,6 +526,11 @@ def get_db():
 
 
 def create_tables():
+    # Ensure all models (including payment models) are registered before create_all
+    try:
+        import backend.models.payment  # noqa: F401
+    except Exception:
+        pass
     # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
 

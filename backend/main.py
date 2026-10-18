@@ -403,6 +403,8 @@ app.include_router(donate_router)
 app.include_router(feedback_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
+os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
 
