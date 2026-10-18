@@ -65,6 +65,7 @@ jobs:
 
       - name: Run backend tests
         run: |
+          PYTHONPATH=. python -c "from backend.models.database import create_tables; create_tables()"
           PYTHONPATH=. pytest backend/tests/ -v --tb=short
         env:
           DATABASE_URL: postgresql://dubber_test:dubber_test_pw@localhost:5432/dubber_test_db
