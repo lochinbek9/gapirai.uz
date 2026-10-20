@@ -353,6 +353,11 @@ def merge_video_audio(
                 return output_path
 
             fb_stderr = (result_fb.stderr or "")[-2000:]
+            if result_fb.returncode == 0:
+                raise RuntimeError(
+                    f"FFmpeg yakunlandi (exit={result_fb.returncode}), lekin chiqish video fayli yaratilmadi yoki bo'sh (0 bayt): {output_path}\n"
+                    f"STDERR:\n{fb_stderr}"
+                )
             raise RuntimeError(
                 f"FFmpeg xatoligi (suv belgisi va fallback ham muvaffaqiyatsiz):\n"
                 f"Returncode={result_fb.returncode}\nSTDERR:\n{fb_stderr}"
