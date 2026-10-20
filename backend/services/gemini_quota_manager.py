@@ -464,8 +464,11 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
     last_error = None
     min_cooldown_remaining = float("inf")
 
-    # Sifat bo'yicha: Har bir model uchun barcha kalitlarni navbatma-navbat sinaymiz
+    # Sifat bo'yicha: Har bir model uchun kalitlarni sinaymiz.
+    # Agar model Google tomonida 503 (high demand) yoki timeout bersa,
+    # 2 ta kalitdan so'ng darhol KEYINGI MODELGA o'tiladi (foydalanuvchi yarim soat kutmasligi uchun).
     for model_name in GEMINI_TEXT_MODELS:
+        model_fail_count = 0
         for api_key in keys:
             avail, remaining_sec = is_model_available(api_key, model_name)
             if not avail:
@@ -475,52 +478,61 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
 
             record_model_request(api_key, model_name)
             try:
-                client = genai.Client(api_key=api_key, http_options={"timeout": 20000})
+                client = genai.Client(api_key=api_key, http_options={"timeout": 12000})
             except Exception:
                 client = genai.Client(api_key=api_key)
 
-            for attempt in range(2):
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=user_message,
-                        config=config,
-                    )
-                    text = response.text or ""
-                    text_clean = text.strip()
-                    if text_clean.startswith("```"):
-                        lines = text_clean.split("\n")
-                        if lines[0].startswith("```"):
-                            lines = lines[1:]
-                        if lines and lines[-1].startswith("```"):
-                            lines = lines[:-1]
-                        text_clean = "\n".join(lines).strip()
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=user_message,
+                    config=config,
+                )
+                text = response.text or ""
+                text_clean = text.strip()
+                if text_clean.startswith("```"):
+                    lines = text_clean.split("\n")
+                    if lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    text_clean = "\n".join(lines).strip()
 
-                    result = json.loads(text_clean)
-                    record_model_success(api_key, model_name)
-                    return result
+                result = json.loads(text_clean)
+                record_model_success(api_key, model_name)
+                return result
 
-                except Exception as exc:
-                    last_error = exc
-                    err_str = str(exc)
-                    is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
-                    is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str
-                    is_timeout = "timeout" in err_str.lower() or "deadline" in err_str.lower() or "timed out" in err_str.lower()
-                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str
-                    is_bad_json = isinstance(exc, json.JSONDecodeError)
+            except Exception as exc:
+                last_error = exc
+                err_str = str(exc)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
+                is_timeout = "timeout" in err_str.lower() or "deadline" in err_str.lower() or "timed out" in err_str.lower()
+                is_not_found = "404" in err_str or "NOT_FOUND" in err_str
+                is_bad_json = isinstance(exc, json.JSONDecodeError)
 
-                    if is_rate_limit:
-                        retry_delay = parse_retry_delay(err_str)
-                        mark_model_cooldown(api_key, model_name, retry_delay, reason=err_str)
-                        if retry_delay < min_cooldown_remaining:
-                            min_cooldown_remaining = retry_delay
-                        # Ushbu kalit/model uchun boshqa urinmaymiz, keyingisiga o'tamiz
+                if is_rate_limit:
+                    retry_delay = parse_retry_delay(err_str)
+                    mark_model_cooldown(api_key, model_name, retry_delay, reason=err_str)
+                    if retry_delay < min_cooldown_remaining:
+                        min_cooldown_remaining = retry_delay
+                    continue
+
+                is_auth_error = any(x in err_str for x in ["401", "UNAUTHENTICATED", "API key not valid", "ACCESS_TOKEN_TYPE_UNSUPPORTED"])
+                if is_auth_error:
+                    logger.warning(f"[Gemini Quota] Kalit {mask_key(api_key)} 401 yaroqsiz kalit — butunlay 30 kunga to'xtatildi: {exc}")
+                    for m in GEMINI_ALL_MONITORED_MODELS:
+                        mark_model_cooldown(api_key, m, 86400.0 * 30, reason=f"401: Yaroqsiz kalit")
+                    continue
+
+                if is_server_error or is_timeout:
+                    logger.warning(f"Gemini {model_name} server band/timeout: {exc}")
+                    mark_model_cooldown(api_key, model_name, 120.0, reason=f"Server band/timeout: {exc}")
+                    model_fail_count += 1
+                    if model_fail_count >= 2:
+                        logger.warning(f"[Gemini Quota] Model {model_name} Google'da band (2 ta kalitda 503/timeout). Keyingi modelga zudlik bilan o'tilmoqda!")
                         break
-
-                    if is_server_error or is_timeout:
-                        logger.warning(f"Gemini {model_name} server band/timeout: {exc} — 2 daqiqaga kutishga qo'yildi.")
-                        mark_model_cooldown(api_key, model_name, 120.0, reason=f"Server band/timeout: {exc}")
-                        break
+                    continue
 
                     if is_bad_json:
                         logger.warning(f"Gemini {model_name} JSON parse xatosi (urinish {attempt + 1}/2): {exc}")
@@ -542,3 +554,306 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
         f"Barcha mavjud Gemini modellari va API kalitlari vaqtinchalik kvota chegarasiga yetgan. "
         f"Eng yaqin model taxminan {wait_msg}dan so'ng yana faollashadi. So'nggi xato: {last_error}"
     )
+
+
+def get_admin_gemini_mode() -> str:
+    """Admin foydalanuvchilar dublyaj/tahlil qilganda qaysi kalit ishlasin: 'free' (default) yoki 'paid'."""
+    redis_client = _get_redis()
+    if redis_client:
+        try:
+            val = redis_client.get("gemini:admin_mode")
+            if val in ("free", "paid"):
+                return val
+        except Exception:
+            pass
+    return "free"
+
+
+def set_admin_gemini_mode(mode: str) -> str:
+    """Admin dublyaj rejimini sozlash ('free' yoki 'paid')."""
+    clean_mode = "paid" if mode == "paid" else "free"
+    redis_client = _get_redis()
+    if redis_client:
+        try:
+            redis_client.set("gemini:admin_mode", clean_mode)
+        except Exception as e:
+            logger.warning(f"Admin rejimini saqlashda xato: {e}")
+    return clean_mode
+
+
+def get_paid_initial_balance() -> float:
+    """Pullik kalit uchun kiritilgan boshlang'ich balans ($). Standart $30.00."""
+    redis_client = _get_redis()
+    if redis_client:
+        try:
+            val = redis_client.get("gemini:paid_initial_balance")
+            if val is not None:
+                return float(val)
+        except Exception:
+            pass
+    return 30.00
+
+
+def set_paid_initial_balance(amount: float) -> float:
+    """Pullik kalit boshlang'ich balansini yangilash."""
+    amount = max(0.0, float(amount))
+    redis_client = _get_redis()
+    if redis_client:
+        try:
+            redis_client.set("gemini:paid_initial_balance", str(round(amount, 4)))
+        except Exception as e:
+            logger.warning(f"Balansni saqlashda xato: {e}")
+    return amount
+
+
+def record_job_key_usage(api_key_or_masked: str, duration_sec: float, cost_usd: float, cost_uzs: int):
+    """Har bir kalit bo'yicha muvaffaqiyatli video soni, davomiyligi va xarajatini Redisda saqlaydi."""
+    if not api_key_or_masked or api_key_or_masked == "none":
+        return
+    redis_client = _get_redis()
+    if not redis_client:
+        return
+    try:
+        masked = mask_key(api_key_or_masked) if len(api_key_or_masked) > 20 else api_key_or_masked
+        kh = hashlib.sha256(masked.encode("utf-8")).hexdigest()[:12]
+        key_redis = f"gemini_kusage:{kh}"
+        pipe = redis_client.pipeline()
+        pipe.hincrby(key_redis, "jobs_count", 1)
+        pipe.hincrbyfloat(key_redis, "duration_sec", float(duration_sec or 0))
+        pipe.hincrbyfloat(key_redis, "cost_usd", float(cost_usd or 0))
+        pipe.hincrby(key_redis, "cost_uzs", int(cost_uzs or 0))
+        pipe.hset(key_redis, "masked_key", masked)
+        pipe.hset(key_redis, "last_used", time.time())
+        pipe.execute()
+    except Exception as e:
+        logger.warning(f"Kalit statistikasini yozishda xato: {e}")
+
+
+def reset_gemini_key_cooldown(masked_key: str, model: Optional[str] = None) -> bool:
+    """Admin tomonidan kalit yoki model cooldownini zudlik bilan tozalash."""
+    all_keys = get_all_gemini_api_keys()
+    target_key = None
+    for k in all_keys:
+        if mask_key(k) == masked_key or k == masked_key:
+            target_key = k
+            break
+    if not target_key:
+        return False
+
+    kh = _key_hash(target_key)
+    redis_client = _get_redis()
+    models_to_reset = [model] if model else GEMINI_ALL_MONITORED_MODELS
+
+    for m in models_to_reset:
+        cd_key = f"{kh}:{m}"
+        _memory_cooldowns.pop(cd_key, None)
+        if redis_client:
+            try:
+                redis_client.delete(f"gemini_cd:{kh}:{m}")
+            except Exception:
+                pass
+    return True
+
+
+def format_duration_uz(seconds: float) -> str:
+    """Soniyalarni chiroyli o'zbekcha formatga o'tkazadi (masalan: '12 daq 45 son')."""
+    sec = int(round(seconds or 0))
+    if sec <= 0:
+        return "0 son"
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    parts = []
+    if h > 0:
+        parts.append(f"{h} soat")
+    if m > 0:
+        parts.append(f"{m} daq")
+    if s > 0 and h == 0:
+        parts.append(f"{s} son")
+    return " ".join(parts) if parts else "0 son"
+
+
+def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
+    """Admin paneldagi Gemini Kalitlar va Kvota boshqaruvi uchun to'liq tahliliy ma'lumot."""
+    all_keys = get_all_gemini_api_keys()
+    paid_keys = get_paid_gemini_api_keys()
+    paid_set = set(paid_keys)
+    redis_client = _get_redis()
+    admin_mode = get_admin_gemini_mode()
+    initial_balance = get_paid_initial_balance()
+
+    db_stats_by_key = {}
+    paid_jobs_totals = {"jobs_count": 0, "duration_sec": 0.0, "cost_usd": 0.0, "cost_uzs": 0}
+
+    if db:
+        try:
+            from backend.models.database import DubbingJob, JobStatus
+            from sqlalchemy import func
+            rows = db.query(
+                DubbingJob.gemini_key_used,
+                func.count(DubbingJob.id).label("job_count"),
+                func.sum(DubbingJob.video_duration).label("duration_sum"),
+                func.sum(DubbingJob.total_cost_usd).label("cost_usd_sum"),
+                func.sum(DubbingJob.total_cost_uzs).label("cost_uzs_sum"),
+            ).filter(
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.gemini_key_used.isnot(None)
+            ).group_by(DubbingJob.gemini_key_used).all()
+
+            for r in rows:
+                if r[0]:
+                    db_stats_by_key[r[0]] = {
+                        "job_count": int(r[1] or 0),
+                        "duration_sec": float(r[2] or 0),
+                        "cost_usd": float(r[3] or 0),
+                        "cost_uzs": int(r[4] or 0),
+                    }
+
+            p_row = db.query(
+                func.count(DubbingJob.id),
+                func.sum(DubbingJob.video_duration),
+                func.sum(DubbingJob.total_cost_usd),
+                func.sum(DubbingJob.total_cost_uzs),
+            ).filter(
+                DubbingJob.status == JobStatus.COMPLETED,
+                DubbingJob.gemini_key_tier == "paid"
+            ).first()
+
+            if p_row:
+                paid_jobs_totals = {
+                    "jobs_count": int(p_row[0] or 0),
+                    "duration_sec": float(p_row[1] or 0),
+                    "cost_usd": float(p_row[2] or 0),
+                    "cost_uzs": int(p_row[3] or 0),
+                }
+        except Exception as e:
+            logger.warning(f"DB key stats yig'ishda xato: {e}")
+
+    paid_key_item = None
+    free_keys_list = []
+
+    total_active = 0
+    total_cooldown = 0
+    grand_total_jobs = 0
+    grand_total_cost_usd = 0.0
+
+    for key in all_keys:
+        is_paid = key in paid_set
+        masked = mask_key(key)
+        kh = _key_hash(key)
+
+        in_cooldown = False
+        max_remaining_sec = 0.0
+        cooldown_reason = ""
+        total_key_requests = 0
+        total_key_success = 0
+        total_key_429 = 0
+
+        for model in GEMINI_ALL_MONITORED_MODELS:
+            avail, rem = is_model_available(key, model)
+            if not avail and rem > max_remaining_sec:
+                in_cooldown = True
+                max_remaining_sec = rem
+
+            if redis_client:
+                try:
+                    st = redis_client.hgetall(f"gemini_stats:{kh}:{model}") or {}
+                    total_key_requests += int(st.get("total_requests") or 0)
+                    total_key_success += int(st.get("total_success") or 0)
+                    total_key_429 += int(st.get("total_429") or 0)
+                    if not cooldown_reason and st.get("last_reason"):
+                        cooldown_reason = st.get("last_reason")
+                except Exception:
+                    pass
+
+        redis_usage = {}
+        if redis_client:
+            try:
+                redis_usage = redis_client.hgetall(f"gemini_kusage:{kh}") or {}
+            except Exception:
+                pass
+
+        db_stat = db_stats_by_key.get(masked, {})
+        jobs_count = max(int(db_stat.get("job_count", 0)), int(redis_usage.get("jobs_count", 0)))
+        duration_sec = max(float(db_stat.get("duration_sec", 0.0)), float(redis_usage.get("duration_sec", 0.0)))
+        cost_usd = max(float(db_stat.get("cost_usd", 0.0)), float(redis_usage.get("cost_usd", 0.0)))
+        cost_uzs = max(int(db_stat.get("cost_uzs", 0)), int(float(redis_usage.get("cost_uzs", 0))))
+
+        if is_paid:
+            jobs_count = max(jobs_count, paid_jobs_totals["jobs_count"])
+            duration_sec = max(duration_sec, paid_jobs_totals["duration_sec"])
+            cost_usd = max(cost_usd, paid_jobs_totals["cost_usd"])
+            cost_uzs = max(cost_uzs, paid_jobs_totals["cost_uzs"])
+
+        grand_total_jobs += jobs_count
+        grand_total_cost_usd += cost_usd
+
+        status_str = "cooldown" if (in_cooldown and max_remaining_sec > 5) else "active"
+        if status_str == "active":
+            total_active += 1
+            remaining_human = "Faol (so'rovga tayyor)"
+        else:
+            total_cooldown += 1
+            m, s = divmod(int(max_remaining_sec), 60)
+            h, m = divmod(m, 60)
+            remaining_human = f"{h}s {m}d {s}s qoldi" if h else f"{m}d {s}s qoldi"
+
+        item = {
+            "key_masked": masked,
+            "tier": "paid" if is_paid else "free",
+            "status": status_str,
+            "remaining_seconds": round(max_remaining_sec, 1),
+            "remaining_human": remaining_human,
+            "cooldown_reason": cooldown_reason[:150] if cooldown_reason else "",
+            "limits": {
+                "rpm": 1000 if is_paid else 15,
+                "rpd": "Cheksiz" if is_paid else 1500,
+                "tpm": "4,000,000" if is_paid else "1,000,000",
+                "label": "1,000+ RPM • Cheksiz RPD (Pay-as-you-go)" if is_paid else "15 RPM • 1,500 RPD • 1M TPM (Bepul)",
+            },
+            "total_jobs": jobs_count,
+            "total_duration_sec": round(duration_sec, 1),
+            "total_duration_formatted": format_duration_uz(duration_sec),
+            "total_cost_usd": round(cost_usd, 4),
+            "total_cost_uzs": cost_uzs,
+            "total_requests": total_key_requests,
+            "success_count": total_key_success,
+            "rate_limit_count": total_key_429,
+        }
+
+        if is_paid:
+            remaining_bal = max(0.0, round(initial_balance - cost_usd, 2))
+            item.update({
+                "initial_balance_usd": initial_balance,
+                "remaining_balance_usd": remaining_bal,
+                "remaining_balance_uzs": int(remaining_bal * 12850),
+                "google_balance_note": (
+                    "Google AI Studio va Gemini API arxitekturasi bo'yicha API kalit faqat model so'rovlari (AI inference) uchun mo'ljallangan "
+                    "bo'lib, billing/balansni ko'rsatuvchi ochiq API endpoint mavjud emas. Google xavfsizlik qoidalariga ko'ra, "
+                    "billing va bank kartasi ma'lumotlari API kalitlar orqali berilmaydi. "
+                    "Shuning uchun GapirAI tizimi Google'ning rasmiy narxlari (input/output tokenlar, audio daqiqalar) asosida har bir so'rovni 1 cent "
+                    "aniqlikda hisoblab, qoldiqni Google Cloud Console dagi haqiqiy summa bilan bir xil ko'rsatadi."
+                ),
+            })
+            paid_key_item = item
+        else:
+            free_keys_list.append(item)
+
+    free_keys_list.sort(key=lambda x: (x["total_jobs"], x["total_cost_usd"]), reverse=True)
+
+    return {
+        "admin_mode": admin_mode,
+        "paid_key_initial_balance": initial_balance,
+        "paid_key": paid_key_item,
+        "free_keys": free_keys_list,
+        "summary": {
+            "total_keys": len(all_keys),
+            "total_paid_keys": len(paid_keys),
+            "total_free_keys": len(free_keys_list),
+            "total_active_keys": total_active,
+            "total_cooldown_keys": total_cooldown,
+            "total_jobs_all": grand_total_jobs,
+            "total_cost_all_usd": round(grand_total_cost_usd, 4),
+        }
+    }
+

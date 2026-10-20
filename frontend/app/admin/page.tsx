@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   ExternalLink,
   RotateCcw,
+  Key,
 } from 'lucide-react'
 import {
   AdminStats,
@@ -40,6 +41,7 @@ import { useAuth } from '@/hooks/useAuth'
 import AdminUsersManager from '@/components/AdminUsersManager'
 import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
 import AdminJobsCostManager from '@/components/AdminJobsCostManager'
+import AdminGeminiKeysManager from '@/components/AdminGeminiKeysManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
 import AdminRetentionManager from '@/components/AdminRetentionManager'
@@ -76,6 +78,7 @@ const STATUS_LABELS: Record<string, string> = {
 type TabType =
   | 'overview'
   | 'jobs'
+  | 'gemini'
   | 'users'
   | 'analytics'
   | 'payments'
@@ -86,6 +89,7 @@ type TabType =
 const TABS: { id: TabType; label: string; icon: React.ReactNode; badge?: string }[] = [
   { id: 'overview', label: 'Umumiy', icon: <Activity className="w-4 h-4" /> },
   { id: 'jobs', label: 'Dublyaj & Xarajatlar', icon: <Video className="w-4 h-4" /> },
+  { id: 'gemini', label: 'Gemini Kalitlar', icon: <Key className="w-4 h-4 text-amber-400" />, badge: '💎 Pullik' },
   { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
   { id: 'analytics', label: 'Analitika & Voronka', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'payments', label: "To'lovlar & Moliya", icon: <CreditCard className="w-4 h-4" /> },
@@ -794,6 +798,15 @@ export default function AdminPage() {
         {activeTab === 'jobs' && (
           <section>
             <AdminJobsCostManager token={token} />
+          </section>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 2.5: GEMINI API KEYS & QUOTA MANAGEMENT */}
+        {/* ========================================================= */}
+        {activeTab === 'gemini' && (
+          <section>
+            <AdminGeminiKeysManager token={token} />
           </section>
         )}
 

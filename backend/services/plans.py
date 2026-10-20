@@ -45,7 +45,11 @@ def is_user_paid_tier(db, user_id) -> bool:
         return False
     try:
         if is_user_admin(db, user_id):
-            return True
+            # Admin o'zi tanlagan rejimga qaraydi:
+            # Agar admin "bepul" tanlagan bo'lsa (default) -> pullik kalitga tegilmaydi (False)
+            # Agar admin "pullik" tanlagan bo'lsa -> pullik kalit ishlatiladi (True)
+            from backend.services.gemini_quota_manager import get_admin_gemini_mode
+            return get_admin_gemini_mode() == "paid"
         sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
         if not sub:
             return False

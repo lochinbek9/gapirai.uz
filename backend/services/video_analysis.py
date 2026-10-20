@@ -273,6 +273,110 @@ JSON formatida qaytaring:
             "remember": str(result.get("remember", "")).strip(),
         }
 
+    def generate_base_analysis(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> dict:
+        """Barcha asosiy bo'limlarni (summary, key_points, chapters, five_minute_summary)
+        BITTA tezkor LLM so'rovi bilan yaratadi. 4 ta alohida chaqiruvga nisbatan 4x tezroq va barqaror!"""
+        system = f"""Siz professional video tahlilchi va ta'lim mutaxassisiz.
+{_NO_HALLUCINATION_RULE}
+{_UNTRUSTED_TRANSCRIPT_RULE}
+{_language_rule(language)}
+
+Videoning berilgan transkriptidan foydalanib, quyidagi barcha bo'limlarni BIR VAQTDA to'liq JSON formatida shakllantiring:
+
+1. "summary":
+   - "short": 2-4 jumlali qisqa, aniq xulosa
+   - "medium": 2-3 paragrafda asosiy mazmun
+   - "detailed": batafsil, to'liq xulosa matni
+
+2. "key_points": eng muhim 5-8 ta asosiy fikr ro'yxati (har biriga sarlavha, qisqa sharh va video soniyasi/timestamp):
+   [{{"title": "...", "description": "...", "timestamp": 120}}, ...]
+
+3. "chapters": videoni mantiqiy boblarga ajrating (start va end soniyalarda):
+   [{{"title": "Kirish / ...", "start": 0, "end": 60}}, ...]
+
+4. "five_minute_summary":
+   - "title": qiziqarli sarlavha
+   - "why_it_matters": nima uchun bu mavzu muhimligi
+   - "core_ideas": asosiy g'oyalar ro'yxati (matnlar)
+   - "examples": keltirilgan misollar (matnlar)
+   - "takeaways": asosiy xulosalar (matnlar)
+   - "key_terms": muhim atamalar [{{"term": "...", "explanation": "..."}}]
+   - "remember": eslab qolish kerak bo'lgan bosh fikr (1 jumla)
+
+Faqat JSON qaytaring:
+{{
+  "summary": {{"short": "...", "medium": "...", "detailed": "..."}},
+  "key_points": [...],
+  "chapters": [...],
+  "five_minute_summary": {{...}}
+}}"""
+        try:
+            result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+            if isinstance(result, dict) and "summary" in result and "chapters" in result:
+                max_ts = max((_safe_float(s.get("end")) for s in segments), default=float(video_duration or 0.0))
+                # Validate key points
+                kp = []
+                for item in result.get("key_points") or []:
+                    if isinstance(item, dict) and item.get("title"):
+                        ts = _safe_float(item.get("timestamp"))
+                        kp.append({
+                            "title": str(item["title"]).strip(),
+                            "description": str(item.get("description", "")).strip(),
+                            "timestamp": min(max(ts, 0.0), max_ts) if max_ts else 0.0,
+                        })
+                # Validate chapters
+                ch = []
+                for item in result.get("chapters") or []:
+                    if isinstance(item, dict) and item.get("title"):
+                        st = _safe_float(item.get("start"))
+                        en = _safe_float(item.get("end"), default=video_duration)
+                        if en <= st:
+                            en = st + 30.0
+                        ch.append({
+                            "title": str(item["title"]).strip(),
+                            "start": max(0.0, st),
+                            "end": max(st + 1.0, en),
+                        })
+                sum_obj = result.get("summary") or {}
+                five_obj = result.get("five_minute_summary") or {}
+                
+                # key_terms in five_minute_summary
+                key_terms = []
+                for it in (five_obj.get("key_terms") or [])[:10]:
+                    if isinstance(it, dict) and it.get("term"):
+                        key_terms.append({
+                            "term": str(it["term"]).strip(),
+                            "explanation": str(it.get("explanation", "")).strip(),
+                        })
+
+                return {
+                    "summary": {
+                        "short": str(sum_obj.get("short", "")).strip(),
+                        "medium": str(sum_obj.get("medium", "")).strip(),
+                        "detailed": str(sum_obj.get("detailed", "")).strip(),
+                    },
+                    "key_points": kp,
+                    "chapters": ch,
+                    "five_minute_summary": {
+                        "title": str(five_obj.get("title", "")).strip(),
+                        "why_it_matters": str(five_obj.get("why_it_matters", "")).strip(),
+                        "core_ideas": [str(x).strip() for x in (five_obj.get("core_ideas") or []) if str(x).strip()],
+                        "examples": [str(x).strip() for x in (five_obj.get("examples") or []) if str(x).strip()],
+                        "takeaways": [str(x).strip() for x in (five_obj.get("takeaways") or []) if str(x).strip()],
+                        "key_terms": key_terms,
+                        "remember": str(five_obj.get("remember", "")).strip(),
+                    },
+                }
+        except Exception as e:
+            logger.warning(f"Bitta chaqiruvda tahlil qilishda xatolik ({e}), alohida metodlarga o'tilmoqda.")
+
+        return {
+            "summary": self.generate_summary(segments, language, is_paid=is_paid),
+            "key_points": self.generate_key_points(segments, language, is_paid=is_paid),
+            "chapters": self.generate_chapters(segments, video_duration, language, is_paid=is_paid),
+            "five_minute_summary": self.generate_five_minute_summary(segments, video_duration, language, is_paid=is_paid),
+        }
+
     def generate_notes(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> str:
         """Returns a structured markdown-style study conspectus (plain text)."""
         system = f"""Siz ta'lim videolaridan konspekt tuzuvchi mutaxassissiz.

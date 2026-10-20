@@ -774,12 +774,9 @@ def process_video(self: Task, job_id: str) -> dict:
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
-            job.stt_model = transcript.get("model") or getattr(settings, "GEMINI_STT_MODEL", "gemini-3.8-flash")
             job.gemini_key_tier = "paid" if is_paid_job else "free"
-            if is_paid_job and transcript.get("gemini_key_used"):
+            if transcript.get("gemini_key_used"):
                 job.gemini_key_used = transcript.get("gemini_key_used")
-            elif not is_paid_job:
-                job.gemini_key_used = None
 
             # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
             # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)

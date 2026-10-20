@@ -5,12 +5,28 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
+  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
   searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
   getPlans, PlanDef, MinutePack, CurrentSubscription,
 } from "@/lib/api";
+
+const ANALYSIS_TIPS = [
+  "Gemini AI videoning eng muhim joylarini ajratib, qisqa konspekt tuzmoqda...",
+  "Transkript orqali videodagi istalgan so'z va daqiqani soniyalarda qidirishingiz mumkin...",
+  "Tahlil tugagach, video mazmuni bo'yicha interaktiv test va AI bilan suhbat ochiladi...",
+  "Barcha asosiy g'oyalar va bo'limlar daqiqama-daqiqa ajratib beriladi...",
+];
+
+function getAnalysisStageIndex(status: string): number {
+  if (status === "pending" || status === "downloading" || status === "extracting_audio") return 0;
+  if (status === "transcribing") return 1;
+  if (status === "analyzing") return 2;
+  if (status === "generating_results" || status === "completed") return 3;
+  return 0;
+}
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
 import NotesTab from "@/components/analysis/NotesTab";
@@ -69,6 +85,26 @@ export default function VideoAnalysisPage() {
   const [plans, setPlans] = useState<PlanDef[]>([]);
   const [minutePacks, setMinutePacks] = useState<MinutePack[]>([]);
   const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
+
+  const isAnalysisActive = Boolean(analysis && analysis.status !== "completed" && analysis.status !== "failed");
+
+  useEffect(() => {
+    if (!isAnalysisActive) return;
+    const timer = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isAnalysisActive]);
+
+  useEffect(() => {
+    if (!isAnalysisActive) return;
+    const timer = setInterval(() => {
+      setTipIndex((i) => (i + 1) % ANALYSIS_TIPS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [isAnalysisActive]);
 
   useEffect(() => {
     getPlans()
@@ -289,18 +325,146 @@ export default function VideoAnalysisPage() {
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {!isDone && !isFailed && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-4">
-            <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto" />
-            <h2 className="text-lg font-bold text-white">
-              {ANALYSIS_STATUS_LABELS[analysis.status]}
-            </h2>
-            <div className="w-full max-w-sm mx-auto h-2 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-500"
-                style={{ width: `${analysis.progress}%` }}
-              />
+          <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+            {/* Top row: Video Thumbnail & Info + Elapsed Time */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-white/10">
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                {analysis.video_thumbnail ? (
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                    <img
+                      src={analysis.video_thumbnail}
+                      alt={analysis.video_title || "Video"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center flex-shrink-0">
+                    <VideoIcon className="w-7 h-7 text-blue-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold text-white line-clamp-2">
+                    {analysis.video_title || "Video tahlili tayyorlanmoqda..."}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                    {analysis.video_duration ? (
+                      <span>Davomiyligi: {formatHumanDuration(analysis.video_duration)}</span>
+                    ) : null}
+                    <span className="flex items-center gap-1 text-blue-400 font-medium">
+                      <Clock className="w-3.5 h-3.5" /> {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1">
+                <span className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                  {Math.round(analysis.progress)}%
+                </span>
+                <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  Jarayonda
+                </span>
+              </div>
             </div>
-            <p className="text-sm text-gray-400">{analysis.status_message}</p>
+
+            {/* Glowing Progress Bar */}
+            <div className="space-y-2">
+              <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden p-0.5 border border-white/10">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(139,92,246,0.5)]"
+                  style={{ width: `${Math.max(5, analysis.progress)}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-xs text-gray-400">
+                <span>{analysis.status_message || ANALYSIS_STATUS_LABELS[analysis.status]}</span>
+                <span>Taxminan: 30-60 soniya</span>
+              </div>
+            </div>
+
+            {/* 4-Stage Visual Stepper */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+              {[
+                {
+                  idx: 0,
+                  title: "1. Media & Audio",
+                  desc: "Yuklab olish va tayyorlash",
+                  icon: VideoIcon,
+                },
+                {
+                  idx: 1,
+                  title: "2. Nutq Transkripti",
+                  desc: "Whisper STT (so'zma-so'z)",
+                  icon: FileText,
+                },
+                {
+                  idx: 2,
+                  title: "3. Gemini AI Tahlili",
+                  desc: "Xulosa va asosiy fikrlar",
+                  icon: Brain,
+                },
+                {
+                  idx: 3,
+                  title: "4. Yakuniy Natijalar",
+                  desc: "Konspekt va testlar",
+                  icon: Sparkles,
+                },
+              ].map((stage) => {
+                const currentStageIdx = getAnalysisStageIndex(analysis.status);
+                const isPassed = currentStageIdx > stage.idx;
+                const isCurrent = currentStageIdx === stage.idx;
+                const StageIcon = stage.icon;
+
+                return (
+                  <div
+                    key={stage.idx}
+                    className={`relative p-3.5 rounded-2xl border transition-all duration-300 ${
+                      isCurrent
+                        ? "bg-gradient-to-b from-blue-500/15 to-violet-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30"
+                        : isPassed
+                        ? "bg-emerald-500/5 border-emerald-500/30 text-gray-300"
+                        : "bg-white/[0.02] border-white/5 opacity-60 text-gray-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 mb-1.5">
+                      <div
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                          isCurrent
+                            ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 animate-pulse"
+                            : isPassed
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                            : "bg-white/10 text-gray-400"
+                        }`}
+                      >
+                        {isPassed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : isCurrent ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        ) : (
+                          <StageIcon className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <span className={`text-xs font-bold leading-tight ${isCurrent ? "text-white" : isPassed ? "text-gray-200" : "text-gray-400"}`}>
+                        {stage.title}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-tight pl-9">
+                      {stage.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Rotating Tips Box */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+              </div>
+              <p className="text-xs text-gray-300 transition-all duration-500">
+                {ANALYSIS_TIPS[tipIndex]}
+              </p>
+            </div>
           </div>
         )}
 

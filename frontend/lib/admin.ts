@@ -826,3 +826,75 @@ export async function apiAdminRetryJob(token: string, jobId: string): Promise<{ 
   })
   return res.data
 }
+
+export interface GeminiKeyItem {
+  key_masked: string
+  tier: 'paid' | 'free'
+  status: 'active' | 'cooldown'
+  remaining_seconds: number
+  remaining_human: string
+  cooldown_reason: string
+  limits: {
+    rpm: number
+    rpd: string | number
+    tpm: string
+    label: string
+  }
+  total_jobs: number
+  total_duration_sec: number
+  total_duration_formatted: string
+  total_cost_usd: number
+  total_cost_uzs: number
+  total_requests: number
+  success_count: number
+  rate_limit_count: number
+  initial_balance_usd?: number
+  remaining_balance_usd?: number
+  remaining_balance_uzs?: number
+  google_balance_note?: string
+}
+
+export interface GeminiKeysOverviewResponse {
+  admin_mode: 'free' | 'paid'
+  paid_key_initial_balance: number
+  paid_key: GeminiKeyItem | null
+  free_keys: GeminiKeyItem[]
+  summary: {
+    total_keys: number
+    total_paid_keys: number
+    total_free_keys: number
+    total_active_keys: number
+    total_cooldown_keys: number
+    total_jobs_all: number
+    total_cost_all_usd: number
+  }
+}
+
+export async function apiAdminGeminiKeysOverview(token: string): Promise<GeminiKeysOverviewResponse> {
+  const res = await axios.get(`${API_URL}/admin/gemini-keys/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminSetGeminiAdminMode(token: string, mode: 'free' | 'paid'): Promise<{ status: string; mode: string }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/admin-mode`, { mode }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminSetGeminiInitialBalance(token: string, initial_balance: number): Promise<{ status: string; initial_balance: number }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/initial-balance`, { initial_balance }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminResetGeminiCooldown(token: string, key_masked: string, model?: string): Promise<{ status: string }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/reset-cooldown`, { key_masked, model }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+

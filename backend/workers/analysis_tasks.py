@@ -239,11 +239,12 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         if analysis.summary and analysis.key_points and analysis.chapters and analysis.five_minute_summary:
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "skipped")
         else:
-            _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 70.0, "AI tahlil qilinmoqda...")
-            analysis.summary = _service.generate_summary(segments, analysis.language, is_paid=is_paid_analysis)
-            analysis.key_points = _service.generate_key_points(segments, analysis.language, is_paid=is_paid_analysis)
-            analysis.chapters = _service.generate_chapters(segments, analysis.video_duration or 0.0, analysis.language, is_paid=is_paid_analysis)
-            analysis.five_minute_summary = _service.generate_five_minute_summary(segments, analysis.video_duration or 0.0, analysis.language, is_paid=is_paid_analysis)
+            _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 75.0, "AI xulosasi, boblari va konspekti tayyorlanmoqda...")
+            base_res = _service.generate_base_analysis(segments, analysis.video_duration or 0.0, analysis.language, is_paid=is_paid_analysis)
+            analysis.summary = base_res["summary"]
+            analysis.key_points = base_res["key_points"]
+            analysis.chapters = base_res["chapters"]
+            analysis.five_minute_summary = base_res["five_minute_summary"]
             if is_paid_analysis and not analysis.gemini_key_used:
                 from backend.services.gemini_quota_manager import get_paid_gemini_api_keys, mask_key
                 paid_k = get_paid_gemini_api_keys()

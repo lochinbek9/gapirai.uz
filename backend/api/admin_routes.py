@@ -2143,6 +2143,66 @@ def get_gemini_quota(current_admin: User = Depends(get_current_admin_user)):
     return get_gemini_quota_status()
 
 
+class AdminGeminiModeRequest(BaseModel):
+    mode: str  # "free" | "paid"
+
+
+class AdminGeminiBalanceRequest(BaseModel):
+    initial_balance: float
+
+
+class AdminGeminiResetCooldownRequest(BaseModel):
+    key_masked: str
+    model: Optional[str] = None
+
+
+@router.get("/gemini-keys/overview")
+def get_gemini_keys_overview(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Barcha Gemini API kalitlari (pullik va 36+ bepul), ularning rasmiy limitlari,
+    muvaffaqiyatli videolar soni, umumiy davomiyligi, hisoblangan tannarxi (USD/UZS)
+    va alohida pullik kalit bloki ma'lumotlarini qaytaradi.
+    """
+    from backend.services.gemini_quota_manager import get_gemini_keys_detailed_stats
+    return get_gemini_keys_detailed_stats(db)
+
+
+@router.post("/gemini-keys/admin-mode")
+def set_admin_gemini_mode_endpoint(
+    req: AdminGeminiModeRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Admin dublyaj/tahlil qilganda qaysi kalit ishlasin: 'free' (default) yoki 'paid'."""
+    from backend.services.gemini_quota_manager import set_admin_gemini_mode
+    res_mode = set_admin_gemini_mode(req.mode)
+    return {"status": "ok", "mode": res_mode, "message": f"Admin rejimi '{res_mode}' ga o'zgartirildi."}
+
+
+@router.post("/gemini-keys/initial-balance")
+def set_admin_gemini_balance_endpoint(
+    req: AdminGeminiBalanceRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Pullik kalitning boshlang'ich kiritilgan balansini sozlash."""
+    from backend.services.gemini_quota_manager import set_paid_initial_balance
+    bal = set_paid_initial_balance(req.initial_balance)
+    return {"status": "ok", "initial_balance": bal, "message": f"Boshlang'ich balans ${bal:.2f} qilib belgilandi."}
+
+
+@router.post("/gemini-keys/reset-cooldown")
+def reset_admin_gemini_cooldown_endpoint(
+    req: AdminGeminiResetCooldownRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Kalit yoki model cooldownini zudlik bilan tozalash."""
+    from backend.services.gemini_quota_manager import reset_gemini_key_cooldown
+    ok = reset_gemini_key_cooldown(req.key_masked, req.model)
+    return {"status": "ok" if ok else "not_found", "key_masked": req.key_masked}
+
+
 class ExcludedEmailCreateRequest(BaseModel):
     email: str
     reason: str = "Dasturchi / Test"
