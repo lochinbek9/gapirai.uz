@@ -2153,12 +2153,11 @@ class AdminGeminiBalanceRequest(BaseModel):
 
 class AdminGeminiResetCooldownRequest(BaseModel):
     key_masked: str
-    model: Optional[str] = None
+    model: str | None = None
 
 
 @router.get("/gemini-keys/overview")
 def get_gemini_keys_overview(
-    db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin_user),
 ):
     """
@@ -2167,7 +2166,11 @@ def get_gemini_keys_overview(
     va alohida pullik kalit bloki ma'lumotlarini qaytaradi.
     """
     from backend.services.gemini_quota_manager import get_gemini_keys_detailed_stats
-    return get_gemini_keys_detailed_stats(db)
+    db = SessionLocal()
+    try:
+        return get_gemini_keys_detailed_stats(db)
+    finally:
+        db.close()
 
 
 @router.post("/gemini-keys/admin-mode")
