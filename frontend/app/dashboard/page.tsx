@@ -521,18 +521,17 @@ function AnalysisCard({
             <button
               onClick={() => onRetry(analysis.id)}
               disabled={isRetrying}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow-sm transition disabled:opacity-50"
-              title="Tahlilni qayta urinish (Regenerate)"
+              title="Qayta urinish (Retry)"
+              className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
-              <span>Qayta urinish</span>
+              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
             </button>
           )}
           {isReady && onRetry && (
             <button
               onClick={() => onRetry(analysis.id)}
               disabled={isRetrying}
-              title="Qayta tahlil qilish"
+              title="Qayta tahlil qilish (Regenerate)"
               className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             >
               <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
@@ -540,7 +539,7 @@ function AnalysisCard({
           )}
           <Link
             href={`/video-analysis/${analysis.id}`}
-            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold"
+            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold whitespace-nowrap"
           >
             Ko'rish →
           </Link>
