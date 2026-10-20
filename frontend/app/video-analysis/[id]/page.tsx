@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight,
+  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
   searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
+  getPlans, PlanDef, MinutePack, CurrentSubscription,
 } from "@/lib/api";
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
@@ -28,6 +29,20 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "quiz", label: "Test" },
   { key: "qa", label: "Savol-javob" },
 ];
+
+function formatHumanDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return "0 soniya";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h} soat ${m} daqiqa${s > 0 ? ` ${s} soniya` : ""}`;
+  }
+  if (m > 0) {
+    return `${m} daqiqa${s > 0 ? ` ${s} soniya` : ""}`;
+  }
+  return `${s} soniya`;
+}
 
 export default function VideoAnalysisPage() {
   const { id } = useParams<{ id: string }>();
@@ -50,7 +65,19 @@ export default function VideoAnalysisPage() {
   const [transcriptView, setTranscriptView] = useState<"normal" | "bilingual">("normal");
   const [bilingual, setBilingual] = useState<BilingualSegment[] | null>(null);
   const [bilingualLoading, setBilingualLoading] = useState(false);
+  const [plans, setPlans] = useState<PlanDef[]>([]);
+  const [minutePacks, setMinutePacks] = useState<MinutePack[]>([]);
+  const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
 
+  useEffect(() => {
+    getPlans()
+      .then((res) => {
+        if (res.plans) setPlans(res.plans);
+        if (res.minute_packs) setMinutePacks(res.minute_packs);
+        if (res.current) setCurrentSub(res.current);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (analysis?.qa_history) setQaHistory(analysis.qa_history);
@@ -320,34 +347,118 @@ export default function VideoAnalysisPage() {
               </span>
             </div>
 
-            {/* ── Dubbing Lead Magnet Banner (Growth Experiment 2) ── */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
-              <div className="space-y-1 text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
-                    🎙️ Ovozli Dublyaj
-                  </span>
-                  <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    Starter: 4,900 so&apos;m
-                  </span>
-                </div>
-                <h3 className="text-sm sm:text-base font-extrabold text-white">
-                  Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
-                </h3>
-                <p className="text-xs text-gray-300">
-                  Sun&apos;iy intellekt orqali professional ovozda to&apos;liq tarjima qiling.
-                </p>
-              </div>
+            {/* ── Dubbing Lead Magnet Banner (Faqat chet tildagi videolar uchun) ── */}
+            {Boolean(analysis.video_language && !analysis.video_language.toLowerCase().startsWith("uz")) && (() => {
+              const durationSec = analysis.video_duration || 0;
+              const videoMinutes = Math.max(1, Math.ceil(durationSec / 60));
+              const availableMinutes = currentSub?.minutes?.total_available ?? 5;
+              const neededMinutes = Math.max(0, videoMinutes - availableMinutes);
 
-              <Link
-                href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
-                className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
-              >
-                <Sparkles size={16} />
-                <span>O&apos;zbekcha dublyaj qilish</span>
-                <ArrowRight size={14} />
-              </Link>
-            </div>
+              const packs = minutePacks.length > 0 ? minutePacks : [
+                { minutes: 15, price: 4900, one_time: true },
+                { minutes: 35, price: 15000 },
+                { minutes: 70, price: 25000 },
+                { minutes: 140, price: 45000 },
+                { minutes: 350, price: 100000 },
+              ];
+
+              const eligiblePacks = packs.filter((p) => !p.already_purchased);
+              const recPack = eligiblePacks.find((p) => p.minutes >= neededMinutes) || eligiblePacks[eligiblePacks.length - 1];
+
+              const recPlan = neededMinutes <= 350
+                ? (plans.find((p) => p.id === "standard") || { id: "standard", name: "Standart", monthly_minutes: 350, price: 49000 })
+                : (plans.find((p) => p.id === "pro") || { id: "pro", name: "Pro", monthly_minutes: 600, price: 199000 });
+
+              const formattedDur = formatHumanDuration(durationSec);
+
+              if (neededMinutes <= 0) {
+                return (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-600/20 via-teal-600/20 to-blue-600/20 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-emerald-500/10">
+                    <div className="space-y-1 text-center sm:text-left">
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                          🎙️ Ovozli Dublyaj
+                        </span>
+                        <span className="text-[11px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          Balansingiz yetarli ({availableMinutes} daqiqa)
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-extrabold text-white">
+                        Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
+                      </h3>
+                      <p className="text-xs text-gray-300">
+                        Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa). Balansingizdagi daqiqalar yetarli — videoni to&apos;liq dublyaj qilishingiz mumkin.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                      className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+                    >
+                      <Sparkles size={16} />
+                      <span>O&apos;zbekcha dublyaj qilish</span>
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+                  <div className="space-y-2 text-center md:text-left max-w-2xl">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
+                        🎙️ Ovozli Dublyaj
+                      </span>
+                      {recPack && (
+                        <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          Tavsiya paket: +{recPack.minutes} daqiqa ({recPack.price.toLocaleString("uz-UZ")} so&apos;m)
+                        </span>
+                      )}
+                      {recPlan && (
+                        <span className="text-[11px] text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 rounded-full">
+                          yoki {recPlan.name} tarifi ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy)
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-white">
+                      Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
+                    </h3>
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa).{" "}
+                      Balansingizda {availableMinutes} daqiqa mavjud — to&apos;liq dublyaj qilish uchun{" "}
+                      <strong className="text-amber-300">{neededMinutes} daqiqa</strong> yetishmayapti.{" "}
+                      Ushbu videoni dublyaj qilish uchun{" "}
+                      {recPack && (
+                        <>
+                          <strong className="text-emerald-300">+{recPack.minutes} daqiqalik paketni</strong> ({recPack.price.toLocaleString("uz-UZ")} so&apos;m) olishni{" "}
+                        </>
+                      )}
+                      yoki{" "}
+                      <strong className="text-violet-300">{recPlan.name} tarifiga</strong> ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy) o&apos;tishni tavsiya qilamiz!
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                    <Link
+                      href={`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(neededMinutes)}&duration=${encodeURIComponent(videoMinutes)}`}
+                      className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <CreditCard size={15} />
+                      <span>Paket yoki tarif olish</span>
+                    </Link>
+                    <Link
+                      href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                      className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-white/10"
+                    >
+                      <Sparkles size={14} className="text-amber-400" />
+                      <span>2 daqiqa bepul sinash</span>
+                      <ArrowRight size={13} />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">
               {TABS.map((t) => (

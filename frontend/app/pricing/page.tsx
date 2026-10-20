@@ -427,10 +427,20 @@ export default function PricingPage() {
                 </div>
                 {(() => {
                   const rec = shortfallMinutes ? (packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]) : packs[0];
+                  const recPlan = shortfallMinutes ? (shortfallMinutes <= 350
+                    ? (plans.find((p) => p.id === 'standard') || { id: 'standard', name: 'Standart', monthly_minutes: 350, price: 49000 })
+                    : (plans.find((p) => p.id === 'pro') || { id: 'pro', name: 'Pro', monthly_minutes: 600, price: 199000 })) : null;
                   return rec ? (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Tavsiya etilgan paket: <strong className="text-violet-600 dark:text-violet-400">+{rec.minutes} daqiqa</strong> ({rec.price.toLocaleString('uz-UZ')} so'm). Ortib qolgan daqiqalar kuymaydi!
-                    </p>
+                    <div className="space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <p>
+                        Tavsiya etilgan paket: <strong className="text-violet-600 dark:text-violet-400">+{rec.minutes} daqiqa</strong> ({rec.price.toLocaleString('uz-UZ')} so&apos;m). Ortib qolgan daqiqalar kuymaydi!
+                      </p>
+                      {recPlan && (
+                        <p>
+                          Yoki oylik tejamkorlik uchun <strong className="text-indigo-600 dark:text-indigo-400">{recPlan.name} tarifiga</strong> ({recPlan.monthly_minutes} daqiqa/oy — {recPlan.price.toLocaleString('uz-UZ')} so&apos;m) o&apos;tishingiz mumkin.
+                        </p>
+                      )}
+                    </div>
                   ) : null;
                 })()}
               </div>
@@ -442,17 +452,33 @@ export default function PricingPage() {
 
             {(() => {
               const rec = shortfallMinutes ? (packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]) : (packs.length > 0 ? packs[0] : null);
+              const recPlan = shortfallMinutes ? (shortfallMinutes <= 350
+                ? (plans.find((p) => p.id === 'standard') || { id: 'standard', name: 'Standart', monthly_minutes: 350, price: 49000 })
+                : (plans.find((p) => p.id === 'pro') || { id: 'pro', name: 'Pro', monthly_minutes: 600, price: 199000 })) : null;
               if (rec) {
                 return (
-                  <button
-                    onClick={() => {
-                      setShowInsufficientMinutes(false)
-                      handleBuyPack(rec.minutes, 'click')
-                    }}
-                    className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90 shadow-lg shadow-violet-500/20"
-                  >
-                    +{rec.minutes} daqiqa olish ({rec.price.toLocaleString('uz-UZ')} UZS)
-                  </button>
+                  <div className="mt-5 space-y-2">
+                    <button
+                      onClick={() => {
+                        setShowInsufficientMinutes(false)
+                        handleBuyPack(rec.minutes, 'click')
+                      }}
+                      className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90 shadow-lg shadow-violet-500/20"
+                    >
+                      +{rec.minutes} daqiqa olish ({rec.price.toLocaleString('uz-UZ')} UZS)
+                    </button>
+                    {recPlan && (
+                      <button
+                        onClick={() => {
+                          setShowInsufficientMinutes(false)
+                          handleSubscribe(recPlan.id, 'click')
+                        }}
+                        className="w-full rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-300 transition"
+                      >
+                        {recPlan.name} tarifiga o&apos;tish ({recPlan.price.toLocaleString('uz-UZ')} UZS/oy)
+                      </button>
+                    )}
+                  </div>
                 )
               }
               return (
@@ -460,7 +486,7 @@ export default function PricingPage() {
                   onClick={scrollToPacks}
                   className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 py-3 text-sm font-bold text-white transition hover:opacity-90"
                 >
-                  Qo'shimcha daqiqa sotib olish
+                  Qo&apos;shimcha daqiqa sotib olish
                 </button>
               )
             })()}
