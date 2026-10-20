@@ -413,19 +413,42 @@ Faqat JSON qaytaring:
         }
 
     def generate_notes(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> str:
-        """Returns a structured markdown-style study conspectus (plain text)."""
-        system = f"""Siz ta'lim videolaridan konspekt tuzuvchi mutaxassissiz.
+        """Returns a deep, structured, professional markdown study conspectus."""
+        system = f"""Siz ta'lim va biznes videolari bo'yicha professional konspekt tuzuvchi yetakchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
 {_language_rule(language)}
 
-Quyidagi tuzilishda konspekt yozing: mavzu sarlavhasi, so'ng raqamlangan
-bo'limlar (asosiy tushunchalar, muhim fikrlar, misollar, xulosa). Markdown
-formatida (## sarlavha, - ro'yxat) yozing.
+VAZIFA:
+Videoda gapirilgan barcha asosiy mavzular, amaliy keyslar, muhim tushunchalar va xulosalarni qamrab olgan CHUQUR, TO'LIQ va STRUKTURAVIY konspekt tuzing.
+Konspekt hech qachon qisqa, yuzaki yoki 1 ta paragrafga siqilgan bo'lmasligi SHART (kamida 500-800 so'z).
 
-JSON formatida qaytaring: {{"notes": "markdown matn"}}"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
-        return str(result.get("notes", "")).strip()
+FORMAT VA TUZILISH TALABLARI (QAT'IY):
+1. Boshida bitta asosiy sarlavha:
+## [Videoning to'liq va aniq mavzusi]
+
+2. Video mazmuni bo'yicha 4 tadan 6 tagacha asosiy bo'lim yarating:
+### 1. [Birinchi mavzu/bo'lim nomi]
+### 2. [Ikkinchi mavzu/bo'lim nomi]
+...
+Oxirgi bo'lim doimo:
+### [N]. Xulosa va tavsiyalar
+
+3. Har bir bo'lim tagida kamida 3-4 tadan batafsil ro'yxat bandi bo'lsin:
+- **[Mavzu/Tushuncha nomi]:** [Videoda aytilgan aniq faktlar, raqamlar, tahlil va amaliy misollar bilan keng tushuntirish].
+- **[Mavzu/Tushuncha nomi]:** [Ikkinchi aniq fikr, keys yoki uning izohi].
+
+4. MUHIM QOIDALAR:
+- Har bir bo'lim va har bir ro'yxat bandi alohida yangi qatorda bo'lishi SHART (haqiqiy markdown newlines).
+- Fikrlarni bitta qatorga yoki paragrafga qorishtirib yozmang.
+- Videoda aytilgan kompaniyalar (Tesla, Toyota, Twitter va h.k.), shaxslar, tajribalar va amaliy raqamlarni albatta kiriting.
+
+JSON FORMATIDA QAYTARING:
+{{"notes": "## Sarlavha\\n\\n### 1. Bo'lim...\\n- **Mavzu:** izoh..."}}"""
+        result = _call_json(system, _format_transcript(segments, max_chars=32000), is_paid=self._get_paid(is_paid))
+        raw = str(result.get("notes", "")).strip()
+        raw = raw.replace("\\n", "\n")
+        return raw
 
     def generate_quiz(self, segments: list[dict], language: str = "uz", num_questions: int = 10, is_paid: bool | None = None) -> list[dict]:
         """Returns [{"question","options","correct_answer","explanation","timestamp"}]."""

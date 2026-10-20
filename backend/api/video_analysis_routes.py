@@ -425,13 +425,14 @@ def get_or_generate_bilingual(
 @router.post("/{analysis_id}/notes")
 def get_or_generate_notes(
     analysis_id: str,
+    force: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
     analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
-    if not analysis.notes:
+    if not analysis.notes or force:
         is_paid = _is_paid_user(db, current_user_id)
         analysis.notes = _service.generate_notes(analysis.transcript_segments, analysis.language, is_paid=is_paid)
         db.commit()

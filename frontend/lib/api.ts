@@ -779,8 +779,8 @@ export async function generateQuiz(analysisId: string): Promise<{ quiz: QuizQues
   return res.data
 }
 
-export async function generateNotes(analysisId: string): Promise<{ notes: string }> {
-  const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes`)
+export async function generateNotes(analysisId: string, force: boolean = false): Promise<{ notes: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes${force ? "?force=true" : ""}`)
   return res.data
 }
 

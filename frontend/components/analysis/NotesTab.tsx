@@ -11,12 +11,13 @@ interface NotesTabProps {
   notes: string | null;
   loading: boolean;
   onGenerate: () => void;
+  onRegenerate?: () => void;
   startTime?: number | null;
   videoDuration?: number;
 }
 
 interface ParsedItem {
-  type: "concept" | "practice" | "tip" | "general";
+  type: "concept" | "practice" | "tip" | "labeled" | "general";
   label?: string;
   content: string;
 }
@@ -102,8 +103,13 @@ function parseNotes(raw: string): ParsedNotes {
       continue;
     }
 
-    // Section header: ### Title
-    if (line.startsWith("### ") || (sections.length > 0 && line.startsWith("## "))) {
+    // Section header: ### Title or ## Title or numbered line "1. Title"
+    const isSectionHeader =
+      line.startsWith("### ") ||
+      (sections.length > 0 && line.startsWith("## ")) ||
+      (/^\d+[\.\)]\s+[A-ZА-ЯЎҚҒҲ]/.test(line) && !line.includes("- ") && !line.includes(" - "));
+
+    if (isSectionHeader) {
       if (currentSection) {
         if (!currentSection.items.length && currentRawLines.length) {
           currentSection.rawText = currentRawLines.join("\n");
@@ -111,7 +117,7 @@ function parseNotes(raw: string): ParsedNotes {
         sections.push(currentSection);
       }
 
-      const headerText = line.replace(/^#{2,3}\s+/, "").trim();
+      const headerText = line.replace(/^#{1,3}\s+/, "").trim();
       const numMatch = headerText.match(/^(\d+)[\.\-–\s]+(.*)$/);
       const isConclusion = /xulosa|maslahat|tavsiya|yakun/i.test(headerText);
 
@@ -146,43 +152,42 @@ function parseNotes(raw: string): ParsedNotes {
 
     currentRawLines.push(line);
 
-    // Bullet point: - **Tushuncha:** ... or - **Amaliyot:** ...
+    // Bullet point: - **Label:** ... or - Content
     const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
     if (bulletMatch) {
       const content = bulletMatch[1].trim();
 
-      // Check for Tushuncha / Concept
-      const conceptMatch = content.match(/^\*\*(?:Tushuncha|Nazariya|Konsept|Tushuntirish|Concept):\*\*\s*(.*)$/i);
-      if (conceptMatch) {
-        currentSection.items.push({
-          type: "concept",
-          label: "Tushuncha (Nazariya)",
-          content: conceptMatch[1].trim(),
-        });
-        continue;
-      }
+      // Check for any **Label:** Body pattern
+      const labeledMatch = content.match(/^\*\*([^*]+):\*\*\s*(.*)$/);
+      if (labeledMatch) {
+        const labelText = labeledMatch[1].trim();
+        const bodyText = labeledMatch[2].trim();
 
-      // Check for Amaliyot / Practice
-      const practiceMatch = content.match(/^\*\*(?:Amaliyot|Qadamlar|Amaliy|Lab|Laboratoriya|Practice):\*\*\s*(.*)$/i);
-      if (practiceMatch) {
-        currentSection.items.push({
-          type: "practice",
-          label: "Amaliyot va Qadamlar",
-          content: practiceMatch[1].trim(),
-        });
-        continue;
-      }
-
-      // Check for Xulosa / Maslahat / Tip
-      const tipMatch = content.match(/^\*\*(?:Maslahat|Tavsiya|Xulosa|Eslatma|Tip|Note|Hujjatlashtirish|Python|Rivojlanish):\*\*\s*(.*)$/i);
-      if (tipMatch) {
-        const colonIdx = content.indexOf(":**");
-        const customLabel = colonIdx > -1 ? content.slice(2, colonIdx) : "Maslahat";
-        currentSection.items.push({
-          type: "tip",
-          label: customLabel,
-          content: tipMatch[1].trim(),
-        });
+        if (/^(?:tushuncha|nazariya|konsept|tushuntirish|concept)$/i.test(labelText)) {
+          currentSection.items.push({
+            type: "concept",
+            label: labelText,
+            content: bodyText,
+          });
+        } else if (/^(?:amaliyot|qadamlar|amaliy|lab|laboratoriya|practice)$/i.test(labelText)) {
+          currentSection.items.push({
+            type: "practice",
+            label: labelText,
+            content: bodyText,
+          });
+        } else if (/^(?:maslahat|tavsiya|xulosa|eslatma|tip|note)$/i.test(labelText)) {
+          currentSection.items.push({
+            type: "tip",
+            label: labelText,
+            content: bodyText,
+          });
+        } else {
+          currentSection.items.push({
+            type: "labeled",
+            label: labelText,
+            content: bodyText,
+          });
+        }
         continue;
       }
 
@@ -208,6 +213,42 @@ function parseNotes(raw: string): ParsedNotes {
     sections.push(currentSection);
   }
 
+  // Fallback: If no markdown headers were matched, try splitting unformatted text into sections
+  if (sections.length === 0 && raw.trim().length > 0) {
+    const sectionSplits = raw.split(/(?=\d+[\.\)]\s+[A-ZА-ЯЎҚҒҲ])/);
+    if (sectionSplits.length > 1) {
+      sectionSplits.forEach((block, idx) => {
+        const blockLines = block.trim().split("\n").filter(Boolean);
+        if (!blockLines.length) return;
+        const firstLine = blockLines[0].trim();
+        const numMatch = firstLine.match(/^(\d+)[\.\)]\s*(.*)$/);
+        const secTitle = numMatch ? numMatch[2] : firstLine;
+        const items: ParsedItem[] = [];
+
+        blockLines.slice(1).forEach((bLine) => {
+          const bMatch = bLine.replace(/^[-*•]\s*/, "").trim();
+          if (bMatch) {
+            const labMatch = bMatch.match(/^\*\*([^*]+):\*\*\s*(.*)$/);
+            if (labMatch) {
+              items.push({ type: "labeled", label: labMatch[1], content: labMatch[2] });
+            } else {
+              items.push({ type: "general", content: bMatch });
+            }
+          }
+        });
+
+        sections.push({
+          id: `section-${idx + 1}`,
+          number: idx + 1 < 10 ? `0${idx + 1}` : `${idx + 1}`,
+          title: secTitle,
+          isConclusion: /xulosa|maslahat|tavsiya|yakun/i.test(secTitle),
+          items,
+          rawText: items.length ? undefined : blockLines.slice(1).join("\n"),
+        });
+      });
+    }
+  }
+
   return {
     mainTitle,
     intro,
@@ -220,6 +261,7 @@ export default function NotesTab({
   notes,
   loading,
   onGenerate,
+  onRegenerate,
   startTime,
   videoDuration,
 }: NotesTabProps) {
@@ -257,7 +299,7 @@ export default function NotesTab({
     URL.revokeObjectURL(url);
   };
 
-  // Faqat konspektning o'zini (saytsiz, videopleyersiz, toza A4 hujjat shaklida) PDF/chop etish
+  // Faqat konspektning o'zini (saytsiz, toza, professional A4 nashr shaklida) PDF/chop etish
   const handlePrint = () => {
     if (!parsed || !notes) return;
 
@@ -270,69 +312,49 @@ export default function NotesTab({
 
     const formatInlineHtml = (text: string) => {
       let safe = escapeHtml(text);
-      safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong style='color:#0f172a;font-weight:700;'>$1</strong>");
       safe = safe.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-      safe = safe.replace(/`([^`]+)`/g, "<code style='background:#f1f5f9;padding:1px 4px;border-radius:4px;font-family:monospace;font-size:11px;'>$1</code>");
+      safe = safe.replace(/`([^`]+)`/g, "<code style='background:#f1f5f9;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:10pt;color:#0f172a;'>$1</code>");
       return safe;
     };
 
     let sectionsHtml = "";
     parsed.sections.forEach((sec) => {
-      if (sec.isConclusion) {
-        const itemsHtml = sec.items
-          .map(
-            (item) => `
-            <div style="background:#ffffff;border:1px solid #d1fae5;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
-              ${item.label ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#047857;margin-bottom:2px;">${escapeHtml(item.label)}</div>` : ""}
-              <div style="font-size:12px;color:#1e293b;line-height:1.5;">${formatInlineHtml(item.content)}</div>
-            </div>`
-          )
-          .join("");
+      const isConcl = sec.isConclusion;
 
-        sectionsHtml += `
-          <div style="border:1.5px solid #10b981;background:#f0fdf4;border-radius:12px;padding:14px 16px;margin-top:16px;break-inside:avoid;page-break-inside:avoid;">
-            <div style="font-size:15px;font-weight:900;color:#065f46;margin-bottom:10px;">${escapeHtml(sec.title)}</div>
-            ${itemsHtml}
-          </div>`;
-      } else {
-        const itemsHtml = sec.items
-          .map((item) => {
-            if (item.type === "concept") {
-              return `
-                <div style="background:#fffbeb;border:1px solid #fef3c7;border-left:3.5px solid #f59e0b;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#b45309;margin-bottom:2px;">💡 ${escapeHtml(item.label || "Tushuncha (Nazariya)")}</div>
-                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
-                </div>`;
-            }
-            if (item.type === "practice") {
-              return `
-                <div style="background:#f0fdf4;border:1px solid #dcfce7;border-left:3.5px solid #10b981;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#047857;margin-bottom:2px;">🛠️ ${escapeHtml(item.label || "Amaliyot va Qadamlar")}</div>
-                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
-                </div>`;
-            }
-            if (item.type === "tip") {
-              return `
-                <div style="background:#f5f3ff;border:1px solid #ede9fe;border-left:3.5px solid #8b5cf6;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
-                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#6d28d9;margin-bottom:2px;">📌 ${escapeHtml(item.label || "Tavsiya")}</div>
-                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
-                </div>`;
-            }
-            return `
-              <div style="display:flex;gap:8px;align-items:flex-start;margin:5px 0;font-size:12px;color:#334155;">
-                <span style="width:5px;height:5px;border-radius:50%;background:#4f46e5;margin-top:7px;flex-shrink:0;"></span>
-                <div style="flex:1;">${formatInlineHtml(item.content)}</div>
-              </div>`;
-          })
-          .join("");
+      const itemsHtml = sec.items
+        .map((item) => {
+          return `
+            <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;font-size:10.5pt;line-height:1.62;color:#1e293b;page-break-inside:avoid;break-inside:avoid;text-align:justify;">
+              <span style="color:#334155;font-size:11pt;line-height:1.4;flex-shrink:0;user-select:none;">•</span>
+              <div style="flex:1;">
+                ${item.label ? `<strong style="color:#0f172a;font-weight:700;">${escapeHtml(item.label)}:</strong> ` : ""}
+                <span style="color:#334155;">${formatInlineHtml(item.content)}</span>
+              </div>
+            </div>`;
+        })
+        .join("");
 
+      if (isConcl) {
         sectionsHtml += `
-          <div style="border:1px solid #e2e8f0;background:#ffffff;border-radius:12px;padding:14px 16px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              ${sec.number ? `<div style="background:#4f46e5;color:#ffffff;font-weight:900;font-family:monospace;font-size:11px;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${sec.number}</div>` : ""}
-              <div style="font-size:14.5px;font-weight:800;color:#0f172a;line-height:1.3;">${escapeHtml(sec.title)}</div>
+          <div style="margin-top:22px;margin-bottom:18px;padding:14px 18px;background:#f8fafc;border-left:4px solid #0f172a;border-radius:4px;page-break-inside:avoid;break-inside:avoid;">
+            <div style="font-size:13pt;font-weight:800;color:#0f172a;margin-bottom:10px;">
+              ${sec.number ? `${sec.number}. ` : ""}${escapeHtml(sec.title)}
             </div>
             <div>${itemsHtml}</div>
+            ${sec.rawText ? `<div style="font-size:10.5pt;color:#334155;line-height:1.6;white-space:pre-line;">${formatInlineHtml(sec.rawText)}</div>` : ""}
+          </div>`;
+      } else {
+        sectionsHtml += `
+          <div style="margin-top:20px;margin-bottom:16px;page-break-inside:avoid;break-inside:avoid;">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:11px;padding-bottom:5px;border-bottom:1px solid #e2e8f0;">
+              ${sec.number ? `<span style="font-size:13.5pt;font-weight:900;color:#0f172a;font-family:monospace;">${sec.number}.</span>` : ""}
+              <h2 style="font-size:13.5pt;font-weight:800;color:#0f172a;margin:0;line-height:1.35;">${escapeHtml(sec.title)}</h2>
+            </div>
+            <div style="padding-left:2px;">
+              ${itemsHtml}
+              ${sec.rawText ? `<div style="font-size:10.5pt;color:#334155;line-height:1.6;white-space:pre-line;margin-bottom:10px;">${formatInlineHtml(sec.rawText)}</div>` : ""}
+            </div>
           </div>`;
       }
     });
@@ -341,49 +363,56 @@ export default function NotesTab({
 <html lang="uz">
 <head>
   <meta charset="utf-8">
-  <title>${escapeHtml(parsed.mainTitle)}</title>
+  <title>&nbsp;</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 12mm 14mm 12mm 14mm;
+      margin: 18mm 20mm 18mm 20mm;
     }
     * {
       box-sizing: border-box;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    body {
+    html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: #0f172a;
-      background: #ffffff;
+      background: #ffffff !important;
       margin: 0;
       padding: 0;
-      line-height: 1.5;
+      line-height: 1.6;
+      font-size: 11pt;
     }
   </style>
 </head>
 <body>
-  <!-- Clean Executive Header -->
-  <div style="border-bottom: 2px solid #4f46e5; padding-bottom: 12px; margin-bottom: 16px;">
-    <div style="display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; padding:3px 10px; border-radius:9999px; margin-bottom:6px;">
-      Konspekt
+  <!-- Document Header -->
+  <div style="margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid #0f172a;">
+    <div style="font-size:9pt;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:6px;">
+      TAHLILIY SHARH VA KONSPEKT
     </div>
-    <div style="font-size:19px; font-weight:900; color:#0f172a; margin:0 0 6px 0; line-height:1.25; letter-spacing:-0.01em;">
+    <h1 style="font-size:20pt;font-weight:900;color:#0f172a;line-height:1.25;margin:0 0 8px 0;letter-spacing:-0.02em;">
       ${escapeHtml(parsed.mainTitle)}
-    </div>
-    <div style="font-size:11px; color:#64748b; display:flex; gap:16px;">
-      <span>⏱️ ~${stats.minutes} daqiqalik o'qish</span>
+    </h1>
+    <div style="font-size:9.5pt;color:#64748b;display:flex;gap:16px;font-weight:500;">
+      <span>⏱️ ~${stats.minutes} daqiqalik mutolaa</span>
+      <span>•</span>
       <span>📝 ${stats.words} ta so'z</span>
     </div>
   </div>
 
   ${parsed.intro && parsed.intro.length > 0 ? `
-  <div style="font-size:12px; color:#334155; background:#f8fafc; border-left:3.5px solid #6366f1; padding:9px 13px; border-radius:0 8px 8px 0; margin-bottom:14px; line-height:1.55;">
+  <div style="font-size:10.5pt;color:#334155;background:#f8fafc;border-left:3.5px solid #0f172a;padding:10px 14px;margin-bottom:20px;line-height:1.6;border-radius:0 4px 4px 0;">
     ${escapeHtml(parsed.intro.join(" "))}
   </div>` : ""}
 
   <div>
     ${sectionsHtml}
+  </div>
+
+  <div style="margin-top:36px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:8.5pt;color:#94a3b8;">
+    <span>Rasmiy tahliliy konspekt</span>
+    <span>Sahifa 1</span>
   </div>
 </body>
 </html>`;
@@ -519,6 +548,22 @@ export default function NotesTab({
               <Printer className="w-3.5 h-3.5 text-violet-400" />
               <span className="hidden sm:inline">PDF / Chop etish</span>
             </button>
+
+            {onRegenerate && (
+              <button
+                onClick={() => {
+                  if (confirm("Konspektni sun'iy intellekt yordamida to'liq qaytadan chuqur shaklda tuzishni tasdiqlaysizmi?")) {
+                    onRegenerate();
+                  }
+                }}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-200 hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
+                title="Konspektni to'liq transkript asosida qaytadan chuqur yaratish"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-violet-400 ${loading ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Qayta yaratish</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -619,7 +664,7 @@ export default function NotesTab({
                 </div>
               </div>
 
-              {/* Items: Concepts, Practices, and General Points */}
+              {/* Items: Concepts, Practices, Labeled Points, and General Points */}
               <div className="space-y-3">
                 {sec.items.map((item, idx) => {
                   if (item.type === "concept") {
@@ -679,6 +724,25 @@ export default function NotesTab({
                           </span>
                         </div>
                         <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-7">
+                          {renderInlineText(item.content)}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (item.type === "labeled") {
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-white/10 bg-gradient-to-r from-violet-500/[0.08] to-transparent hover:border-violet-500/30 p-3.5 space-y-1.5 transition shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-violet-400 shadow-sm" />
+                          <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+                            {item.label}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-4">
                           {renderInlineText(item.content)}
                         </p>
                       </div>

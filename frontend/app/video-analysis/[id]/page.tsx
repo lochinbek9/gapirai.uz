@@ -214,14 +214,14 @@ export default function VideoAnalysisPage() {
     }
   };
 
-  const handleGenerateNotes = async () => {
+  const handleGenerateNotes = async (force: boolean = false) => {
     if (!id) return;
     setNotesStartTime(Date.now());
     setNotesLoading(true);
     try {
-      const res = await generateNotes(id);
+      const res = await generateNotes(id, force);
       setNotes(res.notes);
-      showToast("Konspekt muvaffaqiyatli yaratildi!", "success");
+      showToast(force ? "Konspekt yangilandi!" : "Konspekt muvaffaqiyatli yaratildi!", "success");
     } catch {
       showToast("Konspekt yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
@@ -1014,7 +1014,8 @@ export default function VideoAnalysisPage() {
                 <NotesTab
                   notes={notes}
                   loading={notesLoading}
-                  onGenerate={handleGenerateNotes}
+                  onGenerate={() => handleGenerateNotes(false)}
+                  onRegenerate={() => handleGenerateNotes(true)}
                   startTime={notesStartTime}
                   videoDuration={analysis?.video_duration}
                 />
