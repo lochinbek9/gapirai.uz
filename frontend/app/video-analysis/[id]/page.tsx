@@ -39,7 +39,7 @@ type Tab = "summary" | "chapters" | "transcript" | "notes" | "quiz" | "qa";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "summary", label: "Xulosa" },
-  { key: "chapters", label: "Chapterlar" },
+  { key: "chapters", label: "Boblar" },
   { key: "transcript", label: "Transkript" },
   { key: "notes", label: "Konspekt" },
   { key: "quiz", label: "Test" },
@@ -745,7 +745,7 @@ export default function VideoAnalysisPage() {
                     </button>
                   ))}
                   {(!analysis.chapters || analysis.chapters.length === 0) && (
-                    <p className="text-sm text-gray-500">Chapterlar topilmadi.</p>
+                    <p className="text-sm text-gray-500">Boblar topilmadi.</p>
                   )}
                 </div>
               )}

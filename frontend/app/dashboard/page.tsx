@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl,
   getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats,
-  listUserAnalyses, deleteAnalysis, VideoAnalysis,
+  listUserAnalyses, deleteAnalysis, retryAnalysis, VideoAnalysis,
 } from '@/lib/api'
 import { extractYouTubeId } from '@/lib/youtube'
 import PushOptIn from '@/components/PushOptIn'
@@ -374,11 +374,15 @@ function VideoCard({
 function AnalysisCard({
   analysis,
   onDelete,
+  onRetry,
   isDeleting = false,
+  isRetrying = false,
 }: {
   analysis: VideoAnalysis
   onDelete: (id: string) => void
+  onRetry?: (id: string) => void
   isDeleting?: boolean
+  isRetrying?: boolean
 }) {
   const ytId = extractYouTubeId(analysis.youtube_url)
   const thumbnail =
@@ -512,7 +516,28 @@ function AnalysisCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {isFailed && onRetry && (
+            <button
+              onClick={() => onRetry(analysis.id)}
+              disabled={isRetrying}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow-sm transition disabled:opacity-50"
+              title="Tahlilni qayta urinish (Regenerate)"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+              <span>Qayta urinish</span>
+            </button>
+          )}
+          {isReady && onRetry && (
+            <button
+              onClick={() => onRetry(analysis.id)}
+              disabled={isRetrying}
+              title="Qayta tahlil qilish"
+              className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+            >
+              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
+            </button>
+          )}
           <Link
             href={`/video-analysis/${analysis.id}`}
             className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold"
@@ -521,7 +546,7 @@ function AnalysisCard({
           </Link>
           <button
             onClick={() => onDelete(analysis.id)}
-            disabled={isDeleting}
+            disabled={isDeleting || isRetrying}
             className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             title="O'chirish"
           >
@@ -604,6 +629,26 @@ export default function DashboardPage() {
       alert(err?.response?.data?.detail || "Tahlilni o'chirishda xatolik yuz berdi.")
     } finally {
       setDeletingAnalysisId(null)
+    }
+  }
+
+  const [retryingAnalysisId, setRetryingAnalysisId] = useState<string | null>(null)
+
+  async function handleRetryAnalysis(id: string) {
+    setRetryingAnalysisId(id)
+    try {
+      await retryAnalysis(id)
+      setAnalyses((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, status: 'pending', status_message: "Qayta navbatga qo'shildi..." }
+            : a
+        )
+      )
+      router.push(`/video-analysis/${id}`)
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Tahlilni qayta ishga tushirishda xatolik yuz berdi.")
+      setRetryingAnalysisId(null)
     }
   }
 
@@ -826,7 +871,9 @@ export default function DashboardPage() {
                   key={analysis.id}
                   analysis={analysis}
                   onDelete={handleDeleteAnalysis}
+                  onRetry={handleRetryAnalysis}
                   isDeleting={deletingAnalysisId === analysis.id}
+                  isRetrying={retryingAnalysisId === analysis.id}
                 />
               ))}
             </div>
