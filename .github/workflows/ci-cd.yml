@@ -115,11 +115,61 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             set -e
-            export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/bin:$PATH"
+
+            # Helper for running sudo with password from SSH_PASSWORD
+            run_sudo() {
+              if command -v sudo >/dev/null 2>&1; then
+                if [ -n "${{ secrets.SSH_PASSWORD }}" ]; then
+                  echo "${{ secrets.SSH_PASSWORD }}" | sudo -S "$@" 2>/dev/null || sudo -n "$@" 2>/dev/null || "$@" 2>/dev/null || true
+                else
+                  sudo -n "$@" 2>/dev/null || "$@" 2>/dev/null || true
+                fi
+              else
+                "$@" 2>/dev/null || true
+              fi
+            }
+
+            echo "=== Environment and Node Discovery ==="
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" || true
 
-            echo "=== Finding project directory on production ==="
+            # Find Node anywhere on the system and put it in PATH
+            for candidate in \
+              $(which node 2>/dev/null) \
+              $HOME/.nvm/versions/node/*/bin/node \
+              /home/*/.nvm/versions/node/*/bin/node \
+              /root/.nvm/versions/node/*/bin/node \
+              /usr/local/bin/node \
+              /usr/bin/node \
+              /snap/bin/node \
+              /opt/node*/bin/node; do
+              if [ -x "$candidate" ]; then
+                export PATH="$(dirname "$candidate"):$PATH"
+                break
+              fi
+            done
+
+            export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/bin:$PATH"
+
+            echo "Current user: $(whoami)"
+            echo "Node path:    $(which node 2>/dev/null || echo 'not found') ($(node -v 2>/dev/null || echo 'N/A'))"
+            echo "NPM path:     $(which npm 2>/dev/null || echo 'not found') ($(npm -v 2>/dev/null || echo 'N/A'))"
+            echo "PM2 path:     $(which pm2 2>/dev/null || echo 'not found')"
+
+            echo "=== Checking port 3000 process ==="
+            P3000_PID=$(ss -tulpn 'sport = :3000' 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | head -n 1 || true)
+            if [ -z "$P3000_PID" ]; then
+              P3000_PID=$(lsof -ti :3000 2>/dev/null || true)
+            fi
+            echo "Port 3000 initial PID: $P3000_PID"
+            if [ -n "$P3000_PID" ]; then
+              ps -fp "$P3000_PID" || true
+              ls -l "/proc/$P3000_PID/cwd" 2>/dev/null || true
+              cat "/proc/$P3000_PID/cmdline" 2>/dev/null | tr '\0' ' ' || true
+              echo ""
+            fi
+
+            echo "=== Finding project repository ==="
             TARGET_DIR=""
             for dir in "/home/gapirai/gapirai.uz" "$HOME/gapirai.uz" "/home/gapirai/ai-dubber" "$HOME/ai-dubber" "$HOME/projects/gapirai.uz" "/opt/xadichai"; do
               if [ -d "$dir/.git" ]; then
@@ -133,11 +183,11 @@ jobs:
             fi
 
             if [ -z "$TARGET_DIR" ]; then
-              echo "Error: Could not locate git repository under $HOME"
+              echo "Error: Could not locate git repository"
               exit 1
             fi
 
-            echo "=== Found project repository at $TARGET_DIR ==="
+            echo "Found project repository at: $TARGET_DIR"
             cd "$TARGET_DIR"
 
             echo "=== Pulling latest changes from ${{ github.repository }} ==="
@@ -145,33 +195,92 @@ jobs:
             git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
             git checkout -B main FETCH_HEAD
             git reset --hard FETCH_HEAD
-            git remote set-url origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || git remote add origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
+            git remote set-url origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
+            echo "Git sync complete: $(git log -1 --oneline)"
 
-            echo "=== Git sync complete: $(git log -1 --oneline) ==="
-
-            echo "=== Building and deploying frontend ==="
+            echo "=== Building Frontend ==="
             if [ -d "frontend" ]; then
               cd frontend
               export NEXT_PUBLIC_API_URL="https://gapirai.uz/api"
-              npm install --prefer-offline 2>/dev/null || npm install || true
-              npm run build || true
-              if [ -d ".next/standalone" ]; then
-                cp -r public .next/standalone/public 2>/dev/null || true
-                mkdir -p .next/standalone/.next
-                cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
-                if [ -d "/var/www/xadichai.uz/app" ]; then
-                  sudo rsync -a --delete .next/standalone/ /var/www/xadichai.uz/app/ 2>/dev/null || true
-                  sudo rsync -a --delete .next/static/ /var/www/xadichai.uz/app/.next/static/ 2>/dev/null || true
-                elif [ -d "/var/www/xadichai.uz/public" ]; then
-                  sudo rsync -a --delete .next/standalone/ /var/www/xadichai.uz/public/ 2>/dev/null || true
+              npm ci --prefer-offline 2>/dev/null || npm install
+              npm run build
+              echo "Frontend build completed successfully!"
+
+              # Check for destination directories
+              for dest in "/var/www/xadichai.uz/app" "/var/www/gapirai.uz/app" "/var/www/xadichai.uz/public" "/var/www/gapirai.uz/public"; do
+                if [ -d "$dest" ]; then
+                  echo "Syncing build to destination: $dest"
+                  run_sudo rsync -a --delete .next/ "$dest/.next/" || true
+                  if [ -d "public" ]; then
+                    run_sudo rsync -a --delete public/ "$dest/public/" || true
+                  fi
+                  if [ -d ".next/standalone" ]; then
+                    run_sudo rsync -a --delete .next/standalone/ "$dest/" || true
+                  fi
                 fi
-              fi
+              done
               cd "$TARGET_DIR"
             fi
 
-            echo "=== Restarting application services ==="
+            echo "=== Restarting Services ==="
+            # Docker backend & worker
+            echo "Restarting backend containers..."
             docker restart dubber_backend dubber_worker 2>/dev/null || true
-            pm2 reload all 2>/dev/null || pm2 restart all 2>/dev/null || true
-            sudo systemctl restart xadichai-frontend 2>/dev/null || sudo systemctl restart gapirai-frontend 2>/dev/null || sudo systemctl restart frontend 2>/dev/null || true
-            sudo supervisorctl restart all 2>/dev/null || true
-            echo "=== Successfully updated production repository ==="
+            docker restart $(docker ps -q --filter "publish=3000") 2>/dev/null || true
+
+            # PM2 (all users)
+            echo "Checking PM2..."
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 restart all || pm2 reload all || true
+            fi
+            run_sudo -u ubuntu pm2 restart all 2>/dev/null || true
+            run_sudo pm2 restart all 2>/dev/null || true
+
+            # Systemd services
+            echo "Checking systemd services..."
+            for svc in xadichai-frontend gapirai-frontend frontend gapirai; do
+              if systemctl is-active --quiet "$svc" 2>/dev/null; then
+                echo "Restarting active systemd service: $svc"
+                run_sudo systemctl restart "$svc"
+              fi
+            done
+
+            # Supervisor
+            run_sudo supervisorctl restart all 2>/dev/null || true
+
+            # Check if port 3000 process was restarted
+            sleep 3
+            NEW_P3000_PID=$(ss -tulpn 'sport = :3000' 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | head -n 1 || true)
+            if [ -z "$NEW_P3000_PID" ]; then
+              NEW_P3000_PID=$(lsof -ti :3000 2>/dev/null || true)
+            fi
+            echo "Port 3000 new PID: $NEW_P3000_PID (previous was: $P3000_PID)"
+
+            # If port 3000 process didn't restart and is still the exact old PID, kill it to force restart
+            if [ -n "$P3000_PID" ] && [ "$NEW_P3000_PID" = "$P3000_PID" ]; then
+              echo "Process on port 3000 was not restarted by managers. Restarting it..."
+              kill -15 "$P3000_PID" 2>/dev/null || run_sudo kill -15 "$P3000_PID" 2>/dev/null || true
+              sleep 2
+              if ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
+                kill -9 "$P3000_PID" 2>/dev/null || run_sudo kill -9 "$P3000_PID" 2>/dev/null || true
+                sleep 2
+              fi
+              # If port 3000 is now dead, restart Next.js in background
+              if ! ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
+                echo "Starting frontend fresh via PM2 or npm start..."
+                cd "$TARGET_DIR/frontend"
+                if command -v pm2 >/dev/null 2>&1; then
+                  pm2 start npm --name "gapirai-frontend" -- start || true
+                else
+                  nohup npm start > "$TARGET_DIR/frontend.log" 2>&1 &
+                fi
+                sleep 4
+              fi
+            fi
+
+            # Nginx reload
+            run_sudo nginx -t 2>/dev/null && run_sudo systemctl reload nginx 2>/dev/null || true
+
+            echo "=== Verification ==="
+            curl -sI http://127.0.0.1:3000 | head -n 5 || echo "Could not reach :3000"
+            echo "=== Deployment finished successfully ==="
