@@ -2,12 +2,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  ArrowLeft, Youtube, ChevronDown, ChevronUp,
+  ArrowLeft, ArrowRight, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
   MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles
 } from 'lucide-react'
@@ -210,6 +210,30 @@ export default function VideoPage() {
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+
+  const handleStartAnalysis = async () => {
+    if (job?.linked_analysis_id) {
+      router.push(`/video-analysis/${job.linked_analysis_id}`)
+      return
+    }
+    if (!job?.youtube_url) return
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+    setAnalysisLoading(true)
+    setAnalysisError(null)
+    try {
+      const { analysis_id } = await createAnalysis(job.youtube_url, 'uz')
+      saveAnalysisId(analysis_id)
+      router.push(`/video-analysis/${analysis_id}`)
+    } catch (err: any) {
+      setAnalysisError(err?.response?.data?.detail || "Tahlilni boshlashda xatolik yuz berdi. Qayta urinib ko'ring.")
+      setAnalysisLoading(false)
+    }
+  }
 
   const job = polledJob
 
@@ -920,6 +944,63 @@ export default function VideoPage() {
                 </div>
               </div>
 
+              {/* ── AI Video Tahlili Lead Magnet Banner ── */}
+              {job.status === 'completed' && Boolean(job.youtube_url || job.linked_analysis_id) && (
+                <div className="p-4 sm:p-5 rounded-[24px] bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-purple-600/15 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl shadow-blue-500/5">
+                  <div className="space-y-2 text-center md:text-left max-w-2xl">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" /> AI Video Tahlili
+                      </span>
+                      <span className="text-[11px] text-indigo-600 dark:text-indigo-300 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                        ⚡ 15-20 soniyada tayyor
+                      </span>
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        📝 Konspekt + Testlar
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">
+                      Ushbu videoni sun&apos;iy intellekt orqali tahlil qilishni xohlaysizmi?
+                    </h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                      Videoni to&apos;liq ko&apos;rishga vaqt ketkazmasdan uning qisqa xulosasi, <strong className="text-blue-600 dark:text-blue-400">5 daqiqalik darsligi</strong>, to&apos;liq konspekti (notes) hamda bilimlarni mustahkamlash uchun <strong className="text-purple-600 dark:text-purple-400">test savollarini (quiz)</strong> oling!
+                    </p>
+                    {analysisError && (
+                      <p className="text-xs font-semibold text-red-500 dark:text-red-400 pt-1">
+                        {analysisError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                    <button
+                      onClick={handleStartAnalysis}
+                      disabled={analysisLoading}
+                      className="btn-premium w-full md:w-auto px-5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      {analysisLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Tahlil boshlanmoqda...</span>
+                        </>
+                      ) : job.linked_analysis_id ? (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Tayyor tahlilni ko&apos;rish</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Videoni tahlil qilish</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {job.status === 'completed' && job.content_flagged && (
                 <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-4">
                   <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -1173,6 +1254,46 @@ export default function VideoPage() {
                   </div>
                 )}
               </div>
+
+              {/* AI Video Tahlili Sidebar CTA */}
+              {job.status === 'completed' && Boolean(job.youtube_url || job.linked_analysis_id) && (
+                <div className="glass-card border border-blue-500/30 rounded-[24px] p-5 space-y-3 shadow-xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-purple-500/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-blue-500/20 text-blue-500 shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        AI Video Tahlili
+                      </h3>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+                        Konspekt, test va xulosa
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Videoni ko&apos;rish bilan birga uning qisqa darsligi, konspekti va bilimni sinash testini oling.
+                  </p>
+                  <button
+                    onClick={handleStartAnalysis}
+                    disabled={analysisLoading}
+                    className="w-full btn-premium py-2.5 px-4 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+                  >
+                    {analysisLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Ochilmoqda...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{job.linked_analysis_id ? "Tahlilni ochish" : "Tahlil qilish"}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
               {job.transcript_text && (
                 <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 shadow-xl">
