@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
-  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon,
+  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
@@ -128,6 +128,13 @@ export default function VideoAnalysisPage() {
     }
   }, [analysis?.status, id]);
 
+  const [toast, setToast] = useState<{ type: "error" | "success"; message: string } | null>(null);
+
+  const showToast = (message: string, type: "error" | "success" = "error") => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 6000);
+  };
+
   const handleRetry = async () => {
     if (!id || retrying) return;
     setRetrying(true);
@@ -135,7 +142,7 @@ export default function VideoAnalysisPage() {
       await retryAnalysis(id);
       await refetch();
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.");
+      showToast(e?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.");
     } finally {
       setRetrying(false);
     }
@@ -159,7 +166,7 @@ export default function VideoAnalysisPage() {
       setQaHistory((prev) => [...prev, entry]);
       setQuestion("");
     } catch {
-      alert("Savolga javob berishda xatolik yuz berdi.");
+      showToast("Savolga javob berishda xatolik yuz berdi.");
     } finally {
       setAsking(false);
     }
@@ -171,8 +178,9 @@ export default function VideoAnalysisPage() {
     try {
       const res = await generateQuiz(id);
       setQuiz(res.quiz);
+      showToast("Test savollari muvaffaqiyatli tayyorlandi!", "success");
     } catch {
-      alert("Test yaratishda xatolik yuz berdi.");
+      showToast("Test yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setQuizLoading(false);
     }
@@ -184,8 +192,9 @@ export default function VideoAnalysisPage() {
     try {
       const res = await generateNotes(id);
       setNotes(res.notes);
+      showToast("Konspekt muvaffaqiyatli yaratildi!", "success");
     } catch {
-      alert("Konspekt yaratishda xatolik yuz berdi.");
+      showToast("Konspekt yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setNotesLoading(false);
     }
@@ -203,7 +212,7 @@ export default function VideoAnalysisPage() {
       const res = await generateBilingual(id);
       setBilingual(res.segments);
     } catch {
-      alert("Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
+      showToast("Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
       setTranscriptView("normal");
     } finally {
       setBilingualLoading(false);
@@ -324,6 +333,32 @@ export default function VideoAnalysisPage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        {/* Modern Toast Notification */}
+        {toast && (
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+              toast.type === "error"
+                ? "bg-red-950/80 border-red-500/40 text-red-200"
+                : "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              {toast.type === "error" ? (
+                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              )}
+              <p className="text-xs sm:text-sm font-semibold">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {!isDone && !isFailed && (
           <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
             {/* Top row: Video Thumbnail & Info + Elapsed Time */}

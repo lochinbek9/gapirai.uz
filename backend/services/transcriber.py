@@ -697,40 +697,51 @@ def _transcribe_chunk_azure(chunk_path: Path, offset_seconds: float, language: s
                 pass
 
 
+def _transcribe_chunk_groq(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str, str, str]:
+    """Groq Cloud API (Whisper Large v3 Turbo) orqali ultra-tezkor va 0 xarajatli audio transkripsiya."""
+    from backend.services.groq_service import groq_transcribe_audio, record_groq_job
+    segs, text, lang, masked_k = groq_transcribe_audio(str(chunk_path), language=language)
+    adjusted_segs = []
+    for s in segs:
+        adjusted_segs.append({
+            "start": round(s["start"] + offset_seconds, 3),
+            "end": round(s["end"] + offset_seconds, 3),
+            "text": s["text"],
+        })
+    dur = (adjusted_segs[-1]["end"] - adjusted_segs[0]["start"]) if adjusted_segs else 0.0
+    record_groq_job(masked_k, duration_sec=dur)
+    return adjusted_segs, text, lang, "free", f"groq:{masked_k}"
+
+
 def _transcribe_provider_order(primary: str) -> list[str]:
     """API provayderlar tartibi:
-    1-o'rin: Gemini STT (Google AI Studio / Vertex AI)
-    2-o'rin: Azure STT (Cognitive Services)
-    3-o'rin: OpenAI Whisper
+    1-o'rin: Groq Whisper (ultra-tez LPU, 0 CPU/RAM, bepul kvota)
+    2-o'rin: Gemini STT (Google AI Studio / Vertex AI)
+    3-o'rin: Azure STT (Cognitive Services)
+    4-o'rin: OpenAI Whisper
     """
+    from backend.services.groq_service import is_groq_available
+    groq_ok = is_groq_available()
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
 
-    if primary == "azure":
-        order = ["azure", "gemini", "openai"]
-    elif primary == "gemini":
-        order = ["gemini", "azure", "openai"]
-    elif primary == "openai":
-        order = ["openai", "gemini", "azure"]
-    else:
-        # Default order: openai first if enabled, else gemini
-        order = ["openai", "gemini", "azure"] if getattr(settings, "OPENAI_ENABLED", True) else ["gemini", "azure", "openai"]
+    order = []
+    if groq_ok:
+        order.append("groq")
+    if gemini_ok:
+        order.append("gemini")
+    if azure_ok:
+        order.append("azure")
+    if openai_ok:
+        order.append("openai")
 
-    active = []
-    for name in order:
-        if name == "gemini" and gemini_ok:
-            active.append("gemini")
-        elif name == "azure" and azure_ok:
-            active.append("azure")
-        elif name == "openai" and openai_ok:
-            active.append("openai")
-    return active or ["gemini"]
+    return order or ["gemini"]
 
 
 def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini", is_paid: bool = False) -> dict:
-    """STT API (Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
-    transkripsiya qiladi. Gemini 1-o'rinda, Azure 2-o'rindagi zaxira."""
+    """STT API (Groq / Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
+    transkripsiya qiladi. Groq 1-o'rinda (0 xarajat, ultra-tez), Gemini 2-o'rindagi ishonchli zaxira."""
     segments_list = []
     full_text_parts = []
     detected_language = language
@@ -740,7 +751,9 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
     def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str, str, str]:
         last_error: Exception | None = None
         for name in _transcribe_provider_order(primary):
-            if name == "gemini":
+            if name == "groq":
+                fn = _transcribe_chunk_groq
+            elif name == "gemini":
                 fn = _transcribe_chunk_gemini
             elif name == "azure":
                 fn = _transcribe_chunk_azure
@@ -749,6 +762,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
             try:
                 if name == "gemini":
                     segs, text, lang, tier, k_used = fn(cpath, offset_seconds=offset, language=language, is_paid=is_paid)
+                elif name == "groq":
+                    segs, text, lang, tier, k_used = fn(cpath, offset_seconds=offset, language=language)
                 else:
                     segs, text, lang = fn(cpath, offset_seconds=offset, language=language)
                     tier, k_used = "free", name

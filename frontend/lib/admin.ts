@@ -868,10 +868,66 @@ export interface GeminiKeysOverviewResponse {
     total_jobs_all: number
     total_cost_all_usd: number
   }
+  groq?: GroqKeysOverviewResponse
+}
+
+export interface GroqKeyItem {
+  key_masked: string
+  tier: 'free'
+  tier_label: string
+  status: 'active' | 'cooldown'
+  remaining_seconds: number
+  remaining_human: string
+  cooldown_reason: string
+  models: string[]
+  limits: {
+    rpm: number
+    rpd: number
+    tpm: string
+    label: string
+  }
+  total_jobs: number
+  total_duration_sec: number
+  total_cost_usd: number
+  total_cost_uzs: number
+  total_requests: number
+  success_count: number
+  rate_limit_count: number
+}
+
+export interface GroqKeysOverviewResponse {
+  summary: {
+    provider: string
+    tier: string
+    total_keys: number
+    total_active_keys: number
+    total_cooldown_keys: number
+    total_jobs_all: number
+    total_requests_all: number
+    total_cost_all_usd: number
+    total_cost_all_uzs: number
+    cost_status_label: string
+    description: string
+  }
+  keys: GroqKeyItem[]
 }
 
 export async function apiAdminGeminiKeysOverview(token: string): Promise<GeminiKeysOverviewResponse> {
   const res = await axios.get(`${API_URL}/admin/gemini-keys/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminGroqKeysOverview(token: string): Promise<GroqKeysOverviewResponse> {
+  const res = await axios.get(`${API_URL}/admin/groq-keys/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminResetGroqCooldown(token: string, key_masked: string): Promise<{ status: string }> {
+  const res = await axios.post(`${API_URL}/admin/groq-keys/reset-cooldown`, { key_masked }, {
     headers: { Authorization: `Bearer ${token}` },
   })
   return res.data

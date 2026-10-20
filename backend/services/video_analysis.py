@@ -133,8 +133,26 @@ def _safe_float(value, default: float = 0.0) -> float:
 
 
 def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3, is_paid: bool = False) -> dict:
-    """Faqat Gemini modellaridan (barcha faol API kalitlar va modellarning
-    avtomatik quota/cooldown nazorati bilan) foydalanadi. OpenAI UMUMAN ishlatilmaydi."""
+    """Ultra-tez Groq (qwen/qwen3.8-27b) orqali JSON yaratish, xato bo'lsa Gemini ga o'tish."""
+    import re
+    from backend.services.groq_service import is_groq_available, groq_chat_completion
+
+    if is_groq_available():
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt + "\nMUHIM: Faqat to'g'ri JSON formatida javob bering, markdown kod bloklari yoki ortiqcha matn yozmang."},
+                {"role": "user", "content": user_message},
+            ]
+            raw_text, _ = groq_chat_completion(messages, json_mode=True)
+            clean = raw_text.strip()
+            if clean.startswith("```"):
+                clean = re.sub(r"^```[a-zA-Z]*\s*", "", clean)
+                clean = re.sub(r"\s*```$", "", clean)
+            clean = clean.strip()
+            return json.loads(clean)
+        except Exception as e:
+            logger.warning(f"Groq JSON generation xatolik ({e}) — Gemini zaxirasiga o'tilmoqda")
+
     from backend.services.gemini_quota_manager import call_gemini_json_with_fallback
     return call_gemini_json_with_fallback(system_prompt, user_message, is_paid=is_paid)
 

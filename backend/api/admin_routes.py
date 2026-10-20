@@ -2164,13 +2164,45 @@ def get_gemini_keys_overview(
     Barcha Gemini API kalitlari (pullik va 36+ bepul), ularning rasmiy limitlari,
     muvaffaqiyatli videolar soni, umumiy davomiyligi, hisoblangan tannarxi (USD/UZS)
     va alohida pullik kalit bloki ma'lumotlarini qaytaradi.
+    Shuningdek Groq Cloud kalitlari blokini alohida aralashtirmagan holda taqdim etadi.
     """
     from backend.services.gemini_quota_manager import get_gemini_keys_detailed_stats
+    from backend.services.groq_service import get_groq_keys_detailed_stats
     db = SessionLocal()
     try:
-        return get_gemini_keys_detailed_stats(db)
+        stats = get_gemini_keys_detailed_stats(db)
+        stats["groq"] = get_groq_keys_detailed_stats(db)
+        return stats
     finally:
         db.close()
+
+
+@router.get("/groq-keys/overview")
+def get_groq_keys_overview_endpoint(
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Groq Cloud API kalitlari ro'yxati, bepul limitlar ($0.00 / 0 UZS) va holatini qaytaradi."""
+    from backend.services.groq_service import get_groq_keys_detailed_stats
+    db = SessionLocal()
+    try:
+        return get_groq_keys_detailed_stats(db)
+    finally:
+        db.close()
+
+
+class AdminGroqResetCooldownRequest(BaseModel):
+    key_masked: str
+
+
+@router.post("/groq-keys/reset-cooldown")
+def reset_admin_groq_cooldown_endpoint(
+    req: AdminGroqResetCooldownRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Groq kalit cooldownini qo'lda tozalash."""
+    from backend.services.groq_service import reset_groq_key_cooldown
+    ok = reset_groq_key_cooldown(req.key_masked)
+    return {"status": "ok" if ok else "not_found", "key_masked": req.key_masked}
 
 
 @router.post("/gemini-keys/admin-mode")
