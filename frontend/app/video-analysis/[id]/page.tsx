@@ -422,14 +422,29 @@ export default function VideoAnalysisPage() {
                 </div>
               </div>
 
-              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1">
-                <span className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                  {Math.round(analysis.progress)}%
-                </span>
-                <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                  Jarayonda
-                </span>
+              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
+                <div className="flex items-center sm:flex-col sm:items-end gap-2 sm:gap-0.5">
+                  <span className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                    {Math.round(analysis.progress)}%
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    Jarayonda
+                  </span>
+                </div>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-rose-300 hover:text-rose-200 transition active:scale-95 disabled:opacity-50 shadow-sm"
+                  title="Tahlilni to'xtatish va bekor qilish"
+                >
+                  {cancelling ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5" />
+                  )}
+                  <span>Bekor qilish</span>
+                </button>
               </div>
             </div>
 
