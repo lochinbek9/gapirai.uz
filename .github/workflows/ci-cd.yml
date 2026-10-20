@@ -198,10 +198,13 @@ jobs:
             git remote set-url origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
             echo "Git sync complete: $(git log -1 --oneline)"
 
-            echo "=== Building Frontend ==="
+            echo "=== Ensuring workspace ownership and building Frontend ==="
+            run_sudo chown -R gapirai:gapirai "$TARGET_DIR"
             if [ -d "frontend" ]; then
               cd frontend
               export NEXT_PUBLIC_API_URL="https://gapirai.uz/api"
+              export BROWSERSLIST_IGNORE_OLD_DATA=true
+              export NEXT_TELEMETRY_DISABLED=1
               npm ci --prefer-offline 2>/dev/null || npm install
               npm run build
               echo "Frontend build completed successfully!"
