@@ -11,6 +11,8 @@ interface NotesTabProps {
   notes: string | null;
   loading: boolean;
   onGenerate: () => void;
+  startTime?: number | null;
+  videoDuration?: number;
 }
 
 interface ParsedItem {
@@ -110,7 +112,6 @@ function parseNotes(raw: string): ParsedNotes {
       }
 
       const headerText = line.replace(/^#{2,3}\s+/, "").trim();
-      // Match "1. Title" or "1 - Title"
       const numMatch = headerText.match(/^(\d+)[\.\-–\s]+(.*)$/);
       const isConclusion = /xulosa|maslahat|tavsiya|yakun/i.test(headerText);
 
@@ -215,7 +216,13 @@ function parseNotes(raw: string): ParsedNotes {
   };
 }
 
-export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) {
+export default function NotesTab({
+  notes,
+  loading,
+  onGenerate,
+  startTime,
+  videoDuration,
+}: NotesTabProps) {
   const [copied, setCopied] = useState(false);
 
   const parsed = useMemo(() => {
@@ -250,8 +257,162 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
     URL.revokeObjectURL(url);
   };
 
+  // Faqat konspektning o'zini (saytsiz, videopleyersiz, toza A4 hujjat shaklida) PDF/chop etish
   const handlePrint = () => {
-    window.print();
+    if (!parsed || !notes) return;
+
+    const escapeHtml = (text: string) => {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    };
+
+    const formatInlineHtml = (text: string) => {
+      let safe = escapeHtml(text);
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      safe = safe.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      safe = safe.replace(/`([^`]+)`/g, "<code style='background:#f1f5f9;padding:1px 4px;border-radius:4px;font-family:monospace;font-size:11px;'>$1</code>");
+      return safe;
+    };
+
+    let sectionsHtml = "";
+    parsed.sections.forEach((sec) => {
+      if (sec.isConclusion) {
+        const itemsHtml = sec.items
+          .map(
+            (item) => `
+            <div style="background:#ffffff;border:1px solid #d1fae5;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
+              ${item.label ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#047857;margin-bottom:2px;">${escapeHtml(item.label)}</div>` : ""}
+              <div style="font-size:12px;color:#1e293b;line-height:1.5;">${formatInlineHtml(item.content)}</div>
+            </div>`
+          )
+          .join("");
+
+        sectionsHtml += `
+          <div style="border:1.5px solid #10b981;background:#f0fdf4;border-radius:12px;padding:14px 16px;margin-top:16px;break-inside:avoid;page-break-inside:avoid;">
+            <div style="font-size:15px;font-weight:900;color:#065f46;margin-bottom:10px;">${escapeHtml(sec.title)}</div>
+            ${itemsHtml}
+          </div>`;
+      } else {
+        const itemsHtml = sec.items
+          .map((item) => {
+            if (item.type === "concept") {
+              return `
+                <div style="background:#fffbeb;border:1px solid #fef3c7;border-left:3.5px solid #f59e0b;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#b45309;margin-bottom:2px;">💡 ${escapeHtml(item.label || "Tushuncha (Nazariya)")}</div>
+                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
+                </div>`;
+            }
+            if (item.type === "practice") {
+              return `
+                <div style="background:#f0fdf4;border:1px solid #dcfce7;border-left:3.5px solid #10b981;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#047857;margin-bottom:2px;">🛠️ ${escapeHtml(item.label || "Amaliyot va Qadamlar")}</div>
+                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
+                </div>`;
+            }
+            if (item.type === "tip") {
+              return `
+                <div style="background:#f5f3ff;border:1px solid #ede9fe;border-left:3.5px solid #8b5cf6;border-radius:8px;padding:9px 12px;margin-bottom:8px;">
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#6d28d9;margin-bottom:2px;">📌 ${escapeHtml(item.label || "Tavsiya")}</div>
+                  <div style="font-size:12px;color:#1e293b;line-height:1.55;">${formatInlineHtml(item.content)}</div>
+                </div>`;
+            }
+            return `
+              <div style="display:flex;gap:8px;align-items:flex-start;margin:5px 0;font-size:12px;color:#334155;">
+                <span style="width:5px;height:5px;border-radius:50%;background:#4f46e5;margin-top:7px;flex-shrink:0;"></span>
+                <div style="flex:1;">${formatInlineHtml(item.content)}</div>
+              </div>`;
+          })
+          .join("");
+
+        sectionsHtml += `
+          <div style="border:1px solid #e2e8f0;background:#ffffff;border-radius:12px;padding:14px 16px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              ${sec.number ? `<div style="background:#4f46e5;color:#ffffff;font-weight:900;font-family:monospace;font-size:11px;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${sec.number}</div>` : ""}
+              <div style="font-size:14.5px;font-weight:800;color:#0f172a;line-height:1.3;">${escapeHtml(sec.title)}</div>
+            </div>
+            <div>${itemsHtml}</div>
+          </div>`;
+      }
+    });
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(parsed.mainTitle)}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Clean Executive Header -->
+  <div style="border-bottom: 2px solid #4f46e5; padding-bottom: 12px; margin-bottom: 16px;">
+    <div style="display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; padding:3px 10px; border-radius:9999px; margin-bottom:6px;">
+      Konspekt
+    </div>
+    <div style="font-size:19px; font-weight:900; color:#0f172a; margin:0 0 6px 0; line-height:1.25; letter-spacing:-0.01em;">
+      ${escapeHtml(parsed.mainTitle)}
+    </div>
+    <div style="font-size:11px; color:#64748b; display:flex; gap:16px;">
+      <span>⏱️ ~${stats.minutes} daqiqalik o'qish</span>
+      <span>📝 ${stats.words} ta so'z</span>
+    </div>
+  </div>
+
+  ${parsed.intro && parsed.intro.length > 0 ? `
+  <div style="font-size:12px; color:#334155; background:#f8fafc; border-left:3.5px solid #6366f1; padding:9px 13px; border-radius:0 8px 8px 0; margin-bottom:14px; line-height:1.55;">
+    ${escapeHtml(parsed.intro.join(" "))}
+  </div>` : ""}
+
+  <div>
+    ${sectionsHtml}
+  </div>
+</body>
+</html>`;
+
+    // Print using hidden iframe so the web page is NEVER in the print job
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(fullHtml);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 2000);
+    }, 250);
   };
 
   const scrollToSection = (id: string) => {
@@ -283,6 +444,8 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
         ]}
         estimatedTime="~15-20 soniya"
         onGenerate={onGenerate}
+        startTime={startTime}
+        videoDuration={videoDuration}
       />
     );
   }
@@ -351,10 +514,10 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 hover:text-white transition shadow-sm active:scale-95"
-              title="Chop etish yoki PDF sifatida saqlash"
+              title="Faqat konspektning o'zini toza PDF shaklida saqlash yoki chop etish"
             >
               <Printer className="w-3.5 h-3.5 text-violet-400" />
-              <span className="hidden sm:inline">Chop etish</span>
+              <span className="hidden sm:inline">PDF / Chop etish</span>
             </button>
           </div>
         </div>
@@ -374,7 +537,7 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            {parsed.sections.map((sec, i) => (
+            {parsed.sections.map((sec) => (
               <button
                 key={sec.id}
                 onClick={() => scrollToSection(sec.id)}
@@ -400,7 +563,6 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
       <div className="space-y-5">
         {parsed?.sections.map((sec) => {
           if (sec.isConclusion) {
-            // Special conclusion styling
             return (
               <div
                 key={sec.id}
@@ -437,7 +599,6 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
             );
           }
 
-          // Regular numbered Section Card
           return (
             <div
               key={sec.id}
@@ -524,7 +685,6 @@ export default function NotesTab({ notes, loading, onGenerate }: NotesTabProps) 
                     );
                   }
 
-                  // General bullet item
                   return (
                     <div
                       key={idx}

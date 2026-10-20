@@ -749,6 +749,21 @@ export async function retryAnalysis(analysisId: string): Promise<{ analysis_id: 
   return res.data
 }
 
+export async function cancelAnalysis(analysisId: string): Promise<{ analysis_id: string; status: string; message?: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/cancel`)
+  return res.data
+}
+
+export async function adminCancelJob(jobId: string): Promise<{ status: string; message: string }> {
+  const res = await apiClient.post(`/api/admin/jobs/${jobId}/cancel`)
+  return res.data
+}
+
+export async function adminCancelAnalysis(analysisId: string): Promise<{ status: string; message: string }> {
+  const res = await apiClient.post(`/api/admin/analyses/${analysisId}/cancel`)
+  return res.data
+}
+
 export async function getTranscript(analysisId: string): Promise<{ segments: TranscriptSegment[] }> {
   const res = await apiClient.get(`/api/video-analysis/${analysisId}/transcript`)
   return res.data

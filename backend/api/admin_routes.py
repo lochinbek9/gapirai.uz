@@ -671,6 +671,69 @@ def admin_retry_job(
         db.close()
 
 
+@router.post("/jobs/{job_id}/cancel")
+def admin_cancel_job(
+    job_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel orqali istalgan jarayondagi job'ni to'xtatish va bekor qilish."""
+    from backend.models.database import DubbingJob, JobStatus
+    from backend.celery_app import celery_app
+    db = SessionLocal()
+    try:
+        job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job topilmadi")
+        
+        try:
+            celery_app.control.revoke(str(job.id), terminate=True, signal="SIGTERM")
+        except Exception as e:
+            logger.warning(f"Admin cancel: celery revoke error for {job.id}: {e}")
+
+        job.status = JobStatus.FAILED
+        job.status_message = "Admin tomonidan bekor qilindi"
+        job.error_message = "Admin tomonidan to'xtatildi va bekor qilindi."
+        job.error_code = "ADMIN_CANCELLED"
+        job.processing_claim_token = None
+        job.processing_lease_expires_at = None
+        db.commit()
+        return {"status": "success", "message": f"Job {job_id} bekor qilindi"}
+    finally:
+        db.close()
+
+
+@router.post("/analyses/{analysis_id}/cancel")
+def admin_cancel_analysis(
+    analysis_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel orqali istalgan video tahlilini to'xtatish va bekor qilish."""
+    from backend.models.database import VideoAnalysis, AnalysisStatus
+    from backend.celery_app import celery_app
+    db = SessionLocal()
+    try:
+        va = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
+        if not va:
+            raise HTTPException(status_code=404, detail="Video tahlil topilmadi")
+        
+        try:
+            celery_app.control.revoke(str(va.id), terminate=True, signal="SIGTERM")
+        except Exception as e:
+            logger.warning(f"Admin cancel: celery revoke error for {va.id}: {e}")
+
+        va.status = AnalysisStatus.FAILED
+        va.status_message = "Admin tomonidan bekor qilindi"
+        va.error_message = "Admin tomonidan to'xtatildi va bekor qilindi."
+        va.error_code = "ADMIN_CANCELLED"
+        va.processing_claim_token = None
+        va.processing_lease_expires_at = None
+        db.commit()
+        return {"status": "success", "message": f"Video tahlil {analysis_id} bekor qilindi"}
+    finally:
+        db.close()
+
+
+
 
 @router.get("/retention")
 def admin_retention_stats(

@@ -21,10 +21,13 @@ interface QuizTabProps {
   onSeek: (seconds: number) => void;
   onQuizStarted?: () => void;
   onQuizCompleted?: (score: number, total: number) => void;
+  startTime?: number | null;
+  videoDuration?: number;
 }
 
 export default function QuizTab({
   quiz, loading, answers, onGenerate, onAnswer, onSeek, onQuizStarted, onQuizCompleted,
+  startTime, videoDuration,
 }: QuizTabProps) {
   const [index, setIndex] = useState(0);
   const [reviewingMistakes, setReviewingMistakes] = useState(false);
@@ -74,6 +77,8 @@ export default function QuizTab({
         ]}
         estimatedTime="~15-20 soniya"
         onGenerate={onGenerate}
+        startTime={startTime}
+        videoDuration={videoDuration}
       />
     );
   }

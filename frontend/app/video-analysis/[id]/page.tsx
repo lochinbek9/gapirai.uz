@@ -5,16 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
-  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X,
+  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X, ChevronDown, ChevronUp, Copy, Check, XCircle,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
-  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
+  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, cancelAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
   getPlans, PlanDef, MinutePack, CurrentSubscription,
 } from "@/lib/api";
 
 const ANALYSIS_TIPS = [
-  "Gemini AI videoning eng muhim joylarini ajratib, qisqa konspekt tuzmoqda...",
+  "AI intellekti videoning eng muhim joylarini ajratib, qisqa konspekt tuzmoqda...",
   "Transkript orqali videodagi istalgan so'z va daqiqani soniyalarda qidirishingiz mumkin...",
   "Tahlil tugagach, video mazmuni bo'yicha interaktiv test va AI bilan suhbat ochiladi...",
   "Barcha asosiy g'oyalar va bo'limlar daqiqama-daqiqa ajratib beriladi...",
@@ -68,13 +68,18 @@ export default function VideoAnalysisPage() {
   const htmlVideoRef = useRef<HTMLVideoElement>(null);
   const [tab, setTab] = useState<Tab>("summary");
   const [retrying, setRetrying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
+  const [copiedError, setCopiedError] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [qaHistory, setQaHistory] = useState<QAEntry[]>([]);
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesStartTime, setNotesStartTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TranscriptSegment[] | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
@@ -148,6 +153,27 @@ export default function VideoAnalysisPage() {
     }
   };
 
+  const handleCancel = async () => {
+    if (!id || cancelling) return;
+    if (!confirm("Video tahlilini to'xtatish va bekor qilishni tasdiqlaysizmi?")) return;
+    setCancelling(true);
+    try {
+      await cancelAnalysis(id);
+      showToast("Video tahlili muvaffaqiyatli bekor qilindi.", "success");
+      await refetch();
+    } catch (e: any) {
+      showToast(e?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleCopyError = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedError(true);
+    setTimeout(() => setCopiedError(false), 2000);
+  };
+
   const seek = (seconds: number) => {
     if (playerRef.current) {
       playerRef.current.seekTo(seconds);
@@ -174,6 +200,7 @@ export default function VideoAnalysisPage() {
 
   const handleGenerateQuiz = async () => {
     if (!id) return;
+    setQuizStartTime(Date.now());
     setQuizLoading(true);
     try {
       const res = await generateQuiz(id);
@@ -183,11 +210,13 @@ export default function VideoAnalysisPage() {
       showToast("Test yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setQuizLoading(false);
+      setQuizStartTime(null);
     }
   };
 
   const handleGenerateNotes = async () => {
     if (!id) return;
+    setNotesStartTime(Date.now());
     setNotesLoading(true);
     try {
       const res = await generateNotes(id);
@@ -197,6 +226,7 @@ export default function VideoAnalysisPage() {
       showToast("Konspekt yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setNotesLoading(false);
+      setNotesStartTime(null);
     }
   };
 
@@ -429,13 +459,13 @@ export default function VideoAnalysisPage() {
                 {
                   idx: 1,
                   title: "2. Nutq Transkripti",
-                  desc: "Whisper STT (so'zma-so'z)",
+                  desc: "Groq Whisper (so'zma-so'z)",
                   icon: FileText,
                 },
                 {
                   idx: 2,
-                  title: "3. Gemini AI Tahlili",
-                  desc: "Xulosa va asosiy fikrlar",
+                  title: "3. Sun'iy Intellekt Tahlili",
+                  desc: "Xulosa va boblar",
                   icon: Brain,
                 },
                 {
@@ -491,30 +521,100 @@ export default function VideoAnalysisPage() {
               })}
             </div>
 
-            {/* Rotating Tips Box */}
-            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+            {/* Rotating Tips Box & Cancel */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                </div>
+                <p className="text-xs text-gray-300 transition-all duration-500">
+                  {ANALYSIS_TIPS[tipIndex]}
+                </p>
               </div>
-              <p className="text-xs text-gray-300 transition-all duration-500">
-                {ANALYSIS_TIPS[tipIndex]}
-              </p>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-xs font-semibold text-gray-400 hover:text-rose-300 transition shrink-0 active:scale-95 disabled:opacity-50"
+                title="Tahlilni to'xtatish"
+              >
+                {cancelling ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5" />
+                )}
+                <span>To'xtatish</span>
+              </button>
             </div>
           </div>
         )}
 
         {isFailed && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center space-y-4">
-            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
-            <h2 className="text-lg font-bold text-white">Xatolik yuz berdi</h2>
-            <p className="text-sm text-gray-400 max-w-lg mx-auto">
-              {analysis.error_message || "Videoni tahlil qilishda xatolik yuz berdi. Iltimos, birozdan keyin qayta urinib ko'ring."}
-            </p>
-            <div className="pt-2">
+          <div className="relative overflow-hidden rounded-3xl border border-rose-500/20 bg-gradient-to-b from-rose-950/20 via-slate-900/90 to-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl space-y-8">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Top Video Header Card */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10 relative z-10">
+              <div className="flex items-center gap-4 min-w-0">
+                {analysis.video_thumbnail ? (
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 shadow-md">
+                    <img
+                      src={analysis.video_thumbnail}
+                      alt={analysis.video_title || "Video"}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-rose-950/20" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                    <VideoIcon className="w-6 h-6 text-rose-400" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-lg">
+                    {analysis.video_title || "YouTube Video"}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 font-mono">
+                    {analysis.video_duration && analysis.video_duration > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-gray-500" />
+                        {formatHumanDuration(analysis.video_duration)}
+                      </span>
+                    )}
+                    <span>•</span>
+                    <span className="truncate max-w-[200px] text-gray-500">{analysis.youtube_url}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold shrink-0">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span>Tahlil to'xtatildi</span>
+              </div>
+            </div>
+
+            {/* Error Message & Friendly Diagnosis */}
+            <div className="text-center max-w-xl mx-auto space-y-3 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/5">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Tahlil jarayonida to'xtalish yuz berdi
+              </h2>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Video hajmi katta bo'lgani yoki sun'iy intellekt serverlarida vaqtinchalik yuklama yuqori bo'lgani sababli jarayon to'xtab qoldi.
+                Balansingizdagi daqiqalar saqlab qolingan.
+              </p>
+            </div>
+
+            {/* Action Buttons Row */}
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 relative z-10">
               <button
                 onClick={handleRetry}
                 disabled={retrying}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 active:scale-95 transition-all duration-300 disabled:opacity-50"
               >
                 {retrying ? (
                   <>
@@ -528,6 +628,76 @@ export default function VideoAnalysisPage() {
                   </>
                 )}
               </button>
+
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 text-gray-300 hover:text-rose-200 font-semibold text-sm transition active:scale-95 disabled:opacity-50"
+              >
+                {cancelling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                    <span>Bekor qilinmoqda...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 text-rose-400" />
+                    <span>Tahlilni bekor qilish</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => { clearAnalysisId(); router.push("/"); }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white font-semibold text-sm transition active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Boshqa video tahlil qilish</span>
+              </button>
+            </div>
+
+            {/* Collapsible Technical Details */}
+            <div className="pt-2 border-t border-white/5 relative z-10">
+              <button
+                onClick={() => setShowTechDetails((prev) => !prev)}
+                className="flex items-center justify-center gap-2 mx-auto text-xs text-gray-400 hover:text-gray-200 font-medium py-1 transition"
+              >
+                <span>Texnik xatolik tafsilotlari</span>
+                {showTechDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {showTechDetails && (
+                <div className="mt-3 p-4 rounded-2xl bg-black/40 border border-white/10 text-left space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono pb-2 border-b border-white/5">
+                    <span>ID: {analysis.id}</span>
+                    <button
+                      onClick={() => handleCopyError(`${analysis.error_message || ''}\nCode: ${analysis.error_code || ''}\nID: ${analysis.id}`)}
+                      className="flex items-center gap-1 text-gray-400 hover:text-white transition"
+                    >
+                      {copiedError ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedError ? "Nusxalandi" : "Nusxa olish"}</span>
+                    </button>
+                  </div>
+                  {analysis.error_code && (
+                    <p className="text-xs font-mono text-rose-300">
+                      Kod: <span className="text-white font-bold">{analysis.error_code}</span>
+                    </p>
+                  )}
+                  <p className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                    {analysis.error_message || "Noma'lum xatolik yuz berdi."}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Helpful Advice Banner */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start sm:items-center gap-3 text-xs text-gray-300 relative z-10">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <p className="leading-relaxed">
+                <span className="font-semibold text-white">Foydali tavsiya:</span> Katta hajmdagi videolarda (1 soatdan ortiq) AI tahlili bo'lib-bo'lib amalga oshiriladi. <strong>«Qaytadan urinish»</strong> tugmasini bosganingizda tizim avtomatik ravishda optimal modelni ishga tushiradi.
+              </p>
             </div>
           </div>
         )}
@@ -826,7 +996,13 @@ export default function VideoAnalysisPage() {
               )}
 
               {tab === "notes" && (
-                <NotesTab notes={notes} loading={notesLoading} onGenerate={handleGenerateNotes} />
+                <NotesTab
+                  notes={notes}
+                  loading={notesLoading}
+                  onGenerate={handleGenerateNotes}
+                  startTime={notesStartTime}
+                  videoDuration={analysis?.video_duration}
+                />
               )}
 
               {tab === "quiz" && (
@@ -837,6 +1013,8 @@ export default function VideoAnalysisPage() {
                   onGenerate={handleGenerateQuiz}
                   onAnswer={(qi, oi) => setQuizAnswers((prev) => ({ ...prev, [qi]: oi }))}
                   onSeek={seek}
+                  startTime={quizStartTime}
+                  videoDuration={analysis?.video_duration}
                 />
               )}
 

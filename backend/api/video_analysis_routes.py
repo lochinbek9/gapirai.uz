@@ -296,6 +296,38 @@ def retry_analysis(
     return {"analysis_id": str(analysis.id), "status": "pending"}
 
 
+@router.post("/{analysis_id}/cancel")
+def cancel_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Jarayondagi yoki navbatdagi tahlilni to'xtatish va bekor qilish."""
+    analysis = _get_owned_analysis(analysis_id, db, current_user)
+    if analysis.status == AnalysisStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail="Tugallangan tahlilni bekor qilib bo'lmaydi.",
+        )
+
+    try:
+        from backend.celery_app import celery_app
+        celery_app.control.revoke(str(analysis.id), terminate=True, signal="SIGTERM")
+    except Exception as e:
+        logger.warning(f"Celery task revoke error for {analysis.id}: {e}")
+
+    analysis.status = AnalysisStatus.FAILED
+    analysis.status_message = "Foydalanuvchi tomonidan bekor qilindi"
+    analysis.error_message = "Tahlil foydalanuvchi tomonidan bekor qilindi."
+    analysis.error_code = "CANCELLED"
+    analysis.processing_claim_token = None
+    analysis.processing_lease_expires_at = None
+    analysis.updated_at = datetime.utcnow()
+    db.commit()
+
+    return {"analysis_id": str(analysis.id), "status": "failed", "message": "Tahlil muvaffaqiyatli bekor qilindi"}
+
+
 @router.get("/{analysis_id}/transcript")
 def get_transcript(
     analysis_id: str,

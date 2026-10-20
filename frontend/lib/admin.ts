@@ -827,6 +827,21 @@ export async function apiAdminRetryJob(token: string, jobId: string): Promise<{ 
   return res.data
 }
 
+export async function apiAdminCancelJob(token: string, jobId: string): Promise<{ status: string; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/cancel`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminCancelAnalysis(token: string, analysisId: string): Promise<{ status: string; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/analyses/${analysisId}/cancel`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+
 export interface GeminiKeyItem {
   key_masked: string
   tier: 'paid' | 'free'

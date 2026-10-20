@@ -110,13 +110,30 @@ def _format_timestamp(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
-def _format_transcript(segments: list[dict]) -> str:
+def _format_transcript(segments: list[dict], max_chars: int = 24000) -> str:
     lines = []
     for seg in segments:
         ts = _format_timestamp(seg.get("start", 0))
         text = (seg.get("text") or "").strip()
         if text:
             lines.append(f"[{ts}] {text}")
+
+    total_len = sum(len(l) for l in lines)
+    if total_len > max_chars and len(lines) > 20:
+        # Katta hajmdagi video transkripti (masalan 1-2 soatlik podkastlar).
+        # Groq TPM (Tokens Per Minute) limitiga urilmasligi uchun butun video
+        # xronometraji bo'ylab teng taqsimlangan holda qisqartiriladi,
+        # vaqt belgilari (timestamps) to'liq saqlanadi.
+        step = max(1.0, len(lines) * 1.0 / (max_chars / 65))
+        sampled = []
+        curr = 0.0
+        while int(curr) < len(lines):
+            sampled.append(lines[int(curr)])
+            curr += step
+        if lines and lines[-1] not in sampled:
+            sampled.append(lines[-1])
+        lines = sampled
+
     body = "\n".join(lines)
     # <video_transcript> teglari -- _UNTRUSTED_TRANSCRIPT_RULE shu teglarga
     # ishora qiladi. Bu yerda o'raladi (chaqiruvchi joylarda emas) -- shunda

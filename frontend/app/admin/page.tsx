@@ -26,6 +26,7 @@ import {
   ExternalLink,
   RotateCcw,
   Key,
+  XCircle,
 } from 'lucide-react'
 import {
   AdminStats,
@@ -35,6 +36,7 @@ import {
   RefundsNeededReport,
   apiAdminRefundsNeeded,
   apiAdminRetryJob,
+  apiAdminCancelJob,
 } from '@/lib/admin'
 import { getToken } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
@@ -322,6 +324,7 @@ export default function AdminPage() {
 
   // Retry state in Overview
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null)
   const [retryToast, setRetryToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Sync tab with URL
@@ -420,6 +423,27 @@ export default function AdminPage() {
       })
     } finally {
       setRetryingJobId(null)
+      setTimeout(() => setRetryToast(null), 5000)
+    }
+  }
+
+  async function handleAdminCancel(jobId: string) {
+    const token = getToken()
+    if (!token) return
+    if (!confirm("Ushbu videoni to'xtatish va bekor qilishni tasdiqlaysizmi?")) return
+    try {
+      setCancellingJobId(jobId)
+      setRetryToast(null)
+      const res = await apiAdminCancelJob(token, jobId)
+      setRetryToast({ type: 'success', text: res.message || 'Video muvaffaqiyatli bekor qilindi!' })
+      await loadStats()
+    } catch (err: any) {
+      setRetryToast({
+        type: 'error',
+        text: err?.response?.data?.detail || err?.message || 'Bekor qilishda xatolik',
+      })
+    } finally {
+      setCancellingJobId(null)
       setTimeout(() => setRetryToast(null), 5000)
     }
   }
@@ -770,17 +794,34 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            {isFailed && !isNoSpeech && (
-                              <button
-                                onClick={() => handleOverviewRetry(j.id)}
-                                disabled={retryingJobId === j.id}
-                                className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 mx-auto transition disabled:opacity-50"
-                                title="Qayta urinish"
-                              >
-                                <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
-                                <span>Qayta urinish</span>
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1.5">
+                              {isFailed && !isNoSpeech && (
+                                <button
+                                  onClick={() => handleOverviewRetry(j.id)}
+                                  disabled={retryingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  title="Qayta urinish"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
+                                  <span>Qayta urinish</span>
+                                </button>
+                              )}
+                              {!isSuccess && !isFailed && (
+                                <button
+                                  onClick={() => handleAdminCancel(j.id)}
+                                  disabled={cancellingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  title="To'xtatish va bekor qilish"
+                                >
+                                  {cancellingJobId === j.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-3 h-3" />
+                                  )}
+                                  <span>Bekor qilish</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )

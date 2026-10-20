@@ -202,7 +202,7 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.TRANSCRIBING, 35.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(audio_path, primary="gemini", is_paid=is_paid_analysis)
+            transcript = transcriber.transcribe_audio(audio_path, primary="groq", is_paid=is_paid_analysis)
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
