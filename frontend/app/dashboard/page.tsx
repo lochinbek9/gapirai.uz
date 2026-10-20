@@ -25,7 +25,8 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   if (!sub) return null
   const planName = PLAN_NAMES[sub.plan] || sub.plan
   const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
-  const isAdmin = sub.is_admin || sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
+  const isAdmin = sub.is_admin
+  const isUnlimited = sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
 
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
@@ -47,7 +48,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
         <div className="sm:ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 w-full sm:w-auto">
           {sub.minutes && (
             <>
-              {isAdmin ? (
+              {isUnlimited ? (
                 <p>
                   <span className="font-bold text-violet-600 dark:text-violet-400">Cheksiz daqiqa</span>
                   <span className="text-gray-500 text-[11px] ml-1.5 font-medium">(Barcha AI provayderlar faol)</span>
@@ -63,21 +64,21 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
                   {sub.minutes.monthly_used} daqiqa ishlatildi
                 </p>
               )}
-              {sub.minutes.purchased > 0 && !isAdmin && (
+              {sub.minutes.purchased > 0 && !isUnlimited && (
                 <p className="text-violet-500 dark:text-violet-400 font-semibold">
                   + {sub.minutes.purchased} sotib olingan daqiqa
                 </p>
               )}
             </>
           )}
-          {sub.plan !== 'free' && sub.expires_at && !isAdmin && (
+          {sub.plan !== 'free' && sub.expires_at && !isUnlimited && (
             <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
               {formatTashkentDate(sub.expires_at)} gacha
             </p>
           )}
         </div>
       </div>
-      {!isAdmin && (
+      {!isUnlimited && (
         <Link
           href="/pricing"
           onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}

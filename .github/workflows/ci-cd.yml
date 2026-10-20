@@ -196,15 +196,13 @@ jobs:
             git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
             git checkout -B main FETCH_HEAD -f
             git reset --hard FETCH_HEAD
-            git remote set-url origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
+            git remote set-url origin "git@github.com:${{ github.repository }}.git" 2>/dev/null || true
             echo "Git sync complete: $(git log -1 --oneline)"
 
             echo "=== Ensuring workspace ownership and building Frontend ==="
             run_sudo chown -R gapirai:gapirai "$TARGET_DIR"
             if [ -d "frontend" ]; then
               cd frontend
-              # Temporarily stop running frontend service to prevent file locks during build
-              run_sudo systemctl stop gapirai-frontend 2>/dev/null || true
               export NEXT_PUBLIC_API_URL="https://api.gapirai.uz"
               export BROWSERSLIST_IGNORE_OLD_DATA=true
               export NEXT_TELEMETRY_DISABLED=1
@@ -233,14 +231,19 @@ jobs:
             # Docker backend & worker
             echo "Restarting backend containers..."
             docker restart dubber_backend dubber_worker 2>/dev/null || true
-            docker restart $(docker ps -q --filter "publish=3000") 2>/dev/null || true
+            CONTAINERS_3000=$(docker ps -q --filter "publish=3000" 2>/dev/null || true)
+            if [ -n "$CONTAINERS_3000" ]; then
+              docker restart $CONTAINERS_3000 2>/dev/null || true
+            fi
 
             # PM2 (all users)
             echo "Checking PM2..."
             if command -v pm2 >/dev/null 2>&1; then
               pm2 restart all || pm2 reload all || true
             fi
-            run_sudo -u ubuntu pm2 restart all 2>/dev/null || true
+            if id -u ubuntu >/dev/null 2>&1; then
+              run_sudo -u ubuntu pm2 restart all 2>/dev/null || true
+            fi
             run_sudo pm2 restart all 2>/dev/null || true
 
             # Systemd services

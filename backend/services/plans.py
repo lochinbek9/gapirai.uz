@@ -260,27 +260,6 @@ def get_minute_balance(db, user_id) -> dict:
       "total_available": float,    # monthly_remaining + purchased
     }
     """
-    if is_user_admin(db, user_id):
-        sub = get_or_create_subscription(db, user_id)
-        from backend.models.database import DubbingJob, JobStatus
-        from sqlalchemy import func
-        q = db.query(func.coalesce(func.sum(DubbingJob.video_duration), 0.0)).filter(
-            DubbingJob.user_id == user_id,
-            DubbingJob.status == JobStatus.COMPLETED
-        )
-        if sub.period_started_at:
-            q = q.filter(DubbingJob.created_at >= sub.period_started_at)
-        actual_sec = q.scalar() or 0.0
-        used = actual_sec / 60.0 if actual_sec > 0 else (sub.monthly_minutes_used or 0.0)
-        purchased = sub.purchased_minutes or 0.0
-        return {
-            "is_unlimited": True,
-            "monthly_cap": 999999.0,
-            "monthly_used": round(used, 1),
-            "monthly_remaining": 999999.0,
-            "purchased": round(purchased, 1),
-            "total_available": 999999.0,
-        }
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -304,8 +283,6 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
     - covered=False -> shortfall_minutes = yetishmayotgan daqiqa (butun songa
       yaxlitlangan) -- frontend "Buy additional minutes" CTA'sida ko'rsatiladi
     """
-    if is_user_admin(db, user_id):
-        return True, 0
     bal = get_minute_balance(db, user_id)
     if duration_minutes <= bal["total_available"] + 1e-6:
         return True, 0
@@ -319,8 +296,6 @@ def check_and_consume_quota(db, user_id, duration_minutes: float) -> tuple[bool,
 
     Returns: (covered, shortfall_minutes)
     """
-    if is_user_admin(db, user_id):
-        return True, 0
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -346,8 +321,6 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
     """Video navbatga qo'yilganda chaqiriladi -- avval oylik byudjetdan,
     yetmasa sotib olingan daqiqalardan yechadi. Poyga xavfsizligi uchun
     for_update bilan qatorni qulflaydi."""
-    if is_user_admin(db, user_id):
-        return
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -370,8 +343,6 @@ def refund_quota(db, user_id, duration_minutes: float) -> None:
     oylik hisoblagichdan ayiramiz, purchased qoldig'i esa faqat oylik 0'ga
     yetganda oshadi."""
     if not user_id or duration_minutes <= 0:
-        return
-    if is_user_admin(db, user_id):
         return
     sub = get_or_create_subscription(db, user_id, for_update=True)
     used = sub.monthly_minutes_used or 0.0
