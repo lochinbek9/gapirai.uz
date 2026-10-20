@@ -80,6 +80,10 @@ def get_all_groq_api_keys() -> List[str]:
     potential_env_paths = [
         ".env",
         "backend/.env",
+        "/app/.env",
+        "/app/backend/.env",
+        "/home/gapirai/gapirai.uz/.env",
+        "/home/gapirai/gapirai.uz/backend/.env",
         "/home/kai/projects/gapirai.uz/.env",
         "/home/kai/projects/gapirai.uz/backend/.env",
     ]
