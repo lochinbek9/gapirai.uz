@@ -687,14 +687,14 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
 
     if db:
         try:
-            from backend.models.database import DubbingJob, JobStatus
+            from backend.models.database import DubbingJob, JobStatus, VideoAnalysis, AnalysisStatus
             from sqlalchemy import func
+
+            # 1. Dubbing Jobs
             rows = db.query(
                 DubbingJob.gemini_key_used,
                 func.count(DubbingJob.id).label("job_count"),
                 func.sum(DubbingJob.video_duration).label("duration_sum"),
-                func.sum(DubbingJob.total_cost_usd).label("cost_usd_sum"),
-                func.sum(DubbingJob.total_cost_uzs).label("cost_uzs_sum"),
             ).filter(
                 DubbingJob.status == JobStatus.COMPLETED,
                 DubbingJob.gemini_key_used.isnot(None)
@@ -702,30 +702,73 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
 
             for r in rows:
                 if r[0]:
+                    dur = float(r[2] or 0)
+                    cost_u = round(dur * (0.002 / 60.0), 4)
+                    cost_z = int(cost_u * 12850)
                     db_stats_by_key[r[0]] = {
                         "job_count": int(r[1] or 0),
-                        "duration_sec": float(r[2] or 0),
-                        "cost_usd": float(r[3] or 0),
-                        "cost_uzs": int(r[4] or 0),
+                        "duration_sec": dur,
+                        "cost_usd": cost_u,
+                        "cost_uzs": cost_z,
                     }
 
-            p_row = db.query(
+            # 2. Video Analysis
+            va_rows = db.query(
+                VideoAnalysis.gemini_key_used,
+                func.count(VideoAnalysis.id).label("job_count"),
+                func.sum(VideoAnalysis.video_duration).label("duration_sum"),
+            ).filter(
+                VideoAnalysis.status == AnalysisStatus.COMPLETED,
+                VideoAnalysis.gemini_key_used.isnot(None)
+            ).group_by(VideoAnalysis.gemini_key_used).all()
+
+            for r in va_rows:
+                if r[0]:
+                    k = r[0]
+                    dur = float(r[2] or 0)
+                    cost_u = round(dur * (0.002 / 60.0), 4)
+                    cost_z = int(cost_u * 12850)
+                    if k in db_stats_by_key:
+                        db_stats_by_key[k]["job_count"] += int(r[1] or 0)
+                        db_stats_by_key[k]["duration_sec"] += dur
+                        db_stats_by_key[k]["cost_usd"] += cost_u
+                        db_stats_by_key[k]["cost_uzs"] += cost_z
+                    else:
+                        db_stats_by_key[k] = {
+                            "job_count": int(r[1] or 0),
+                            "duration_sec": dur,
+                            "cost_usd": cost_u,
+                            "cost_uzs": cost_z,
+                        }
+
+            # Pullik kalit umumiy xarajatlari (Dubbing + Video Analysis)
+            p_jobs = db.query(
                 func.count(DubbingJob.id),
                 func.sum(DubbingJob.video_duration),
-                func.sum(DubbingJob.total_cost_usd),
-                func.sum(DubbingJob.total_cost_uzs),
             ).filter(
                 DubbingJob.status == JobStatus.COMPLETED,
                 DubbingJob.gemini_key_tier == "paid"
             ).first()
 
-            if p_row:
-                paid_jobs_totals = {
-                    "jobs_count": int(p_row[0] or 0),
-                    "duration_sec": float(p_row[1] or 0),
-                    "cost_usd": float(p_row[2] or 0),
-                    "cost_uzs": int(p_row[3] or 0),
-                }
+            p_va = db.query(
+                func.count(VideoAnalysis.id),
+                func.sum(VideoAnalysis.video_duration),
+            ).filter(
+                VideoAnalysis.status == AnalysisStatus.COMPLETED,
+                VideoAnalysis.gemini_key_tier == "paid"
+            ).first()
+
+            total_p_cnt = (int(p_jobs[0]) if p_jobs and p_jobs[0] else 0) + (int(p_va[0]) if p_va and p_va[0] else 0)
+            total_p_dur = (float(p_jobs[1]) if p_jobs and p_jobs[1] else 0.0) + (float(p_va[1]) if p_va and p_va[1] else 0.0)
+            total_p_cost_usd = round(total_p_dur * (0.002 / 60.0), 4)
+            total_p_cost_uzs = int(total_p_cost_usd * 12850)
+
+            paid_jobs_totals = {
+                "jobs_count": total_p_cnt,
+                "duration_sec": total_p_dur,
+                "cost_usd": total_p_cost_usd,
+                "cost_uzs": total_p_cost_uzs,
+            }
         except Exception as e:
             logger.warning(f"DB key stats yig'ishda xato: {e}")
 
