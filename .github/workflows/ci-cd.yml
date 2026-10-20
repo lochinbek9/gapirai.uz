@@ -192,8 +192,9 @@ jobs:
 
             echo "=== Pulling latest changes from ${{ github.repository }} ==="
             export GIT_TERMINAL_PROMPT=0
+            git reset --hard HEAD || true
             git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
-            git checkout -B main FETCH_HEAD
+            git checkout -B main FETCH_HEAD -f
             git reset --hard FETCH_HEAD
             git remote set-url origin "https://github.com/${{ github.repository }}.git" 2>/dev/null || true
             echo "Git sync complete: $(git log -1 --oneline)"
