@@ -477,6 +477,31 @@ def process_video(self: Task, job_id: str) -> dict:
         if not job:
             raise ValueError(f"Job topilmadi: {job_id}")
 
+        # Pullik/bepul kalit ajratish (2026-10-20):
+        # 1. 2-daqiqalik sinov dublyaji (is_preview=True) bo'lsa -> FAQAT bepul kalitlar (is_paid=False)
+        # 2. Kvotadan daqiqa yechilgan (quota_consumed=True) bo'lsa -> Pullik kalit (is_paid=True)
+        # 3. Foydalanuvchining pullik obunasi (Standard/Pro) yoki admin bo'lsa -> Pullik kalit (is_paid=True)
+        is_paid_job = False
+        if not getattr(job, "is_preview", False):
+            if getattr(job, "quota_consumed", False):
+                is_paid_job = True
+            elif job.user_id:
+                try:
+                    from backend.models.database import User, Subscription, PlanTier
+                    sub = db.query(Subscription).filter(Subscription.user_id == job.user_id).first()
+                    if sub and sub.plan != PlanTier.FREE:
+                        is_paid_job = True
+                    else:
+                        u = db.query(User).filter(User.id == job.user_id).first()
+                        if u and getattr(u, "role", None) == "admin":
+                            is_paid_job = True
+                except Exception:
+                    pass
+
+        if not getattr(job, "gemini_key_tier", None):
+            job.gemini_key_tier = "paid" if is_paid_job else "free"
+            db.commit()
+
         is_recovery_job = bool(job.completed_at is not None)
 
         # 2026-08-26 audit: bir xil task_id ikki worker'da bir vaqtda faol
@@ -729,6 +754,7 @@ def process_video(self: Task, job_id: str) -> dict:
                     audio_path,
                     language="uz" if uzbek_source else None,
                     primary=stt_primary,
+                    is_paid=is_paid_job,
                 )
             except transcriber.WrongLanguageError as exc:
                 if uzbek_source:
@@ -744,6 +770,7 @@ def process_video(self: Task, job_id: str) -> dict:
                         audio_path,
                         language=None,
                         primary=stt_primary,
+                        is_paid=is_paid_job,
                     )
                 else:
                     _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
@@ -759,6 +786,9 @@ def process_video(self: Task, job_id: str) -> dict:
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
             job.stt_model = transcript.get("model") or getattr(settings, "GEMINI_STT_MODEL", "gemini-3.8-flash")
+            job.gemini_key_tier = transcript.get("gemini_key_tier") or ("paid" if is_paid_job else "free")
+            if transcript.get("gemini_key_used"):
+                job.gemini_key_used = transcript.get("gemini_key_used")
 
             # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
             # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)
@@ -876,7 +906,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 translated_segments = translator.passthrough_segments(segments)
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
-                translated_segments = translator.translate_segments(segments)
+                translated_segments = translator.translate_segments(segments, is_paid=is_paid_job)
 
             # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
             # uzunroq chiqqan tarjimalar BIR MARTA qisqartiriladi (haqiqiy

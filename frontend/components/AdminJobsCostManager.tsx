@@ -644,6 +644,19 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               {job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1'}
                             </span>
                           </div>
+                          <div className="pt-0.5">
+                            {job.models.gemini_key_tier === 'paid' ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Pullik kalit'}>
+                                <span>💎</span>
+                                <span>Pullik kalit</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Bepul kalit hovuzi'}>
+                                <span>🆓</span>
+                                <span>Bepul kalit</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -896,6 +909,29 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   <span className="font-bold text-white font-mono">
                     {selectedJob.costs.cost_per_minute_uzs.toLocaleString()} UZS / daqiqa
                   </span>
+                </div>
+
+                {/* AI Key Tier Status */}
+                <div className="p-2.5 bg-black/25 rounded-lg border border-white/5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-[11px]">AI Kalit toifasi:</span>
+                    {selectedJob.models.gemini_key_tier === 'paid' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <span>💎</span>
+                        <span>Pullik (Balansli) kalit</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                        <span>🆓</span>
+                        <span>Bepul kalit (30+ hovuz)</span>
+                      </span>
+                    )}
+                  </div>
+                  {selectedJob.models.gemini_key_used && (
+                    <span className="font-mono text-[10px] text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">
+                      {selectedJob.models.gemini_key_used}
+                    </span>
+                  )}
                 </div>
 
                 {/* Payment Margin if paid */}

@@ -218,7 +218,7 @@ export default function VideoPage() {
       router.push(`/video-analysis/${job.linked_analysis_id}`)
       return
     }
-    if (!job?.youtube_url) return
+    if (!job?.youtube_url && !job?.id) return
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
       return
@@ -226,7 +226,7 @@ export default function VideoPage() {
     setAnalysisLoading(true)
     setAnalysisError(null)
     try {
-      const { analysis_id } = await createAnalysis(job.youtube_url, 'uz')
+      const { analysis_id } = await createAnalysis(job.youtube_url || `upload://${job.id}`, 'uz', job.id)
       saveAnalysisId(analysis_id)
       router.push(`/video-analysis/${analysis_id}`)
     } catch (err: any) {

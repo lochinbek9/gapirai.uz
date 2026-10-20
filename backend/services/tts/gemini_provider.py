@@ -61,11 +61,14 @@ def _config_for(voice: str):
     )
 
 
-def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
-    """Bitta so'rovni yuboradi. Barcha mavjud Gemini API kalitlari bo'yicha rotatsiya qiladi.
+def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -> bytes | None:
+    """Bitta so'rovni yuboradi. Barcha mavjud Gemini API kalitlari bo'yicha rotatsiya qiladi:
+    - is_paid=True bo'lsa pullik (balansli) kalit(lar)ga ustunlik beradi.
+    - is_paid=False bo'lsa FAQAT bepul kalitlar hovuzidan foydalanadi.
     429/503 bo'lsa, tegishli kalit cooldown'ga olinib, darhol keyingi toza kalitga o'tiladi."""
     from backend.services.gemini_quota_manager import (
         get_all_gemini_api_keys,
+        get_gemini_keys_for_request,
         is_model_available,
         mark_model_cooldown,
         record_model_request,
@@ -106,7 +109,7 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                         time.sleep(1.0 * (attempt + 1))
         return None
 
-    api_keys = get_all_gemini_api_keys()
+    api_keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not api_keys:
         primary = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
         if primary:
@@ -236,6 +239,9 @@ _SILENCE_THRESH_OFFSET = 16
 class GeminiProvider(TTSProvider):
     """Gemini'ning tayyor ovozlari (Autonoe/Aoede/Charon/Fenrir/Puck)."""
 
+    def __init__(self, is_paid: bool = False):
+        self.is_paid = is_paid
+
     @property
     def name(self) -> str:
         return "gemini"
@@ -250,6 +256,7 @@ class GeminiProvider(TTSProvider):
         text: str,
         output_path: str,
         voice_name: str | None = None,
+        is_paid: bool | None = None,
     ) -> bool:
         if not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
             return False
@@ -266,12 +273,14 @@ class GeminiProvider(TTSProvider):
         else:
             voice = settings.GEMINI_FEMALE_VOICE if self._is_female(voice_name) else settings.GEMINI_MALE_VOICE
 
+        use_paid = self.is_paid if is_paid is None else is_paid
+
         try:
-            pcm_data = _generate_pcm_with_retry(clean_text, voice)
+            pcm_data = _generate_pcm_with_retry(clean_text, voice, is_paid=use_paid)
             if not pcm_data:
                 return False
             _write_wav(output_path, pcm_data)
-            logger.info(f"Gemini TTS: voice={voice}, chars={len(clean_text)}")
+            logger.info(f"Gemini TTS: voice={voice}, chars={len(clean_text)}, is_paid={use_paid}")
             return True
         except Exception as exc:
             logger.warning(f"Gemini TTS xato: {exc}")

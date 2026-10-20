@@ -243,6 +243,8 @@ class Settings(BaseSettings):
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
     GEMINI_API_KEYS: str = ""
+    GEMINI_PAID_API_KEY: str = ""
+    GEMINI_PAID_API_KEYS: str = ""
     GOOGLE_GENERATIVE_AI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
     GEMINI_STT_MODEL: str = "gemini-3.8-flash"

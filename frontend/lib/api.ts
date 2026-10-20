@@ -701,11 +701,13 @@ export interface VideoAnalysis {
   progress: number
   status_message?: string
   youtube_url: string
+  video_url?: string
   video_title?: string
   video_duration?: number
   video_thumbnail?: string
   language: string
   video_language?: string
+  gemini_key_tier?: string
   summary?: VideoAnalysisSummary
   key_points?: KeyPoint[]
   chapters?: Chapter[]
@@ -718,8 +720,12 @@ export interface VideoAnalysis {
   created_at?: string
 }
 
-export async function createAnalysis(youtube_url: string, language: string = 'uz'): Promise<{ analysis_id: string; status: string }> {
-  const res = await apiClient.post('/api/video-analysis', { youtube_url, language })
+export async function createAnalysis(
+  youtube_url: string,
+  language: string = 'uz',
+  job_id?: string
+): Promise<{ analysis_id: string; status: string }> {
+  const res = await apiClient.post('/api/video-analysis', { youtube_url, language, job_id })
   return res.data
 }
 

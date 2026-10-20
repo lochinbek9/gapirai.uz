@@ -49,6 +49,7 @@ export default function VideoAnalysisPage() {
   const router = useRouter();
   const { analysis, error, is404, refetch } = useAnalysisPolling(id);
   const playerRef = useRef<YouTubePlayerHandle>(null);
+  const htmlVideoRef = useRef<HTMLVideoElement>(null);
   const [tab, setTab] = useState<Tab>("summary");
   const [retrying, setRetrying] = useState(false);
   const [question, setQuestion] = useState("");
@@ -104,7 +105,14 @@ export default function VideoAnalysisPage() {
     }
   };
 
-  const seek = (seconds: number) => playerRef.current?.seekTo(seconds);
+  const seek = (seconds: number) => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(seconds);
+    } else if (htmlVideoRef.current) {
+      htmlVideoRef.current.currentTime = seconds;
+      htmlVideoRef.current.play().catch(() => {});
+    }
+  };
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,6 +337,13 @@ export default function VideoAnalysisPage() {
           <>
             {videoId ? (
               <YouTubePlayer ref={playerRef} videoId={videoId} />
+            ) : analysis?.video_url ? (
+              <video
+                ref={htmlVideoRef}
+                src={analysis.video_url}
+                controls
+                className="w-full aspect-video rounded-2xl bg-black object-contain shadow-2xl border border-white/10"
+              />
             ) : (
               <div className="aspect-video bg-black rounded-2xl flex items-center justify-center text-gray-500 text-sm">
                 Video ko'rsatib bo'lmadi

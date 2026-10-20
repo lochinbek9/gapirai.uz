@@ -80,8 +80,12 @@ def get_all_gemini_api_keys() -> List[str]:
     for env_val in [
         getattr(settings, "GEMINI_API_KEY", ""),
         getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", ""),
+        getattr(settings, "GEMINI_PAID_API_KEY", ""),
+        getattr(settings, "GEMINI_PAID_API_KEYS", ""),
         os.environ.get("GEMINI_API_KEYS", ""),
         os.environ.get("GEMINI_API_KEY", ""),
+        os.environ.get("GEMINI_PAID_API_KEY", ""),
+        os.environ.get("GEMINI_PAID_API_KEYS", ""),
         os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", ""),
     ]:
         if env_val:
@@ -111,7 +115,7 @@ def get_all_gemini_api_keys() -> List[str]:
                         k, v = line.split("=", 1)
                         k = k.strip()
                         v = v.strip().strip('"').strip("'")
-                        if k in ("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_API_KEYS"):
+                        if k in ("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_API_KEYS", "GEMINI_PAID_API_KEY", "GEMINI_PAID_API_KEYS"):
                             for part in v.split(","):
                                 cleaned = part.strip()
                                 if cleaned and len(cleaned) >= 15:
@@ -127,6 +131,100 @@ def get_all_gemini_api_keys() -> List[str]:
             unique_keys.append(k)
 
     return unique_keys
+
+
+def get_paid_gemini_api_keys() -> List[str]:
+    """Pullik (balansli) Gemini API kalitlarini qaytaradi."""
+    settings = get_settings()
+    raw_keys: List[str] = []
+
+    for env_val in [
+        getattr(settings, "GEMINI_PAID_API_KEY", ""),
+        getattr(settings, "GEMINI_PAID_API_KEYS", ""),
+        os.environ.get("GEMINI_PAID_API_KEY", ""),
+        os.environ.get("GEMINI_PAID_API_KEYS", ""),
+    ]:
+        if env_val:
+            for part in str(env_val).split(","):
+                cleaned = part.strip().strip('"').strip("'")
+                if cleaned and len(cleaned) >= 15:
+                    raw_keys.append(cleaned)
+
+    potential_env_paths = [
+        ".env",
+        "backend/.env",
+        "../.env",
+        "/app/.env",
+        "/app/backend/.env",
+        "/home/gapirai/gapirai.uz/.env",
+        "/home/gapirai/gapirai.uz/backend/.env",
+    ]
+    for env_path in potential_env_paths:
+        if os.path.isfile(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k in ("GEMINI_PAID_API_KEY", "GEMINI_PAID_API_KEYS"):
+                            for part in v.split(","):
+                                cleaned = part.strip()
+                                if cleaned and len(cleaned) >= 15:
+                                    raw_keys.append(cleaned)
+            except Exception:
+                pass
+
+    seen = set()
+    unique_keys = []
+    for k in raw_keys:
+        if k not in seen:
+            seen.add(k)
+            unique_keys.append(k)
+    return unique_keys
+
+
+def is_paid_gemini_key(api_key: str) -> bool:
+    """Kalit pullik (balansli) toifaga tegishli ekanligini tekshiradi."""
+    if not api_key:
+        return False
+    paid_set = set(get_paid_gemini_api_keys())
+    return api_key.strip() in paid_set
+
+
+def get_free_gemini_api_keys() -> List[str]:
+    """Pullik bo'lmagan (bepul 30+ hovuzdagi) Gemini kalitlarini qaytaradi."""
+    all_keys = get_all_gemini_api_keys()
+    paid_set = set(get_paid_gemini_api_keys())
+    free_list = [k for k in all_keys if k not in paid_set]
+    return free_list if free_list else all_keys
+
+
+def get_gemini_keys_for_request(is_paid: bool = False) -> List[str]:
+    """
+    So'rov turiga mos Gemini API kalitlarini saralab beradi:
+    - is_paid=True (Pullik tarifdagilar / sotib olingan daqiqali dublyajlar):
+      Birinchi o'rinda pullik (balansli) kalit(lar), favqulodda zaxira sifatida bepul kalitlar.
+    - is_paid=False (Bepul foydalanuvchilar, 2-daqiqalik sinov dublyajlari, bepul tahlillar):
+      FAQAT bepul kalitlar (pullik kalit balansi tegilmaydi).
+    """
+    paid_keys = get_paid_gemini_api_keys()
+    free_keys = get_free_gemini_api_keys()
+
+    if is_paid:
+        combined = []
+        seen = set()
+        for k in paid_keys + free_keys:
+            if k not in seen:
+                seen.add(k)
+                combined.append(k)
+        return combined if combined else get_all_gemini_api_keys()
+    else:
+        # Bepul foydalanuvchilar faqat bepul hovuzdan foydalanadi
+        return free_keys if free_keys else get_all_gemini_api_keys()
 
 
 def mask_key(api_key: str) -> str:
@@ -325,21 +423,26 @@ def get_gemini_quota_status() -> Dict[str, Any]:
 
         keys_overview.append({
             "key_masked": masked,
+            "tier": "paid" if is_paid_gemini_key(key) else "free",
             "models": models_info,
         })
 
     return {
         "timestamp": now,
         "total_keys": len(keys),
+        "total_paid_keys": len(get_paid_gemini_api_keys()),
+        "total_free_keys": len(get_free_gemini_api_keys()),
         "total_active_slots": total_active_models,
         "total_cooldown_slots": total_cooldown_models,
         "keys": keys_overview,
     }
 
 
-def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temperature: float = 0.4) -> dict:
+def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temperature: float = 0.4, is_paid: bool = False) -> dict:
     """
     Barcha berilgan Gemini API kalitlari va modellarini navbatma-navbat sinab ko'radi:
+    - is_paid=True bo'lsa: birinchi o'rinda pullik (balansli) kalit(lar), keyin bepul hovuz.
+    - is_paid=False bo'lsa: FAQAT bepul kalitlar (pullik kalit balansi tegilmaydi).
     - Yaxshi modeldan oddiysiga qarab yuradi (Pro -> Flash -> Flash-Lite).
     - 429 xatosi chiqqanda cooldown hisoblaydi va keyingi kalit/modelga o'tadi.
     - Cooldown'da turgan modellar uchun tarmoqqa ortiqcha so'rov yubormasdan sakrab o'tadi.
@@ -348,7 +451,7 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
     from google import genai
     from google.genai import types
 
-    keys = get_all_gemini_api_keys()
+    keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not keys:
         raise RuntimeError("Hech qanday faol GEMINI API kaliti topilmadi!")
 

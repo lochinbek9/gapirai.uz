@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.models.database import get_db, VideoAnalysis, AnalysisStatus, User
+from backend.models.database import get_db, VideoAnalysis, AnalysisStatus, User, DubbingJob
 from backend.services.downloader import get_video_info
 import uuid
 from backend.services.auth import get_current_user, get_optional_user_id
@@ -31,7 +31,8 @@ ALLOWED_ANALYSIS_LANGUAGES = {"uz", "en", "ru", "tr", "kk", "original"}
 
 
 class CreateAnalysisRequest(BaseModel):
-    youtube_url: str
+    youtube_url: Optional[str] = None
+    job_id: Optional[str] = None
     language: str = "uz"
 
 
@@ -79,12 +80,18 @@ def _get_accessible_analysis(
 
 def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
     raw_status = analysis.status.value if hasattr(analysis.status, "value") else analysis.status
+    video_url = None
+    if analysis.youtube_url and analysis.youtube_url.startswith("upload://"):
+        raw_jid = analysis.youtube_url.replace("upload://", "").strip()
+        video_url = f"/outputs/{raw_jid}/video/dubbed_final.mp4"
+
     return {
         "id": str(analysis.id),
         "status": str(raw_status).lower() if raw_status else "pending",
         "progress": analysis.progress or 0.0,
         "status_message": analysis.status_message,
         "youtube_url": analysis.youtube_url,
+        "video_url": video_url,
         "video_title": analysis.video_title,
         "video_duration": analysis.video_duration,
         "video_thumbnail": analysis.video_thumbnail,
@@ -97,6 +104,8 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
         "notes": analysis.notes,
         "quiz": analysis.quiz,
         "qa_history": analysis.qa_history or [],
+        "gemini_key_tier": getattr(analysis, "gemini_key_tier", None),
+        "gemini_key_used": getattr(analysis, "gemini_key_used", None),
         "error_message": analysis.error_message,
         "error_code": analysis.error_code,
         "created_at": to_tashkent_iso(analysis.created_at),
@@ -137,11 +146,67 @@ async def create_analysis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if not _is_valid_youtube_url(request.youtube_url):
-        raise HTTPException(status_code=400, detail="Faqat YouTube URL qabul qilinadi.")
-
     if request.language not in ALLOWED_ANALYSIS_LANGUAGES:
         raise HTTPException(status_code=400, detail="Noto'g'ri tahlil tili.")
+
+    # 1. Agar job_id ko'rsatilgan bo'lsa yoki youtube_url upload:// bilan boshlansa -> mavjud DubbingJob dan tahlil
+    target_job = None
+    if request.job_id:
+        try:
+            target_job = db.query(DubbingJob).filter(DubbingJob.id == request.job_id).first()
+        except Exception:
+            pass
+    elif request.youtube_url and request.youtube_url.startswith("upload://"):
+        raw_jid = request.youtube_url.replace("upload://", "").strip()
+        try:
+            target_job = db.query(DubbingJob).filter(DubbingJob.id == raw_jid).first()
+        except Exception:
+            pass
+
+    if target_job:
+        # Allaqachon tahlil yaratilgan bo'lsa
+        if target_job.linked_analysis_id:
+            existing = db.query(VideoAnalysis).filter(VideoAnalysis.id == target_job.linked_analysis_id).first()
+            if existing:
+                raw_st = existing.status.value if hasattr(existing.status, "value") else str(existing.status).lower()
+                return {"analysis_id": str(existing.id), "status": raw_st}
+
+        root_job = db.query(DubbingJob).filter(DubbingJob.id == target_job.storage_id).first() if target_job.storage_id else target_job
+        segments = (root_job.transcript_segments if root_job else None) or target_job.transcript_segments
+
+        is_user_paid = (
+            getattr(current_user, "is_admin", False)
+            or getattr(current_user, "current_plan", "free") != "free"
+            or bool(getattr(target_job, "quota_consumed", False))
+        )
+
+        analysis = VideoAnalysis(
+            user_id=current_user.id,
+            youtube_url=target_job.youtube_url or f"upload://{target_job.id}",
+            youtube_video_id=target_job.youtube_video_id,
+            video_title=target_job.video_title or "Yuklangan video",
+            video_duration=target_job.video_duration,
+            video_thumbnail=target_job.video_thumbnail,
+            language=request.language,
+            status=AnalysisStatus.TRANSCRIBING if segments else AnalysisStatus.PENDING,
+            progress=25.0 if segments else 0.0,
+            status_message="Transkript dublyajdan qayta ishlatildi" if segments else "Navbatga qo'shildi",
+            transcript_segments=segments,
+            gemini_key_tier="paid" if is_user_paid else "free",
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+
+        target_job.linked_analysis_id = analysis.id
+        db.commit()
+
+        analyze_video_task.apply_async(args=[str(analysis.id)], task_id=str(analysis.id))
+        return {"analysis_id": str(analysis.id), "status": "pending"}
+
+    # 2. Aks holda YouTube URL talab qilinadi
+    if not request.youtube_url or not _is_valid_youtube_url(request.youtube_url):
+        raise HTTPException(status_code=400, detail="Faqat YouTube URL yoki yuklangan video qabul qilinadi.")
 
     try:
         # Thread'da ishga tushiriladi — get_video_info bloklovchi (yt-dlp
@@ -160,16 +225,17 @@ async def create_analysis(
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
         )
 
-    # Boshqa foydalanuvchi ALLAQACHON shu videoni shu tilda tahlil qilgan
-    # bo'lsa, qayta yuklab olish/transkripsiya/LLM chaqiruvlari o'rniga
-    # tayyor natijadan nusxa olamiz (2026-08-25, DubbingJob keshi bilan
-    # bir xil naqsh -- find_cached_analysis "original" tilini ataylab
-    # o'tkazib yuboradi, chunki u faqat transkripsiyadan keyin hal bo'ladi).
+    # Boshqa foydalanuvchi ALLAQACHON shu videoni shu tilda tahlil qilgan bo'lsa
     video_id = extract_youtube_video_id(request.youtube_url)
     cached = find_cached_analysis(db, video_id, request.language)
     if cached:
         analysis = clone_analysis_for_user(db, cached, current_user.id)
         return {"analysis_id": str(analysis.id), "status": "completed"}
+
+    is_user_paid = (
+        getattr(current_user, "is_admin", False)
+        or getattr(current_user, "current_plan", "free") != "free"
+    )
 
     analysis = VideoAnalysis(
         user_id=current_user.id,
@@ -182,6 +248,7 @@ async def create_analysis(
         status=AnalysisStatus.PENDING,
         progress=0.0,
         status_message="Navbatga qo'shildi",
+        gemini_key_tier="paid" if is_user_paid else "free",
     )
     db.add(analysis)
     db.commit()
@@ -249,6 +316,22 @@ def get_chapters(
     return {"chapters": analysis.chapters or []}
 
 
+def _is_paid_user(db: Session, user_id: Optional[uuid.UUID]) -> bool:
+    if not user_id:
+        return False
+    try:
+        from backend.models.database import User, Subscription, PlanTier
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if sub and sub.plan != PlanTier.FREE:
+            return True
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and (getattr(user, "is_admin", False) or getattr(user, "role", None) == "admin"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 @router.post("/{analysis_id}/question", dependencies=[Depends(rate_limit("video_analysis_question", 20, 600))])
 def ask_question(
     analysis_id: str,
@@ -262,9 +345,10 @@ def ask_question(
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Savol bo'sh bo'lishi mumkin emas.")
 
+    is_paid = _is_paid_user(db, current_user_id)
     qa_history = analysis.qa_history or []
     result = _service.answer_question(
-        analysis.transcript_segments, request.question.strip(), qa_history
+        analysis.transcript_segments, request.question.strip(), qa_history, is_paid=is_paid
     )
     entry = {
         "question": request.question.strip(),
@@ -287,7 +371,8 @@ def get_or_generate_quiz(
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.quiz:
-        analysis.quiz = _service.generate_quiz(analysis.transcript_segments, analysis.language)
+        is_paid = _is_paid_user(db, current_user_id)
+        analysis.quiz = _service.generate_quiz(analysis.transcript_segments, analysis.language, is_paid=is_paid)
         db.commit()
     return {"quiz": analysis.quiz}
 
@@ -310,7 +395,8 @@ def get_or_generate_bilingual(
                 for s in analysis.transcript_segments
             ]
         else:
-            analysis.bilingual_segments = _service.generate_bilingual_segments(analysis.transcript_segments, analysis.language)
+            is_paid = _is_paid_user(db, current_user_id)
+            analysis.bilingual_segments = _service.generate_bilingual_segments(analysis.transcript_segments, analysis.language, is_paid=is_paid)
         db.commit()
     return {"segments": analysis.bilingual_segments}
 
@@ -325,7 +411,8 @@ def get_or_generate_notes(
     if analysis.status != AnalysisStatus.COMPLETED or not analysis.transcript_segments:
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.notes:
-        analysis.notes = _service.generate_notes(analysis.transcript_segments, analysis.language)
+        is_paid = _is_paid_user(db, current_user_id)
+        analysis.notes = _service.generate_notes(analysis.transcript_segments, analysis.language, is_paid=is_paid)
         db.commit()
     return {"notes": analysis.notes}
 

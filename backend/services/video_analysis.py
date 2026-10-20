@@ -132,15 +132,21 @@ def _safe_float(value, default: float = 0.0) -> float:
         return default
 
 
-def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3) -> dict:
+def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3, is_paid: bool = False) -> dict:
     """Faqat Gemini modellaridan (barcha faol API kalitlar va modellarning
     avtomatik quota/cooldown nazorati bilan) foydalanadi. OpenAI UMUMAN ishlatilmaydi."""
     from backend.services.gemini_quota_manager import call_gemini_json_with_fallback
-    return call_gemini_json_with_fallback(system_prompt, user_message)
+    return call_gemini_json_with_fallback(system_prompt, user_message, is_paid=is_paid)
 
 
 class VideoAnalysisService:
-    def generate_summary(self, segments: list[dict], language: str = "uz") -> dict:
+    def __init__(self, is_paid: bool = False):
+        self.is_paid = is_paid
+
+    def _get_paid(self, is_paid: bool | None = None) -> bool:
+        return self.is_paid if is_paid is None else is_paid
+
+    def generate_summary(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> dict:
         """Returns {"short": str, "medium": str, "detailed": str}."""
         system = f"""Siz video transkriptlarini xulosalovchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
@@ -153,14 +159,14 @@ Uchta xulosa formatida javob bering:
 - "detailed": videodagi barcha muhim fikrlarni tartibli tushuntiruvchi batafsil xulosa
 
 JSON formatida qaytaring: {{"short": "...", "medium": "...", "detailed": "..."}}"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         return {
             "short": str(result.get("short", "")).strip(),
             "medium": str(result.get("medium", "")).strip(),
             "detailed": str(result.get("detailed", "")).strip(),
         }
 
-    def generate_key_points(self, segments: list[dict], language: str = "uz") -> list[dict]:
+    def generate_key_points(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> list[dict]:
         """Returns [{"title","description","timestamp"}]."""
         system = f"""Siz video transkriptidan asosiy fikrlarni ajratib oluvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
@@ -172,7 +178,7 @@ tushuntirish va transkriptdagi eng yaqin soniya (timestamp, raqam) bering.
 
 JSON formatida qaytaring:
 {{"key_points": [{{"title": "...", "description": "...", "timestamp": 125}}, ...]}}"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         points = []
         for item in result.get("key_points", []) if isinstance(result, dict) else []:
@@ -186,7 +192,7 @@ JSON formatida qaytaring:
             })
         return points
 
-    def generate_chapters(self, segments: list[dict], video_duration: float, language: str = "uz") -> list[dict]:
+    def generate_chapters(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> list[dict]:
         """Returns [{"title","start","end"}]."""
         system = f"""Siz video mazmunini mantiqiy chapterlarga ajratuvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
@@ -199,7 +205,7 @@ har biri qisqa sarlavha va boshlanish/tugash vaqti (soniyada) bilan. Chapterlar
 
 JSON formatida qaytaring:
 {{"chapters": [{{"title": "...", "start": 0, "end": 120}}, ...]}}"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         chapters = []
         for item in result.get("chapters", []) if isinstance(result, dict) else []:
             if not isinstance(item, dict) or not item.get("title"):
@@ -210,7 +216,7 @@ JSON formatida qaytaring:
         chapters.sort(key=lambda c: c["start"])
         return chapters
 
-    def generate_five_minute_summary(self, segments: list[dict], video_duration: float, language: str = "uz") -> dict:
+    def generate_five_minute_summary(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> dict:
         """"5 daqiqada" — video davomiyligidan qat'i nazar, taxminan 5 daqiqalik
         o'qish/o'rganish tajribasiga siqilgan, o'quv-yo'naltirilgan xulosa
         (oddiy generate_summary'dagi qisqa/o'rta/batafsil variantlardan farqli
@@ -239,7 +245,7 @@ JSON formatida qaytaring:
 {{"title": "...", "why_it_matters": "...", "core_ideas": ["...", ...],
 "examples": ["...", ...], "takeaways": ["...", ...],
 "key_terms": [{{"term": "...", "explanation": "..."}}, ...], "remember": "..."}}"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         if not isinstance(result, dict):
             result = {}
 
@@ -267,7 +273,7 @@ JSON formatida qaytaring:
             "remember": str(result.get("remember", "")).strip(),
         }
 
-    def generate_notes(self, segments: list[dict], language: str = "uz") -> str:
+    def generate_notes(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> str:
         """Returns a structured markdown-style study conspectus (plain text)."""
         system = f"""Siz ta'lim videolaridan konspekt tuzuvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
@@ -279,10 +285,10 @@ bo'limlar (asosiy tushunchalar, muhim fikrlar, misollar, xulosa). Markdown
 formatida (## sarlavha, - ro'yxat) yozing.
 
 JSON formatida qaytaring: {{"notes": "markdown matn"}}"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         return str(result.get("notes", "")).strip()
 
-    def generate_quiz(self, segments: list[dict], language: str = "uz", num_questions: int = 10) -> list[dict]:
+    def generate_quiz(self, segments: list[dict], language: str = "uz", num_questions: int = 10, is_paid: bool | None = None) -> list[dict]:
         """Returns [{"question","options","correct_answer","explanation","timestamp"}]."""
         system = f"""Siz video mazmuniga asoslangan test tuzuvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
@@ -297,7 +303,7 @@ JSON formatida qaytaring:
 {{"questions": [{{"question": "...", "options": ["...", "...", "...", "..."],
 "correct_answer": 0, "explanation": "...", "timestamp": 125}}, ...]}}
 ("correct_answer" — to'g'ri javobning options ro'yxatidagi indeksi, 0 dan boshlab.)"""
-        result = _call_json(system, _format_transcript(segments))
+        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         questions = []
         for item in result.get("questions", []) if isinstance(result, dict) else []:
@@ -324,6 +330,7 @@ JSON formatida qaytaring:
         segments: list[dict],
         question: str,
         qa_history: list[dict] | None = None,
+        is_paid: bool | None = None,
     ) -> dict:
         """Returns {"answer": str, "timestamps": [float, ...]}.
 
@@ -358,7 +365,7 @@ soniyalardagi vaqtlarini (timestamps) ham bering.
 
 JSON formatida qaytaring: {{"answer": "...", "timestamps": [125, 340]}}"""
         user_message = f"Transkript:\n{_format_transcript(segments)}{history_text}\n\nSavol: {question}"
-        result = _call_json(system, user_message)
+        result = _call_json(system, user_message, is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         timestamps = []
         for ts in result.get("timestamps", []) if isinstance(result, dict) else []:
@@ -370,7 +377,7 @@ JSON formatida qaytaring: {{"answer": "...", "timestamps": [125, 340]}}"""
             "timestamps": timestamps,
         }
 
-    def generate_bilingual_segments(self, segments: list[dict], target_language: str) -> list[dict]:
+    def generate_bilingual_segments(self, segments: list[dict], target_language: str, is_paid: bool | None = None) -> list[dict]:
         """Returns [{"start","end","original","translated"}] — Transkript tabidagi
         "Bilingual" ko'rinishi uchun: har bir gap original tilda va tanlangan
         tahlil tilida yonma-yon.
@@ -395,7 +402,7 @@ tarjima qiling. Texnik atamalarni original holida qoldiring. Tarjimalar sonini
 va tartibini o'zgartirmang — har bir raqamga bitta tarjima mos kelishi kerak.
 
 JSON formatida qaytaring: {{"translations": ["1-tarjima", "2-tarjima", ...]}}"""
-        result = _call_json(system, numbered)
+        result = _call_json(system, numbered, is_paid=self._get_paid(is_paid))
         translations = result.get("translations") if isinstance(result, dict) else None
         translations = translations if isinstance(translations, list) else []
 

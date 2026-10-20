@@ -95,6 +95,8 @@ class DubbingJob(Base):
     stt_model = Column(String(50), nullable=True)     # STT modeli: gemini-3.8-flash, whisper-1, etc.
     translation_model = Column(String(50), nullable=True)  # Tarjima modeli: gemini-3.8-flash, gpt-4o, etc.
     tts_model = Column(String(50), nullable=True)     # TTS modeli: gemini-3.8-flash-tts, edge-neural, etc.
+    gemini_key_tier = Column(String(20), nullable=True)  # "paid" | "free"
+    gemini_key_used = Column(String(64), nullable=True)  # mask_key (masalan: AQ.Ab8...WaETg)
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -252,6 +254,8 @@ class VideoAnalysis(Base):
     # quiz/notes/Q&A kabi "lazy" endpointlar uni qayta hal qilmasdan to'g'ridan-to'g'ri ishlatadi.
     language = Column(String(10), default="uz")
     video_language = Column(String(10), nullable=True)  # Whisper aniqlagan original til kodi
+    gemini_key_tier = Column(String(20), nullable=True)  # "paid" | "free"
+    gemini_key_used = Column(String(64), nullable=True)  # mask_key (masalan: AQ.Ab8...WaETg)
 
     status = Column(Enum(AnalysisStatus, values_callable=lambda obj: [e.value for e in obj]), default=AnalysisStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)

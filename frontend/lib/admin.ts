@@ -579,6 +579,8 @@ export interface AdminJobCostItem {
     voice_style: string | null
     stt_model: string | null
     translation_model: string | null
+    gemini_key_tier?: 'paid' | 'free' | null
+    gemini_key_used?: string | null
   }
   costs: {
     tts_cost_usd: number
