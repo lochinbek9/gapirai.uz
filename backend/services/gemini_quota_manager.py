@@ -534,20 +534,19 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
                         break
                     continue
 
-                    if is_bad_json:
-                        logger.warning(f"Gemini {model_name} JSON parse xatosi (urinish {attempt + 1}/2): {exc}")
-                        time.sleep(1.0)
-                        continue
+                if is_bad_json:
+                    logger.warning(f"Gemini {model_name} JSON parse xatosi: {exc}")
+                    continue
 
-                    if is_not_found:
-                        logger.warning(f"Gemini {model_name} mavjud emas (404): {exc} — o'chirilmoqda.")
-                        mark_model_cooldown(api_key, model_name, 86400.0, reason=f"404 Not Found: {exc}")
-                        break
-
-                    # Boshqa noma'lum xatolar
-                    logger.warning(f"Gemini {model_name} xatosi: {exc} — keyingi modelga o'tilmoqda.")
-                    mark_model_cooldown(api_key, model_name, 3600.0, reason=f"Error: {exc}")
+                if is_not_found:
+                    logger.warning(f"Gemini {model_name} mavjud emas (404): {exc} — o'chirilmoqda.")
+                    mark_model_cooldown(api_key, model_name, 86400.0, reason=f"404 Not Found: {exc}")
                     break
+
+                # Boshqa noma'lum xatolar
+                logger.warning(f"Gemini {model_name} xatosi: {exc} — keyingi kalitga o'tilmoqda.")
+                mark_model_cooldown(api_key, model_name, 300.0, reason=f"Error: {exc}")
+                continue
 
     wait_msg = f"{min_cooldown_remaining / 60:.1f} daqiqa" if min_cooldown_remaining < float("inf") else "noma'lum vaqt"
     raise RuntimeError(
@@ -792,11 +791,18 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
         total_key_success = 0
         total_key_429 = 0
 
-        for model in GEMINI_ALL_MONITORED_MODELS:
+        active_models_count = 0
+        cooldown_models_count = 0
+        min_model_remaining = float("inf")
+
+        for model in GEMINI_TEXT_MODELS:
             avail, rem = is_model_available(key, model)
-            if not avail and rem > max_remaining_sec:
-                in_cooldown = True
-                max_remaining_sec = rem
+            if avail:
+                active_models_count += 1
+            else:
+                cooldown_models_count += 1
+                if rem < min_model_remaining:
+                    min_model_remaining = rem
 
             if redis_client:
                 try:
@@ -808,6 +814,10 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
                         cooldown_reason = st.get("last_reason")
                 except Exception:
                     pass
+
+        # Kalit faqat barcha matn modellari cooldown'da bo'lsa kutishga o'tadi
+        in_cooldown = (active_models_count == 0) and (cooldown_models_count > 0)
+        max_remaining_sec = min_model_remaining if (in_cooldown and min_model_remaining != float("inf")) else 0.0
 
         redis_usage = {}
         if redis_client:
