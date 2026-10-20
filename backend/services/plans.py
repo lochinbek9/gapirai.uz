@@ -35,6 +35,28 @@ def is_user_admin(db, user_id) -> bool:
     except Exception:
         return False
 
+
+def is_user_paid_tier(db, user_id) -> bool:
+    """Tekshiradi: foydalanuvchi HAQIQATDA pullik tarifdami (Standard/Pro),
+    yoki qo'shimcha sotib olingan daqiqalari bormi, yoki adminmi.
+    Bepul tarifdagi (PlanTier.FREE) foydalanuvchilar oylik 5 daqiqa bepul kvotasini
+    ishlatsa ham, bu funksiya FALSE qaytaradi (ular bepul hisoblanadi)."""
+    if not user_id:
+        return False
+    try:
+        if is_user_admin(db, user_id):
+            return True
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if not sub:
+            return False
+        if sub.plan != PlanTier.FREE:
+            return True
+        if getattr(sub, "purchased_minutes", 0) and float(sub.purchased_minutes) > 0:
+            return True
+        return False
+    except Exception:
+        return False
+
 QUOTA_RESET_DAYS = 30  # oylik daqiqa kvotasi har doim shuncha kunda qayta boshlanadi
 
 # Bitta job uchun maksimal video davomiyligi (daqiqa) — barcha tariflar uchun

@@ -317,19 +317,8 @@ def get_chapters(
 
 
 def _is_paid_user(db: Session, user_id: Optional[uuid.UUID]) -> bool:
-    if not user_id:
-        return False
-    try:
-        from backend.models.database import User, Subscription, PlanTier
-        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
-        if sub and sub.plan != PlanTier.FREE:
-            return True
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and (getattr(user, "is_admin", False) or getattr(user, "role", None) == "admin"):
-            return True
-    except Exception:
-        pass
-    return False
+    from backend.services.plans import is_user_paid_tier
+    return is_user_paid_tier(db, user_id)
 
 
 @router.post("/{analysis_id}/question", dependencies=[Depends(rate_limit("video_analysis_question", 20, 600))])

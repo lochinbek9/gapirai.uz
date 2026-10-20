@@ -141,24 +141,13 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             return {"analysis_id": analysis_id, "status": "skipped_duplicate_claim"}
 
         # Pullik/bepul kalit ajratish (2026-10-20):
-        # Foydalanuvchining pullik obunasi (Standard/Pro) yoki admin bo'lsa -> Pullik kalit
-        is_paid_analysis = False
-        if analysis.user_id:
-            try:
-                from backend.models.database import User, Subscription, PlanTier
-                sub = db.query(Subscription).filter(Subscription.user_id == analysis.user_id).first()
-                if sub and sub.plan != PlanTier.FREE:
-                    is_paid_analysis = True
-                else:
-                    u = db.query(User).filter(User.id == analysis.user_id).first()
-                    if u and getattr(u, "role", None) == "admin":
-                        is_paid_analysis = True
-            except Exception:
-                pass
-
-        if not getattr(analysis, "gemini_key_tier", None):
-            analysis.gemini_key_tier = "paid" if is_paid_analysis else "free"
-            db.commit()
+        # FAQAT haqiqiy pullik obunasi borlar (Standard/Pro), daqiqa paketi sotib olganlar yoki adminlar -> Pullik kalit
+        from backend.services.plans import is_user_paid_tier
+        is_paid_analysis = is_user_paid_tier(db, analysis.user_id) if analysis.user_id else False
+        analysis.gemini_key_tier = "paid" if is_paid_analysis else "free"
+        if not is_paid_analysis:
+            analysis.gemini_key_used = None
+        db.commit()
 
         # video-analysis o'zining uploads/ papkasini dublyajnikidan alohida
         # ushlaydi (bir xil job_id ehtimoli yo'q — UUID) — shuning uchun

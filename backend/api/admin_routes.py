@@ -2509,10 +2509,7 @@ def admin_jobs_cost(
                     "voice_style": job.voice_style,
                     "stt_model": stt_model,
                     "translation_model": llm_model,
-                    "gemini_key_tier": getattr(job, "gemini_key_tier", None) or (
-                        "paid" if (getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False))
-                        else ("free" if getattr(job, "is_preview", False) else None)
-                    ),
+                    "gemini_key_tier": getattr(job, "gemini_key_tier", None) or "free",
                     "gemini_key_used": getattr(job, "gemini_key_used", None),
                 },
                 "costs": {

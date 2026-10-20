@@ -478,29 +478,18 @@ def process_video(self: Task, job_id: str) -> dict:
             raise ValueError(f"Job topilmadi: {job_id}")
 
         # Pullik/bepul kalit ajratish (2026-10-20):
-        # 1. 2-daqiqalik sinov dublyaji (is_preview=True) bo'lsa -> FAQAT bepul kalitlar (is_paid=False)
-        # 2. Kvotadan daqiqa yechilgan (quota_consumed=True) bo'lsa -> Pullik kalit (is_paid=True)
-        # 3. Foydalanuvchining pullik obunasi (Standard/Pro) yoki admin bo'lsa -> Pullik kalit (is_paid=True)
+        # 1. 2-daqiqalik sinov dublyaji (is_preview=True) bo'lsa -> FAQAT bepul kalitlar
+        # 2. Bepul tarifdagi foydalanuvchilar (PlanTier.FREE va sotib olingan daqiqasi yo'q) -> FAQAT bepul kalitlar (oylik 5 daqiqa bepul kvotasi ham bepul hovuzdan ishlanadi)
+        # 3. FAQAT haqiqiy pullik obunasi borlar (Standard/Pro), daqiqa paketi sotib olganlar yoki adminlar -> Pullik kalit
+        from backend.services.plans import is_user_paid_tier
         is_paid_job = False
-        if not getattr(job, "is_preview", False):
-            if getattr(job, "quota_consumed", False):
-                is_paid_job = True
-            elif job.user_id:
-                try:
-                    from backend.models.database import User, Subscription, PlanTier
-                    sub = db.query(Subscription).filter(Subscription.user_id == job.user_id).first()
-                    if sub and sub.plan != PlanTier.FREE:
-                        is_paid_job = True
-                    else:
-                        u = db.query(User).filter(User.id == job.user_id).first()
-                        if u and getattr(u, "role", None) == "admin":
-                            is_paid_job = True
-                except Exception:
-                    pass
+        if not getattr(job, "is_preview", False) and job.user_id:
+            is_paid_job = is_user_paid_tier(db, job.user_id)
 
-        if not getattr(job, "gemini_key_tier", None):
-            job.gemini_key_tier = "paid" if is_paid_job else "free"
-            db.commit()
+        job.gemini_key_tier = "paid" if is_paid_job else "free"
+        if not is_paid_job:
+            job.gemini_key_used = None
+        db.commit()
 
         is_recovery_job = bool(job.completed_at is not None)
 
@@ -786,9 +775,11 @@ def process_video(self: Task, job_id: str) -> dict:
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
             job.stt_model = transcript.get("model") or getattr(settings, "GEMINI_STT_MODEL", "gemini-3.8-flash")
-            job.gemini_key_tier = transcript.get("gemini_key_tier") or ("paid" if is_paid_job else "free")
-            if transcript.get("gemini_key_used"):
+            job.gemini_key_tier = "paid" if is_paid_job else "free"
+            if is_paid_job and transcript.get("gemini_key_used"):
                 job.gemini_key_used = transcript.get("gemini_key_used")
+            elif not is_paid_job:
+                job.gemini_key_used = None
 
             # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
             # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)
