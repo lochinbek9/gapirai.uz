@@ -201,16 +201,12 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     else:
         stt_cost_usd = 0.0
 
-    chars = len(job.translated_text) if getattr(job, "translated_text", None) else int(dur_min * 1000)
-    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if dur_sec > 0 else 0.0
+    chars = len(job.translated_text) if getattr(job, "translated_text", None) else int(dur_min * 1200)
+    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if (dur_sec > 0 or chars > 0) else 0.0
 
-    tts_prov_val = (getattr(job, "tts_provider", None) or "gemini").lower()
-    if tts_prov_val == "gemini":
-        tts_cost_usd = round((chars / 1000.0) * 0.017, 4) if dur_sec > 0 else 0.0
-    elif tts_prov_val == "azure":
-        tts_cost_usd = round((chars / 1000.0) * 0.016, 4) if dur_sec > 0 else 0.0
-    else:
-        tts_cost_usd = 0.0
+    # Foydalanuvchi talabi: TTS da Gemini pullik narxini ($0.017 / 1,000 belgi) doim chiqaraver
+    est_chars = chars if chars > 0 else int(dur_min * 1200)
+    tts_cost_usd = round((est_chars / 1000.0) * 0.017, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
 
     total_cost_usd = round(stt_cost_usd + llm_cost_usd + tts_cost_usd, 4)
     total_cost_uzs = int(round(total_cost_usd * 12850))

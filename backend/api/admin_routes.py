@@ -2846,26 +2846,24 @@ def admin_jobs_cost(
 
             # TTS Cost estimation:
             # Foydalanuvchi talabi: "tts da gemini pullik narxini doim chiqaraver!"
+            # Bepul Edge, bepul Gemini yoki Azure bo'lishidan qat'i nazar,
+            # TTS xarajati sifatida Gemini pullik stavkasi ($0.017 / 1,000 belgi) doim hisoblanadi va qo'shiladi!
             tts_usd = round(tts_info.get("cost_usd", 0.0), 4)
             tts_uzs = round(tts_info.get("cost_uzs", 0.0))
-            tts_prov = (job.tts_provider or "gemini").lower()
 
-            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
-                est_chars = chars if chars > 0 else int(dur_min * 1000)
-                if tts_prov == "gemini":
-                    # Gemini TTS: 1,000 belgiga $0.017 USD pullik narxi doim ko'rsatiladi
-                    calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
-                    tts_usd = max(tts_usd, calculated_gemini_tts)
-                    tts_uzs = int(round(tts_usd * USD_TO_UZS))
-                elif tts_prov == "azure":
-                    # Azure Neural TTS: 1,000 belgiga $0.016 USD
-                    calculated_azure_tts = round((est_chars / 1000.0) * 0.016, 4)
-                    tts_usd = max(tts_usd, calculated_azure_tts)
-                    tts_uzs = int(round(tts_usd * USD_TO_UZS))
-                elif tts_prov == "edge":
-                    # Edge 100% bepul
-                    tts_usd = 0.0
-                    tts_uzs = 0
+            tts_char_count = tts_info.get("characters", 0)
+            if tts_char_count and tts_char_count > 0:
+                est_chars = tts_char_count
+            elif chars > 0:
+                est_chars = chars
+            else:
+                est_chars = int(dur_min * 1200)
+
+            if (dur_sec > 0 or est_chars > 0) and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
+                # Gemini TTS stavkasi: 1,000 belgiga $0.017 USD
+                calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
+                tts_usd = max(tts_usd, calculated_gemini_tts)
+                tts_uzs = int(round(tts_usd * USD_TO_UZS))
 
             total_usd = round(tts_usd + stt_cost_usd + llm_cost_usd, 4)
             total_uzs = int(round(total_usd * USD_TO_UZS))
@@ -2938,7 +2936,7 @@ def admin_jobs_cost(
                 "costs": {
                     "tts_cost_usd": tts_usd,
                     "tts_cost_uzs": tts_uzs,
-                    "tts_characters": tts_info["characters"],
+                    "tts_characters": tts_info["characters"] if tts_info.get("characters", 0) > 0 else est_chars,
                     "tts_duration_seconds": round(tts_info["duration_seconds"], 1),
                     "tts_calls_count": tts_info["calls_count"],
                     "cache_hits_count": tts_info["cache_hits_count"],
