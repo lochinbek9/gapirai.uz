@@ -602,6 +602,8 @@ export interface AdminJobCostItem {
     translation_model: string | null
     gemini_key_tier?: 'paid' | 'free' | null
     gemini_key_used?: string | null
+    has_transcript?: boolean
+    has_translation?: boolean
   }
   costs: {
     tts_cost_usd: number
@@ -856,7 +858,16 @@ export async function apiAdminSystemHealth(token: string): Promise<SystemHealthR
 export async function apiAdminRetryJob(
   token: string,
   jobId: string,
-  payload?: { gemini_key_tier?: string; tts_provider?: string; voice_name?: string }
+  payload?: {
+    gemini_key_tier?: string
+    tts_provider?: string
+    voice_name?: string
+    stt_provider?: string
+    translation_model?: string
+    reuse_transcript?: boolean
+    reuse_translation?: boolean
+    force_regenerate?: boolean
+  }
 ): Promise<{ success: boolean; message: string }> {
   const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, payload || {}, {
     headers: { Authorization: `Bearer ${token}` },

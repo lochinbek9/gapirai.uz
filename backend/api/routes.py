@@ -62,6 +62,10 @@ class RegenerateJobRequest(BaseModel):
     tts_provider: Optional[str] = None
     gemini_key_tier: Optional[str] = None
     force_regenerate: Optional[bool] = None
+    stt_provider: Optional[str] = None
+    translation_model: Optional[str] = None
+    reuse_transcript: Optional[bool] = None
+    reuse_translation: Optional[bool] = None
 
 
 class VideoInfoResponse(BaseModel):
@@ -894,6 +898,18 @@ def retry_job(
             job.voice_name = payload.voice_name
         if payload.gemini_key_tier:
             job.gemini_key_tier = payload.gemini_key_tier
+        if payload.stt_provider:
+            job.stt_model = payload.stt_provider
+        if payload.reuse_transcript is False:
+            job.transcript_segments = None
+            job.transcript_text = None
+            job.srt_content = None
+        if payload.translation_model:
+            job.translation_model = payload.translation_model
+        if payload.reuse_translation is False:
+            job.translated_segments = None
+            job.translated_text = None
+            job.uzbek_srt_content = None
 
     # 2. Balansdan daqiqa yechish (admin uchun cheksiz/bepul, oddiy user uchun balansdan yechiladi)
     duration_seconds = job.video_duration

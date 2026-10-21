@@ -71,12 +71,31 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [retryMessage, setRetryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  // Retry Confirmation Modal State (Gemini Bepul vs Pullik + Narx taxmini)
+  // Retry Confirmation Modal State (Granular AI models per stage)
   const [retryModalJob, setRetryModalJob] = useState<AdminJobCostItem | null>(null)
-  const [retryTier, setRetryTier] = useState<'free' | 'paid'>('free')
-  const [retryProvider, setRetryProvider] = useState<string>('gemini')
+  const [retryTtsOption, setRetryTtsOption] = useState<'gemini_paid' | 'edge' | 'gemini_free' | 'azure'>('gemini_paid')
+  const [retrySttOption, setRetrySttOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
+  const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
 
-  const handleRetryJob = async (jobId: string, options?: { gemini_key_tier?: string; tts_provider?: string }) => {
+  const openRetryModal = (job: AdminJobCostItem) => {
+    setRetryModalJob(job)
+    // Foydalanuvchida ovoz uchun pullik Gemini balansi bor:
+    setRetryTtsOption('gemini_paid')
+    setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
+    setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_free')
+  }
+
+  const handleRetryJob = async (
+    jobId: string,
+    options?: {
+      gemini_key_tier?: string
+      tts_provider?: string
+      stt_provider?: string
+      translation_model?: string
+      reuse_transcript?: boolean
+      reuse_translation?: boolean
+    }
+  ) => {
     try {
       setRetryingId(jobId)
       setRetryMessage(null)
@@ -927,11 +946,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           )}
                           {job.status === 'FAILED' && !nonRetryable && (
                             <button
-                              onClick={() => {
-                                setRetryModalJob(job)
-                                setRetryTier('free')
-                                setRetryProvider(job.models.tts_provider || 'gemini')
-                              }}
+                              onClick={() => openRetryModal(job)}
                               disabled={retryingId === job.id}
                               title="Qayta ishga tushirish (Retry)"
                               className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50"
@@ -1235,9 +1250,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                     onClick={() => {
                       const target = selectedJob
                       setSelectedJob(null)
-                      setRetryModalJob(target)
-                      setRetryTier('free')
-                      setRetryProvider(target.models.tts_provider || 'gemini')
+                      openRetryModal(target)
                     }}
                     disabled={retryingId === selectedJob.id}
                     className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
@@ -1259,58 +1272,138 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         </div>
       )}
 
-      {/* Retry Confirmation Modal (Gemini Free vs Paid + Narx hisobi) */}
+      {/* Granular Retry Modal: TTS, STT, LLM individual model selection & live unit economics */}
       {retryModalJob && (() => {
-        const durMin = Math.max(0.1, (retryModalJob.video_duration || 60) / 60)
+        const durSec = retryModalJob.video_duration || 60
+        const durMin = Math.max(0.1, durSec / 60)
         const estChars = Math.round(durMin * 1200)
-        const estTTSPaidUsd = (estChars / 1000) * 0.017
-        const estSTTUsd = durMin * 0.002
-        const estLLMUsd = (estChars / 1000) * 0.0005
-        const estPaidTotalUsd = estTTSPaidUsd + estSTTUsd + estLLMUsd
-        const estPaidTotalUzs = Math.round(estPaidTotalUsd * 12800)
+
+        // TTS Cost:
+        let estTTSUsd = 0
+        if (retryTtsOption === 'gemini_paid') estTTSUsd = (estChars / 1000) * 0.017
+        else if (retryTtsOption === 'azure') estTTSUsd = (estChars / 1000) * 0.016
+        else estTTSUsd = 0 // edge or gemini_free
+
+        // STT Cost:
+        let estSTTUsd = 0
+        if (retrySttOption === 'existing' || retrySttOption === 'groq' || retrySttOption === 'gemini_free') {
+          estSTTUsd = 0
+        } else if (retrySttOption === 'gemini_paid') {
+          estSTTUsd = durMin * 0.002
+        } else if (retrySttOption === 'openai') {
+          estSTTUsd = durMin * 0.006
+        }
+
+        // LLM Cost:
+        let estLLMUsd = 0
+        if (retryLlmOption === 'existing' || retryLlmOption === 'gemini_free') {
+          estLLMUsd = 0
+        } else if (retryLlmOption === 'gemini_paid') {
+          estLLMUsd = (estChars / 1000) * 0.0005
+        } else if (retryLlmOption === 'openai') {
+          estLLMUsd = (estChars / 1000) * 0.001
+        }
+
+        const estTotalUsd = estTTSUsd + estSTTUsd + estLLMUsd
+        const estTotalUzs = Math.round(estTotalUsd * 12800)
+
+        const estTTSUzs = Math.round(estTTSUsd * 12800)
+        const estSTTUzs = Math.round(estSTTUsd * 12800)
+        const estLLMUzs = Math.round(estLLMUsd * 12800)
+
+        const onConfirmRetry = () => {
+          let ttsProv = 'gemini'
+          if (retryTtsOption === 'edge') ttsProv = 'edge'
+          else if (retryTtsOption === 'azure') ttsProv = 'azure'
+          else ttsProv = 'gemini'
+
+          let sttProv = 'groq'
+          if (retrySttOption === 'gemini_paid' || retrySttOption === 'gemini_free') sttProv = 'gemini-3.8-flash'
+          else if (retrySttOption === 'openai') sttProv = 'whisper-1'
+          else sttProv = 'groq'
+
+          let transModel = 'gemini-3.8-flash'
+          if (retryLlmOption === 'openai') transModel = 'gpt-4o-mini'
+          else transModel = 'gemini-3.8-flash'
+
+          const geminiTier =
+            retryTtsOption === 'gemini_paid' || retrySttOption === 'gemini_paid' || retryLlmOption === 'gemini_paid'
+              ? 'paid'
+              : 'free'
+
+          handleRetryJob(retryModalJob.id, {
+            tts_provider: ttsProv,
+            gemini_key_tier: geminiTier,
+            stt_provider: sttProv,
+            translation_model: transModel,
+            reuse_transcript: retrySttOption === 'existing',
+            reuse_translation: retryLlmOption === 'existing',
+          })
+        }
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#121622] border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-[#11141f] border border-white/10 rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               {/* Header */}
-              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#11141f]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                     <RefreshCw className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">Qayta ishga tushirish (Dublyaj)</h3>
-                    <p className="text-xs text-gray-400 line-clamp-1 max-w-[340px]">{retryModalJob.video_title}</p>
+                    <h3 className="text-sm sm:text-base font-bold text-white">Qayta ishga tushirish (AI Modellar)</h3>
+                    <p className="text-xs text-gray-400 line-clamp-1 max-w-[320px] sm:max-w-[400px]">
+                      {retryModalJob.video_title}
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setRetryModalJob(null)}
-                  className="p-1 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition"
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Body */}
-              <div className="p-5 space-y-4">
-                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Video davomiyligi:</span>
-                  <span className="font-mono text-white font-semibold">
-                    {Math.floor(retryModalJob.video_duration / 60)} daqiqa {retryModalJob.video_duration % 60} soniya
-                  </span>
+              {/* Scrollable Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Video Info pill */}
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <span>Davomiyligi:</span>
+                    <strong className="text-white font-mono">
+                      {Math.floor(retryModalJob.video_duration / 60)} daq {retryModalJob.video_duration % 60} soniya
+                    </strong>
+                  </div>
+                  {retryModalJob.error_code && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-gray-400">Oxirgi xatolik:</span>
+                      <span className="text-[10px] font-mono text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
+                        {retryModalJob.error_code}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-2">
-                    AI Modellar va Tarif darajasini tanlang:
-                  </label>
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {/* Option 1: Gemini Bepul */}
+                {/* 1. TTS OVOZ SINTEZI */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>TTS Ovoz Sintezi (Ovoz yaratish):</span>
+                    </label>
+                    <span className="text-[10px] text-cyan-300 font-mono">
+                      {retryTtsOption === 'gemini_paid' ? `~${estTTSUzs.toLocaleString()} UZS` : '0 UZS'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Gemini Paid */}
                     <div
-                      onClick={() => setRetryTier('free')}
-                      className={`cursor-pointer rounded-xl p-3.5 border transition-all ${
-                        retryTier === 'free'
-                          ? 'bg-emerald-500/10 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
+                      onClick={() => setRetryTtsOption('gemini_paid')}
+                      className={`cursor-pointer rounded-xl p-3 border transition-all ${
+                        retryTtsOption === 'gemini_paid'
+                          ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/5'
                           : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                       }`}
                     >
@@ -1318,27 +1411,63 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         <div className="flex items-center gap-2">
                           <input
                             type="radio"
-                            checked={retryTier === 'free'}
-                            onChange={() => setRetryTier('free')}
+                            name="retry_tts"
+                            checked={retryTtsOption === 'gemini_paid'}
+                            onChange={() => setRetryTtsOption('gemini_paid')}
+                            className="accent-amber-500"
+                          />
+                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                            <span>💎</span>
+                            <span>Gemini: Pullik API (Tavsiya etiladi)</span>
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                          ~{estTTSUzs.toLocaleString()} UZS (~${estTTSUsd.toFixed(3)})
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                        Balansli pullik Gemini kaliti orqali yuqori sifatli va cheklovlarsiz sintez.
+                      </p>
+                    </div>
+
+                    {/* Edge TTS */}
+                    <div
+                      onClick={() => setRetryTtsOption('edge')}
+                      className={`cursor-pointer rounded-xl p-3 border transition-all ${
+                        retryTtsOption === 'edge'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/5'
+                          : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="retry_tts"
+                            checked={retryTtsOption === 'edge'}
+                            onChange={() => setRetryTtsOption('edge')}
                             className="accent-emerald-500"
                           />
-                          <span className="text-sm font-bold text-white">Gemini: Bepul (Tavsiya etiladi)</span>
+                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                            <span>⚡</span>
+                            <span>Microsoft Edge Neural: Bepul</span>
+                          </span>
                         </div>
-                        <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                           0 UZS ($0.00)
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1.5 pl-5">
-                        Bepul Gemini API kalitlari hovuzidan foydalaniladi. Balans yoki kartadan pul yechilmaydi.
+                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                        Madina / Sardor ovozlari orqali 100% bepul va cheklovlarsiz sintez.
                       </p>
                     </div>
 
-                    {/* Option 2: Gemini Pullik */}
+                    {/* Gemini Free (with warning) */}
                     <div
-                      onClick={() => setRetryTier('paid')}
-                      className={`cursor-pointer rounded-xl p-3.5 border transition-all ${
-                        retryTier === 'paid'
-                          ? 'bg-amber-500/10 border-amber-500/40 shadow-lg shadow-amber-500/5'
+                      onClick={() => setRetryTtsOption('gemini_free')}
+                      className={`cursor-pointer rounded-xl p-3 border transition-all ${
+                        retryTtsOption === 'gemini_free'
+                          ? 'bg-blue-500/10 border-blue-500/50'
                           : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                       }`}
                     >
@@ -1346,49 +1475,316 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         <div className="flex items-center gap-2">
                           <input
                             type="radio"
-                            checked={retryTier === 'paid'}
-                            onChange={() => setRetryTier('paid')}
-                            className="accent-amber-500"
+                            name="retry_tts"
+                            checked={retryTtsOption === 'gemini_free'}
+                            onChange={() => setRetryTtsOption('gemini_free')}
+                            className="accent-blue-500"
                           />
-                          <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                            <span>💎</span>
-                            <span>Gemini: Pullik API</span>
+                          <span className="text-xs font-medium text-gray-300 flex items-center gap-1">
+                            <span>🆓</span>
+                            <span>Gemini: Bepul kalit hovuzi</span>
                           </span>
                         </div>
-                        <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                          ~{estPaidTotalUzs.toLocaleString()} UZS
+                        <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">
+                          0 UZS
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1.5 pl-5">
-                        Yuqori tezlik va cheklovlarsiz pullik Gemini kaliti orqali ishlanadi.
+                      <p className="text-[10px] text-amber-400/90 mt-1 pl-5">
+                        ⚠️ Diqqat: Google bepul kalitlarida TTS kvotasi juda past va ko‘pincha 429 xatosi beradi.
                       </p>
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Cost Breakdown */}
-                      <div className="mt-3 pt-2.5 border-t border-white/10 pl-5 text-[11px] space-y-1 font-mono">
-                        <div className="flex justify-between text-gray-400">
-                          <span>TTS Ovoz sintezi:</span>
-                          <span className="text-gray-200">~${estTTSPaidUsd.toFixed(3)} USD ({Math.round(estTTSPaidUsd * 12800).toLocaleString()} UZS)</span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>STT Transkripsiya:</span>
-                          <span className="text-gray-200">~${estSTTUsd.toFixed(3)} USD ({Math.round(estSTTUsd * 12800).toLocaleString()} UZS)</span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>LLM Tarjima:</span>
-                          <span className="text-gray-200">~${estLLMUsd.toFixed(4)} USD ({Math.round(estLLMUsd * 12800).toLocaleString()} UZS)</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-amber-400 pt-1 border-t border-white/5">
-                          <span>Jami kutilayotgan xarajat:</span>
-                          <span>~{estPaidTotalUzs.toLocaleString()} UZS (~${estPaidTotalUsd.toFixed(3)})</span>
+                {/* 2. STT TRANSKRIPSIYA */}
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                      <span>STT Transkripsiya (Nutqni aniqlash):</span>
+                    </label>
+                    <span className="text-[10px] text-purple-300 font-mono">
+                      {estSTTUzs > 0 ? `~${estSTTUzs.toLocaleString()} UZS` : '0 UZS'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Existing text reuse */}
+                    {retryModalJob.models.has_transcript && (
+                      <div
+                        onClick={() => setRetrySttOption('existing')}
+                        className={`sm:col-span-2 cursor-pointer rounded-xl p-2.5 border transition-all ${
+                          retrySttOption === 'existing'
+                            ? 'bg-purple-500/15 border-purple-500/50 text-white'
+                            : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="flex items-center gap-2 cursor-pointer font-medium">
+                            <input
+                              type="radio"
+                              name="retry_stt"
+                              checked={retrySttOption === 'existing'}
+                              onChange={() => setRetrySttOption('existing')}
+                              className="accent-purple-500"
+                            />
+                            <span>✅ Saqlangan transkript (Kesh, 0 UZS)</span>
+                          </label>
+                          <span className="text-[10px] font-mono text-purple-300">Vaqt tejaladi</span>
                         </div>
                       </div>
+                    )}
+
+                    {/* Groq Whisper */}
+                    <div
+                      onClick={() => setRetrySttOption('groq')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retrySttOption === 'groq'
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_stt"
+                            checked={retrySttOption === 'groq'}
+                            onChange={() => setRetrySttOption('groq')}
+                            className="accent-emerald-500"
+                          />
+                          <span>⚡ Groq Whisper (Bepul)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                      </div>
                     </div>
+
+                    {/* Gemini Free STT */}
+                    <div
+                      onClick={() => setRetrySttOption('gemini_free')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retrySttOption === 'gemini_free'
+                          ? 'bg-blue-500/15 border-blue-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_stt"
+                            checked={retrySttOption === 'gemini_free'}
+                            onChange={() => setRetrySttOption('gemini_free')}
+                            className="accent-blue-500"
+                          />
+                          <span>🆓 Gemini Flash (Bepul)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-blue-300">0 UZS</span>
+                      </div>
+                    </div>
+
+                    {/* Gemini Paid STT */}
+                    <div
+                      onClick={() => setRetrySttOption('gemini_paid')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retrySttOption === 'gemini_paid'
+                          ? 'bg-amber-500/15 border-amber-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_stt"
+                            checked={retrySttOption === 'gemini_paid'}
+                            onChange={() => setRetrySttOption('gemini_paid')}
+                            className="accent-amber-500"
+                          />
+                          <span>💎 Gemini Flash (Pullik)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-amber-300">
+                          ~{Math.round(durMin * 0.002 * 12800).toLocaleString()} UZS
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* OpenAI Whisper */}
+                    <div
+                      onClick={() => setRetrySttOption('openai')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retrySttOption === 'openai'
+                          ? 'bg-white/15 border-white/40 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_stt"
+                            checked={retrySttOption === 'openai'}
+                            onChange={() => setRetrySttOption('openai')}
+                            className="accent-gray-400"
+                          />
+                          <span>🤖 OpenAI Whisper</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-gray-300">
+                          ~{Math.round(durMin * 0.006 * 12800).toLocaleString()} UZS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. LLM TARJIMA */}
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>LLM Tarjima (O‘zbek tiliga o‘girish):</span>
+                    </label>
+                    <span className="text-[10px] text-indigo-300 font-mono">
+                      {estLLMUzs > 0 ? `~${estLLMUzs.toLocaleString()} UZS` : '0 UZS'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Existing translation reuse */}
+                    {retryModalJob.models.has_translation && (
+                      <div
+                        onClick={() => setRetryLlmOption('existing')}
+                        className={`sm:col-span-2 cursor-pointer rounded-xl p-2.5 border transition-all ${
+                          retryLlmOption === 'existing'
+                            ? 'bg-indigo-500/15 border-indigo-500/50 text-white'
+                            : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="flex items-center gap-2 cursor-pointer font-medium">
+                            <input
+                              type="radio"
+                              name="retry_llm"
+                              checked={retryLlmOption === 'existing'}
+                              onChange={() => setRetryLlmOption('existing')}
+                              className="accent-indigo-500"
+                            />
+                            <span>✅ Saqlangan tarjima (Kesh, 0 UZS)</span>
+                          </label>
+                          <span className="text-[10px] font-mono text-indigo-300">Mavjud matn</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gemini Free Translation */}
+                    <div
+                      onClick={() => setRetryLlmOption('gemini_free')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retryLlmOption === 'gemini_free'
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_llm"
+                            checked={retryLlmOption === 'gemini_free'}
+                            onChange={() => setRetryLlmOption('gemini_free')}
+                            className="accent-emerald-500"
+                          />
+                          <span>🆓 Gemini 3.8 (Bepul pool)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                      </div>
+                    </div>
+
+                    {/* Gemini Paid Translation */}
+                    <div
+                      onClick={() => setRetryLlmOption('gemini_paid')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retryLlmOption === 'gemini_paid'
+                          ? 'bg-amber-500/15 border-amber-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_llm"
+                            checked={retryLlmOption === 'gemini_paid'}
+                            onChange={() => setRetryLlmOption('gemini_paid')}
+                            className="accent-amber-500"
+                          />
+                          <span>💎 Gemini 3.8 (Pullik API)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-amber-300">
+                          ~{Math.round((estChars / 1000) * 0.0005 * 12800).toLocaleString()} UZS
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* GPT-4o Mini */}
+                    <div
+                      onClick={() => setRetryLlmOption('openai')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retryLlmOption === 'openai'
+                          ? 'bg-white/15 border-white/40 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_llm"
+                            checked={retryLlmOption === 'openai'}
+                            onChange={() => setRetryLlmOption('openai')}
+                            className="accent-gray-400"
+                          />
+                          <span>🤖 GPT-4o Mini</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-gray-300">
+                          ~{Math.round((estChars / 1000) * 0.001 * 12800).toLocaleString()} UZS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COST BREAKDOWN CARD */}
+                <div className="bg-black/40 border border-white/10 rounded-xl p-3.5 space-y-1.5 font-mono text-xs">
+                  <div className="flex justify-between text-gray-400 text-[11px]">
+                    <span>TTS Ovoz sintezi:</span>
+                    <span className={estTTSUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
+                      {estTTSUzs > 0 ? `~${estTTSUzs.toLocaleString()} UZS (~$${estTTSUsd.toFixed(3)})` : '0 UZS (Bepul)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-400 text-[11px]">
+                    <span>STT Transkripsiya:</span>
+                    <span className={estSTTUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
+                      {estSTTUzs > 0 ? `~${estSTTUzs.toLocaleString()} UZS (~$${estSTTUsd.toFixed(3)})` : '0 UZS (Bepul)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-400 text-[11px]">
+                    <span>LLM Tarjima:</span>
+                    <span className={estLLMUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
+                      {estLLMUzs > 0 ? `~${estLLMUzs.toLocaleString()} UZS (~$${estLLMUsd.toFixed(4)})` : '0 UZS (Bepul)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-xs pt-2 border-t border-white/10">
+                    <span className="text-white font-sans">Jami kutilayotgan xarajat:</span>
+                    <span className={estTotalUzs > 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                      ~{estTotalUzs.toLocaleString()} UZS {estTotalUsd > 0 && `(~$${estTotalUsd.toFixed(3)})`}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="p-4 bg-white/[0.01] border-t border-white/10 flex items-center justify-end gap-2.5">
+              <div className="p-4 bg-white/[0.01] border-t border-white/10 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setRetryModalJob(null)}
@@ -1398,19 +1794,19 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleRetryJob(retryModalJob.id, { gemini_key_tier: retryTier, tts_provider: retryProvider })}
+                  onClick={onConfirmRetry}
                   disabled={retryingId === retryModalJob.id}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg ${
-                    retryTier === 'free'
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
-                      : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
+                    estTotalUzs > 0
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
                   }`}
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${retryingId === retryModalJob.id ? 'animate-spin' : ''}`} />
                   <span>
-                    {retryTier === 'free'
-                      ? 'Bepul ishga tushirish (0 UZS)'
-                      : `Pullik ishga tushirish (~${estPaidTotalUzs.toLocaleString()} UZS)`}
+                    {estTotalUzs > 0
+                      ? `Pullik ishga tushirish (~${estTotalUzs.toLocaleString()} UZS)`
+                      : 'Bepul ishga tushirish (0 UZS)'}
                   </span>
                 </button>
               </div>

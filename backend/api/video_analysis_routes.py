@@ -331,7 +331,7 @@ def cancel_analysis(
         )
 
     try:
-        from backend.celery_app import celery_app
+        from backend.workers.celery_app import celery_app
         celery_app.control.revoke(str(analysis.id), terminate=True, signal="SIGTERM")
     except Exception as e:
         logger.warning(f"Celery task revoke error for {analysis.id}: {e}")

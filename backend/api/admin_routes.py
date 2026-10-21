@@ -786,7 +786,7 @@ def admin_cancel_job(
 ):
     """Admin panel orqali istalgan jarayondagi job'ni to'xtatish va bekor qilish."""
     from backend.models.database import DubbingJob, JobStatus
-    from backend.celery_app import celery_app
+    from backend.workers.celery_app import celery_app
     db = SessionLocal()
     try:
         job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
@@ -817,7 +817,7 @@ def admin_cancel_analysis(
 ):
     """Admin panel orqali istalgan video tahlilini to'xtatish va bekor qilish."""
     from backend.models.database import VideoAnalysis, AnalysisStatus
-    from backend.celery_app import celery_app
+    from backend.workers.celery_app import celery_app
     db = SessionLocal()
     try:
         va = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
@@ -2907,6 +2907,8 @@ def admin_jobs_cost(
                     "translation_model": llm_model,
                     "gemini_key_tier": getattr(job, "gemini_key_tier", None) or "free",
                     "gemini_key_used": getattr(job, "gemini_key_used", None),
+                    "has_transcript": bool(job.transcript_segments),
+                    "has_translation": bool(job.translated_segments),
                 },
                 "costs": {
                     "tts_cost_usd": tts_usd,

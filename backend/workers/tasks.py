@@ -1048,6 +1048,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 existing_qa=job.segment_qa,
                 progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
                 provider_name=tts_provider,
+                is_paid=is_paid_job,
             )
             job.dubbed_audio_path = dubbed_audio_path
             if tts_provider == "gemini":
@@ -1161,14 +1162,13 @@ def process_video(self: Task, job_id: str) -> dict:
         # Agar job dastlabki xatolikdan so'ng qayta urinishda muvaffaqiyatli yakunlansa, adminlarga xabar berish
         if getattr(self.request, "retries", 0) > 0:
             try:
-                from backend.services.telegram_notify import send_telegram_message
-                if getattr(settings, "ADMIN_TG_IDS", None):
+                from backend.services.telegram_notify import send_telegram_message, get_admin_tg_ids
+                admin_ids = get_admin_tg_ids(exclude_blocked=True)
+                if admin_ids:
                     v_title = getattr(job, "video_title", None) or "Video"
                     fe_url = (getattr(settings, "FRONTEND_URL", None) or "https://gapirai.uz").rstrip("/")
-                    for a_id in settings.ADMIN_TG_IDS.split(","):
-                        a_id = a_id.strip().strip('"').strip("'")
-                        if a_id:
-                            send_telegram_message(
+                    for a_id in admin_ids:
+                        send_telegram_message(
                                 a_id,
                                 f"✅ <b>Job qayta urinishda muvaffaqiyatli yakunlandi!</b>\n\n"
                                 f"🆔 Job: <code>{job_id}</code>\n"

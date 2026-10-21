@@ -130,6 +130,7 @@ def _synthesize_text(
     video_id: str | None = None,
     user_id: str | None = None,
     provider_name: str | None = None,
+    is_paid: bool = False,
 ) -> str:
     """
     Matnni audioga aylantiradi.
@@ -170,10 +171,13 @@ def _synthesize_text(
         log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
         return primary.name
 
-    logger.info(f"TTS provider: {primary.name} | chars={len(text)}")
+    logger.info(f"TTS provider: {primary.name} | chars={len(text)} | is_paid={is_paid}")
 
     try:
-        if primary.synthesize(text, output_path, voice_name=voice_name):
+        synth_kwargs = {"voice_name": voice_name}
+        if primary.name == "gemini":
+            synth_kwargs["is_paid"] = is_paid
+        if primary.synthesize(text, output_path, **synth_kwargs):
             log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id)
             return primary.name
     except PermanentTTSError as exc:
@@ -205,7 +209,10 @@ def _synthesize_text(
             if get_cached(text, fb_voice, fallback.name, output_path):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
                 return fallback.name
-            if fallback.synthesize(text, output_path, voice_name=fb_voice):
+            fb_kwargs = {"voice_name": fb_voice}
+            if fallback.name == "gemini":
+                fb_kwargs["is_paid"] = is_paid
+            if fallback.synthesize(text, output_path, **fb_kwargs):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
                 return fallback.name
         except PermanentTTSError as exc:
@@ -247,6 +254,7 @@ def synthesize_segments(
     existing_qa: dict | None = None,
     progress_cb=None,
     provider_name: str | None = None,
+    is_paid: bool = False,
 ) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
@@ -348,7 +356,7 @@ def synthesize_segments(
             engine = get_provider(provider_name).name
         else:
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: dastlabki sintezda xatolik: {exc}")
                 engine = get_provider(provider_name).name
@@ -365,7 +373,7 @@ def synthesize_segments(
                 f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
             )
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))

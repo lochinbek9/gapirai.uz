@@ -9,7 +9,7 @@ class TestTelegramNotify(unittest.TestCase):
     @patch("backend.services.telegram_notify.get_settings")
     def test_send_content_blocked_to_admins_multiple_admins(self, mock_settings, mock_send_msg):
         settings = MagicMock()
-        settings.ADMIN_TG_IDS = '"557407324, 1758736133"'
+        settings.ADMIN_TG_IDS = '"557407324, 987654321"'
         mock_settings.return_value = settings
 
         send_content_blocked_to_admins(
@@ -26,7 +26,7 @@ class TestTelegramNotify(unittest.TestCase):
 
         self.assertEqual(mock_send_msg.call_count, 2)
         call_ids = [call.args[0] for call in mock_send_msg.call_args_list]
-        self.assertEqual(call_ids, ["557407324", "1758736133"])
+        self.assertEqual(call_ids, ["557407324", "987654321"])
 
         sent_text = mock_send_msg.call_args_list[0].args[1]
         self.assertIn("Test Video Title", sent_text)
@@ -143,6 +143,21 @@ class TestTelegramNotify(unittest.TestCase):
         err2 = PermanentError("Ushbu video kontent siyosatiga mos kelmaydi.", code="CONTENT_BLOCKED")
         send_error_to_admins(err2, stage="SAFETY_CHECK")
         mock_send_msg.assert_not_called()
+
+    @patch("backend.services.telegram_notify.send_telegram_message")
+    @patch("backend.services.telegram_notify.get_settings")
+    def test_excluded_admin_id_never_receives_errors_or_blocks(self, mock_settings, mock_send_msg):
+        settings = MagicMock()
+        # Even if 1758736133 is in ADMIN_TG_IDS, it must be excluded
+        settings.ADMIN_TG_IDS = "557407324, 1758736133"
+        mock_settings.return_value = settings
+
+        err = RuntimeError("Test internal error")
+        send_error_to_admins(err, context_msg="Testing exclusions")
+
+        self.assertEqual(mock_send_msg.call_count, 1)
+        self.assertEqual(mock_send_msg.call_args[0][0], "557407324")
+
 
 
 if __name__ == "__main__":
