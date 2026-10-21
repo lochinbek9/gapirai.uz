@@ -189,12 +189,15 @@ def _synthesize_text(
     if primary.name == "gemini" or provider_name == "gemini":
         logger.warning(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — zaxira provayderga (Edge/Azure) xavfsiz fallback qilinmoqda.")
 
-    # --- Fallback zanjiri: Azure (kalit mavjud bo'lsa), so'ng har doim tayyor Edge ---
+    # --- Fallback zanjiri: Azure, Gemini va Edge o'zaro bir-birini sug'urtalaydi ---
     fallback_chain = []
     az = get_provider("azure")
     if getattr(az, "subscription_key", None) or getattr(az, "key", None):
         fallback_chain.append("azure")
-    fallback_chain.append("edge")
+    if primary.name != "gemini":
+        fallback_chain.append("gemini")
+    if primary.name != "edge":
+        fallback_chain.append("edge")
 
     for fb_candidate in fallback_chain:
         try:
@@ -202,10 +205,14 @@ def _synthesize_text(
             fb_voice = voice_name
             if fb_candidate in ("azure", "edge"):
                 if fb_voice not in ("uz-UZ-MadinaNeural", "uz-UZ-SardorNeural"):
-                    if fb_voice and any(f in fb_voice.lower() for f in ["female", "madina", "autonoe", "aoede", "kore"]):
+                    if fb_voice and any(f in str(fb_voice).lower() for f in ["female", "madina", "autonoe", "aoede", "kore"]):
                         fb_voice = "uz-UZ-MadinaNeural"
                     else:
                         fb_voice = "uz-UZ-SardorNeural"
+            elif fb_candidate == "gemini":
+                if fb_voice in ("uz-UZ-MadinaNeural", "uz-UZ-SardorNeural") or not fb_voice:
+                    fb_voice = "Autonoe" if fb_voice == "uz-UZ-MadinaNeural" else "Charon"
+
             if get_cached(text, fb_voice, fallback.name, output_path):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
                 return fallback.name

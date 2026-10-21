@@ -1319,7 +1319,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
       {retryModalJob && (() => {
         const durSec = retryModalJob.video_duration || 60
         const durMin = Math.max(0.1, durSec / 60)
-        const estChars = Math.round(durMin * 1200)
+        // Videoning haqiqiy belgilari mavjud bo'lsa, o'shani olamiz (aniq hisob-kitob tashqi jadval bilan 100% bir xil bo'ladi)
+        const realChars = retryModalJob.costs?.tts_characters || 0
+        const estChars = realChars > 0 ? realChars : Math.round(durMin * 1200)
 
         // TTS Cost:
         // Foydalanuvchi talabi: TTS da Gemini pullik narxini doim chiqaraver!

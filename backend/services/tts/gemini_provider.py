@@ -78,10 +78,15 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
 
     config = _config_for(voice)
     primary_model = settings.GEMINI_TTS_MODEL or "gemini-3.8-flash-tts"
-    candidate_models = [primary_model]
-    for alt_model in ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]:
-        if alt_model not in candidate_models:
-            candidate_models.append(alt_model)
+    candidate_models = [
+        primary_model,
+        "gemini-3.8-flash-lite-tts",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash-preview-tts",
+    ]
+    seen = set()
+    candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
     if settings.GEMINI_USE_VERTEX:
         max_attempts = 3
@@ -129,21 +134,47 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
             record_model_request(key, model_name)
             try:
                 client = _get_client(api_key=key)
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config,
-                )
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        inline_data = getattr(part, "inline_data", None)
-                        if inline_data and getattr(inline_data, "data", None):
-                            raw_data = inline_data.data
-                            if isinstance(raw_data, str):
-                                import base64
-                                raw_data = base64.b64decode(raw_data)
-                            record_model_success(key, model_name)
-                            return raw_data
+                raw_data = None
+
+                # 1. Agar model interactions model bo'lsa (gemini-3.8-flash-tts)
+                if hasattr(client, "interactions") and ("-tts" in model_name or "3.8" in model_name):
+                    try:
+                        interaction = client.interactions.create(
+                            model=model_name,
+                            input=[{
+                                "type": "user_input",
+                                "content": [{"type": "text", "text": contents}],
+                            }],
+                            response_format={"type": "audio", "mime_type": "audio/l16", "sample_rate": 24000},
+                            generation_config={"speech_config": [{"voice": voice}]},
+                        )
+                        if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
+                            import base64
+                            raw_data = base64.b64decode(interaction.output_audio.data)
+                    except Exception as iexc:
+                        logger.debug(f"Interactions TTS ({model_name}) xato: {iexc} — generate_content'ga o'tilmoqda")
+
+                # 2. Standart generate_content (gemini-2.5-flash / gemini-2.0-flash)
+                if not raw_data:
+                    gen_model = "gemini-2.5-flash" if "-tts" in model_name else model_name
+                    response = client.models.generate_content(
+                        model=gen_model,
+                        contents=contents,
+                        config=config,
+                    )
+                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                        for part in response.candidates[0].content.parts:
+                            inline_data = getattr(part, "inline_data", None)
+                            if inline_data and getattr(inline_data, "data", None):
+                                raw_data = inline_data.data
+                                if isinstance(raw_data, str):
+                                    import base64
+                                    raw_data = base64.b64decode(raw_data)
+                                break
+
+                if raw_data:
+                    record_model_success(key, model_name)
+                    return raw_data
             except Exception as e:
                 err_str = str(e)
                 is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
