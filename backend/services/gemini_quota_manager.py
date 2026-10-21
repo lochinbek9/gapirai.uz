@@ -203,13 +203,15 @@ def get_free_gemini_api_keys() -> List[str]:
     return free_list if free_list else all_keys
 
 
-def get_gemini_keys_for_request(is_paid: bool = False) -> List[str]:
+def get_gemini_keys_for_request(is_paid: bool = False, allow_paid_fallback: bool = True) -> List[str]:
     """
     So'rov turiga mos Gemini API kalitlarini saralab beradi:
     - is_paid=True (Pullik tarifdagilar / sotib olingan daqiqali dublyajlar):
       Birinchi o'rinda pullik (balansli) kalit(lar), favqulodda zaxira sifatida bepul kalitlar.
     - is_paid=False (Bepul foydalanuvchilar, 2-daqiqalik sinov dublyajlari, bepul tahlillar):
-      FAQAT bepul kalitlar (pullik kalit balansi tegilmaydi).
+      Birinchi o'rinda bepul kalitlar (30+ hovuz). Agar barcha bepul kalitlar 429 kvota limiti
+      yoki cooldown sababli tugasa, foydalanuvchi ishi to'xtab qolmasligi uchun
+      avtomatik ravishda pullik kalit(lar)ga favqulodda zaxira sifatida o'tiladi.
     """
     paid_keys = get_paid_gemini_api_keys()
     free_keys = get_free_gemini_api_keys()
@@ -223,8 +225,16 @@ def get_gemini_keys_for_request(is_paid: bool = False) -> List[str]:
                 combined.append(k)
         return combined if combined else get_all_gemini_api_keys()
     else:
-        # Bepul foydalanuvchilar faqat bepul hovuzdan foydalanadi
-        return free_keys if free_keys else get_all_gemini_api_keys()
+        # Bepul foydalanuvchilar: birinchi navbatda bepul kalitlar,
+        # yetmasa pullik kalit(lar) favqulodda zaxira sifatida qo'shiladi.
+        combined = []
+        seen = set()
+        keys_to_merge = (free_keys + paid_keys) if allow_paid_fallback else free_keys
+        for k in keys_to_merge:
+            if k not in seen:
+                seen.add(k)
+                combined.append(k)
+        return combined if combined else get_all_gemini_api_keys()
 
 
 def mask_key(api_key: str) -> str:
@@ -793,16 +803,16 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
 
         active_models_count = 0
         cooldown_models_count = 0
-        min_model_remaining = float("inf")
+        models_in_cooldown = []
 
-        for model in GEMINI_TEXT_MODELS:
+        for model in GEMINI_ALL_MONITORED_MODELS:
             avail, rem = is_model_available(key, model)
             if avail:
                 active_models_count += 1
             else:
                 cooldown_models_count += 1
-                if rem < min_model_remaining:
-                    min_model_remaining = rem
+                if rem > 0:
+                    models_in_cooldown.append((model, rem))
 
             if redis_client:
                 try:
@@ -815,9 +825,31 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
                 except Exception:
                     pass
 
-        # Kalit faqat barcha matn modellari cooldown'da bo'lsa kutishga o'tadi
-        in_cooldown = (active_models_count == 0) and (cooldown_models_count > 0)
-        max_remaining_sec = min_model_remaining if (in_cooldown and min_model_remaining != float("inf")) else 0.0
+        # Redis'dagi ushbu kalitga tegishli barcha model cooldown kalitlarini ham tekshirish
+        if redis_client:
+            try:
+                cd_keys = redis_client.keys(f"gemini_cd:{kh}:*")
+                for cdk in cd_keys:
+                    ttl = redis_client.ttl(cdk)
+                    if ttl and ttl > 0:
+                        m_name = cdk.split(":")[-1]
+                        if not any(m == m_name for m, _ in models_in_cooldown):
+                            models_in_cooldown.append((m_name, float(ttl)))
+                        if not cooldown_reason:
+                            try:
+                                r_val = redis_client.get(cdk)
+                                if r_val:
+                                    cooldown_reason = str(r_val)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+        # Google'da 429 kvota chegarasi butun loyihaga (API kalitga) beriladi.
+        # Agar asosiy modellar yoki istalgan model cooldown'da bo'lsa, kalit tiklanish vaqti ko'rsatiladi.
+        max_cd_remaining = max((rem for _, rem in models_in_cooldown), default=0.0)
+        in_cooldown = max_cd_remaining > 5.0
+        max_remaining_sec = max_cd_remaining if in_cooldown else 0.0
 
         redis_usage = {}
         if redis_client:
@@ -849,7 +881,12 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
             total_cooldown += 1
             m, s = divmod(int(max_remaining_sec), 60)
             h, m = divmod(m, 60)
-            remaining_human = f"{h}s {m}d {s}s qoldi" if h else f"{m}d {s}s qoldi"
+            if h > 0:
+                remaining_human = f"{h}s {m}d qoldi"
+            elif m > 0:
+                remaining_human = f"{m}d {s}s qoldi"
+            else:
+                remaining_human = f"{s}s qoldi"
 
         item = {
             "key_masked": masked,

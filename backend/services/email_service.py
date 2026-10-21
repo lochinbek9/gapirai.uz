@@ -193,6 +193,108 @@ def send_dubbing_complete_email(to_email: str, name: str, video_title: str, job_
         return False
 
 
+def send_subtitles_complete_email(to_email: str, name: str, video_title: str, job_id: str) -> bool:
+    """Subtitr tayyor bo'lganda foydalanuvchiga xabar yuboradi."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY sozlanmagan — subtitr tayyor xabari yuborilmadi.")
+        return False
+
+    frontend_url = (getattr(settings, "FRONTEND_URL", None) or "https://gapirai.uz").rstrip("/")
+    video_url = f"{frontend_url}/video/{job_id}"
+    greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
+    text_body = (
+        f"{greeting}\n\n"
+        f"\"{video_title}\" videongizning o'zbekcha subtitrlari tayyor!\n\n"
+        f"Ko'rish/yuklab olish uchun: {video_url}\n\n"
+        f"GapirAI.uz jamoasi"
+    )
+    html_body = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="color:#1e293b;margin:0 0 16px;">GapirAI<span style="color:#7c3aed;">.uz</span></h2>
+      <p style="color:#334155;font-size:14px;">{greeting}</p>
+      <p style="color:#334155;font-size:14px;">
+        <strong>"{video_title}"</strong> videongizning o'zbekcha subtitrlari tayyor!
+      </p>
+      <a href="{video_url}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9);color:#fff;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:12px;margin:16px 0;">Subtitrlarni ko'rish / yuklab olish</a>
+      <p style="color:#94a3b8;font-size:11px;margin-top:24px;">GapirAI.uz jamoasi</p>
+    </div>
+    """
+
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": "Subtitr tayyor!",
+        "html": html_body,
+        "text": text_body,
+    }
+
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend xatoligi (subtitr tayyor, {to_email}): {response.status_code} {response.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Subtitr tayyor xabarini yuborishda xatolik ({to_email}): {e}")
+        return False
+
+
+def send_analysis_complete_email(to_email: str, name: str, video_title: str, analysis_id: str) -> bool:
+    """Video tahlil tayyor bo'lganda foydalanuvchiga xabar yuboradi."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY sozlanmagan — tahlil tayyor xabari yuborilmadi.")
+        return False
+
+    frontend_url = (getattr(settings, "FRONTEND_URL", None) or "https://gapirai.uz").rstrip("/")
+    analysis_url = f"{frontend_url}/learn/{analysis_id}"
+    greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
+    text_body = (
+        f"{greeting}\n\n"
+        f"\"{video_title}\" videongizning chuqur AI tahlili, boblari va konspekti tayyor!\n\n"
+        f"Tahlilni ochish: {analysis_url}\n\n"
+        f"GapirAI.uz jamoasi"
+    )
+    html_body = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+      <h2 style="color:#1e293b;margin:0 0 16px;">GapirAI<span style="color:#7c3aed;">.uz</span></h2>
+      <p style="color:#334155;font-size:14px;">{greeting}</p>
+      <p style="color:#334155;font-size:14px;">
+        <strong>"{video_title}"</strong> videongizning chuqur AI tahlili, konspekti va boblari tayyor!
+      </p>
+      <a href="{analysis_url}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9);color:#fff;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:12px;margin:16px 0;">Tahlilni ko'rish</a>
+      <p style="color:#94a3b8;font-size:11px;margin-top:24px;">GapirAI.uz jamoasi</p>
+    </div>
+    """
+
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": "Video tahlili tayyor!",
+        "html": html_body,
+        "text": text_body,
+    }
+
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code in (200, 201):
+            return True
+        logger.error(f"Resend xatoligi (tahlil tayyor, {to_email}): {response.status_code} {response.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Tahlil tayyor xabarini yuborishda xatolik ({to_email}): {e}")
+        return False
+
+
 def send_subscription_reminder_email(to_email: str, name: str, plan_name: str, expires_at_str: str) -> bool:
     """Tarif obunasi 3 kundan keyin tugashi haqida eslatma yuboradi
     (backend/scripts/subscription_reminders.py — kunlik cron)."""

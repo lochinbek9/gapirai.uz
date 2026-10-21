@@ -259,6 +259,19 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         analysis.error_message = None
         db.commit()
 
+        # Foydalanuvchiga tahlil tayyorligi haqida email yuborish
+        if analysis.user_id and analysis.user and analysis.user.email:
+            try:
+                from backend.services.email_service import send_analysis_complete_email
+                send_analysis_complete_email(
+                    analysis.user.email,
+                    analysis.user.name or "",
+                    analysis.video_title or "Video",
+                    str(analysis_id),
+                )
+            except Exception as email_err:
+                logger.warning(f"Tahlil tayyor email yuborilmadi (analysis {analysis_id}): {email_err}")
+
         _cleanup_analysis_dirs(analysis_id)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "COMPLETED")
 
