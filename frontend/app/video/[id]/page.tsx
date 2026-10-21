@@ -738,21 +738,12 @@ export default function VideoPage() {
                         Ushbu video YouTube himoyasi bilan cheklangan
                       </h3>
                       <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                        YouTube bot himoyasi (Sign-in check), yosh chegarasi yoki hududiy cheklov sababli videoni avtomatik yuklab bo&apos;lmadi.
-                        Lekin dublyaj qilishning 2 ta oson va kafolatlangan usuli bor:
+                        Videoni to&apos;g&apos;ridan-to&apos;g&apos;ri fayl sifatida yuklab dublyajni davom ettirishingiz mumkin:
                       </p>
                     </div>
 
-                    {/* Solution 1: Direct File Upload */}
-                    <div className="max-w-md w-full bg-black/[0.02] dark:bg-white/[0.02] p-4 rounded-2xl border border-black/5 dark:border-white/10 space-y-3">
-                      <div className="text-left">
-                        <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                          <span>📁 1-Yechim:</span> Videoni fayl sifatida yuklash (100% ishlaydi)
-                        </div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                          Faylni to&apos;g&apos;ridan-to&apos;g&apos;ri yuklaganda YouTube blokirovkalari umuman bo&apos;lmaydi.
-                        </div>
-                      </div>
+                    {/* Direct File Upload */}
+                    <div className="max-w-md w-full">
                       <UploadRecoveryPrompt jobId={id} />
                     </div>
 

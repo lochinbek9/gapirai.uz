@@ -108,11 +108,6 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
 
   return (
     <div className="w-full space-y-3">
-      <div className="space-y-1 text-center">
-        <p className="text-sm font-bold text-gray-900 dark:text-white">Bu videoni havola orqali olishning imkoni bo&apos;lmadi.</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Videoni qurilmangizdan yuklashingiz mumkin.</p>
-      </div>
-
       {state === "uploading" ? (
         <div className="glass-card rounded-2xl p-4 space-y-3 border border-gray-200/60 dark:border-white/10">
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
