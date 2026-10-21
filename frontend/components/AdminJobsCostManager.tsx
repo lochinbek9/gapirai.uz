@@ -55,6 +55,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [ttsProviderFilter, setTtsProviderFilter] = useState<string>('ALL')
+  const [planFilter, setPlanFilter] = useState<string>('ALL')
+  const [errorCodeFilter, setErrorCodeFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<string>('newest')
   const [includeInternal, setIncludeInternal] = useState(false)
   const [dateRange, setDateRange] = useState<DateRangeValue>('today')
@@ -110,7 +112,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         sortBy,
         dateRange,
         customStartDate || undefined,
-        customEndDate || undefined
+        customEndDate || undefined,
+        planFilter === 'ALL' ? undefined : planFilter,
+        errorCodeFilter === 'ALL' ? undefined : errorCodeFilter
       )
       setData(res)
     } catch (err: any) {
@@ -118,7 +122,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
     } finally {
       setLoading(false)
     }
-  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, includeInternal, sortBy, dateRange, customStartDate, customEndDate])
+  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, planFilter, errorCodeFilter, includeInternal, sortBy, dateRange, customStartDate, customEndDate])
 
   useEffect(() => {
     loadData()
@@ -161,7 +165,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   const getRelativeTime = (dateStr: string | null | undefined): string => getTashkentRelativeTime(dateStr)
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, errorCode?: string | null) => {
     switch (status) {
       case 'COMPLETED':
         return {
@@ -170,6 +174,13 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           dot: 'bg-emerald-400',
         }
       case 'FAILED':
+        if (errorCode === 'NO_SPEECH_FOUND' || errorCode?.includes('NO_SPEECH')) {
+          return {
+            label: 'Ovoz topilmadi',
+            color: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+            dot: 'bg-amber-400',
+          }
+        }
         return {
           label: 'Xatolik',
           color: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
@@ -369,6 +380,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 key={tab.id}
                 onClick={() => {
                   setStatusFilter(tab.id)
+                  if (tab.id !== 'FAILED' && errorCodeFilter !== 'ALL') {
+                    setErrorCodeFilter('ALL')
+                  }
                   setPage(1)
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${
@@ -382,10 +396,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
             ))}
           </div>
 
-          {/* Search, Provider, Sorting */}
+          {/* Search, Error Type, Plan, Provider, Sorting */}
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search Input */}
-            <div className="relative min-w-[200px] sm:min-w-[260px] flex-1">
+            <div className="relative min-w-[180px] sm:min-w-[220px] flex-1">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -404,6 +418,51 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               )}
             </div>
 
+            {/* Error Type Filter Dropdown (Xatolik turi filtri - faqat Xatolik bosilganda yoki faol bo'lganda) */}
+            {(statusFilter === 'FAILED' || errorCodeFilter !== 'ALL') && (
+              <CustomSelect
+                value={errorCodeFilter}
+                onChange={(val) => {
+                  setErrorCodeFilter(val)
+                  if (val !== 'ALL') {
+                    setStatusFilter('FAILED')
+                  }
+                  setPage(1)
+                }}
+                options={[
+                  { value: 'ALL', label: 'Barcha xatoliklar' },
+                  { value: 'NO_SPEECH_FOUND', label: '🎙 Ovoz topilmadi (User)' },
+                  { value: 'AUTH_ERROR', label: '🔒 Kirish / Bot cheklovi' },
+                  { value: 'DOWNLOAD_ERROR', label: '📥 Yuklab olish xatosi' },
+                  { value: 'TRANSCRIBE_ERROR', label: '🎧 Nutqni aniqlash' },
+                  { value: 'TRANSLATE_ERROR', label: '🌐 Tarjima xatosi' },
+                  { value: 'SYNTHESIS_ERROR', label: '🔊 Ovoz sintezi (TTS)' },
+                  { value: 'MERGE_ERROR', label: '🎬 Birlashtirish (Merge)' },
+                  { value: 'TIMEOUT', label: '⏱ Vaqt tugashi' },
+                  { value: 'CONTENT_BLOCKED', label: '🛡 Bloklangan kontent' },
+                  { value: 'OTHER', label: '⚠️ Boshqa xatoliklar' },
+                ]}
+                className="min-w-[165px]"
+              />
+            )}
+
+            {/* Plan / Tarif Filter Dropdown */}
+            <CustomSelect
+              value={planFilter}
+              onChange={(val) => {
+                setPlanFilter(val)
+                setPage(1)
+              }}
+              options={[
+                { value: 'ALL', label: 'Barcha tariflar' },
+                { value: 'free', label: 'Free (Bepul)' },
+                { value: 'standard', label: 'Standard' },
+                { value: 'pro', label: 'Pro' },
+                { value: 'admin', label: 'Admin hisoblar' },
+              ]}
+              className="min-w-[135px]"
+            />
+
             {/* Custom Provider Filter Dropdown */}
             <CustomSelect
               value={ttsProviderFilter}
@@ -420,7 +479,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 { value: 'openai', label: 'OpenAI' },
                 { value: 'elevenlabs', label: 'ElevenLabs' },
               ]}
-              className="min-w-[130px]"
+              className="min-w-[125px]"
             />
 
             {/* Custom Sort Filter Dropdown */}
@@ -433,10 +492,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               options={[
                 { value: 'newest', label: 'Eng yangi' },
                 { value: 'oldest', label: 'Eng eski' },
-                { value: 'duration_desc', label: 'Eng uzun video (yuqori xarajat)' },
+                { value: 'duration_desc', label: 'Eng uzun video' },
                 { value: 'duration_asc', label: 'Eng qisqa video' },
               ]}
-              className="min-w-[150px]"
+              className="min-w-[135px]"
             />
           </div>
         </div>
@@ -501,7 +560,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 </tr>
               ) : (
                 jobs.map((job) => {
-                  const statusInfo = getStatusBadge(job.status)
+                  const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || Boolean(job.error_code?.includes('NO_SPEECH'))
+                  const statusInfo = getStatusBadge(job.status, job.error_code)
                   const isUpload = Boolean(
                     job.youtube_url?.startsWith('upload://') ||
                     job.youtube_video_id?.startsWith('upload_') ||
@@ -546,31 +606,39 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               {job.video_title}
                             </p>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              {/* UUID button */}
-                              <button
-                                onClick={() => copyToClipboard(job.id, job.id)}
-                                title="ID nusxalash"
-                                className="font-mono text-[10px] text-gray-500 hover:text-gray-300 flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded"
-                              >
-                                {copiedId === job.id ? (
-                                  <Check className="w-2.5 h-2.5 text-emerald-400" />
-                                ) : (
-                                  <Copy className="w-2.5 h-2.5" />
-                                )}
-                                <span>{job.id.substring(0, 8)}...</span>
-                              </button>
-
-                              {/* Clickable link to video page */}
+                              {/* Full link to video */}
                               <a
                                 href={jobLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded font-semibold transition"
-                                title="Dublyaj sahifasini ochish"
+                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2 py-0.5 rounded font-mono font-medium transition"
+                                title={`To'liq havola: ${jobLink}`}
                               >
-                                <ExternalLink className="w-2.5 h-2.5" />
-                                <span>{isUpload ? 'Fayl' : 'Ochish'}</span>
+                                <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                                <span className="truncate max-w-[130px]">{jobLink}</span>
                               </a>
+
+                              {/* Copy Full URL button */}
+                              <button
+                                onClick={() => {
+                                  const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${jobLink}` : jobLink
+                                  copyToClipboard(fullUrl, job.id)
+                                }}
+                                title="To'liq havolani nusxalash (Copy URL)"
+                                className="text-gray-400 hover:text-white flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded text-[10px] transition"
+                              >
+                                {copiedId === job.id ? (
+                                  <>
+                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                    <span className="text-emerald-400 text-[9px]">Nusxalandi</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-2.5 h-2.5" />
+                                    <span className="text-[9px]">URL</span>
+                                  </>
+                                )}
+                              </button>
 
                               {/* YouTube link */}
                               {job.youtube_url && !isUpload && (
@@ -578,7 +646,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                   href={job.youtube_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[10px] text-gray-500 hover:text-red-400 flex items-center gap-0.5 transition"
+                                  className="text-[10px] text-gray-400 hover:text-red-400 flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition"
+                                  title="YouTube original videosini ochish"
                                 >
                                   <span>YT</span>
                                 </a>
@@ -695,7 +764,12 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           )}
 
                           {job.error_code && (
-                            <p className="text-[10px] font-mono text-rose-400 truncate max-w-[150px]" title={job.error_message || ''}>
+                            <p
+                              className={`text-[10px] font-mono truncate max-w-[150px] ${
+                                isNoSpeech ? 'text-amber-400 font-semibold' : 'text-rose-400'
+                              }`}
+                              title={job.error_message || ''}
+                            >
                               {job.error_code}
                             </p>
                           )}
@@ -718,26 +792,29 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           </div>
                           <div className="flex items-center gap-1 text-[10px]">
                             <span className="text-gray-500">STT:</span>
-                            {job.models.is_groq ? (
-                              <span className="text-amber-300 font-mono text-[9px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold">
-                                ⚡ Groq Whisper (Turbo)
-                              </span>
-                            ) : (
-                              <span className="text-gray-300 font-mono text-[9px]">
-                                {job.models.stt_display || job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1'}
-                              </span>
-                            )}
+                            <span
+                              className="text-gray-300 font-mono text-[9px] truncate max-w-[120px]"
+                              title={job.models.stt_display || job.models.stt_model || 'whisper-1'}
+                            >
+                              {job.models.is_groq ? 'Groq Whisper' : (job.models.stt_display || job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1')}
+                            </span>
                           </div>
                           <div className="pt-0.5">
                             {job.models.gemini_key_tier === 'paid' ? (
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Pullik kalit'}>
+                              <span
+                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                title={job.models.gemini_key_used ? `Gemini kaliti: ${job.models.gemini_key_used}` : 'Gemini pullik kalit'}
+                              >
                                 <span>💎</span>
-                                <span>{job.models.is_groq ? '⚡ Groq LPU' : 'Pullik kalit'}</span>
+                                <span>Gemini: Pullik</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Bepul kalit hovuzi'}>
+                              <span
+                                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20"
+                                title={job.models.gemini_key_used ? `Gemini kaliti: ${job.models.gemini_key_used}` : 'Gemini bepul kalit hovuzi'}
+                              >
                                 <span>🆓</span>
-                                <span>Bepul kalit</span>
+                                <span>Gemini: Bepul</span>
                               </span>
                             )}
                           </div>
@@ -779,7 +856,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
-                          {job.status === 'FAILED' && (
+                          {job.status === 'FAILED' && !isNoSpeech && (
                             <button
                               onClick={() => handleRetryJob(job.id)}
                               disabled={retryingId === job.id}
@@ -998,7 +1075,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {/* AI Key Tier Status */}
                 <div className="p-2.5 bg-black/25 rounded-lg border border-white/5 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-[11px]">AI Kalit toifasi:</span>
+                    <span className="text-gray-400 text-[11px]">Gemini kalit toifasi:</span>
                     {selectedJob.models.gemini_key_tier === 'paid' ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         <span>💎</span>

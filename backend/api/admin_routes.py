@@ -2517,6 +2517,8 @@ def admin_jobs_cost(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
     tts_provider: str | None = Query(default=None),
+    plan: str | None = Query(default=None),
+    error_code: str | None = Query(default=None),
     include_internal: bool = Query(default=False),
     sort_by: str = Query(default="newest"),
     date_range: str = Query(default="today"),
@@ -2532,8 +2534,12 @@ def admin_jobs_cost(
     try:
         internal_ids_select = select(User.id).filter(User.is_internal.is_(True))
 
-        # Base query joined with User
-        base_query = db.query(DubbingJob, User).outerjoin(User, DubbingJob.user_id == User.id)
+        # Base query joined with User and Subscription
+        base_query = (
+            db.query(DubbingJob, User)
+            .outerjoin(User, DubbingJob.user_id == User.id)
+            .outerjoin(Subscription, User.id == Subscription.user_id)
+        )
 
         # Exclude internal accounts unless explicitly requested
         if not include_internal:
@@ -2545,6 +2551,60 @@ def admin_jobs_cost(
         if tts_provider and tts_provider.strip().lower() not in ("all", ""):
             clean_prov = tts_provider.strip().lower()
             base_query = base_query.filter(func.lower(DubbingJob.tts_provider) == clean_prov)
+
+        # Plan / Tarif filter
+        if plan and plan.strip().lower() not in ("all", ""):
+            clean_plan = plan.strip().lower()
+            if clean_plan == "admin":
+                base_query = base_query.filter(User.role == "admin")
+            elif clean_plan == "free":
+                base_query = base_query.filter(
+                    or_(
+                        Subscription.plan == PlanTier.FREE,
+                        Subscription.plan.is_(None),
+                        DubbingJob.user_id.is_(None),
+                    )
+                )
+            elif clean_plan in ("standard", "standart"):
+                base_query = base_query.filter(Subscription.plan == PlanTier.STANDARD)
+            elif clean_plan == "pro":
+                base_query = base_query.filter(Subscription.plan == PlanTier.PRO)
+
+        # Error code filter
+        if error_code and error_code.strip().upper() not in ("ALL", ""):
+            ec = error_code.strip().upper()
+            if ec == "DOWNLOAD_ERROR":
+                base_query = base_query.filter(
+                    or_(
+                        DubbingJob.error_code.ilike("%DOWNLOAD%"),
+                        DubbingJob.error_code.in_([
+                            "EXTRACTOR_ERROR", "PO_TOKEN_REQUIRED", "VIDEO_UNAVAILABLE",
+                            "PROXY_ERROR", "PROXY_BILLING_ERROR", "NETWORK_ERROR",
+                            "HTTP_403", "HTTP_429", "UPSTREAM_ERROR"
+                        ])
+                    )
+                )
+            elif ec == "TRANSCRIBE_ERROR":
+                base_query = base_query.filter(DubbingJob.error_code.ilike("%TRANSCRIB%"))
+            elif ec == "TRANSLATE_ERROR":
+                base_query = base_query.filter(DubbingJob.error_code.ilike("%TRANSLAT%"))
+            elif ec == "SYNTHESIS_ERROR":
+                base_query = base_query.filter(or_(DubbingJob.error_code.ilike("%SYNTHES%"), DubbingJob.error_code.ilike("%TTS%")))
+            elif ec == "MERGE_ERROR":
+                base_query = base_query.filter(or_(DubbingJob.error_code.ilike("%MERG%"), DubbingJob.error_code.ilike("%SYNC%")))
+            elif ec == "OTHER":
+                known = ["NO_SPEECH_FOUND", "AUTH_ERROR", "CONTENT_BLOCKED", "TIMEOUT"]
+                base_query = base_query.filter(
+                    DubbingJob.error_code.isnot(None),
+                    ~DubbingJob.error_code.in_(known),
+                    ~DubbingJob.error_code.ilike("%DOWNLOAD%"),
+                    ~DubbingJob.error_code.ilike("%TRANSCRIB%"),
+                    ~DubbingJob.error_code.ilike("%TRANSLAT%"),
+                    ~DubbingJob.error_code.ilike("%SYNTHES%"),
+                    ~DubbingJob.error_code.ilike("%MERG%"),
+                )
+            else:
+                base_query = base_query.filter(DubbingJob.error_code == ec)
 
         # Status filter
         if status and status.strip().upper() not in ("ALL", ""):

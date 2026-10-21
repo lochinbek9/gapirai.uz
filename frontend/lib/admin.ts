@@ -664,7 +664,9 @@ export async function apiAdminJobsCost(
   sortBy: string = 'newest',
   dateRange: string = 'today',
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  plan?: string,
+  errorCode?: string
 ): Promise<AdminJobsCostResponse> {
   const res = await axios.get(`${API_URL}/admin/jobs-cost`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -674,6 +676,8 @@ export async function apiAdminJobsCost(
       status: status || undefined,
       search: search || undefined,
       tts_provider: ttsProvider || undefined,
+      plan: plan && plan !== 'ALL' ? plan : undefined,
+      error_code: errorCode && errorCode !== 'ALL' ? errorCode : undefined,
       include_internal: includeInternal,
       sort_by: sortBy,
       date_range: dateRange,
