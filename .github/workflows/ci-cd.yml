@@ -236,27 +236,23 @@ jobs:
               docker restart $CONTAINERS_3000 2>/dev/null || true
             fi
 
-            # PM2 (all users)
+            # PM2 (gapirai user) with strict timeout
             echo "Checking PM2..."
             if command -v pm2 >/dev/null 2>&1; then
-              pm2 restart all || pm2 reload all || true
+              timeout 10s pm2 restart all --update-env 2>/dev/null || timeout 5s pm2 reload all 2>/dev/null || true
             fi
-            if id -u ubuntu >/dev/null 2>&1; then
-              run_sudo -u ubuntu pm2 restart all 2>/dev/null || true
-            fi
-            run_sudo pm2 restart all 2>/dev/null || true
 
             # Systemd services
             echo "Checking systemd services..."
-            for svc in xadichai-frontend gapirai-frontend frontend gapirai; do
+            for svc in gapirai-frontend xadichai-frontend frontend gapirai; do
               if systemctl is-enabled --quiet "$svc" 2>/dev/null || systemctl is-active --quiet "$svc" 2>/dev/null; then
                 echo "Restarting/starting systemd service: $svc"
-                run_sudo systemctl restart "$svc" 2>/dev/null || run_sudo systemctl start "$svc" 2>/dev/null || true
+                timeout 25s run_sudo systemctl restart "$svc" 2>/dev/null || true
               fi
             done
 
             # Supervisor
-            run_sudo supervisorctl restart all 2>/dev/null || true
+            timeout 10s run_sudo supervisorctl restart all 2>/dev/null || true
 
             # Check if port 3000 process was restarted
             sleep 3
