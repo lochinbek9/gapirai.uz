@@ -113,6 +113,7 @@ jobs:
           username: gapirai
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
+          command_timeout: 8m
           script: |
             set -e
 
@@ -247,7 +248,7 @@ jobs:
             for svc in gapirai-frontend xadichai-frontend frontend gapirai; do
               if systemctl is-enabled --quiet "$svc" 2>/dev/null || systemctl is-active --quiet "$svc" 2>/dev/null; then
                 echo "Restarting/starting systemd service: $svc"
-                timeout 25s run_sudo systemctl restart "$svc" 2>/dev/null || true
+                timeout 15s run_sudo systemctl restart "$svc" 2>/dev/null || timeout 10s systemctl --user restart "$svc" 2>/dev/null || true
               fi
             done
 
@@ -271,16 +272,16 @@ jobs:
                 kill -9 "$P3000_PID" 2>/dev/null || run_sudo kill -9 "$P3000_PID" 2>/dev/null || true
                 sleep 2
               fi
-              # If port 3000 is now dead, restart Next.js in background
+              # If port 3000 is now dead, restart Next.js in background with detached stdio
               if ! ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
-                echo "Starting frontend fresh via PM2 or npm start..."
+                echo "Starting frontend fresh via PM2 or npm start (detached)..."
                 cd "$TARGET_DIR/frontend"
                 if command -v pm2 >/dev/null 2>&1; then
-                  pm2 start npm --name "gapirai-frontend" -- start || true
+                  timeout 15s pm2 start npm </dev/null >/dev/null 2>&1 --name "gapirai-frontend" -- start || true
                 else
-                  nohup npm start > "$TARGET_DIR/frontend.log" 2>&1 &
+                  nohup npm start </dev/null > "$TARGET_DIR/frontend.log" 2>&1 &
                 fi
-                sleep 4
+                sleep 3
               fi
             fi
 
