@@ -78,12 +78,28 @@ def _get_accessible_analysis(
     raise HTTPException(status_code=403, detail="Bu tahlilga kirish huquqingiz yo'q.")
 
 
-def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
+def _analysis_to_dict(analysis: VideoAnalysis, db: Optional[Session] = None) -> dict:
     raw_status = analysis.status.value if hasattr(analysis.status, "value") else analysis.status
     video_url = None
     if analysis.youtube_url and analysis.youtube_url.startswith("upload://"):
         raw_jid = analysis.youtube_url.replace("upload://", "").strip()
         video_url = f"/outputs/{raw_jid}/video/dubbed_final.mp4"
+
+    linked_job = None
+    if db:
+        try:
+            if analysis.id:
+                linked_job = db.query(DubbingJob).filter(DubbingJob.linked_analysis_id == analysis.id).order_by(DubbingJob.created_at.desc()).first()
+            if not linked_job and analysis.user_id and analysis.youtube_video_id:
+                linked_job = db.query(DubbingJob).filter(
+                    DubbingJob.user_id == analysis.user_id,
+                    DubbingJob.youtube_video_id == analysis.youtube_video_id,
+                ).order_by(DubbingJob.created_at.desc()).first()
+                if linked_job and not linked_job.linked_analysis_id:
+                    linked_job.linked_analysis_id = analysis.id
+                    db.commit()
+        except Exception as e:
+            logger.warning(f"Error resolving linked dubbing job for analysis {analysis.id}: {e}")
 
     return {
         "id": str(analysis.id),
@@ -109,6 +125,10 @@ def _analysis_to_dict(analysis: VideoAnalysis) -> dict:
         "error_message": analysis.error_message,
         "error_code": analysis.error_code,
         "created_at": to_tashkent_iso(analysis.created_at),
+        "linked_job_id": str(linked_job.id) if linked_job else None,
+        "linked_job_status": (linked_job.status.value if hasattr(linked_job.status, "value") else str(linked_job.status).lower()) if linked_job else None,
+        "linked_job_is_preview": bool(linked_job.is_preview) if linked_job else False,
+        "linked_job_progress": float(linked_job.progress or 0.0) if linked_job else 0.0,
     }
 
 
@@ -266,7 +286,7 @@ def get_analysis(
     current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
     analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
-    return _analysis_to_dict(analysis)
+    return _analysis_to_dict(analysis, db=db)
 
 
 @router.post("/{analysis_id}/retry", dependencies=[Depends(rate_limit("video_analysis_retry", 8, 600))])

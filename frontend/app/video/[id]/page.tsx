@@ -15,6 +15,7 @@ import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
+import ConfirmModal from '@/components/ConfirmModal'
 import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
@@ -199,6 +200,8 @@ export default function VideoPage() {
   const [showSrtModal, setShowSrtModal] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
+  const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
   const [retryLoading, setRetryLoading] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
   const [regenProvider, setRegenProvider] = useState<'gemini' | 'edge' | 'azure'>('gemini')
@@ -287,19 +290,25 @@ export default function VideoPage() {
     }
   }
 
-  const handleCancel = async () => {
+  const handleOpenCancel = () => {
+    setConfirmCancelOpen(true)
+  }
+
+  const handleExecuteCancel = async () => {
     if (!id) return
-    if (!window.confirm("Rostdan ham ushbu dublyajni bekor qilmoqchimisiz?")) return
     setCancelLoading(true)
     try {
       const res = await cancelJob(id)
       if (res.success) {
+        setConfirmCancelOpen(false)
         window.location.reload()
       } else {
-        alert(res.message || "Bekor qilishda xatolik yuz berdi.")
+        setToast({ type: 'error', message: res.message || "Bekor qilishda xatolik yuz berdi." })
+        setConfirmCancelOpen(false)
       }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.")
+      setToast({ type: 'error', message: err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi." })
+      setConfirmCancelOpen(false)
     } finally {
       setCancelLoading(false)
     }
@@ -447,6 +456,30 @@ export default function VideoPage() {
           </Link>
         </div>
       </header>
+
+      {/* Toast Alert */}
+      {toast && (
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-4">
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+              toast.type === "error"
+                ? "bg-rose-950/80 border-rose-500/40 text-rose-200"
+                : "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <p className="text-xs sm:text-sm font-semibold">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className={theaterMode ? 'w-full' : 'max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8'}>
         <div className={theaterMode
@@ -904,7 +937,7 @@ export default function VideoPage() {
 
                     <div className="pt-1">
                       <button
-                        onClick={handleCancel}
+                        onClick={handleOpenCancel}
                         disabled={cancelLoading}
                         className="glass-input hover:text-red-600 dark:hover:text-red-400 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition duration-200 disabled:opacity-50 border border-gray-200/60 dark:border-white/10"
                       >
@@ -1434,6 +1467,19 @@ export default function VideoPage() {
           </div>
         </div>
       )}
+
+      {/* Modern Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmCancelOpen}
+        onClose={() => setConfirmCancelOpen(false)}
+        onConfirm={handleExecuteCancel}
+        loading={cancelLoading}
+        title="Dublyaj jarayonini bekor qilish"
+        message="Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz?"
+        confirmText="Ha, bekor qilinsin"
+        cancelText="Ortga"
+        danger
+      />
     </div>
   )
 }

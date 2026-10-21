@@ -415,19 +415,26 @@ class SetPlanRequest(BaseModel):
 def admin_list_users(
     q: str | None = None,
     filter_type: str | None = Query(None, description="all | customers | internal"),
+    plan_filter: str | None = Query(None, description="all | free | paid | standard | pro | has_package"),
+    balance_filter: str | None = Query(None, description="all | has_balance | no_balance | has_purchased | no_purchased"),
+    sort_by: str = Query("newest", description="newest | oldest | balance_desc | balance_asc | purchased_desc | alphabetical"),
+    date_range: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_admin_user),
 ):
-    """Admin panel: foydalanuvchilarni qidirish va ularning obuna/daqiqa holatini ko'rish."""
+    """Admin panel: foydalanuvchilarni qidirish, tarif, balans va ro'yxatdan o'tgan sana bo'yicha saralash."""
     db = SessionLocal()
     try:
-        query = db.query(User)
+        query = db.query(User, Subscription).outerjoin(Subscription, User.id == Subscription.user_id)
         if filter_type == "customers":
             query = query.filter(User.is_internal.is_(False))
         elif filter_type == "internal":
             query = query.filter(User.is_internal.is_(True))
 
+        # Search term
         if q and q.strip():
             term = f"%{q.strip()}%"
             query = query.filter(
@@ -438,24 +445,123 @@ def admin_list_users(
                 )
             )
 
-        total = query.count()
-        users = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+        # Plan filter
+        if plan_filter and plan_filter.strip().lower() not in ("all", ""):
+            pf = plan_filter.strip().lower()
+            if pf == "free":
+                query = query.filter(or_(Subscription.plan == PlanTier.FREE, Subscription.plan.is_(None)))
+            elif pf == "paid":
+                query = query.filter(Subscription.plan.in_([PlanTier.STANDARD, PlanTier.PRO]))
+            elif pf == "standard":
+                query = query.filter(Subscription.plan == PlanTier.STANDARD)
+            elif pf == "pro":
+                query = query.filter(Subscription.plan == PlanTier.PRO)
+            elif pf == "has_package":
+                query = query.filter(Subscription.purchased_minutes > 0)
 
-        user_ids = [u.id for u in users]
-        existing_subs = {
-            s.user_id: s
-            for s in db.query(Subscription).filter(Subscription.user_id.in_(user_ids)).all()
-        } if user_ids else {}
+        # Balance filter
+        if balance_filter and balance_filter.strip().lower() not in ("all", ""):
+            bf = balance_filter.strip().lower()
+            if bf == "has_purchased":
+                query = query.filter(Subscription.purchased_minutes > 0)
+            elif bf == "no_purchased":
+                query = query.filter(or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0))
+            elif bf == "has_balance":
+                query = query.filter(
+                    or_(
+                        Subscription.purchased_minutes > 0,
+                        case(
+                            (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) < 60),
+                            (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) < 20),
+                            else_=func.coalesce(Subscription.monthly_minutes_used, 0) < 5,
+                        )
+                    )
+                )
+            elif bf == "no_balance":
+                query = query.filter(
+                    and_(
+                        or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0),
+                        case(
+                            (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) >= 60),
+                            (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) >= 20),
+                            else_=func.coalesce(Subscription.monthly_minutes_used, 0) >= 5,
+                        )
+                    )
+                )
+
+        # Date range filter for user registration
+        if date_range and date_range.strip().lower() not in ("all", ""):
+            TASHKENT_OFFSET = timedelta(hours=5)
+            tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+            tashkent_today_date = tashkent_now.date()
+            u_start_utc = None
+            u_end_utc = None
+            dr = date_range.strip().lower()
+            if dr == "today":
+                dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+                u_start_utc = dt - TASHKENT_OFFSET
+            elif dr == "7d":
+                dt = tashkent_today_date - timedelta(days=6)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "14d":
+                dt = tashkent_today_date - timedelta(days=13)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "30d":
+                dt = tashkent_today_date - timedelta(days=29)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "90d":
+                dt = tashkent_today_date - timedelta(days=89)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "custom" and start_date:
+                try:
+                    s_parts = [int(p) for p in start_date.split("-")]
+                    u_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                    if end_date:
+                        e_parts = [int(p) for p in end_date.split("-")]
+                        u_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+                except Exception:
+                    pass
+            if u_start_utc:
+                query = query.filter(User.created_at >= u_start_utc)
+            if u_end_utc:
+                query = query.filter(User.created_at < u_end_utc)
+
+        total = query.count()
+
+        # Sorting logic
+        calc_balance_expr = (
+            func.coalesce(Subscription.purchased_minutes, 0.0) +
+            func.greatest(
+                0.0,
+                case(
+                    (Subscription.plan == PlanTier.PRO, 60.0),
+                    (Subscription.plan == PlanTier.STANDARD, 20.0),
+                    else_=5.0,
+                ) - func.coalesce(Subscription.monthly_minutes_used, 0.0)
+            )
+        )
+        if sort_by == "oldest":
+            query = query.order_by(User.created_at.asc())
+        elif sort_by == "balance_desc":
+            query = query.order_by(calc_balance_expr.desc(), User.created_at.desc())
+        elif sort_by == "balance_asc":
+            query = query.order_by(calc_balance_expr.asc(), User.created_at.desc())
+        elif sort_by == "purchased_desc":
+            query = query.order_by(func.coalesce(Subscription.purchased_minutes, 0).desc(), User.created_at.desc())
+        elif sort_by == "alphabetical":
+            query = query.order_by(func.coalesce(User.name, User.email).asc())
+        else: # "newest"
+            query = query.order_by(User.created_at.desc())
+
+        rows = query.offset((page - 1) * limit).limit(limit).all()
 
         result = []
-        for u in users:
-            sub = existing_subs.get(u.id)
+        for u, sub in rows:
             if not sub:
                 sub = Subscription(user_id=u.id, plan=PlanTier.FREE, period_started_at=datetime.utcnow())
                 db.add(sub)
                 db.commit()
                 db.refresh(sub)
-                existing_subs[u.id] = sub
 
             bal = get_minute_balance(db, u.id)
             result.append({
@@ -2413,10 +2519,13 @@ def admin_jobs_cost(
     tts_provider: str | None = Query(default=None),
     include_internal: bool = Query(default=False),
     sort_by: str = Query(default="newest"),
+    date_range: str = Query(default="today"),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
-    Har bir dublyaj job uchun xarajatlar taqsimoti (TTS, STT, LLM) va batafsil statuslar.
+    Har bir dublyaj job uchun xarajatlar taqsimoti (TTS, STT, LLM), sana oraliq filtri va batafsil statuslar.
     """
     import uuid as _uuid
     db = SessionLocal()
@@ -2460,6 +2569,44 @@ def admin_jobs_cost(
                     base_query = base_query.filter(DubbingJob.status == js)
                 except ValueError:
                     base_query = base_query.filter(func.upper(func.cast(DubbingJob.status, func.text)) == clean_status)
+
+        # Date range filter (default: "today" in Tashkent UTC+5)
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        date_start_utc = None
+        date_end_utc = None
+
+        dr = (date_range or "today").strip().lower()
+        if dr == "today":
+            dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+            date_start_utc = dt - TASHKENT_OFFSET
+        elif dr == "7d":
+            dt = tashkent_today_date - timedelta(days=6)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "14d":
+            dt = tashkent_today_date - timedelta(days=13)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "30d":
+            dt = tashkent_today_date - timedelta(days=29)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "90d":
+            dt = tashkent_today_date - timedelta(days=89)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "custom" and start_date:
+            try:
+                s_parts = [int(p) for p in start_date.split("-")]
+                date_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                if end_date:
+                    e_parts = [int(p) for p in end_date.split("-")]
+                    date_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+            except Exception:
+                pass
+
+        if date_start_utc:
+            base_query = base_query.filter(DubbingJob.created_at >= date_start_utc)
+        if date_end_utc:
+            base_query = base_query.filter(DubbingJob.created_at < date_end_utc)
 
         # Search filter
         if search and search.strip():
@@ -2572,6 +2719,13 @@ def admin_jobs_cost(
                         "paid_at": to_tashkent_iso(p.created_at),
                     }
 
+        # Batch load subscriptions & balances for users on current page
+        user_ids = [u.id for _, u in page_rows if u]
+        user_subs = {
+            s.user_id: s
+            for s in db.query(Subscription).filter(Subscription.user_id.in_(user_ids)).all()
+        } if user_ids else {}
+
         USD_TO_UZS = 12800
 
         # Build job response items
@@ -2592,10 +2746,25 @@ def admin_jobs_cost(
             dur_sec = float(job.video_duration or 0.0)
             dur_min = dur_sec / 60.0
 
-            # STT Cost estimation (Whisper $0.006/min; Gemini $0.002/min)
+            # STT Cost estimation and Groq identification
             stt_model = job.stt_model or "gemini-3.8-flash"
+            gemini_key_used = getattr(job, "gemini_key_used", None) or ""
+            is_groq = "groq" in stt_model.lower() or gemini_key_used.startswith("groq:")
+            if is_groq:
+                stt_display = "Groq Whisper (Turbo)"
+                stt_provider_name = "groq"
+            elif "gemini" in stt_model.lower():
+                stt_display = "Gemini Flash STT"
+                stt_provider_name = "gemini"
+            elif "whisper" in stt_model.lower():
+                stt_display = "OpenAI Whisper"
+                stt_provider_name = "openai"
+            else:
+                stt_display = stt_model
+                stt_provider_name = "other"
+
             if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT):
-                stt_rate = 0.002 if "gemini" in stt_model.lower() else 0.006
+                stt_rate = 0.002 if ("gemini" in stt_model.lower() or is_groq) else 0.006
                 stt_cost_usd = round(dur_min * stt_rate, 4)
             else:
                 stt_cost_usd = 0.0
@@ -2645,6 +2814,12 @@ def admin_jobs_cost(
                     "avg_score": avg_score,
                 }
 
+            # User plan & balance
+            u_sub = user_subs.get(user.id) if user else None
+            plan_name = (u_sub.plan.value if hasattr(u_sub.plan, "value") else str(u_sub.plan)).capitalize() if u_sub else "Bepul"
+            u_bal = get_minute_balance(db, user.id) if user else None
+            bal_minutes = u_bal.get("total_available", 0.0) if u_bal else 0.0
+
             items.append({
                 "id": j_id,
                 "video_title": job.video_title or "Nomsiz video",
@@ -2666,6 +2841,9 @@ def admin_jobs_cost(
                     "voice_name": job.voice_name,
                     "voice_style": job.voice_style,
                     "stt_model": stt_model,
+                    "stt_display": stt_display,
+                    "stt_provider_name": stt_provider_name,
+                    "is_groq": is_groq,
                     "translation_model": llm_model,
                     "gemini_key_tier": getattr(job, "gemini_key_tier", None) or "free",
                     "gemini_key_used": getattr(job, "gemini_key_used", None),
@@ -2697,14 +2875,23 @@ def admin_jobs_cost(
                     "email": user.email if user else None,
                     "phone": user.phone if user else None,
                     "is_internal": bool(getattr(user, "is_internal", False)) if user else False,
+                    "plan": plan_name,
+                    "balance_minutes": bal_minutes,
                 },
                 "error_code": job.error_code,
                 "error_message": job.error_message,
                 "qa_summary": qa_summary,
             })
 
-        # Summary KPIs (fast on DubbingJob table)
-        stat_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select)) if not include_internal else None
+        # Summary KPIs (calculated according to the selected date_range)
+        stat_filter_list = []
+        if not include_internal:
+            stat_filter_list.append(or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select)))
+        if date_start_utc:
+            stat_filter_list.append(DubbingJob.created_at >= date_start_utc)
+        if date_end_utc:
+            stat_filter_list.append(DubbingJob.created_at < date_end_utc)
+        stat_filter = and_(*stat_filter_list) if stat_filter_list else None
 
         q_stat = db.query(DubbingJob.status, func.count(DubbingJob.id))
         if stat_filter is not None:
@@ -2738,6 +2925,7 @@ def admin_jobs_cost(
 
         return {
             "summary": {
+                "date_range": dr,
                 "total_jobs": total_all_jobs,
                 "completed_jobs": completed_all,
                 "failed_jobs": failed_all,

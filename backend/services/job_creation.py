@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
-from backend.models.database import DubbingJob, JobStatus, User, ContentViolation
+from backend.models.database import DubbingJob, JobStatus, User, ContentViolation, VideoAnalysis
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.downloader import get_video_info
 from backend.services.content_safety import check_safety
@@ -434,10 +434,18 @@ async def create_dubbing_job(
                     reused_video_path = str(pv)
                     break
 
+    linked_analysis = None
+    if video_id and user:
+        linked_analysis = db.query(VideoAnalysis).filter(
+            VideoAnalysis.user_id == user.id,
+            VideoAnalysis.youtube_video_id == video_id,
+        ).order_by(VideoAnalysis.created_at.desc()).first()
+
     job_id = str(uuid.uuid4())
     job = DubbingJob(
         id=job_id,
         user_id=user.id,
+        linked_analysis_id=linked_analysis.id if linked_analysis else None,
         youtube_url=youtube_url,
         youtube_video_id=video_id,
         video_title=title,

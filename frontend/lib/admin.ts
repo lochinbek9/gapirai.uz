@@ -128,9 +128,26 @@ export interface AdminUsersResponse {
   users: AdminUserItem[]
 }
 
-export async function apiAdminListUsers(token: string, q?: string, page: number = 1, limit: number = 25): Promise<AdminUsersResponse> {
+export async function apiAdminListUsers(
+  token: string,
+  q?: string,
+  page: number = 1,
+  limit: number = 25,
+  planFilter?: string,
+  balanceFilter?: string,
+  sortBy: string = 'newest',
+  dateRange?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<AdminUsersResponse> {
   const params: Record<string, any> = { page, limit }
   if (q && q.trim()) params.q = q.trim()
+  if (planFilter && planFilter !== 'all') params.plan_filter = planFilter
+  if (balanceFilter && balanceFilter !== 'all') params.balance_filter = balanceFilter
+  if (sortBy) params.sort_by = sortBy
+  if (dateRange && dateRange !== 'all') params.date_range = dateRange
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
   const res = await axios.get(`${API_URL}/admin/users`, {
     headers: { Authorization: `Bearer ${token}` },
     params,
@@ -578,6 +595,9 @@ export interface AdminJobCostItem {
     voice_name: string | null
     voice_style: string | null
     stt_model: string | null
+    stt_display?: string | null
+    stt_provider_name?: string | null
+    is_groq?: boolean
     translation_model: string | null
     gemini_key_tier?: 'paid' | 'free' | null
     gemini_key_used?: string | null
@@ -609,6 +629,8 @@ export interface AdminJobCostItem {
     email: string | null
     phone: string | null
     is_internal: boolean
+    plan?: string
+    balance_minutes?: number
   }
   error_code: string | null
   error_message: string | null
@@ -621,7 +643,7 @@ export interface AdminJobCostItem {
 }
 
 export interface AdminJobsCostResponse {
-  summary: AdminJobCostSummary
+  summary: AdminJobCostSummary & { date_range?: string }
   pagination: {
     page: number
     page_size: number
@@ -639,7 +661,10 @@ export async function apiAdminJobsCost(
   search?: string,
   ttsProvider?: string,
   includeInternal: boolean = false,
-  sortBy: string = 'newest'
+  sortBy: string = 'newest',
+  dateRange: string = 'today',
+  startDate?: string,
+  endDate?: string
 ): Promise<AdminJobsCostResponse> {
   const res = await axios.get(`${API_URL}/admin/jobs-cost`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -651,6 +676,9 @@ export async function apiAdminJobsCost(
       tts_provider: ttsProvider || undefined,
       include_internal: includeInternal,
       sort_by: sortBy,
+      date_range: dateRange,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
     },
   })
   return res.data

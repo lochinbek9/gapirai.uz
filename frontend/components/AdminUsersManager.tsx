@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, Component, ErrorInfo, ReactNode } from 'react'
 import {
   Search,
   Plus,
@@ -16,6 +16,12 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
+  Filter,
+  ArrowUpDown,
+  Info,
+  Clock,
+  AlertTriangle,
+  Package,
 } from 'lucide-react'
 import {
   AdminUserItem,
@@ -23,8 +29,10 @@ import {
   apiAdminAddMinutes,
   apiAdminSetPlan,
 } from '@/lib/admin'
-import { formatTashkentDate } from '@/lib/timestamp'
+import { formatTashkentDate, formatTashkentDateTimeObj } from '@/lib/timestamp'
 import { getToken } from '@/lib/auth'
+import CustomSelect, { SelectOption } from '@/components/CustomSelect'
+import DateRangePills, { DateRangeValue } from '@/components/DateRangePills'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -78,6 +86,14 @@ function AdminUsersManagerInner() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
+  // Filters and Sorting
+  const [planFilter, setPlanFilter] = useState<string>('all')
+  const [balanceFilter, setBalanceFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('newest')
+  const [dateRange, setDateRange] = useState<DateRangeValue>('all')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+
   // Minute Top-up / Deduct modal state
   const [minuteModalUser, setMinuteModalUser] = useState<AdminUserItem | null>(null)
   const [actionType, setActionType] = useState<'add' | 'deduct'>('add')
@@ -92,13 +108,33 @@ function AdminUsersManagerInner() {
   const [planDays, setPlanDays] = useState<number>(30)
   const [resetMonthly, setResetMonthly] = useState<boolean>(true)
 
-  const fetchUsers = useCallback(async (query: string = '', p: number = 1) => {
+  const fetchUsers = useCallback(async (
+    query: string = '',
+    p: number = 1,
+    pFilter: string = planFilter,
+    bFilter: string = balanceFilter,
+    sBy: string = sortBy,
+    dRange: string = dateRange,
+    sDate: string = startDate,
+    eDate: string = endDate,
+  ) => {
     const token = getToken()
     if (!token) return
     setLoading(true)
     setError(null)
     try {
-      const data = await apiAdminListUsers(token, query, p, 20)
+      const data = await apiAdminListUsers(
+        token,
+        query,
+        p,
+        20,
+        pFilter,
+        bFilter,
+        sBy,
+        dRange,
+        sDate,
+        eDate
+      )
       if (data && Array.isArray(data.users)) {
         setUsers(data.users)
         setTotal(data.total || 0)
@@ -112,11 +148,11 @@ function AdminUsersManagerInner() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [planFilter, balanceFilter, sortBy, dateRange, startDate, endDate])
 
   useEffect(() => {
-    fetchUsers(search, page)
-  }, [fetchUsers, page])
+    fetchUsers(search, page, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)
+  }, [fetchUsers, search, page, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -214,10 +250,88 @@ function AdminUsersManagerInner() {
     }
   }
 
-  const safeUsers = Array.isArray(users) ? users : []
+  const safeUsers = useMemo(() => (Array.isArray(users) ? users : []), [users])
+
+  const planOptions: SelectOption[] = [
+    { value: 'all', label: 'Barcha tariflar' },
+    { value: 'free', label: 'Bepul (Free)', icon: <Sparkles className="w-3.5 h-3.5 text-gray-400" /> },
+    { value: 'paid', label: 'Pullik (Standart + Pro)', icon: <Crown className="w-3.5 h-3.5 text-amber-400" /> },
+    { value: 'standard', label: 'Standart tarif', icon: <Zap className="w-3.5 h-3.5 text-blue-400" /> },
+    { value: 'pro', label: 'Pro tarif', icon: <Crown className="w-3.5 h-3.5 text-amber-400" /> },
+    { value: 'has_package', label: 'Paket xarid qilganlar', icon: <Package className="w-3.5 h-3.5 text-emerald-400" /> },
+  ]
+
+  const balanceOptions: SelectOption[] = [
+    { value: 'all', label: 'Barcha balanslar' },
+    { value: 'has_balance', label: 'Balansi bor (>0 daq)' },
+    { value: 'no_balance', label: 'Balansi tugagan (0 daq)' },
+    { value: 'has_purchased', label: 'Kuymas paketi bor' },
+    { value: 'no_purchased', label: 'Kuymas paketi yo\'q' },
+  ]
+
+  const sortOptions: SelectOption[] = [
+    { value: 'newest', label: 'Eng yangi qo\'shilganlar' },
+    { value: 'oldest', label: 'Eng eski qo\'shilganlar' },
+    { value: 'balance_desc', label: 'Eng ko\'p balans bo\'yicha' },
+    { value: 'balance_asc', label: 'Eng kam balans bo\'yicha' },
+    { value: 'purchased_desc', label: 'Kuymas daqiqa bo\'yicha' },
+    { value: 'alphabetical', label: 'Alifbo bo\'yicha (A-Z)' },
+  ]
+
+  const insights = useMemo(() => {
+    const list: { type: 'warning' | 'caution' | 'success' | 'info'; title: string; description: string }[] = []
+    if (safeUsers.length === 0) return list
+
+    const freeCount = safeUsers.filter((u) => (u.plan || 'free').toLowerCase() === 'free').length
+    const paidCount = safeUsers.filter((u) => ['standard', 'pro'].includes((u.plan || '').toLowerCase())).length
+    const zeroBalCount = safeUsers.filter((u) => (u.balance?.total_available ?? 0) <= 0).length
+    const hasPurchasedCount = safeUsers.filter((u) => (u.balance?.purchased ?? 0) > 0).length
+    const unverifiedCount = safeUsers.filter((u) => !u.is_verified).length
+
+    if (zeroBalCount > 0) {
+      list.push({
+        type: 'warning',
+        title: `${zeroBalCount} ta foydalanuvchida daqiqa tugagan`,
+        description: `Ko'rsatilgan ro'yxatdagi foydalanuvchilarning balansi 0 daqiqa bo'lib qolgan. Ularga daqiqa paketlari (Starter 15 daqiqa) taklifini ko'rsatish konversiyani oshiradi.`,
+      })
+    }
+
+    if (paidCount > 0) {
+      list.push({
+        type: 'success',
+        title: `${paidCount} ta faol pullik mijoz (Standart/Pro)`,
+        description: `Platformaga to'lov qilayotgan obunachilar. Ularning limitsiz tahlil va tezkor audio generatsiyadan foydalanishini nazorat qilib boring.`,
+      })
+    } else if (freeCount > 0 && total > 0) {
+      list.push({
+        type: 'info',
+        title: `Obunalarga konversiya kutilmoqda`,
+        description: `Ko'rsatilgan foydalanuvchilar bepul sinov tarifida. Qulay paketlar va aksiyalar ularning faolligini oshiradi.`,
+      })
+    }
+
+    if (hasPurchasedCount > 0) {
+      list.push({
+        type: 'info',
+        title: `${hasPurchasedCount} ta foydalanuvchida kuymas daqiqalar mavjud`,
+        description: `Ushbu daqiqalar bir martalik xarid qilingan bo'lib, oylik muddatga bog'liq emas va hech qachon kuymaydi.`,
+      })
+    }
+
+    if (unverifiedCount > 0) {
+      list.push({
+        type: 'caution',
+        title: `${unverifiedCount} ta tasdiqlanmagan profil`,
+        description: `Ushbu akkauntlar ro'yxatdan o'tgan, biroq email manzilini hali tasdiqlamagan.`,
+      })
+    }
+
+    return list
+  }, [safeUsers, total])
 
   return (
     <section className="space-y-4">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-extrabold text-white tracking-wide flex items-center gap-2">
@@ -229,45 +343,103 @@ function AdminUsersManagerInner() {
           </p>
         </div>
 
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Email, ism yoki telefon..."
-              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 w-52 sm:w-64 transition"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('')
-                  fetchUsers('', 1)
+        {/* Date Range Pills & Refresh */}
+        <DateRangePills
+          value={dateRange}
+          onChange={(newRange, start, end) => {
+            setDateRange(newRange)
+            if (start) setStartDate(start)
+            if (end) setEndDate(end)
+            setPage(1)
+          }}
+          onRefresh={() => fetchUsers(search, page, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)}
+          loading={loading}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      </div>
+
+      {/* Filter and Search Bar with CustomSelect (No native white select glare!) */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Search Input */}
+          <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Email, ism yoki telefon..."
+                className="w-full bg-black/20 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('')
+                    setPage(1)
+                    fetchUsers('', 1, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shrink-0"
+            >
+              Qidirish
+            </button>
+          </form>
+
+          {/* Filters Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Tarif / Paket Filter */}
+            <div className="w-44 sm:w-48">
+              <CustomSelect
+                value={planFilter}
+                onChange={(val) => {
+                  setPlanFilter(val)
+                  setPage(1)
                 }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+                options={planOptions}
+                icon={<Filter className="w-3.5 h-3.5 text-blue-400" />}
+                placeholder="Tarif bo'yicha"
+              />
+            </div>
+
+            {/* Balans Filter */}
+            <div className="w-44 sm:w-48">
+              <CustomSelect
+                value={balanceFilter}
+                onChange={(val) => {
+                  setBalanceFilter(val)
+                  setPage(1)
+                }}
+                options={balanceOptions}
+                icon={<Coins className="w-3.5 h-3.5 text-amber-400" />}
+                placeholder="Balans bo'yicha"
+              />
+            </div>
+
+            {/* Sort Filter */}
+            <div className="w-48 sm:w-52">
+              <CustomSelect
+                value={sortBy}
+                onChange={(val) => {
+                  setSortBy(val)
+                  setPage(1)
+                }}
+                options={sortOptions}
+                icon={<ArrowUpDown className="w-3.5 h-3.5 text-purple-400" />}
+                placeholder="Tartiblash"
+              />
+            </div>
           </div>
-          <button
-            type="submit"
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition"
-          >
-            Qidirish
-          </button>
-          <button
-            type="button"
-            onClick={() => fetchUsers(search, page)}
-            disabled={loading}
-            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 transition disabled:opacity-50"
-            title="Yangilash"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </form>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -284,12 +456,48 @@ function AdminUsersManagerInner() {
         </div>
       )}
 
+      {/* Tizimning Avtomatik Xulosalari va Tavsiyalari (User Insights) */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Info className="w-4 h-4 text-blue-400" />
+            Tizimning Avtomatik Xulosalari va Tavsiyalari
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {insights.map((ins, i) => (
+              <div
+                key={i}
+                className={`p-3.5 rounded-xl border text-xs space-y-1 ${
+                  ins.type === 'warning'
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                    : ins.type === 'caution'
+                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                    : ins.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                }`}
+              >
+                <div className="font-bold flex items-center gap-1.5">
+                  {ins.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                  {ins.type === 'caution' && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
+                  {ins.type === 'success' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                  {ins.type === 'info' && <Info className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                  <span>{ins.title}</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed">{ins.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
+        <table className="w-full text-sm min-w-[880px]">
           <thead>
             <tr className="border-b border-white/10 text-left">
               <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
+              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Qo'shilgan vaqti</th>
               <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Tarif</th>
               <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Daqiqa Balansi</th>
               <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Amal qilish muddati</th>
@@ -299,14 +507,14 @@ function AdminUsersManagerInner() {
           <tbody>
             {loading && safeUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-400">
+                <td colSpan={6} className="py-12 text-center text-gray-400">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-400 mb-2" />
                   Yuklanmoqda...
                 </td>
               </tr>
             ) : safeUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-400">
+                <td colSpan={6} className="py-8 text-center text-gray-400">
                   Foydalanuvchi topilmadi
                 </td>
               </tr>
@@ -316,6 +524,7 @@ function AdminUsersManagerInner() {
                 const displayTitle = u.email || u.phone || u.name || 'Foydalanuvchi'
                 const initial = (displayTitle || 'U')[0].toUpperCase()
                 const bal = u.balance || { total_available: 0, monthly_remaining: 0, monthly_cap: 5, purchased: 0 }
+                const createdDt = formatTashkentDateTimeObj(u.created_at)
 
                 return (
                   <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition">
@@ -339,6 +548,17 @@ function AdminUsersManagerInner() {
                             </div>
                           )}
                         </div>
+                      </div>
+                    </td>
+
+                    {/* Platformaga qo'shilganlik vaqti */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-200 font-medium flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span>{createdDt.date}</span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono mt-0.5 pl-5">
+                        {createdDt.time || '—'}
                       </div>
                     </td>
 

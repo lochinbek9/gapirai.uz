@@ -36,6 +36,8 @@ import {
   AdminJobCostItem,
 } from '@/lib/admin'
 import { formatTashkentDateTimeObj, getTashkentRelativeTime } from '@/lib/timestamp'
+import CustomSelect from '@/components/CustomSelect'
+import DateRangePills, { DateRangeValue } from '@/components/DateRangePills'
 
 interface AdminJobsCostManagerProps {
   token: string
@@ -55,6 +57,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [ttsProviderFilter, setTtsProviderFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<string>('newest')
   const [includeInternal, setIncludeInternal] = useState(false)
+  const [dateRange, setDateRange] = useState<DateRangeValue>('today')
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
 
   // Detail Modal State
   const [selectedJob, setSelectedJob] = useState<AdminJobCostItem | null>(null)
@@ -102,7 +107,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         debouncedSearch || undefined,
         ttsProviderFilter === 'ALL' ? undefined : ttsProviderFilter,
         includeInternal,
-        sortBy
+        sortBy,
+        dateRange,
+        customStartDate || undefined,
+        customEndDate || undefined
       )
       setData(res)
     } catch (err: any) {
@@ -110,11 +118,18 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
     } finally {
       setLoading(false)
     }
-  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, includeInternal, sortBy])
+  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, includeInternal, sortBy, dateRange, customStartDate, customEndDate])
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const handleDateRangeChange = (newRange: DateRangeValue, start?: string, end?: string) => {
+    setDateRange(newRange)
+    if (start) setCustomStartDate(start)
+    if (end) setCustomEndDate(end)
+    setPage(1)
+  }
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
@@ -252,15 +267,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               <span>Dasturchi / Test hisoblarni ham ko‘rsatish</span>
             </label>
 
-            {/* Refresh button */}
-            <button
-              onClick={() => loadData()}
-              disabled={loading}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-lg shadow-blue-500/20"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Yangilash</span>
-            </button>
+            {/* Date Range Pills & Refresh */}
+            <DateRangePills
+              value={dateRange}
+              onChange={handleDateRangeChange}
+              onRefresh={() => loadData()}
+              loading={loading}
+              startDate={customStartDate}
+              endDate={customEndDate}
+            />
           </div>
         </div>
 
@@ -389,38 +404,40 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               )}
             </div>
 
-            {/* Provider Filter */}
-            <select
+            {/* Custom Provider Filter Dropdown */}
+            <CustomSelect
               value={ttsProviderFilter}
-              onChange={(e) => {
-                setTtsProviderFilter(e.target.value)
+              onChange={(val) => {
+                setTtsProviderFilter(val)
                 setPage(1)
               }}
-              className="bg-black/30 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="ALL">Barcha TTS</option>
-              <option value="azure">Azure</option>
-              <option value="edge">Edge (Bepul)</option>
-              <option value="gemini">Gemini</option>
-              <option value="uzbekvoice">UzbekVoice</option>
-              <option value="openai">OpenAI</option>
-              <option value="elevenlabs">ElevenLabs</option>
-            </select>
+              options={[
+                { value: 'ALL', label: 'Barcha TTS' },
+                { value: 'azure', label: 'Azure' },
+                { value: 'edge', label: 'Edge (Bepul)' },
+                { value: 'gemini', label: 'Gemini' },
+                { value: 'uzbekvoice', label: 'UzbekVoice' },
+                { value: 'openai', label: 'OpenAI' },
+                { value: 'elevenlabs', label: 'ElevenLabs' },
+              ]}
+              className="min-w-[130px]"
+            />
 
-            {/* Sort Filter */}
-            <select
+            {/* Custom Sort Filter Dropdown */}
+            <CustomSelect
               value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value)
+              onChange={(val) => {
+                setSortBy(val)
                 setPage(1)
               }}
-              className="bg-black/30 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-blue-500"
-            >
-              <option value="newest">Eng yangi</option>
-              <option value="oldest">Eng eski</option>
-              <option value="duration_desc">Eng uzun video (yuqori xarajat)</option>
-              <option value="duration_asc">Eng qisqa video</option>
-            </select>
+              options={[
+                { value: 'newest', label: 'Eng yangi' },
+                { value: 'oldest', label: 'Eng eski' },
+                { value: 'duration_desc', label: 'Eng uzun video (yuqori xarajat)' },
+                { value: 'duration_asc', label: 'Eng qisqa video' },
+              ]}
+              className="min-w-[150px]"
+            />
           </div>
         </div>
       </div>
@@ -460,6 +477,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               <tr className="border-b border-white/10 bg-white/[0.02] text-gray-400 text-[11px] font-semibold tracking-wider uppercase">
                 <th className="py-3 px-4">Video & ID</th>
                 <th className="py-3 px-4">Foydalanuvchi</th>
+                <th className="py-3 px-4 whitespace-nowrap">Tarif & Balans</th>
                 <th className="py-3 px-4 whitespace-nowrap">Uringan vaqti</th>
                 <th className="py-3 px-4">Status & Bosqich</th>
                 <th className="py-3 px-4">Modellar</th>
@@ -470,20 +488,28 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
             <tbody className="divide-y divide-white/5">
               {loading && jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-500">
+                  <td colSpan={8} className="py-12 text-center text-gray-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-400" />
                     <span>Yuklanmoqda...</span>
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-500">
+                  <td colSpan={8} className="py-12 text-center text-gray-500">
                     Hech qanday dublyaj jobi topilmadi.
                   </td>
                 </tr>
               ) : (
                 jobs.map((job) => {
                   const statusInfo = getStatusBadge(job.status)
+                  const isUpload = Boolean(
+                    job.youtube_url?.startsWith('upload://') ||
+                    job.youtube_video_id?.startsWith('upload_') ||
+                    job.video_title?.includes('.mp4') ||
+                    job.video_title?.includes('.m4a')
+                  )
+                  const jobLink = job.subtitle_only ? `/subtitles/${job.id}` : `/video/${job.id}`
+
                   return (
                     <tr
                       key={job.id}
@@ -519,7 +545,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             >
                               {job.video_title}
                             </p>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
                               {/* UUID button */}
                               <button
                                 onClick={() => copyToClipboard(job.id, job.id)}
@@ -534,22 +560,46 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                 <span>{job.id.substring(0, 8)}...</span>
                               </button>
 
+                              {/* Clickable link to video page */}
+                              <a
+                                href={jobLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded font-semibold transition"
+                                title="Dublyaj sahifasini ochish"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                                <span>{isUpload ? 'Fayl' : 'Ochish'}</span>
+                              </a>
+
                               {/* YouTube link */}
-                              {job.youtube_url && (
+                              {job.youtube_url && !isUpload && (
                                 <a
                                   href={job.youtube_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-[10px] text-gray-500 hover:text-red-400 flex items-center gap-0.5 transition"
                                 >
-                                  <ExternalLink className="w-2.5 h-2.5" />
                                   <span>YT</span>
+                                </a>
+                              )}
+
+                              {/* Direct MP4 for uploaded file */}
+                              {isUpload && (
+                                <a
+                                  href={`/outputs/${job.id}/video/dubbed_final.mp4`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono transition"
+                                  title="To'g'ridan-to'g'ri MP4 faylni ochish"
+                                >
+                                  <span>MP4</span>
                                 </a>
                               )}
 
                               {job.subtitle_only && (
                                 <span className="text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1 rounded">
-                                  Faqat subtitr
+                                  Subtitr
                                 </span>
                               )}
                             </div>
@@ -571,6 +621,34 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               Dasturchi / Test
                             </span>
                           )}
+                        </div>
+                      </td>
+
+                      {/* Tarif & Balans */}
+                      <td className="py-3.5 px-4 min-w-[125px] whitespace-nowrap">
+                        <div className="space-y-1">
+                          <div>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                job.user.plan?.toLowerCase() === 'pro'
+                                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                                  : job.user.plan?.toLowerCase() === 'standard' || job.user.plan?.toLowerCase() === 'standart'
+                                  ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                                  : 'bg-white/5 text-gray-400 border-white/10'
+                              }`}
+                            >
+                              {job.user.plan || 'Bepul'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-300 flex items-center gap-1">
+                            <span className="text-gray-500">Balans:</span>
+                            <span className="font-semibold text-emerald-400">
+                              {typeof job.user.balance_minutes === 'number'
+                                ? job.user.balance_minutes.toFixed(1)
+                                : '—'}
+                            </span>
+                            <span className="text-[10px] text-gray-500">daq</span>
+                          </div>
                         </div>
                       </td>
 
@@ -638,17 +716,23 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                            <span>STT:</span>
-                            <span className="text-gray-300 font-mono text-[9px]">
-                              {job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1'}
-                            </span>
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <span className="text-gray-500">STT:</span>
+                            {job.models.is_groq ? (
+                              <span className="text-amber-300 font-mono text-[9px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold">
+                                ⚡ Groq Whisper (Turbo)
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 font-mono text-[9px]">
+                                {job.models.stt_display || job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1'}
+                              </span>
+                            )}
                           </div>
                           <div className="pt-0.5">
                             {job.models.gemini_key_tier === 'paid' ? (
                               <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Pullik kalit'}>
                                 <span>💎</span>
-                                <span>Pullik kalit</span>
+                                <span>{job.models.is_groq ? '⚡ Groq LPU' : 'Pullik kalit'}</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20" title={job.models.gemini_key_used ? `Kalit: ${job.models.gemini_key_used}` : 'Bepul kalit hovuzi'}>

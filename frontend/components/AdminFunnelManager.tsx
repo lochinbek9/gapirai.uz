@@ -198,7 +198,8 @@ export default function AdminFunnelManager({ token }: { token: string }) {
           <div className="space-y-3 pt-2">
             {data.stages.map((stage: FunnelStageItem, index: number) => {
               const IconComp = STAGE_ICONS[stage.icon] || Users
-              const widthPct = Math.max(stage.pct_of_top, 4)
+              // Agar 0 bo'lsa bo'yalmasligi kerak (0% bo'sh qoladi)
+              const widthPct = stage.pct_of_top > 0 ? Math.max(stage.pct_of_top, 1.5) : 0
 
               return (
                 <div key={stage.key} className="space-y-1.5">
@@ -218,26 +219,37 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                     </div>
                   </div>
 
-                  {/* Bar */}
-                  <div className="h-4 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-500 transition-all duration-700 shadow-sm"
-                      style={{ width: `${widthPct}%` }}
-                    />
+                  {/* Bar: 0% bo'lsa bo'yalmaydi */}
+                  <div className="h-3.5 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                    {widthPct > 0 ? (
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-500 transition-all duration-700 shadow-sm"
+                        style={{ width: `${widthPct}%` }}
+                      />
+                    ) : (
+                      <div className="h-full w-0" />
+                    )}
                   </div>
 
-                  {/* Drop-off & Conversion Badge between steps */}
+                  {/* Connector between steps: markazlashtirilgan chiroyli ko'rsatkich, sonlarning tepasida turib xalaqit bermaydi */}
                   {index < data.stages.length - 1 && (
-                    <div className="flex items-center justify-between px-3 py-1 text-[11px] text-slate-400">
-                      <div className="flex items-center gap-1.5 text-emerald-400">
-                        <ArrowRight className="w-3 h-3" />
-                        <span>Keyingi bosqichga o'tish: <strong>{data.stages[index + 1].conversion_from_prev}%</strong></span>
+                    <div className="flex items-center justify-center gap-2.5 py-1 text-[11px]">
+                      <div className="h-px bg-white/5 flex-1" />
+                      <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 px-3 py-0.5 rounded-full font-mono text-[10px]">
+                        <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                          <ArrowRight className="w-2.5 h-2.5" />
+                          {data.stages[index + 1].conversion_from_prev}% o'tish
+                        </span>
+                        {data.stages[index + 1].drop_pct > 0 && (
+                          <>
+                            <span className="text-gray-600">•</span>
+                            <span className="text-rose-400 font-semibold">
+                              -{data.stages[index + 1].drop_pct}% uzilish
+                            </span>
+                          </>
+                        )}
                       </div>
-                      {data.stages[index + 1].drop_pct > 0 && (
-                        <div className="flex items-center gap-1 text-rose-400">
-                          <span>Yo'qotish (Drop-off): <strong>-{data.stages[index + 1].drop_pct}%</strong></span>
-                        </div>
-                      )}
+                      <div className="h-px bg-white/5 flex-1" />
                     </div>
                   )}
                 </div>

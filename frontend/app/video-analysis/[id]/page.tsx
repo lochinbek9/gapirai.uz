@@ -32,6 +32,7 @@ import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
 import NotesTab from "@/components/analysis/NotesTab";
 import QuizTab from "@/components/analysis/QuizTab";
 import QATab from "@/components/analysis/QATab";
+import ConfirmModal from "@/components/ConfirmModal";
 import { formatTs } from "@/lib/timestamp";
 import { extractYouTubeId } from "@/lib/youtube";
 
@@ -134,6 +135,7 @@ export default function VideoAnalysisPage() {
   }, [analysis?.status, id]);
 
   const [toast, setToast] = useState<{ type: "error" | "success"; message: string } | null>(null);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
 
   const showToast = (message: string, type: "error" | "success" = "error") => {
     setToast({ type, message });
@@ -153,13 +155,17 @@ export default function VideoAnalysisPage() {
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!id || cancelling) return;
-    if (!confirm("Video tahlilini to'xtatish va bekor qilishni tasdiqlaysizmi?")) return;
+    setConfirmCancelOpen(true);
+  };
+
+  const executeCancel = async () => {
     setCancelling(true);
     try {
       await cancelAnalysis(id);
       showToast("Video tahlili muvaffaqiyatli bekor qilindi.", "success");
+      setConfirmCancelOpen(false);
       await refetch();
     } catch (e: any) {
       showToast(e?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.");
@@ -345,20 +351,34 @@ export default function VideoAnalysisPage() {
   return (
     <div className="min-h-screen bg-slate-900">
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={() => { clearAnalysisId(); router.push("/"); }}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
-            aria-label="Orqaga qaytish"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
-            <span className="text-lg font-black tracking-tight text-white">
-              GapirAI<span className="text-violet-500">.uz</span>
-            </span>
-          </Link>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => { clearAnalysisId(); router.push("/"); }}
+              className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
+              aria-label="Orqaga qaytish"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
+              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
+              <span className="text-lg font-black tracking-tight text-white">
+                GapirAI<span className="text-violet-500">.uz</span>
+              </span>
+            </Link>
+          </div>
+
+          {analysis.linked_job_id && (
+            <Link
+              href={`/video/${analysis.linked_job_id}`}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/25 transition active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">Dublyaj sahifasiga o'tish</span>
+              <span className="sm:hidden">Dublyaj</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
       </header>
 
@@ -791,11 +811,11 @@ export default function VideoAnalysisPage() {
                     </div>
 
                     <Link
-                      href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                      href={analysis.linked_job_id ? `/video/${analysis.linked_job_id}` : `/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
                       className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
                     >
                       <Sparkles size={16} />
-                      <span>O&apos;zbekcha dublyaj qilish</span>
+                      <span>{analysis.linked_job_id ? "Tayyor dublyajni ochish" : "O'zbekcha dublyaj qilish"}</span>
                       <ArrowRight size={14} />
                     </Link>
                   </div>
@@ -839,21 +859,34 @@ export default function VideoAnalysisPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
-                    <Link
-                      href={`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(neededMinutes)}&duration=${encodeURIComponent(videoMinutes)}`}
-                      className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
-                    >
-                      <CreditCard size={15} />
-                      <span>Paket yoki tarif olish</span>
-                    </Link>
-                    <Link
-                      href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
-                      className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-white/10"
-                    >
-                      <Sparkles size={14} className="text-amber-400" />
-                      <span>2 daqiqa bepul sinash</span>
-                      <ArrowRight size={13} />
-                    </Link>
+                    {analysis.linked_job_id ? (
+                      <Link
+                        href={`/video/${analysis.linked_job_id}`}
+                        className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Sparkles size={15} />
+                        <span>Dublyaj sahifasiga o'tish</span>
+                        <ArrowRight size={13} />
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          href={`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(neededMinutes)}&duration=${encodeURIComponent(videoMinutes)}`}
+                          className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                        >
+                          <CreditCard size={15} />
+                          <span>Paket yoki tarif olish</span>
+                        </Link>
+                        <Link
+                          href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                          className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-white/10"
+                        >
+                          <Sparkles size={14} className="text-amber-400" />
+                          <span>2 daqiqa bepul sinash</span>
+                          <ArrowRight size={13} />
+                        </Link>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -1048,6 +1081,19 @@ export default function VideoAnalysisPage() {
           </>
         )}
       </div>
+
+      {/* Modern Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmCancelOpen}
+        onClose={() => setConfirmCancelOpen(false)}
+        onConfirm={executeCancel}
+        loading={cancelling}
+        title="Video tahlilini bekor qilish"
+        message="Haqiqatan ham ushbu video tahlilini to'xtatib bekor qilmoqchimisiz?"
+        confirmText="Ha, bekor qilinsin"
+        cancelText="Ortga"
+        danger
+      />
     </div>
   );
 }

@@ -70,14 +70,14 @@ interface Props {
 export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
   return (
     <div className="pt-2 pb-1 space-y-2.5">
-      <div className="flex items-center justify-between ml-1">
+      <div className="flex flex-wrap items-center justify-between gap-1 ml-1">
         <div className="flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Tayyor namunaviy videolar
           </span>
         </div>
-        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium hidden sm:inline">
           Havola izlamasdan 1 klikda sinab ko'ring
         </span>
       </div>
