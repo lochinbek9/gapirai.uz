@@ -347,6 +347,14 @@ def synthesize_segments(
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         engine = "unknown"
+        def _call_synth() -> str:
+            try:
+                return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
+            except TypeError as te:
+                if "is_paid" in str(te):
+                    return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                raise
+
         # Checkpoint reuse: agar ushbu segment audio fayli diskda allaqachon mavjud va yaroqli bo'lsa,
         # API'ga qayta so'rov yuborilmaydi (qimmatli kvotani tejaydi va tez tugatadi):
         if seg_file.exists() and seg_file.stat().st_size > 500 and _validate_wav_file(str(seg_file))[0]:
@@ -356,7 +364,7 @@ def synthesize_segments(
             engine = get_provider(provider_name).name
         else:
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
+                engine = _call_synth()
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: dastlabki sintezda xatolik: {exc}")
                 engine = get_provider(provider_name).name
@@ -373,7 +381,7 @@ def synthesize_segments(
                 f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
             )
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
+                engine = _call_synth()
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))
