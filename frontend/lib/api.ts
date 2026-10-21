@@ -65,6 +65,14 @@ export interface Job {
   translation_model?: string | null
   tts_model?: string | null
   is_preview?: boolean
+  costs?: {
+    stt_cost_usd: number
+    llm_cost_usd: number
+    tts_cost_usd: number
+    total_cost_usd: number
+    total_cost_uzs: number
+    cost_per_minute_uzs: number
+  }
 }
 
 export type JobStatus =

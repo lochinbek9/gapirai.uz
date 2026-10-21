@@ -1289,12 +1289,12 @@ export default function VideoPage() {
                   <InfoRow label="Subtitr" value="✅ Mavjud (To'liq matn pastda)" />
                 )}
 
-                {/* Admin-only AI models breakdown */}
+                {/* Admin-only AI models breakdown & Real Costs */}
                 {isAdmin && (
                   <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-5 -mb-5 p-4 rounded-b-[24px] space-y-2.5">
                     <div className="flex items-center justify-between text-xs font-bold text-amber-500 uppercase tracking-wider">
                       <span className="flex items-center gap-1.5">
-                        <span>🛠</span> AI Modellar (Admin)
+                        <span>🛠</span> AI Modellar & Real Xarajat (Admin)
                       </span>
                       <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-300 font-mono font-bold">
                         ADMIN
@@ -1315,6 +1315,63 @@ export default function VideoPage() {
                           : '— (eski job)'))
                       }
                     />
+
+                    {/* Real Xarajat (Tannarx) */}
+                    {(() => {
+                      const durSec = job.video_duration || 0
+                      const durMin = durSec / 60
+                      const chars = job.translated_text ? job.translated_text.length : Math.round(durMin * 1000)
+                      const sttUsd = job.costs?.stt_cost_usd ?? 0.0
+                      const llmUsd = job.costs?.llm_cost_usd ?? (durSec > 0 ? Number(((chars / 1000) * 0.0005).toFixed(4)) : 0)
+                      const ttsProv = (job.tts_provider || 'gemini').toLowerCase()
+                      const ttsUsd = job.costs?.tts_cost_usd ?? (
+                        ttsProv === 'gemini'
+                          ? Number(((chars / 1000) * 0.017).toFixed(4))
+                          : ttsProv === 'azure'
+                          ? Number(((chars / 1000) * 0.016).toFixed(4))
+                          : 0.0
+                      )
+                      const totalUsd = job.costs?.total_cost_usd ?? Number((sttUsd + llmUsd + ttsUsd).toFixed(4))
+                      const totalUzs = job.costs?.total_cost_uzs ?? Math.round(totalUsd * 12850)
+                      const perMinUzs = durMin > 0 ? Math.round(totalUzs / durMin) : 0
+
+                      return (
+                        <div className="pt-2.5 mt-2.5 border-t border-amber-500/20 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold text-amber-500">
+                            <span className="flex items-center gap-1">
+                              <span>💰</span> Real Tannarx (Jami):
+                            </span>
+                            <span className="font-mono text-amber-400">
+                              ~{totalUzs.toLocaleString()} UZS (~${totalUsd.toFixed(4)})
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-400 dark:text-gray-300 space-y-1 pl-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">STT (Nutq):</span>
+                              <span className={sttUsd === 0 ? "text-emerald-400 font-semibold" : "text-gray-200"}>
+                                {sttUsd === 0 ? "$0.0000 (Bepul)" : `$${sttUsd.toFixed(4)}`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">Tarjima (LLM):</span>
+                              <span className="text-gray-200">${llmUsd.toFixed(4)} (~{Math.round(llmUsd * 12850)} UZS)</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">TTS (Ovoz):</span>
+                              <span className={ttsUsd === 0 ? "text-emerald-400" : "text-amber-300 font-semibold"}>
+                                {ttsUsd === 0 ? "$0.0000 (Edge Bepul)" : `$${ttsUsd.toFixed(4)} (~${Math.round(ttsUsd * 12850)} UZS)`}
+                              </span>
+                            </div>
+                            {durMin > 0 && (
+                              <div className="flex justify-between items-center text-[10px] text-amber-500/90 pt-1 border-t border-amber-500/10">
+                                <span>1 daqiqa tannarxi:</span>
+                                <span className="font-semibold font-mono">~{perMinUzs.toLocaleString()} UZS/daq</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

@@ -2823,8 +2823,11 @@ def admin_jobs_cost(
                 stt_display = stt_model
                 stt_provider_name = "other"
 
-            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT):
-                stt_rate = 0.002 if ("gemini" in stt_model.lower() or is_groq) else 0.006
+            # STT Cost estimation:
+            # Foydalanuvchi talabi: STT to'liq bepul, faqat pullik Gemini STT ishlatilgandagina xarajat chiqadi, aks holda $0!
+            is_paid_gemini_stt = getattr(job, "gemini_key_tier", None) == "paid" and "gemini" in stt_model.lower() and not is_groq
+            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT) and is_paid_gemini_stt:
+                stt_rate = 0.002
                 stt_cost_usd = round(dur_min * stt_rate, 4)
             else:
                 stt_cost_usd = 0.0
@@ -2832,17 +2835,39 @@ def admin_jobs_cost(
             # LLM Translation Cost estimation (~$0.0005 per 1k characters)
             llm_model = job.translation_model or "gemini-1.5-flash"
             llm_cost_usd = 0.0
+            chars = 0
             if job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
                 if job.translated_text:
                     chars = len(job.translated_text)
                     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
                 elif dur_sec > 0:
-                    chars = int(dur_min * 1200)
+                    chars = int(dur_min * 1000)
                     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
 
-            tts_usd = round(tts_info["cost_usd"], 4)
-            tts_uzs = round(tts_info["cost_uzs"])
-            total_usd = round(tts_usd + (tts_uzs / USD_TO_UZS) + stt_cost_usd + llm_cost_usd, 4)
+            # TTS Cost estimation:
+            # Foydalanuvchi talabi: "tts da gemini pullik narxini doim chiqaraver!"
+            tts_usd = round(tts_info.get("cost_usd", 0.0), 4)
+            tts_uzs = round(tts_info.get("cost_uzs", 0.0))
+            tts_prov = (job.tts_provider or "gemini").lower()
+
+            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
+                est_chars = chars if chars > 0 else int(dur_min * 1000)
+                if tts_prov == "gemini":
+                    # Gemini TTS: 1,000 belgiga $0.017 USD pullik narxi doim ko'rsatiladi
+                    calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
+                    tts_usd = max(tts_usd, calculated_gemini_tts)
+                    tts_uzs = int(round(tts_usd * USD_TO_UZS))
+                elif tts_prov == "azure":
+                    # Azure Neural TTS: 1,000 belgiga $0.016 USD
+                    calculated_azure_tts = round((est_chars / 1000.0) * 0.016, 4)
+                    tts_usd = max(tts_usd, calculated_azure_tts)
+                    tts_uzs = int(round(tts_usd * USD_TO_UZS))
+                elif tts_prov == "edge":
+                    # Edge 100% bepul
+                    tts_usd = 0.0
+                    tts_uzs = 0
+
+            total_usd = round(tts_usd + stt_cost_usd + llm_cost_usd, 4)
             total_uzs = int(round(total_usd * USD_TO_UZS))
 
             cost_per_min_uzs = int(round(total_uzs / dur_min)) if dur_min > 0 else 0
@@ -2897,7 +2922,7 @@ def admin_jobs_cost(
                 "subtitle_only": bool(job.subtitle_only),
                 "source_language": job.source_language,
                 "models": {
-                    "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "edge"),
+                    "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "gemini"),
                     "voice_name": job.voice_name,
                     "voice_style": job.voice_style,
                     "stt_model": stt_model,

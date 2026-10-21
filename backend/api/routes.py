@@ -119,6 +119,7 @@ class JobResponse(BaseModel):
     queue_eta_minutes: Optional[int] = None
     is_preview: bool = False
     audio_mix_mode: Optional[str] = None
+    costs: Optional[Dict[str, Any]] = None
 
 
 def _normalize_audio_mix_mode(mode: str | None) -> str:
@@ -189,6 +190,41 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         except Exception:
             channel_name = None
 
+    # Real Xarajat (Tannarx) hisoblash (Admin va xarajat monitoringi uchun)
+    dur_sec = float(job.video_duration or 0.0)
+    dur_min = dur_sec / 60.0
+    stt_model_val = getattr(job, "stt_model", None) or ""
+    gem_tier = getattr(job, "gemini_key_tier", None)
+    is_groq = "groq" in stt_model_val.lower() or (getattr(job, "gemini_key_used", None) or "").startswith("groq:")
+    if gem_tier == "paid" and "gemini" in stt_model_val.lower() and not is_groq and dur_sec > 0:
+        stt_cost_usd = round(dur_min * 0.002, 4)
+    else:
+        stt_cost_usd = 0.0
+
+    chars = len(job.translated_text) if getattr(job, "translated_text", None) else int(dur_min * 1000)
+    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if dur_sec > 0 else 0.0
+
+    tts_prov_val = (getattr(job, "tts_provider", None) or "gemini").lower()
+    if tts_prov_val == "gemini":
+        tts_cost_usd = round((chars / 1000.0) * 0.017, 4) if dur_sec > 0 else 0.0
+    elif tts_prov_val == "azure":
+        tts_cost_usd = round((chars / 1000.0) * 0.016, 4) if dur_sec > 0 else 0.0
+    else:
+        tts_cost_usd = 0.0
+
+    total_cost_usd = round(stt_cost_usd + llm_cost_usd + tts_cost_usd, 4)
+    total_cost_uzs = int(round(total_cost_usd * 12850))
+    cost_per_minute_uzs = int(round(total_cost_uzs / dur_min)) if dur_min > 0 else 0
+
+    costs = {
+        "stt_cost_usd": stt_cost_usd,
+        "llm_cost_usd": llm_cost_usd,
+        "tts_cost_usd": tts_cost_usd,
+        "total_cost_usd": total_cost_usd,
+        "total_cost_uzs": total_cost_uzs,
+        "cost_per_minute_uzs": cost_per_minute_uzs,
+    }
+
     return JobResponse(
         job_id=str(job.id),
         status=status_str,
@@ -234,18 +270,11 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
             else (f"azure-neural ({getattr(job, 'voice_name', None) or 'uz-UZ-SardorNeural'})" if (getattr(job, "tts_provider", None) == 'azure' or (getattr(job, "voice_name", None) and 'Neural' in str(job.voice_name)))
             else None))
         ),
-
-        # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
-        # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
-        # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
-        # bo'lgan bo'lsa, original_video_path allaqachon to'ldirilgan
-        # bo'ladi). error_code ro'yxatiga qarab tekshirish - eski,
-        # klassifikatordan OLDINGI "DOWNLOAD_FAILED" kabi qiymatlarni
-        # noto'g'ri chetlab qo'ygan edi (2026-08-23 aniqlangan).
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
         is_preview=bool(getattr(job, "is_preview", False)),
         audio_mix_mode=_normalize_audio_mix_mode(getattr(job, "audio_mix_mode", None) or getattr(settings, "AUDIO_MIX_MODE", "dubbed_only")),
+        costs=costs,
     )
 
 

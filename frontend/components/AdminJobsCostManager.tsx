@@ -33,8 +33,10 @@ import {
   apiAdminJobsCost,
   apiAdminRetryJob,
   apiAdminCancelJob,
+  apiAdminGeminiKeysOverview,
   AdminJobsCostResponse,
   AdminJobCostItem,
+  GeminiKeysOverviewResponse,
 } from '@/lib/admin'
 import { formatTashkentDateTimeObj, getTashkentRelativeTime } from '@/lib/timestamp'
 import CustomSelect from '@/components/CustomSelect'
@@ -46,6 +48,7 @@ interface AdminJobsCostManagerProps {
 
 export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProps) {
   const [data, setData] = useState<AdminJobsCostResponse | null>(null)
+  const [geminiOverview, setGeminiOverview] = useState<GeminiKeysOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,12 +80,39 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [retrySttOption, setRetrySttOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
   const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
 
+  // Bepul kalitlarning cooldown holati va aniq tiklanish vaqti
+  const freeKeys = geminiOverview?.free_keys || []
+  const activeFreeKeysCount = freeKeys.filter((k) => k.status === 'active').length
+  const isFreeKeysInCooldown = freeKeys.length > 0 && activeFreeKeysCount === 0
+
+  const cooldownCandidateSeconds = freeKeys.map((k) => k.remaining_seconds).filter((s) => s > 0)
+  const minCooldownSeconds = isFreeKeysInCooldown && cooldownCandidateSeconds.length > 0
+    ? Math.min(...cooldownCandidateSeconds)
+    : (isFreeKeysInCooldown ? 82800 : 0)
+
+  const formatExactRemaining = (sec: number) => {
+    if (!sec || sec <= 0 || !isFinite(sec)) return '0 daqiqa'
+    const h = Math.floor(sec / 3600)
+    const m = Math.floor((sec % 3600) / 60)
+    const s = Math.floor(sec % 60)
+    if (h > 0) return `${h} soat ${m} daqiqa`
+    if (m > 0) return `${m} daqiqa ${s} soniya`
+    return `${s} soniya`
+  }
+  const exactCooldownText = formatExactRemaining(minCooldownSeconds)
+
   const openRetryModal = (job: AdminJobCostItem) => {
     setRetryModalJob(job)
-    // Foydalanuvchida ovoz uchun pullik Gemini balansi bor:
-    setRetryTtsOption('gemini_paid')
-    setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
-    setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_free')
+    // Agar bepul kalitlar cooldown'da bo'lsa, pullik yoki edge tanlanadi:
+    if (isFreeKeysInCooldown) {
+      setRetryTtsOption('gemini_paid')
+      setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
+      setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_paid')
+    } else {
+      setRetryTtsOption('gemini_paid')
+      setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
+      setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_free')
+    }
   }
 
   const handleRetryJob = async (
@@ -146,22 +176,26 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
     try {
       setLoading(true)
       setError(null)
-      const res = await apiAdminJobsCost(
-        token,
-        page,
-        pageSize,
-        statusFilter === 'ALL' ? undefined : statusFilter,
-        debouncedSearch || undefined,
-        ttsProviderFilter === 'ALL' ? undefined : ttsProviderFilter,
-        includeInternal,
-        sortBy,
-        dateRange,
-        customStartDate || undefined,
-        customEndDate || undefined,
-        planFilter === 'ALL' ? undefined : planFilter,
-        errorCodeFilter === 'ALL' ? undefined : errorCodeFilter
-      )
+      const [res, geminiRes] = await Promise.all([
+        apiAdminJobsCost(
+          token,
+          page,
+          pageSize,
+          statusFilter === 'ALL' ? undefined : statusFilter,
+          debouncedSearch || undefined,
+          ttsProviderFilter === 'ALL' ? undefined : ttsProviderFilter,
+          includeInternal,
+          sortBy,
+          dateRange,
+          customStartDate || undefined,
+          customEndDate || undefined,
+          planFilter === 'ALL' ? undefined : planFilter,
+          errorCodeFilter === 'ALL' ? undefined : errorCodeFilter
+        ),
+        apiAdminGeminiKeysOverview(token).catch(() => null),
+      ])
       setData(res)
+      if (geminiRes) setGeminiOverview(geminiRes)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Maʼlumotlarni yuklab bo‘lmadi')
     } finally {
@@ -913,7 +947,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] text-gray-400 font-mono">
                             <span title="TTS xarajati">TTS: ${job.costs.tts_cost_usd}</span>
                             <span>•</span>
-                            <span title="STT xarajati">STT: ${job.costs.stt_cost_usd}</span>
+                            <span title="STT xarajati" className={job.costs.stt_cost_usd === 0 ? "text-emerald-400 font-medium" : ""}>
+                              STT: {job.costs.stt_cost_usd === 0 ? "$0 (Bepul)" : `$${job.costs.stt_cost_usd}`}
+                            </span>
                             <span>•</span>
                             <span title="LLM xarajati">LLM: ${job.costs.llm_cost_usd}</span>
                           </div>
@@ -1130,8 +1166,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <span>STT (Nutq)</span>
                       <Cpu className="w-3.5 h-3.5 text-purple-400" />
                     </div>
-                    <div className="text-sm font-bold text-white font-mono">
-                      ${selectedJob.costs.stt_cost_usd} USD
+                    <div className="text-sm font-bold font-mono flex items-center gap-1.5">
+                      <span className={selectedJob.costs.stt_cost_usd === 0 ? "text-emerald-400" : "text-white"}>
+                        ${selectedJob.costs.stt_cost_usd} USD
+                      </span>
+                      {selectedJob.costs.stt_cost_usd === 0 && (
+                        <span className="text-[10px] font-sans font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                          Bepul
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-gray-400 mt-1">
                       Model: {selectedJob.models.stt_model || 'Whisper'}
@@ -1279,10 +1322,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         const estChars = Math.round(durMin * 1200)
 
         // TTS Cost:
+        // Foydalanuvchi talabi: TTS da Gemini pullik narxini doim chiqaraver!
         let estTTSUsd = 0
-        if (retryTtsOption === 'gemini_paid') estTTSUsd = (estChars / 1000) * 0.017
-        else if (retryTtsOption === 'azure') estTTSUsd = (estChars / 1000) * 0.016
-        else estTTSUsd = 0 // edge or gemini_free
+        if (retryTtsOption === 'gemini_paid' || retryTtsOption === 'gemini_free') {
+          estTTSUsd = (estChars / 1000) * 0.017
+        } else if (retryTtsOption === 'azure') {
+          estTTSUsd = (estChars / 1000) * 0.016
+        } else {
+          estTTSUsd = 0 // edge
+        }
 
         // STT Cost:
         let estSTTUsd = 0
@@ -1393,7 +1441,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <span>TTS Ovoz Sintezi (Ovoz yaratish):</span>
                     </label>
                     <span className="text-[10px] text-cyan-300 font-mono">
-                      {retryTtsOption === 'gemini_paid' ? `~${estTTSUzs.toLocaleString()} UZS` : '0 UZS'}
+                      {estTTSUzs > 0 ? `~${estTTSUzs.toLocaleString()} UZS` : '0 UZS'}
                     </span>
                   </div>
 
@@ -1462,13 +1510,17 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       </p>
                     </div>
 
-                    {/* Gemini Free (with warning) */}
+                    {/* Gemini Free (Locked when in cooldown) */}
                     <div
-                      onClick={() => setRetryTtsOption('gemini_free')}
-                      className={`cursor-pointer rounded-xl p-3 border transition-all ${
-                        retryTtsOption === 'gemini_free'
-                          ? 'bg-blue-500/10 border-blue-500/50'
-                          : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+                      onClick={() => {
+                        if (!isFreeKeysInCooldown) setRetryTtsOption('gemini_free')
+                      }}
+                      className={`rounded-xl p-3 border transition-all ${
+                        isFreeKeysInCooldown
+                          ? 'opacity-60 cursor-not-allowed bg-rose-500/5 border-rose-500/30'
+                          : retryTtsOption === 'gemini_free'
+                          ? 'bg-blue-500/10 border-blue-500/50 cursor-pointer'
+                          : 'bg-white/[0.02] border-white/10 hover:border-white/20 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -1477,7 +1529,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             type="radio"
                             name="retry_tts"
                             checked={retryTtsOption === 'gemini_free'}
-                            onChange={() => setRetryTtsOption('gemini_free')}
+                            onChange={() => {
+                              if (!isFreeKeysInCooldown) setRetryTtsOption('gemini_free')
+                            }}
+                            disabled={isFreeKeysInCooldown}
                             className="accent-blue-500"
                           />
                           <span className="text-xs font-medium text-gray-300 flex items-center gap-1">
@@ -1485,13 +1540,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             <span>Gemini: Bepul kalit hovuzi</span>
                           </span>
                         </div>
-                        <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">
-                          0 UZS
-                        </span>
+                        {isFreeKeysInCooldown ? (
+                          <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+                            🔒 BLOKLANGAN (429 Limit)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                            ~{estTTSUzs.toLocaleString()} UZS (~${estTTSUsd.toFixed(3)})
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[10px] text-amber-400/90 mt-1 pl-5">
-                        ⚠️ Diqqat: Google bepul kalitlarida TTS kvotasi juda past va ko‘pincha 429 xatosi beradi.
-                      </p>
+                      {isFreeKeysInCooldown ? (
+                        <p className="text-[11px] text-rose-400 font-medium mt-1 pl-5">
+                          ⛔ Barcha bepul kalitlar 429 limitda! Tiklanishiga aniq: <strong>{exactCooldownText}</strong> qoldi. Iltimos, Pullik API yoki 100% bepul Microsoft Edge tanlang.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-amber-400/90 mt-1 pl-5">
+                          ⚠️ Google bepul kalitlarida TTS kvotasi past va ko‘pincha 429 xatosi beradi. Real stavka: ~${estTTSUsd.toFixed(3)}.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1561,25 +1628,38 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                     {/* Gemini Free STT */}
                     <div
-                      onClick={() => setRetrySttOption('gemini_free')}
-                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
-                        retrySttOption === 'gemini_free'
-                          ? 'bg-blue-500/15 border-blue-500/50 text-white'
-                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      onClick={() => {
+                        if (!isFreeKeysInCooldown) setRetrySttOption('gemini_free')
+                      }}
+                      className={`rounded-xl p-2.5 border transition-all ${
+                        isFreeKeysInCooldown
+                          ? 'opacity-50 cursor-not-allowed bg-rose-500/5 border-rose-500/20'
+                          : retrySttOption === 'gemini_free'
+                          ? 'bg-blue-500/15 border-blue-500/50 text-white cursor-pointer'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                        <label className="flex items-center gap-2 font-medium">
                           <input
                             type="radio"
                             name="retry_stt"
                             checked={retrySttOption === 'gemini_free'}
-                            onChange={() => setRetrySttOption('gemini_free')}
+                            onChange={() => {
+                              if (!isFreeKeysInCooldown) setRetrySttOption('gemini_free')
+                            }}
+                            disabled={isFreeKeysInCooldown}
                             className="accent-blue-500"
                           />
                           <span>🆓 Gemini Flash (Bepul)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-blue-300">0 UZS</span>
+                        {isFreeKeysInCooldown ? (
+                          <span className="text-[9px] font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                            429 ({exactCooldownText})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-blue-300">0 UZS ($0)</span>
+                        )}
                       </div>
                     </div>
 
@@ -1678,25 +1758,38 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                     {/* Gemini Free Translation */}
                     <div
-                      onClick={() => setRetryLlmOption('gemini_free')}
-                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
-                        retryLlmOption === 'gemini_free'
-                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
-                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      onClick={() => {
+                        if (!isFreeKeysInCooldown) setRetryLlmOption('gemini_free')
+                      }}
+                      className={`rounded-xl p-2.5 border transition-all ${
+                        isFreeKeysInCooldown
+                          ? 'opacity-50 cursor-not-allowed bg-rose-500/5 border-rose-500/20'
+                          : retryLlmOption === 'gemini_free'
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white cursor-pointer'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                        <label className="flex items-center gap-2 font-medium">
                           <input
                             type="radio"
                             name="retry_llm"
                             checked={retryLlmOption === 'gemini_free'}
-                            onChange={() => setRetryLlmOption('gemini_free')}
+                            onChange={() => {
+                              if (!isFreeKeysInCooldown) setRetryLlmOption('gemini_free')
+                            }}
+                            disabled={isFreeKeysInCooldown}
                             className="accent-emerald-500"
                           />
                           <span>🆓 Gemini 3.8 (Bepul pool)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                        {isFreeKeysInCooldown ? (
+                          <span className="text-[9px] font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                            429 ({exactCooldownText})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                        )}
                       </div>
                     </div>
 
@@ -1795,8 +1888,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 <button
                   type="button"
                   onClick={onConfirmRetry}
-                  disabled={retryingId === retryModalJob.id}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg ${
+                  disabled={
+                    retryingId === retryModalJob.id ||
+                    (isFreeKeysInCooldown &&
+                      (retryTtsOption === 'gemini_free' ||
+                        retrySttOption === 'gemini_free' ||
+                        retryLlmOption === 'gemini_free'))
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                     estTotalUzs > 0
                       ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
                       : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
@@ -1804,8 +1903,13 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${retryingId === retryModalJob.id ? 'animate-spin' : ''}`} />
                   <span>
-                    {estTotalUzs > 0
-                      ? `Pullik ishga tushirish (~${estTotalUzs.toLocaleString()} UZS)`
+                    {isFreeKeysInCooldown &&
+                    (retryTtsOption === 'gemini_free' ||
+                      retrySttOption === 'gemini_free' ||
+                      retryLlmOption === 'gemini_free')
+                      ? 'Bepul kalitlar 429 limitda'
+                      : estTotalUzs > 0
+                      ? `Ishga tushirish (~${estTotalUzs.toLocaleString()} UZS)`
                       : 'Bepul ishga tushirish (0 UZS)'}
                   </span>
                 </button>

@@ -303,6 +303,16 @@ function VideoCard({
               <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || '— (eski job)'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || '— (eski job)'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || (prov === 'azure' ? `azure-neural (${voiceDisplayName})` : prov === 'edge' ? `edge-tts (${voiceDisplayName})` : `gemini-tts (${voiceDisplayName})`)}</span></div>
+              <div className="flex justify-between pt-1 border-t border-amber-500/10 text-amber-500 font-semibold">
+                <span>Tannarx:</span>
+                <span className="font-mono">
+                  {job.costs?.total_cost_uzs !== undefined
+                    ? `~${job.costs.total_cost_uzs.toLocaleString()} UZS (~$${job.costs.total_cost_usd.toFixed(4)})`
+                    : prov === 'edge'
+                    ? '0 UZS ($0.00)'
+                    : `~${Math.round(((job.video_duration || 0) / 60) * 1000 * 0.0175 * 12.85).toLocaleString()} UZS`}
+                </span>
+              </div>
             </div>
           </div>
         )}
