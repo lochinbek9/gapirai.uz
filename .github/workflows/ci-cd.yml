@@ -114,6 +114,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
           command_timeout: 8m
+          request_pty: true
           script: |
             set -e
 
@@ -121,7 +122,7 @@ jobs:
             run_sudo() {
               if command -v sudo >/dev/null 2>&1; then
                 if [ -n "${{ secrets.SSH_PASSWORD }}" ]; then
-                  echo "${{ secrets.SSH_PASSWORD }}" | sudo -S "$@" 2>/dev/null || sudo -n "$@" 2>/dev/null || "$@" 2>/dev/null || true
+                  echo "${{ secrets.SSH_PASSWORD }}" | sudo -S -p '' "$@" 2>/dev/null || sudo -n "$@" 2>/dev/null || "$@" 2>/dev/null || true
                 else
                   sudo -n "$@" 2>/dev/null || "$@" 2>/dev/null || true
                 fi
@@ -193,6 +194,7 @@ jobs:
 
             echo "=== Pulling latest changes from ${{ github.repository }} ==="
             export GIT_TERMINAL_PROMPT=0
+            PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "HEAD~1")
             git reset --hard HEAD || true
             git fetch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
             git checkout -B main FETCH_HEAD -f
@@ -229,31 +231,29 @@ jobs:
             fi
 
             echo "=== Restarting Services ==="
-            # Docker backend & worker
-            echo "Restarting backend containers..."
-            docker restart dubber_backend dubber_worker 2>/dev/null || true
-            CONTAINERS_3000=$(docker ps -q --filter "publish=3000" 2>/dev/null || true)
-            if [ -n "$CONTAINERS_3000" ]; then
-              docker restart $CONTAINERS_3000 2>/dev/null || true
-            fi
-
-            # PM2 (gapirai user) with strict timeout
-            echo "Checking PM2..."
-            if command -v pm2 >/dev/null 2>&1; then
-              timeout 10s pm2 restart all --update-env 2>/dev/null || timeout 5s pm2 reload all 2>/dev/null || true
+            # Check if backend files changed
+            CHANGED_BACKEND=$(git diff --name-only "$PREV_HEAD" HEAD 2>/dev/null | grep -E '^(backend|docker|Dockerfile)' || true)
+            if [ -n "$CHANGED_BACKEND" ]; then
+              echo "Backend changes detected ($CHANGED_BACKEND). Gracefully restarting backend containers..."
+              docker restart -t 15 dubber_backend dubber_worker 2>/dev/null || true
+            else
+              echo "No backend changes detected since $PREV_HEAD. Keeping backend and worker running to avoid interrupting active jobs."
             fi
 
             # Systemd services
             echo "Checking systemd services..."
-            for svc in gapirai-frontend xadichai-frontend frontend gapirai; do
+            for svc in gapirai-frontend xadichai-frontend frontend; do
               if systemctl is-enabled --quiet "$svc" 2>/dev/null || systemctl is-active --quiet "$svc" 2>/dev/null; then
-                echo "Restarting/starting systemd service: $svc"
-                timeout 15s run_sudo systemctl restart "$svc" 2>/dev/null || timeout 10s systemctl --user restart "$svc" 2>/dev/null || true
+                echo "Restarting systemd service: $svc"
+                timeout 20s run_sudo systemctl restart "$svc" 2>&1 || timeout 15s systemctl --user restart "$svc" 2>&1 || true
               fi
             done
 
-            # Supervisor
-            timeout 10s run_sudo supervisorctl restart all 2>/dev/null || true
+            # PM2 check with strict timeout (avoid hangs)
+            echo "Checking PM2..."
+            if command -v pm2 >/dev/null 2>&1; then
+              timeout 10s pm2 reload all 2>&1 || timeout 10s pm2 restart all 2>&1 || true
+            fi
 
             # Check if port 3000 process was restarted
             sleep 3
@@ -263,31 +263,32 @@ jobs:
             fi
             echo "Port 3000 new PID: $NEW_P3000_PID (previous was: $P3000_PID)"
 
-            # If port 3000 process didn't restart and is still the exact old PID, kill it to force restart
+            # If port 3000 process didn't restart and is still the exact old PID, force restart it
             if [ -n "$P3000_PID" ] && [ "$NEW_P3000_PID" = "$P3000_PID" ]; then
-              echo "Process on port 3000 was not restarted by managers. Restarting it..."
-              kill -15 "$P3000_PID" 2>/dev/null || run_sudo kill -15 "$P3000_PID" 2>/dev/null || true
+              echo "Process on port 3000 was not recycled. Force restarting..."
+              run_sudo kill -15 "$P3000_PID" 2>/dev/null || kill -15 "$P3000_PID" 2>/dev/null || true
               sleep 2
               if ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
-                kill -9 "$P3000_PID" 2>/dev/null || run_sudo kill -9 "$P3000_PID" 2>/dev/null || true
+                run_sudo kill -9 "$P3000_PID" 2>/dev/null || kill -9 "$P3000_PID" 2>/dev/null || true
                 sleep 2
               fi
               # If port 3000 is now dead, restart Next.js in background with detached stdio
               if ! ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
-                echo "Starting frontend fresh via PM2 or npm start (detached)..."
-                cd "$TARGET_DIR/frontend"
-                if command -v pm2 >/dev/null 2>&1; then
-                  timeout 15s pm2 start npm </dev/null >/dev/null 2>&1 --name "gapirai-frontend" -- start || true
-                else
-                  nohup npm start </dev/null > "$TARGET_DIR/frontend.log" 2>&1 &
-                fi
+                echo "Starting frontend fresh (detached)..."
+                run_sudo systemctl start gapirai-frontend 2>&1 || systemctl --user start gapirai-frontend 2>&1 || true
                 sleep 3
+                if ! ss -tulpn 'sport = :3000' 2>/dev/null | grep -q '3000'; then
+                  cd "$TARGET_DIR/frontend"
+                  (nohup npm start </dev/null > "$TARGET_DIR/frontend.log" 2>&1 &)
+                  sleep 4
+                fi
               fi
             fi
 
             # Nginx reload
-            run_sudo nginx -t 2>/dev/null && run_sudo systemctl reload nginx 2>/dev/null || true
+            run_sudo nginx -t 2>&1 && run_sudo systemctl reload nginx 2>&1 || true
 
             echo "=== Verification ==="
+            sleep 2
             curl -sI http://127.0.0.1:3000 | head -n 5 || echo "Could not reach :3000"
             echo "=== Deployment finished successfully ==="
