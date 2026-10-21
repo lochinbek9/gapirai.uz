@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResp
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, defer
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant, VideoAnalysis
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id

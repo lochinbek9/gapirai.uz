@@ -82,10 +82,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   // Bepul kalitlarning cooldown holati va aniq tiklanish vaqti
   const freeKeys = geminiOverview?.free_keys || []
-  const activeFreeKeysCount = freeKeys.filter((k) => k.status === 'active').length
-  const isFreeKeysInCooldown = freeKeys.length > 0 && activeFreeKeysCount === 0
+  const activeFreeKeysCount = Array.isArray(freeKeys) ? freeKeys.filter((k) => k?.status === 'active').length : 0
+  const isFreeKeysInCooldown = Array.isArray(freeKeys) && freeKeys.length > 0 && activeFreeKeysCount === 0
 
-  const cooldownCandidateSeconds = freeKeys.map((k) => k.remaining_seconds).filter((s) => s > 0)
+  const cooldownCandidateSeconds = Array.isArray(freeKeys) ? freeKeys.map((k) => k?.remaining_seconds || 0).filter((s) => s > 0) : []
   const minCooldownSeconds = isFreeKeysInCooldown && cooldownCandidateSeconds.length > 0
     ? Math.min(...cooldownCandidateSeconds)
     : (isFreeKeysInCooldown ? 82800 : 0)
@@ -937,21 +937,21 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         <div>
                           {/* Total UZS & USD */}
                           <div className="text-sm font-bold font-mono text-emerald-400">
-                            {job.costs.total_cost_uzs.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">UZS</span>
+                            {(job.costs?.total_cost_uzs ?? 0).toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">UZS</span>
                           </div>
                           <div className="text-[10px] font-mono text-gray-400">
-                            ${job.costs.total_cost_usd} USD
+                            ${job.costs?.total_cost_usd ?? 0} USD
                           </div>
 
                           {/* Breakdown pills */}
                           <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] text-gray-400 font-mono">
-                            <span title="TTS xarajati">TTS: ${job.costs.tts_cost_usd}</span>
+                            <span title="TTS xarajati">TTS: ${job.costs?.tts_cost_usd ?? 0}</span>
                             <span>•</span>
-                            <span title="STT xarajati" className={job.costs.stt_cost_usd === 0 ? "text-emerald-400 font-medium" : ""}>
-                              STT: {job.costs.stt_cost_usd === 0 ? "$0 (Bepul)" : `$${job.costs.stt_cost_usd}`}
+                            <span title="STT xarajati" className={(job.costs?.stt_cost_usd ?? 0) === 0 ? "text-emerald-400 font-medium" : ""}>
+                              STT: {(job.costs?.stt_cost_usd ?? 0) === 0 ? "$0 (Bepul)" : `$${job.costs?.stt_cost_usd}`}
                             </span>
                             <span>•</span>
-                            <span title="LLM xarajati">LLM: ${job.costs.llm_cost_usd}</span>
+                            <span title="LLM xarajati">LLM: ${job.costs?.llm_cost_usd ?? 0}</span>
                           </div>
 
                           {/* Payment badge if paid */}
@@ -1132,10 +1132,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   </span>
                   <div className="text-right">
                     <div className="text-base font-bold font-mono text-emerald-400">
-                      {selectedJob.costs.total_cost_uzs.toLocaleString()} UZS
+                      {(selectedJob.costs?.total_cost_uzs ?? 0).toLocaleString()} UZS
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">
-                      ${selectedJob.costs.total_cost_usd} USD
+                      ${selectedJob.costs?.total_cost_usd ?? 0} USD
                     </div>
                   </div>
                 </div>
@@ -1148,14 +1148,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
                     </div>
                     <div className="text-sm font-bold text-white font-mono">
-                      ${selectedJob.costs.tts_cost_usd} USD
+                      ${selectedJob.costs?.tts_cost_usd ?? 0} USD
                     </div>
                     <div className="text-[10px] text-gray-400 mt-1">
-                      {selectedJob.costs.tts_characters.toLocaleString()} ta belgi
+                      {(selectedJob.costs?.tts_characters ?? 0).toLocaleString()} ta belgi
                     </div>
-                    {selectedJob.costs.cache_hits_count > 0 && (
+                    {(selectedJob.costs?.cache_hits_count ?? 0) > 0 && (
                       <div className="text-[10px] text-emerald-400 mt-0.5">
-                        Kesh: +${selectedJob.costs.cache_saved_usd} tejandi
+                        Kesh: +${selectedJob.costs?.cache_saved_usd ?? 0} tejandi
                       </div>
                     )}
                   </div>
@@ -1167,10 +1167,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <Cpu className="w-3.5 h-3.5 text-purple-400" />
                     </div>
                     <div className="text-sm font-bold font-mono flex items-center gap-1.5">
-                      <span className={selectedJob.costs.stt_cost_usd === 0 ? "text-emerald-400" : "text-white"}>
-                        ${selectedJob.costs.stt_cost_usd} USD
+                      <span className={(selectedJob.costs?.stt_cost_usd ?? 0) === 0 ? "text-emerald-400" : "text-white"}>
+                        ${selectedJob.costs?.stt_cost_usd ?? 0} USD
                       </span>
-                      {selectedJob.costs.stt_cost_usd === 0 && (
+                      {(selectedJob.costs?.stt_cost_usd ?? 0) === 0 && (
                         <span className="text-[10px] font-sans font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                           Bepul
                         </span>
@@ -1188,7 +1188,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                     </div>
                     <div className="text-sm font-bold text-white font-mono">
-                      ${selectedJob.costs.llm_cost_usd} USD
+                      ${selectedJob.costs?.llm_cost_usd ?? 0} USD
                     </div>
                     <div className="text-[10px] text-gray-400 mt-1">
                       Model: {selectedJob.models.translation_model || 'Gemini'}
@@ -1199,7 +1199,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-gray-400">
                   <span>1 daqiqa dublyaj narxi:</span>
                   <span className="font-bold text-white font-mono">
-                    {selectedJob.costs.cost_per_minute_uzs.toLocaleString()} UZS / daqiqa
+                    {(selectedJob.costs?.cost_per_minute_uzs ?? 0).toLocaleString()} UZS / daqiqa
                   </span>
                 </div>
 
