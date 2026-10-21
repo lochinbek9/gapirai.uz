@@ -45,16 +45,47 @@ function formatRemainingTime(seconds: number): string {
   return `${s} soniya`
 }
 
-function getElapsedSeconds(job?: Job | null, currentTime?: number): number {
-  if (!job?.created_at) return 0
-  const start = parseApiDate(job.created_at)?.getTime() ?? 0
-  if (!start) return 0
-  return Math.max(0, Math.floor(((currentTime || Date.now()) - start) / 1000))
+function getElapsedSeconds(job?: Job | null, currentTime?: number, sessionStartTime?: number): number {
+  if (!job) return 0
+  const now = currentTime || Date.now()
+
+  // 1. Agar updated_at mavjud bo'lsa va 1 soatdan kam vaqt oldin bo'lsa:
+  if (job.updated_at) {
+    const upd = parseApiDate(job.updated_at)?.getTime() ?? 0
+    const diffUpd = (now - upd) / 1000
+    if (upd > 0 && diffUpd >= 0 && diffUpd < 3600) {
+      return Math.floor(diffUpd)
+    }
+  }
+
+  // 2. created_at tekshiruvi:
+  if (job.created_at) {
+    const start = parseApiDate(job.created_at)?.getTime() ?? 0
+    const diff = (now - start) / 1000
+    // Agar yaratilganiga 1 soatdan ko'p bo'lmagan bo'lsa, created_at'dan hisoblaymiz:
+    if (start > 0 && diff >= 0 && diff < 3600) {
+      return Math.floor(diff)
+    }
+  }
+
+  // 3. Agar video bir necha kun/soat oldin yaratilgan bo'lib, hozir qayta ishlanayotgan bo'lsa:
+  // noo'rin 9869:29 ko'rinmasligi uchun joriy sahifa sessiyasi / retry boshlangan vaqtdan hisoblanadi!
+  if (sessionStartTime) {
+    const sessionDiff = Math.floor((now - sessionStartTime) / 1000)
+    return Math.max(0, sessionDiff)
+  }
+
+  return 0
 }
 
 function formatElapsedTimer(seconds: number): string {
-  const m = Math.floor(seconds / 60)
+  if (!seconds || seconds <= 0) return '00:00'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
+  if (h > 0) {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
@@ -208,6 +239,7 @@ export default function VideoPage() {
   const [regenGender, setRegenGender] = useState<'male' | 'female'>('male')
   const [regenLoading, setRegenLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const sessionStartRef = useRef<number>(Date.now())
   const [isCopied, setIsCopied] = useState(false)
   const [isEnCopied, setIsEnCopied] = useState(false)
   const prevStatusRef = useRef<string | undefined>(undefined)
@@ -809,7 +841,7 @@ export default function VideoPage() {
               );
             })() : (() => {
               const activeStage = getActivePipelineStage(job);
-              const elapsedSec = getElapsedSeconds(job, currentTime);
+              const elapsedSec = getElapsedSeconds(job, currentTime, sessionStartRef.current);
               const isQueued = job.status === 'pending' || (job.progress || 0) <= 0;
 
               const stages = [
@@ -825,7 +857,7 @@ export default function VideoPage() {
                     {/* Yuqori xotirjam ko'rsatkich (Ko'zni charchatadigan aylanuvchi spinnerlarsiz) */}
                     <div className="flex items-center justify-between px-2 text-xs">
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold shadow-sm">
-                        <span className={`w-2 h-2 rounded-full ${isQueued ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                        <span className={`w-2 h-2 rounded-full ${isQueued ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`} />
                         <span>{isQueued ? "Navbatda turibdi" : "Sun'iy intellekt ishlamoqda"}</span>
                       </div>
                       
@@ -866,14 +898,19 @@ export default function VideoPage() {
                         )}
                       </div>
 
-                      <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative">
+                      <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative shadow-inner">
                         {isQueued ? (
-                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-500/20 via-violet-500/40 to-indigo-500/20" />
+                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-500/20 via-violet-500/50 to-indigo-500/20 relative overflow-hidden animate-pulse">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                          </div>
                         ) : (
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-emerald-500 transition-[width] duration-700 ease-out shadow-sm"
+                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-emerald-500 transition-[width] duration-700 ease-out shadow-sm relative overflow-hidden"
                             style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
-                          />
+                          >
+                            {/* Harakatlanuvchi jonli nur (shimmer animation) */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -890,7 +927,7 @@ export default function VideoPage() {
                               isDone
                                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                                 : isCurrent
-                                ? 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200 ring-2 ring-violet-500/20 shadow-sm'
+                                ? 'border-violet-500/60 bg-violet-500/20 text-violet-800 dark:text-violet-200 ring-2 ring-violet-500/30 shadow-md shadow-violet-500/10'
                                 : 'border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] text-gray-400 dark:text-gray-500 opacity-60'
                             }`}
                           >
@@ -899,7 +936,10 @@ export default function VideoPage() {
                               {isDone ? (
                                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">✓ Tayyor</span>
                               ) : isCurrent ? (
-                                <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 bg-violet-500/20 px-1.5 py-0.5 rounded-full">Bajarilmoqda</span>
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-500/25 px-2 py-0.5 rounded-full border border-violet-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
+                                  <span>Bajarilmoqda</span>
+                                </span>
                               ) : (
                                 <span className="text-[10px] text-gray-400">Kutilmoqda</span>
                               )}

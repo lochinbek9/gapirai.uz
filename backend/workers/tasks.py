@@ -179,18 +179,24 @@ def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, 
 
 
 _GENDER_SYSTEM_PROMPT = (
-    "You analyze video transcripts and determine the speaker's gender. "
-    "Reply with ONLY one word: 'male' or 'female'. "
-    "If unclear or multiple speakers, reply 'male'."
+    "You are an expert AI that determines whether the primary speaker or singer in a video is 'male' or 'female'. "
+    "Analyze the video title, artist/channel name, and spoken or sung transcript carefully. "
+    "Look for female names (e.g. Taylor Swift, Dua Lipa, Selena Gomez, Sarah, Elena, Madina, Malika, etc.), "
+    "female grammatical markers in Russian/Uzbek/Spanish ('я пошла', 'men o'zim qildim', 'onasi', etc.), "
+    "or female self-introductions. "
+    "Reply with ONLY ONE WORD: 'female' or 'male'. "
+    "If the primary speaker/singer is female, return 'female'. "
+    "If male, return 'male'. If truly indeterminable, return 'male'."
 )
 
 
-def _detect_gender(transcript_text: str) -> str:
+def _detect_gender(transcript_text: str, title: str = "") -> str:
     """Detect speaker gender -- TRANSLATE_PROVIDER='gemini' bo'lsa Gemini birinchi,
     aks holda OpenAI birinchi, ikkalasi ham ishlamasa 'male'ga tushiriladi."""
     from backend.services.openai_compat import light_model_kwargs
 
-    snippet = transcript_text[:1000]
+    snippet = (transcript_text or "")[:3500]
+    prompt_text = f"Video Title: {title}\n\nTranscript:\n{snippet}" if title else f"Transcript:\n{snippet}"
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
     prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not openai_ok
@@ -208,7 +214,7 @@ def _detect_gender(transcript_text: str) -> str:
         for k in keys:
             try:
                 response = _get_gemini_client(api_key=k).models.generate_content(
-                    model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
+                    model=_gemini_text_model(), contents=prompt_text, config=config,
                 )
                 result = (response.text or "").strip().lower()
                 return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
@@ -225,7 +231,7 @@ def _detect_gender(transcript_text: str) -> str:
             model=settings.OPENAI_LIGHT_MODEL,
             messages=[
                 {"role": "system", "content": _GENDER_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Transcript: {snippet}"},
+                {"role": "user", "content": prompt_text},
             ],
             **light_model_kwargs(temperature=0, max_tokens=5),
         )
@@ -482,9 +488,14 @@ def process_video(self: Task, job_id: str) -> dict:
         # 2. Bepul tarifdagi foydalanuvchilar (PlanTier.FREE va sotib olingan daqiqasi yo'q) -> FAQAT bepul kalitlar (oylik 5 daqiqa bepul kvotasi ham bepul hovuzdan ishlanadi)
         # 3. FAQAT haqiqiy pullik obunasi borlar (Standard/Pro), daqiqa paketi sotib olganlar yoki adminlar -> Pullik kalit
         from backend.services.plans import is_user_paid_tier
-        is_paid_job = False
-        if not getattr(job, "is_preview", False) and job.user_id:
+        if getattr(job, "is_preview", False):
+            is_paid_job = False
+        elif job.gemini_key_tier in ("free", "paid"):
+            is_paid_job = (job.gemini_key_tier == "paid")
+        elif job.user_id:
             is_paid_job = is_user_paid_tier(db, job.user_id)
+        else:
+            is_paid_job = False
 
         job.gemini_key_tier = "paid" if is_paid_job else "free"
         if not is_paid_job:
@@ -854,28 +865,35 @@ def process_video(self: Task, job_id: str) -> dict:
         # keyingi bosqichlarni "bu tugal gap" deb aldab qo'yadi.
         segments = synthesizer.group_segments_into_sentences(segments)
 
-        # BOSQICH 3: Jins aniqlash (foydalanuvchi tanlamagan bo'lsa avtomatik)
+        # BOSQICH 3: Jins aniqlash (foydalanuvchi yangi videoda qo'lda tanlagan bo'lsa o'sha olinadi, qolganlarida AI aniqlaydi)
         current_stage = "GENDER"
         stage_t0 = time.monotonic()
-        if job.speaker_gender:
-            gender = job.speaker_gender
-            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped")
-        else:
-            setting = job.voice_gender_setting or "male"
-            if setting in ("male", "female"):
-                gender = setting
-            elif job.subtitle_only:
-                # "Subtitr" rejimida ovoz yaratilmaydi -- jins hech qayerda
-                # ishlatilmaydi, shuning uchun bekorga LLM chaqirmaymiz.
-                gender = "male"
-            elif donor_j and donor_j.speaker_gender in ("male", "female"):
-                gender = donor_j.speaker_gender
-            else:
-                _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
-                gender = _detect_gender(transcript_text)
+        user_choice = getattr(job, "voice_gender_setting", None)
+        if user_choice in ("male", "female"):
+            # Foydalanuvchi yangi videoda jinsni qo'lda tanlagan
+            gender = user_choice
             job.speaker_gender = gender
             db.commit()
-            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "ok")
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"User setting: {user_choice}")
+        elif job.subtitle_only:
+            gender = "male"
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", "subtitle-only")
+        elif getattr(job, "speaker_gender", None) in ("male", "female"):
+            gender = job.speaker_gender
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"Already set: {gender}")
+        elif donor_j and getattr(donor_j, "voice_gender_setting", None) == "auto" and donor_j.speaker_gender in ("male", "female"):
+            gender = donor_j.speaker_gender
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"Donor auto: {gender}")
+        else:
+            _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
+            gender = _detect_gender(transcript_text, title=getattr(job, "video_title", "") or "")
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "ok", f"Detected: {gender}")
 
         # BOSQICH 4: Tarjima
         # Checkpoint: tarjima qilingan segmentlar saqlanadi — Google
@@ -1002,15 +1020,19 @@ def process_video(self: Task, job_id: str) -> dict:
 
             # Provayder va jinsga qarab aniq ovoz nomini tanlash
             if tts_provider in ("azure", "edge"):
-                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                default_voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             elif tts_provider == "gemini":
-                voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
+                default_voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
             else:
-                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                default_voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
 
-            if getattr(job, "voice_name", None):
+            user_chose_gender = getattr(job, "voice_gender_setting", None) in ("male", "female")
+            if user_chose_gender and getattr(job, "voice_name", None):
+                # Foydalanuvchi jins va ovozni yangi videoda qo'lda tanlagan
                 voice = job.voice_name
             else:
+                # Avtomatik jins aniqlash: ovoz aniqlangan jinsga (female/male) mos bo'lishi shart!
+                voice = default_voice
                 job.voice_name = voice
 
             if not getattr(job, "voice_style", None):

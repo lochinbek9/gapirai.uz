@@ -352,17 +352,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if mode == "subtitle":
         await update.message.reply_text("⏳ Video tekshirilmoqda...")
-        await _execute_dubbing_job_flow(update.message, chat_id, url, voice_gender="male", mode=mode)
+        await _execute_dubbing_job_flow(update.message, chat_id, url, voice_gender="auto", mode=mode)
     else:
         context.user_data["pending_url"] = url
         context.user_data["pending_mode"] = mode
         markup = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("👨 Erkak (Sardor)", callback_data="vg:male"),
-                InlineKeyboardButton("👩 Ayol (Madina)", callback_data="vg:female"),
+                InlineKeyboardButton("🤖 Avtomatik (AI aniqlaydi)", callback_data="vg:auto"),
             ],
             [
-                InlineKeyboardButton("🤖 Avtomatik", callback_data="vg:auto"),
+                InlineKeyboardButton("👨 Erkak (Sardor)", callback_data="vg:male"),
+                InlineKeyboardButton("👩 Ayol (Madina)", callback_data="vg:female"),
             ]
         ])
         await update.message.reply_text(
@@ -389,7 +389,7 @@ async def handle_gender_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def _execute_dubbing_job_flow(
-    target_message, chat_id: str | int, url: str, voice_gender: str = "male", mode: str = "dub"
+    target_message, chat_id: str | int, url: str, voice_gender: str = "auto", mode: str = "dub"
 ) -> None:
     chat_id_str = str(chat_id)
     db = SessionLocal()
@@ -409,6 +409,12 @@ async def _execute_dubbing_job_flow(
             await target_message.reply_text("Bu YouTube havolasi noto'g'ri ko'rinadi.")
         elif result.outcome == "fetch_error":
             await target_message.reply_text(f"Video ma'lumotlarini olishda xatolik: {result.error_detail}")
+        elif result.outcome == "music_copyright":
+            reason = result.error_detail or "Mualliflik huquqi bilan himoyalangan qo'shiq va musiqiy videolarni dublyaj qilib bo'lmaydi."
+            await target_message.reply_text(
+                f"🚫 <b>Mualliflik huquqi cheklovi</b>\n\n{reason}\n\n<i>Hisobingizdan hech qanday daqiqa/kredit yechilmadi.</i>",
+                parse_mode="HTML"
+            )
         elif result.outcome == "blocked":
             reason = result.error_detail or "Ushbu video GapirAI.uz kontent siyosatiga mos kelmagani sababli dublaj qilinmaydi."
             await target_message.reply_text(

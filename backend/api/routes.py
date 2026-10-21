@@ -60,6 +60,7 @@ class RegenerateJobRequest(BaseModel):
     voice_name: Optional[str] = None
     speaker_gender: Optional[str] = None
     tts_provider: Optional[str] = None
+    gemini_key_tier: Optional[str] = None
     force_regenerate: Optional[bool] = None
 
 
@@ -86,6 +87,7 @@ class JobResponse(BaseModel):
     error_message: Optional[str] = None
     error_code: Optional[str] = None
     created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     speaker_gender: Optional[str] = None
     voice_gender_setting: Optional[str] = None
     uzbek_srt_content: Optional[str] = None
@@ -203,6 +205,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         error_message=None if redact else job.error_message,
         error_code=None if redact else job.error_code,
         created_at=to_tashkent_iso(job.created_at) if job.created_at else None,
+        updated_at=to_tashkent_iso(job.updated_at) if getattr(job, "updated_at", None) else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         uzbek_srt_content=job.uzbek_srt_content,
@@ -292,6 +295,11 @@ def _raise_for_outcome(result: JobCreationResult) -> None:
         raise HTTPException(
             status_code=403,
             detail=detail,
+        )
+    if result.outcome == "music_copyright":
+        raise HTTPException(
+            status_code=400,
+            detail=result.error_detail or "Mualliflik huquqi bilan himoyalangan qo'shiq va musiqiy videolarni dublyaj qilib bo'lmaydi."
         )
     if result.outcome == "too_long":
         raise HTTPException(
@@ -884,6 +892,8 @@ def retry_job(
             job.tts_provider = payload.tts_provider
         if payload.voice_name:
             job.voice_name = payload.voice_name
+        if payload.gemini_key_tier:
+            job.gemini_key_tier = payload.gemini_key_tier
 
     # 2. Balansdan daqiqa yechish (admin uchun cheksiz/bepul, oddiy user uchun balansdan yechiladi)
     duration_seconds = job.video_duration
@@ -1438,10 +1448,13 @@ def cancel_job(
     # bilgan ISTALGAN kishi (havola ulashish, log, referrer orqali) boshqa
     # birovning ishlayotgan job'ini bekor qila olardi. DELETE /jobs/{job_id}
     # (yuqorida) bilan bir xil naqsh -- so'rovning o'ziga user_id filtri.
-    job = db.query(DubbingJob).filter(
-        DubbingJob.id == job_id,
-        DubbingJob.user_id == current_user.id,
-    ).first()
+    from backend.services.plans import is_user_admin
+    is_admin = is_user_admin(db, current_user.id)
+
+    query = db.query(DubbingJob).filter(DubbingJob.id == job_id)
+    if not is_admin:
+        query = query.filter(DubbingJob.user_id == current_user.id)
+    job = query.first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
     

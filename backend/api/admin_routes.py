@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, date
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from pydantic import BaseModel
 from sqlalchemy import func, or_, and_, select, case, distinct, text
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail, TTSUsageLog, JobStatus
@@ -766,13 +766,15 @@ def admin_system_health(current_user: User = Depends(get_current_admin_user)):
 @router.post("/jobs/{job_id}/retry")
 def admin_retry_job(
     job_id: str,
+    payload: dict | None = Body(None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """Admin panel orqali xatolikka uchragan yoki to'xtab qolgan job'ni bevosita qayta navbatga qo'yish."""
-    from backend.api.routes import retry_job
+    from backend.api.routes import retry_job, RegenerateJobRequest
+    req_obj = RegenerateJobRequest(**payload) if payload else None
     db = SessionLocal()
     try:
-        return retry_job(job_id=job_id, payload=None, db=db, current_user=current_user)
+        return retry_job(job_id=job_id, payload=req_obj, db=db, current_user=current_user)
     finally:
         db.close()
 
@@ -2611,6 +2613,7 @@ def admin_jobs_cost(
             clean_status = status.strip().upper()
             if clean_status == "PROCESSING":
                 base_query = base_query.filter(DubbingJob.status.in_([
+                    JobStatus.PENDING,
                     JobStatus.DOWNLOADING,
                     JobStatus.TRANSCRIBING,
                     JobStatus.TRANSLATING,
@@ -2619,10 +2622,7 @@ def admin_jobs_cost(
                     JobStatus.MERGING,
                 ]))
             elif clean_status in ("AWAITING", "AWAITING_PAYMENT"):
-                base_query = base_query.filter(DubbingJob.status.in_([
-                    JobStatus.AWAITING_PAYMENT,
-                    JobStatus.PENDING,
-                ]))
+                base_query = base_query.filter(DubbingJob.status == JobStatus.AWAITING_PAYMENT)
             else:
                 try:
                     js = JobStatus(clean_status)
@@ -2983,17 +2983,26 @@ def admin_jobs_cost(
         page_total_uzs = sum(item["costs"]["total_cost_uzs"] for item in items)
         page_avg_job_uzs = round(page_total_uzs / len(items)) if items else 0
 
+        active_pipeline_count = sum(status_counts.get(s, 0) for s in [
+            JobStatus.DOWNLOADING, JobStatus.TRANSCRIBING, JobStatus.TRANSLATING,
+            JobStatus.SYNTHESIZING, JobStatus.SYNCING, JobStatus.MERGING
+        ])
+        pending_count = status_counts.get(JobStatus.PENDING, 0)
+        total_active = active_pipeline_count + pending_count
+
+        worker_concurrency = 2
+        actual_processing = min(worker_concurrency, total_active)
+        queued_count = max(0, total_active - worker_concurrency)
+
         return {
             "summary": {
                 "date_range": dr,
                 "total_jobs": total_all_jobs,
                 "completed_jobs": completed_all,
                 "failed_jobs": failed_all,
-                "processing_jobs": sum(status_counts.get(s, 0) for s in [
-                    JobStatus.DOWNLOADING, JobStatus.TRANSCRIBING, JobStatus.TRANSLATING,
-                    JobStatus.SYNTHESIZING, JobStatus.SYNCING, JobStatus.MERGING
-                ]),
-                "awaiting_payment_jobs": status_counts.get(JobStatus.AWAITING_PAYMENT, 0) + status_counts.get(JobStatus.PENDING, 0),
+                "processing_jobs": actual_processing,
+                "queued_jobs": queued_count,
+                "awaiting_payment_jobs": status_counts.get(JobStatus.AWAITING_PAYMENT, 0),
                 "success_rate_pct": success_rate,
                 "total_completed_duration_min": total_dur_min,
                 "providers": prov_counts,

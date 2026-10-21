@@ -565,6 +565,7 @@ export interface AdminJobCostSummary {
   completed_jobs: number
   failed_jobs: number
   processing_jobs: number
+  queued_jobs?: number
   awaiting_payment_jobs: number
   success_rate_pct: number
   total_completed_duration_min: number
@@ -852,8 +853,12 @@ export async function apiAdminSystemHealth(token: string): Promise<SystemHealthR
   return res.data
 }
 
-export async function apiAdminRetryJob(token: string, jobId: string): Promise<{ success: boolean; message: string }> {
-  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, {}, {
+export async function apiAdminRetryJob(
+  token: string,
+  jobId: string,
+  payload?: { gemini_key_tier?: string; tts_provider?: string; voice_name?: string }
+): Promise<{ success: boolean; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, payload || {}, {
     headers: { Authorization: `Bearer ${token}` },
   })
   return res.data

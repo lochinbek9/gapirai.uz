@@ -192,7 +192,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [voiceGender, setVoiceGender] = useState("male");
+  const [voiceGender, setVoiceGender] = useState("auto");
   const [voiceName, setVoiceName] = useState<string>("");
   const [ttsProvider, setTtsProvider] = useState<string>("gemini");
   const [isProUser, setIsProUser] = useState<boolean>(false);
