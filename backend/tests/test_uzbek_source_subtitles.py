@@ -12,8 +12,9 @@ from backend.workers.tasks import is_uzbek_source
 
 
 class TestProviderOrder(unittest.TestCase):
-    def _order(self, primary, gemini):
-        with patch.object(transcriber.settings, "GEMINI_API_KEY", "k" if gemini else ""), \
+    def _order(self, primary, gemini, groq=False):
+        with patch("backend.services.groq_service.is_groq_available", return_value=groq), \
+             patch.object(transcriber.settings, "GEMINI_API_KEY", "k" if gemini else ""), \
              patch.object(transcriber.settings, "GEMINI_USE_VERTEX", False), \
              patch.object(transcriber.settings, "AZURE_SPEECH_KEY", ""), \
              patch.object(transcriber.settings, "OPENAI_ENABLED", True):

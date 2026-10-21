@@ -713,7 +713,7 @@ def _transcribe_chunk_groq(chunk_path: Path, offset_seconds: float, language: st
     return adjusted_segs, text, lang, "free", f"groq:{masked_k}"
 
 
-def _transcribe_provider_order(primary: str) -> list[str]:
+def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     """API provayderlar tartibi:
     1-o'rin: Groq Whisper (ultra-tez LPU, 0 CPU/RAM, bepul kvota)
     2-o'rin: Gemini STT (Google AI Studio / Vertex AI)
@@ -726,15 +726,23 @@ def _transcribe_provider_order(primary: str) -> list[str]:
     azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
 
-    order = []
+    active = []
     if groq_ok:
-        order.append("groq")
+        active.append("groq")
     if gemini_ok:
-        order.append("gemini")
+        active.append("gemini")
     if azure_ok:
-        order.append("azure")
+        active.append("azure")
     if openai_ok:
-        order.append("openai")
+        active.append("openai")
+
+    if primary in active:
+        order = [primary] + [p for p in active if p != primary]
+    else:
+        if getattr(settings, "OPENAI_ENABLED", True) and "openai" in active:
+            order = ["openai"] + [p for p in active if p != "openai"]
+        else:
+            order = active
 
     return order or ["gemini"]
 
@@ -761,7 +769,15 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
                 fn = _transcribe_chunk
             try:
                 if name == "gemini":
-                    segs, text, lang, tier, k_used = fn(cpath, offset_seconds=offset, language=language, is_paid=is_paid)
+                    try:
+                        res = fn(cpath, offset_seconds=offset, language=language, is_paid=is_paid)
+                    except TypeError:
+                        res = fn(cpath, offset_seconds=offset, language=language)
+                    if isinstance(res, (tuple, list)) and len(res) >= 5:
+                        segs, text, lang, tier, k_used = res[:5]
+                    else:
+                        segs, text, lang = res[0], res[1], res[2]
+                        tier, k_used = "free", name
                 elif name == "groq":
                     segs, text, lang, tier, k_used = fn(cpath, offset_seconds=offset, language=language)
                 else:
