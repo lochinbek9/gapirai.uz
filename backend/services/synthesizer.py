@@ -192,12 +192,26 @@ def _synthesize_text(
     # --- Fallback zanjiri: Azure, Gemini va Edge o'zaro bir-birini sug'urtalaydi ---
     fallback_chain = []
     az = get_provider("azure")
-    if getattr(az, "subscription_key", None) or getattr(az, "key", None):
-        fallback_chain.append("azure")
-    if primary.name != "gemini":
+    has_azure = az.is_available() if hasattr(az, "is_available") else bool(getattr(settings, "AZURE_SPEECH_KEY", None))
+
+    if primary.name == "edge":
+        if has_azure:
+            fallback_chain.append("azure")
         fallback_chain.append("gemini")
-    if primary.name != "edge":
+    elif primary.name == "gemini":
+        if has_azure:
+            fallback_chain.append("azure")
         fallback_chain.append("edge")
+    elif primary.name == "azure":
+        fallback_chain.append("gemini")
+        fallback_chain.append("edge")
+    else:
+        if has_azure:
+            fallback_chain.append("azure")
+        if primary.name != "gemini":
+            fallback_chain.append("gemini")
+        if primary.name != "edge":
+            fallback_chain.append("edge")
 
     for fb_candidate in fallback_chain:
         try:
@@ -224,8 +238,19 @@ def _synthesize_text(
                 return fallback.name
         except PermanentTTSError as exc:
             logger.error(f"{fb_candidate} fallback doimiy xatolik: {exc}")
-        except Exception as exc:
-            logger.warning(f"{fb_candidate} fallback muvaffaqiyatsiz: {exc}")
+    # 4. Agar barcha oddiy provayderlar va bepul zaxiralar yiqilsa, foydalanuvchiga xatolik ko'rsatmaslik uchun
+    # oxirgi ishonchli xavfsizlik to'ri sifatida pullik Gemini kaliti orqali sintez qilib beramiz:
+    try:
+        gemini_paid_prov = get_provider("gemini")
+        paid_key = getattr(settings, "GEMINI_PAID_API_KEY", None) or os.environ.get("GEMINI_PAID_API_KEY")
+        if paid_key:
+            fb_voice = "Autonoe" if voice_name in ("uz-UZ-MadinaNeural", "Madina", "Autonoe") else "Charon"
+            if gemini_paid_prov.synthesize(text, output_path, voice_name=fb_voice, is_paid=True):
+                log_tts_usage(gemini_paid_prov, text, output_path, video_id=video_id, user_id=user_id)
+                logger.info(f"Favqulodda xavfsizlik to'ri: pullik Gemini orqali segment muvaffaqiyatli sintez qilindi (voice={fb_voice}).")
+                return "gemini"
+    except Exception as exc:
+        logger.warning(f"Favqulodda pullik Gemini zaxirasi ham ishlamadi: {exc}")
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 
@@ -419,11 +444,11 @@ def synthesize_segments(
             "seg_id": seg["id"],
         })
 
-    # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit) —
-    # juda ko'p parallel oqim ba'zi segmentlarni Edge TTS'ga (boshqa ovozga)
-    # "fallback" qilib qo'yishi mumkin edi, natijada bitta dublyajda ikki xil
-    # odam ovozi eshitilardi. 5 oqim boshqa bosqichlar bilan mos va xavfsiz.
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit: 5).
+    # Edge TTS va Azure esa yuqori parallellikni muammosiz ko'tara oladi,
+    # shu sababli 8 ta oqim orqali sintez qilish vaqti 40-50% ga qisqaradi.
+    synth_workers = 8 if (provider_name in ("edge", "azure") or settings.FREE_MODE) else 5
+    with ThreadPoolExecutor(max_workers=synth_workers) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
     # Tuzatib bo'lmagan segmentlar (yuqoridagi "__failed__" sentinel) --

@@ -105,6 +105,18 @@ class AzureProvider(TTSProvider):
         # Azure Neural TTS: ~$16 per 1M chars = $0.016 per 1K chars
         return 0.016
 
+    @property
+    def key(self) -> str | None:
+        k = settings.AZURE_SPEECH_KEY
+        return k if (k and k not in ("", "your-azure-key")) else None
+
+    @property
+    def subscription_key(self) -> str | None:
+        return self.key
+
+    def is_available(self) -> bool:
+        return bool(self.key)
+
     def synthesize(
         self,
         text: str,

@@ -174,7 +174,10 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         remaining_factor = max(0.1, (100.0 - live_progress) / 100.0)
         # Taxminiy qolgan vaqt to'g'ridan-to'g'ri joriy vaqtdan (now) hisoblanadi,
         # shunda navbatda kutgan vaqt hisob-kitobni buzib 0 soniya/noto'g'ri ko'rsatmaydi.
-        est_remaining_seconds = max(15.0, (20.0 + 0.35 * duration) * remaining_factor)
+        base_dur = 25.0 + 0.40 * duration
+        if status_str in ("synthesizing", "merging"):
+            base_dur = max(base_dur, 35.0 + 0.35 * duration)
+        est_remaining_seconds = max(15.0, base_dur * remaining_factor)
         expected_dt = datetime.utcnow() + timedelta(seconds=est_remaining_seconds)
         expected_end_time = to_tashkent_iso(expected_dt)
 

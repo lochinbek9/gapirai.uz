@@ -2852,7 +2852,10 @@ def admin_jobs_cost(
             tts_uzs = round(tts_info.get("cost_uzs", 0.0))
 
             tts_char_count = tts_info.get("characters", 0)
-            if tts_char_count and tts_char_count > 0:
+            full_text_chars = len(job.translated_text) if getattr(job, "translated_text", None) else 0
+            if full_text_chars > 0:
+                est_chars = full_text_chars
+            elif tts_char_count and tts_char_count > 0 and tts_char_count >= int(dur_min * 600):
                 est_chars = tts_char_count
             elif chars > 0:
                 est_chars = chars
@@ -2936,7 +2939,7 @@ def admin_jobs_cost(
                 "costs": {
                     "tts_cost_usd": tts_usd,
                     "tts_cost_uzs": tts_uzs,
-                    "tts_characters": tts_info["characters"] if tts_info.get("characters", 0) > 0 else est_chars,
+                    "tts_characters": est_chars,
                     "tts_duration_seconds": round(tts_info["duration_seconds"], 1),
                     "tts_calls_count": tts_info["calls_count"],
                     "cache_hits_count": tts_info["cache_hits_count"],

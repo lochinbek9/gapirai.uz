@@ -7,8 +7,10 @@ import subprocess
 import tempfile
 
 from backend.services.tts.base import TTSProvider
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 def _prosody_for_text(text: str, is_female: bool) -> tuple[str, str]:
@@ -92,16 +94,24 @@ class EdgeProvider(TTSProvider):
 
             rate, pitch = _prosody_for_text(clean_text, is_female)
 
+            proxy_url = getattr(settings, "YOUTUBE_PROXY_URL", None) or os.environ.get("YOUTUBE_PROXY_URL")
+
             async def _run():
                 last_err = None
                 for attempt in range(3):
                     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
                         tmp_mp3 = tmp.name
                     try:
-                        # 1-urinishda prosody bilan, keyingi urinishlarda toza standart sozlama bilan sinash
+                        # 1-urinishda prosody bilan to'g'ridan-to'g'ri, keyingi urinishlarda toza standart va proxy orqali sinash
                         cur_rate = rate if attempt == 0 else "+0%"
                         cur_pitch = pitch if attempt == 0 else "+0Hz"
-                        communicate = edge_tts.Communicate(clean_text, chosen_voice, rate=cur_rate, pitch=cur_pitch)
+                        use_proxy = proxy_url if attempt > 0 else None
+                        communicate = edge_tts.Communicate(
+                            clean_text, chosen_voice,
+                            rate=cur_rate, pitch=cur_pitch,
+                            proxy=use_proxy,
+                            connect_timeout=6, receive_timeout=20,
+                        )
                         await communicate.save(tmp_mp3)
 
                         if os.path.exists(tmp_mp3) and os.path.getsize(tmp_mp3) > 100:
@@ -111,7 +121,8 @@ class EdgeProvider(TTSProvider):
 
                             res = subprocess.run(
                                 [
-                                    "ffmpeg", "-y", "-i", tmp_mp3,
+                                    "ffmpeg", "-y", "-loglevel", "error", "-nostats",
+                                    "-i", tmp_mp3,
                                     "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1",
                                     output_path,
                                 ],

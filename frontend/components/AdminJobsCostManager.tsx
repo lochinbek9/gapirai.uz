@@ -103,13 +103,13 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   const openRetryModal = (job: AdminJobCostItem) => {
     setRetryModalJob(job)
-    // Agar bepul kalitlar cooldown'da bo'lsa, pullik yoki edge tanlanadi:
+    // Standart holatda bepul variantlar (Edge TTS va Groq/Kesh) tanlanadi, kerak bo'lsa pullik Gemini/Azure tanlanishi mumkin:
     if (isFreeKeysInCooldown) {
-      setRetryTtsOption('gemini_paid')
+      setRetryTtsOption('edge')
       setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
-      setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_paid')
+      setRetryLlmOption(job.models.has_translation ? 'existing' : 'groq')
     } else {
-      setRetryTtsOption('gemini_paid')
+      setRetryTtsOption('edge')
       setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
       setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_free')
     }
@@ -1319,9 +1319,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
       {retryModalJob && (() => {
         const durSec = retryModalJob.video_duration || 60
         const durMin = Math.max(0.1, durSec / 60)
-        // Videoning haqiqiy belgilari mavjud bo'lsa, o'shani olamiz (aniq hisob-kitob tashqi jadval bilan 100% bir xil bo'ladi)
+        // Videoning haqiqiy belgilari mavjud bo'lsa, o'shani olamiz.
+        // Agar realChars video davomiyligiga nisbatan asossiz kichik bo'lsa (masalan job yiqilib faqat 1 ta segment yozilgan bo'lsa), video davomiyligiga mos to'liq belgi sonini olamiz:
         const realChars = retryModalJob.costs?.tts_characters || 0
-        const estChars = realChars > 0 ? realChars : Math.round(durMin * 1200)
+        const minExpectedChars = Math.round(durMin * 600)
+        const estChars = (realChars >= minExpectedChars) ? realChars : Math.round(durMin * 1100)
 
         // TTS Cost:
         // Foydalanuvchi talabi: TTS da Gemini pullik narxini doim chiqaraver!
@@ -1346,7 +1348,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
         // LLM Cost:
         let estLLMUsd = 0
-        if (retryLlmOption === 'existing' || retryLlmOption === 'gemini_free') {
+        if (retryLlmOption === 'existing' || retryLlmOption === 'gemini_free' || retryLlmOption === 'groq') {
           estLLMUsd = 0
         } else if (retryLlmOption === 'gemini_paid') {
           estLLMUsd = (estChars / 1000) * 0.0005
@@ -1374,6 +1376,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
           let transModel = 'gemini-3.8-flash'
           if (retryLlmOption === 'openai') transModel = 'gpt-4o-mini'
+          else if (retryLlmOption === 'groq') transModel = 'qwen/qwen3.8-27b'
           else transModel = 'gemini-3.8-flash'
 
           const geminiTier =
@@ -1508,7 +1511,39 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-400 mt-1 pl-5">
-                        Madina / Sardor ovozlari orqali 100% bepul va cheklovlarsiz sintez.
+                        Madina / Sardor ovozlari orqali 100% bepul sintez (Zaxirada Azure/Gemini himoyasi).
+                      </p>
+                    </div>
+
+                    {/* Azure TTS */}
+                    <div
+                      onClick={() => setRetryTtsOption('azure')}
+                      className={`cursor-pointer rounded-xl p-3 border transition-all ${
+                        retryTtsOption === 'azure'
+                          ? 'bg-cyan-500/10 border-cyan-500/50 shadow-md shadow-cyan-500/5'
+                          : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="retry_tts"
+                            checked={retryTtsOption === 'azure'}
+                            onChange={() => setRetryTtsOption('azure')}
+                            className="accent-cyan-500"
+                          />
+                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                            <span>☁️</span>
+                            <span>Microsoft Azure Speech (Rasmiy API)</span>
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          ~{Math.round((estChars / 1000) * 0.016 * 12800).toLocaleString()} UZS (~$0.016/1k)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                        Azure Cognitive Services rasmiy kaliti orqali tezkor va ishonchli sintez (500k bepul limiti mavjud).
                       </p>
                     </div>
 
@@ -1792,6 +1827,30 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         ) : (
                           <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Groq Cloud LPU (100% Free Translation) */}
+                    <div
+                      onClick={() => setRetryLlmOption('groq')}
+                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
+                        retryLlmOption === 'groq'
+                          ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
+                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer font-medium">
+                          <input
+                            type="radio"
+                            name="retry_llm"
+                            checked={retryLlmOption === 'groq'}
+                            onChange={() => setRetryLlmOption('groq')}
+                            className="accent-emerald-500"
+                          />
+                          <span>⚡ Groq Cloud LPU (Bepul, 0 UZS)</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-emerald-400">0 UZS (LPU tezkor)</span>
                       </div>
                     </div>
 

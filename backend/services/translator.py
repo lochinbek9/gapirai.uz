@@ -445,17 +445,39 @@ def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:
         return list(executor.map(_translate_segment_free, segments))
 
 
+def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """Groq Cloud LPU orqali ultra-tez va 100% bepul tarjima (qwen/qwen3.8-27b)."""
+    from backend.services.groq_service import groq_chat_completion
+    instruction = _build_instruction(clean_segments)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": instruction},
+    ]
+    content, masked_k = groq_chat_completion(
+        messages=messages,
+        model="qwen/qwen3.8-27b",
+        json_mode=True,
+        temperature=0.35,
+    )
+    result = json.loads(content)
+    logger.info(f"Groq LLM tarjima muvaffaqiyatli yakunlandi ({masked_k}).")
+    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+
+
 def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
     """Bir bo'lak segmentlarni tarjima qilish -- TRANSLATE_PROVIDER ga qarab,
-    uch pog'onali zaxira bilan: OpenAI -> Gemini -> xom Google Translate
-    (oxirgi chora). Ilgari faqat ikki pog'ona bor edi (OpenAI -> Gemini) --
-    2026-09-12 ikkalasi ham bir vaqtda kvota tugashi (OpenAI insufficient_quota
-    + Gemini free-tier RESOURCE_EXHAUSTED) kuzatilgach, video butunlay
-    muvaffaqiyatsiz bo'lib qolmasligi uchun uchinchi pog'ona qo'shildi."""
+    ko'p pog'onali zaxira bilan: Gemini -> Groq LPU (bepul) -> xom Google Translate
+    (oxirgi chora). Video hech qachon tarjima sababli to'xtab qolmaydi."""
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+
+    if settings.TRANSLATE_PROVIDER == "groq":
+        try:
+            return _translate_chunk_groq(segments, clean_segments)
+        except Exception as e:
+            logger.warning(f"Groq tarjima muvaffaqiyatsiz ({e}), Gemini'ga o'tilmoqda.")
 
     if settings.TRANSLATE_PROVIDER == "gemini":
         last_ex = None
@@ -467,10 +489,30 @@ def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
                 logger.warning(f"Gemini tarjima urinishi {attempt+1}/3 muvaffaqiyatsiz ({e}).")
                 if attempt < 2:
                     time.sleep(2.0 * (attempt + 1))
-        raise RuntimeError(f"Gemini tarjima barcha urinishlarda muvaffaqiyatsiz bo'ldi: {last_ex}")
+        # Bepul zaxira 1: Groq LPU (0 UZS, ultra-tez, sifatli)
+        try:
+            logger.info("Gemini tarjima muvaffaqiyatsiz bo'ldi — bepul Groq LPU orqali tarjima qilinmoqda...")
+            return _translate_chunk_groq(segments, clean_segments)
+        except Exception as groq_err:
+            logger.warning(f"Groq tarjima ham muvaffaqiyatsiz ({groq_err}) — bepul Google MT'ga (oxirgi chora) o'tilmoqda.")
+            return _translate_chunk_free_mt(segments)
 
     try:
         return _translate_chunk_openai(segments, clean_segments)
+    except Exception as e:
+        if not gemini_available:
+            try:
+                return _translate_chunk_groq(segments, clean_segments)
+            except Exception:
+                return _translate_chunk_free_mt(segments)
+        logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
+        try:
+            return _translate_chunk_gemini(segments, clean_segments, is_paid=is_paid)
+        except Exception as e2:
+            try:
+                return _translate_chunk_groq(segments, clean_segments)
+            except Exception:
+                return _translate_chunk_free_mt(segments)
     except Exception as e:
         if not gemini_available:
             logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) va Gemini kaliti yo'q — bepul (LLM'siz) tarjimaga o'tilmoqda.")
