@@ -22,6 +22,8 @@ from backend.services.plans import (
     STARTER_PACK_MINUTES,
     has_purchased_starter_pack,
     get_minute_balance,
+    get_user_first_video_discount,
+    apply_user_discount,
 )
 from backend.services.click_service import generate_payment_url
 from backend.config import get_settings
@@ -37,12 +39,17 @@ def minute_balance(
     """Dashboard uchun: {monthly_cap, monthly_used, monthly_remaining,
     purchased, total_available} + sotib olsa bo'ladigan paketlar."""
     has_starter = has_purchased_starter_pack(db, current_user.id)
+    discount = get_user_first_video_discount(db, current_user.id)
+    is_disc_active = bool(discount and discount.get("active"))
+
     return {
         "balance": get_minute_balance(db, current_user.id),
+        "discount": discount,
         "packs": [
             {
                 "minutes": m,
                 "price": p,
+                "discounted_price": int(round(p * 0.9)) if is_disc_active else None,
                 "one_time": m == STARTER_PACK_MINUTES,
                 "already_purchased": has_starter if m == STARTER_PACK_MINUTES else False,
             }
@@ -82,7 +89,8 @@ def purchase_minutes(
             detail="Starter paketi (15 daqiqa) bir martalik maxsus taklif hisoblanadi va siz uni allaqachon xarid qilgansiz. Iltimos, boshqa paketlarni tanlang.",
         )
 
-    amount = all_packs[req.pack]
+    base_amount = all_packs[req.pack]
+    amount, _ = apply_user_discount(db, current_user.id, base_amount)
     settings = get_settings()
 
     origin_header = request.headers.get("origin") or request.headers.get("referer")
@@ -104,6 +112,9 @@ def purchase_minutes(
             db.add(payment)
             db.commit()
             db.refresh(payment)
+        elif payment.amount != amount:
+            payment.amount = amount
+            db.commit()
         payment_url = generate_payme_checkout_url(
             merchant_id=settings.PAYME_MERCHANT_ID,
             account_field="payment_id",
@@ -126,6 +137,9 @@ def purchase_minutes(
         db.add(payment)
         db.commit()
         db.refresh(payment)
+    elif payment.amount != amount:
+        payment.amount = amount
+        db.commit()
 
     payment_url = generate_payment_url(
         merchant_id=settings.CLICK_MERCHANT_ID or "56653",

@@ -16,6 +16,8 @@ from backend.services.plans import (
     get_or_create_subscription,
     get_minute_balance,
     is_user_admin,
+    get_user_first_video_discount,
+    apply_user_discount,
 )
 from backend.config import get_settings
 
@@ -31,10 +33,12 @@ def list_plans(
     # obuna bo'lish (subscribe) uchun login talab qilinadi.
     current = None
     has_starter = False
+    discount = None
     if current_user:
         has_starter = has_purchased_starter_pack(db, current_user.id)
         sub = get_or_create_subscription(db, current_user.id)
         bal = get_minute_balance(db, current_user.id)
+        discount = get_user_first_video_discount(db, current_user.id)
         from backend.services.timezone_utils import to_tashkent_iso
         current = {
             "plan": sub.plan.value,
@@ -42,10 +46,13 @@ def list_plans(
             "minutes": bal,  # {monthly_cap, monthly_used, monthly_remaining, purchased, total_available}
             "is_admin": is_user_admin(db, current_user.id),
         }
+
+    is_disc_active = bool(discount and discount.get("active"))
     return {
         "plans": [
             {
                 "id": p.id, "name": p.name, "price": p.price,
+                "discounted_price": int(round(p.price * 0.9)) if is_disc_active else None,
                 "monthly_minutes": p.monthly_minutes,
                 "priority": p.priority, "tts_tier": p.tts_tier,
                 "tier": p.tier.value, "period_days": p.period_days,
@@ -57,12 +64,14 @@ def list_plans(
             {
                 "minutes": m,
                 "price": price,
+                "discounted_price": int(round(price * 0.9)) if is_disc_active else None,
                 "one_time": m == STARTER_PACK_MINUTES,
                 "already_purchased": has_starter if m == STARTER_PACK_MINUTES else False,
             }
             for m, price in sorted(MINUTE_PACKS.items())
         ],
         "current": current,
+        "discount": discount,
     }
 
 
@@ -83,11 +92,12 @@ def subscribe(
 
     settings = get_settings()
     plan = PLANS[plan_id]
+    amount, _ = apply_user_discount(db, current_user.id, plan.price)
 
     payment = Payment(
         user_id=current_user.id,
         plan=plan_id,
-        amount=plan.price,
+        amount=amount,
         provider=PaymentProvider.CLICK,
         status=PaymentStatus.PENDING,
         click_create_time=int(time.time()),

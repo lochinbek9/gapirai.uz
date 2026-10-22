@@ -19,6 +19,9 @@ import {
   Star,
   Layers,
   Sparkle,
+  Gift,
+  MessageCircle,
+  ExternalLink,
 } from 'lucide-react'
 import {
   getPlans,
@@ -32,6 +35,7 @@ import {
   PlanDef,
   CurrentSubscription,
   MinutePack,
+  JobDiscountOffer,
 } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
@@ -48,6 +52,7 @@ export default function PricingPage() {
   const [plans, setPlans] = useState<PlanDef[]>([])
   const [packs, setPacks] = useState<MinutePack[]>(DEFAULT_PACKS)
   const [current, setCurrent] = useState<CurrentSubscription | null>(null)
+  const [discountOffer, setDiscountOffer] = useState<JobDiscountOffer | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState<string | null>(null)
   const [buyingPack, setBuyingPack] = useState<number | null>(null)
@@ -84,6 +89,7 @@ export default function PricingPage() {
         setPlans(res.plans)
         if (res.minute_packs?.length) setPacks(res.minute_packs)
         setCurrent(res.current)
+        if (res.discount) setDiscountOffer(res.discount)
       })
       .catch(() => setError("Tariflarni yuklashda xatolik yuz berdi."))
       .finally(() => setLoading(false))
@@ -254,6 +260,71 @@ export default function PricingPage() {
           </p>
         )}
 
+        {/* Active 10% First Video Welcome Discount Banner */}
+        {discountOffer?.active && (
+          <div className="max-w-2xl mx-auto p-4 rounded-3xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-purple-500/20 border border-amber-500/40 text-gray-900 dark:text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-amber-500/25 text-amber-500 shrink-0">
+                <Gift className="w-6 h-6 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-500">
+                    Maxsus Taklif • 10% Chegirma
+                  </span>
+                  <span className="text-[10px] bg-amber-500/25 text-amber-600 dark:text-amber-300 font-mono font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                    24 SOAT FAOL
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  Ilk videongiz tayyor bo&apos;lgani munosabati bilan barcha tarif va daqiqa paketlariga 10% chegirma narxlari avtomatik qo&apos;llanildi!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Expired Discount Soft-Landing with Admin Contacts */}
+        {discountOffer?.expired && (
+          <div className="max-w-2xl mx-auto p-4 rounded-3xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 text-gray-900 dark:text-white shadow-md space-y-3">
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-5 h-5 text-blue-400 shrink-0" />
+              <div className="text-xs">
+                <span className="font-bold text-blue-400">24 soatlik chegirma muddati tugabdimi?</span>
+                <span className="text-gray-600 dark:text-gray-300 ml-1">
+                  Ko&apos;nglingizni aslo cho&apos;ktirmang! Adminlarimiz bilan to&apos;g&apos;ridan-to&apos;g&apos;ri bog&apos;lanib maxsus chegirma so&apos;rashingiz mumkin:
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <a
+                href="https://t.me/goldendevuz?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-600 dark:text-blue-300 transition text-xs font-semibold group"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-blue-400" />
+                  <span>@goldendevuz (557407324)</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+              </a>
+              <a
+                href="https://t.me/mentor_lochinbek?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-600 dark:text-blue-300 transition text-xs font-semibold group"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-blue-400" />
+                  <span>@mentor_lochinbek (1758736133)</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Monthly / Yearly Switcher */}
         <div className="flex items-center justify-center gap-3 pt-2">
           <span className={`text-sm font-bold transition ${billingCycle === 'monthly' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
@@ -356,16 +427,35 @@ export default function PricingPage() {
 
                       {/* Price Display */}
                       <div className="pt-1">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
-                            {plan.price === 0 ? 'Bepul' : (monthlyEquivalent ?? plan.price).toLocaleString('uz-UZ')}
-                          </span>
-                          {plan.price > 0 && (
-                            <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-slate-400">
-                              so'm/oy
+                        {plan.discounted_price && plan.price > 0 && billingCycle === 'monthly' ? (
+                          <div className="flex flex-col">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-3xl sm:text-4xl font-black text-amber-500 tracking-tight">
+                                {plan.discounted_price.toLocaleString('uz-UZ')}
+                              </span>
+                              <span className="text-base font-bold text-gray-400 line-through">
+                                {plan.price.toLocaleString('uz-UZ')}
+                              </span>
+                              <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-slate-400">
+                                so&apos;m/oy
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                              10% ilk video chegirmasi faol!
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                              {plan.price === 0 ? 'Bepul' : (monthlyEquivalent ?? plan.price).toLocaleString('uz-UZ')}
+                            </span>
+                            {plan.price > 0 && (
+                              <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-slate-400">
+                                so&apos;m/oy
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {monthlyEquivalent !== null && (
                           <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
@@ -536,9 +626,20 @@ export default function PricingPage() {
                     <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-slate-500 font-semibold mt-0.5">
                       daqiqa
                     </span>
-                    <span className="text-sm font-bold text-violet-600 dark:text-violet-400 mt-2">
-                      {p.price.toLocaleString('uz-UZ')} so'm
-                    </span>
+                    {p.discounted_price ? (
+                      <div className="flex flex-col items-center mt-2">
+                        <span className="text-sm font-bold text-amber-500">
+                          {p.discounted_price.toLocaleString('uz-UZ')} so&apos;m
+                        </span>
+                        <span className="text-[11px] text-gray-400 line-through">
+                          {p.price.toLocaleString('uz-UZ')} so&apos;m
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-bold text-violet-600 dark:text-violet-400 mt-2">
+                        {p.price.toLocaleString('uz-UZ')} so&apos;m
+                      </span>
+                    )}
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                       ~{perMin} so'm / daq
                     </span>

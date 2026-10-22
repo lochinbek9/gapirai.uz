@@ -75,6 +75,40 @@ export interface Job {
     total_cost_uzs: number
     cost_per_minute_uzs: number
   }
+  user_info?: JobUserInfo | null
+  discount_offer?: JobDiscountOffer | null
+}
+
+export interface JobDiscountOffer {
+  eligible: boolean
+  active: boolean
+  expired: boolean
+  percent: number
+  seconds_left: number
+  expires_at: string | null
+  first_job_id: string | null
+}
+
+export interface JobUserInfo {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  telegram_chat_id?: string | null
+  auth_provider?: string
+  role?: string
+  is_internal?: boolean
+  plan?: string
+  plan_expires_at?: string | null
+  minutes?: MinuteBalance | null
+  created_at?: string | null
+  last_active_at?: string | null
+  jobs_count?: number
+  completed_jobs_count?: number
+  payments_total_uzs?: number
+  payments_count?: number
+  anonymous?: boolean
+  error?: string
 }
 
 export type JobStatus =
@@ -339,6 +373,7 @@ export interface PlanDef {
   id: string
   name: string
   price: number
+  discounted_price?: number | null
   monthly_minutes: number
   priority: boolean
   tts_tier: string
@@ -359,6 +394,7 @@ export interface MinuteBalance {
 export interface MinutePack {
   minutes: number
   price: number
+  discounted_price?: number | null
   one_time?: boolean
   already_purchased?: boolean
 }
@@ -382,12 +418,21 @@ export async function getJobsStats(): Promise<JobsStats> {
   return res.data
 }
 
-export async function getPlans(): Promise<{ plans: PlanDef[]; minute_packs: MinutePack[]; current: CurrentSubscription | null }> {
+export async function getPlans(): Promise<{
+  plans: PlanDef[]
+  minute_packs: MinutePack[]
+  current: CurrentSubscription | null
+  discount?: JobDiscountOffer | null
+}> {
   const res = await apiClient.get('/api/plans')
   return res.data
 }
 
-export async function getMinuteBalance(): Promise<{ balance: MinuteBalance; packs: MinutePack[] }> {
+export async function getMinuteBalance(): Promise<{
+  balance: MinuteBalance
+  packs: MinutePack[]
+  discount?: JobDiscountOffer | null
+}> {
   const res = await apiClient.get('/api/minutes')
   return res.data
 }

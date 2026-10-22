@@ -120,6 +120,8 @@ class JobResponse(BaseModel):
     is_preview: bool = False
     audio_mix_mode: Optional[str] = None
     costs: Optional[Dict[str, Any]] = None
+    user_info: Optional[Dict[str, Any]] = None
+    discount_offer: Optional[Dict[str, Any]] = None
 
 
 def _normalize_audio_mix_mode(mode: str | None) -> str:
@@ -653,6 +655,78 @@ def get_job(
             response.status_message = (
                 f"Navbatda: {position}-o'rin, taxminan {queue_load.format_wait(eta)} kutish"
             )
+
+    # 1. Admin uchun video egasining to'liq ma'lumotlari (Ism-familiya, email, telefon, tarif, balans, LTV)
+    if is_admin:
+        if job.user_id:
+            try:
+                from sqlalchemy import func
+                from backend.models.payment import Payment, PaymentStatus
+                from backend.services.plans import get_or_create_subscription, get_minute_balance
+
+                owner = db.query(User).filter(User.id == job.user_id).first()
+                if owner:
+                    sub = get_or_create_subscription(db, owner.id)
+                    bal = get_minute_balance(db, owner.id)
+                    user_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id == owner.id).count()
+                    user_completed_count = db.query(DubbingJob).filter(
+                        DubbingJob.user_id == owner.id,
+                        DubbingJob.status == JobStatus.COMPLETED
+                    ).count()
+                    payments_total = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                        Payment.user_id == owner.id,
+                        Payment.status == PaymentStatus.APPROVED
+                    ).scalar() or 0
+                    payments_count = db.query(Payment).filter(
+                        Payment.user_id == owner.id,
+                        Payment.status == PaymentStatus.APPROVED
+                    ).count()
+
+                    response.user_info = {
+                        "id": str(owner.id),
+                        "name": owner.name,
+                        "email": owner.email,
+                        "phone": owner.phone,
+                        "telegram_chat_id": owner.telegram_chat_id,
+                        "auth_provider": owner.auth_provider,
+                        "role": owner.role,
+                        "is_internal": owner.is_internal,
+                        "plan": sub.plan.value if sub else "free",
+                        "plan_expires_at": to_tashkent_iso(sub.current_period_end) if sub and sub.current_period_end else None,
+                        "minutes": bal,
+                        "created_at": to_tashkent_iso(owner.created_at) if owner.created_at else None,
+                        "last_active_at": to_tashkent_iso(owner.last_active_at) if owner.last_active_at else None,
+                        "jobs_count": user_jobs_count,
+                        "completed_jobs_count": user_completed_count,
+                        "payments_total_uzs": int(payments_total),
+                        "payments_count": payments_count,
+                        "anonymous": False,
+                    }
+                else:
+                    response.user_info = {
+                        "anonymous": False,
+                        "id": str(job.user_id),
+                        "name": "Noma'lum foydalanuvchi",
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to fetch user_info for admin on job {job.id}: {e}")
+                response.user_info = {"anonymous": False, "id": str(job.user_id), "error": str(e)}
+        else:
+            response.user_info = {
+                "anonymous": True,
+                "name": "Anonim mehmon (ro'yxatdan o'tmagan)",
+            }
+
+    # 2. Foydalanuvchi o'zining ilk videosi tugallanganda 24 soatlik 10% chegirma holati
+    if current_user_id and is_owner and job.status == JobStatus.COMPLETED:
+        try:
+            from backend.services.plans import get_user_first_video_discount
+            disc = get_user_first_video_discount(db, current_user_id)
+            if disc and disc.get("eligible"):
+                response.discount_offer = disc
+        except Exception as e:
+            logger.warning(f"Failed to check discount_offer for user {current_user_id}: {e}")
+
     return response
 
 

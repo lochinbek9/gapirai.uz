@@ -99,6 +99,98 @@ LEGACY_MINUTE_PACKS: dict[int, int] = {
     300: 100_000,
 }
 
+FIRST_VIDEO_DISCOUNT_PERCENT = 10
+FIRST_VIDEO_DISCOUNT_HOURS = 24
+
+
+def get_user_first_video_discount(db, user_id) -> dict:
+    """Ilk videosi muvaffaqiyatli tugagan foydalanuvchilar uchun 24 soatlik 10% chegirma holatini tekshiradi.
+    - Foydalanuvchining ilk COMPLETED bo'lgan DubbingJob'ini topadi.
+    - completed_at dan boshlab 24 soat vaqt beriladi.
+    - Agar 24 soat ichida bo'lsa: active=True, percent=10, expires_at, seconds_left.
+    - Agar 24 soat o'tgan bo'lsa: active=False, expired=True.
+    - Agar birorta ham videosi tugallanmagan bo'lsa: eligible=False.
+    """
+    if not user_id:
+        return {
+            "eligible": False,
+            "active": False,
+            "expired": False,
+            "percent": 0,
+            "seconds_left": 0,
+            "expires_at": None,
+            "first_job_id": None,
+        }
+    try:
+        from backend.models.database import DubbingJob, JobStatus
+        from backend.services.timezone_utils import to_tashkent_iso
+
+        first_job = (
+            db.query(DubbingJob)
+            .filter(
+                DubbingJob.user_id == user_id,
+                DubbingJob.status == JobStatus.COMPLETED,
+            )
+            .order_by(DubbingJob.completed_at.asc(), DubbingJob.created_at.asc())
+            .first()
+        )
+        if not first_job:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        base_time = first_job.completed_at or first_job.created_at
+        if not base_time:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        expires_at = base_time + timedelta(hours=FIRST_VIDEO_DISCOUNT_HOURS)
+        now_utc = datetime.utcnow()
+        is_active = now_utc < expires_at
+        seconds_left = max(0, int((expires_at - now_utc).total_seconds()))
+
+        return {
+            "eligible": True,
+            "active": is_active,
+            "expired": not is_active,
+            "percent": FIRST_VIDEO_DISCOUNT_PERCENT if is_active else 0,
+            "seconds_left": seconds_left,
+            "expires_at": to_tashkent_iso(expires_at),
+            "first_job_id": str(first_job.id),
+        }
+    except Exception:
+        return {
+            "eligible": False,
+            "active": False,
+            "expired": False,
+            "percent": 0,
+            "seconds_left": 0,
+            "expires_at": None,
+            "first_job_id": None,
+        }
+
+
+def apply_user_discount(db, user_id, amount: int) -> tuple[int, bool]:
+    """Agar foydalanuvchida 24 soatlik 10% chegirma faol bo'lsa, narxga chegirma qo'llaydi."""
+    disc = get_user_first_video_discount(db, user_id)
+    if disc.get("active"):
+        discounted = int(round(amount * (1.0 - (FIRST_VIDEO_DISCOUNT_PERCENT / 100.0))))
+        return max(1000, discounted), True
+    return amount, False
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Celery navbat arxitekturasi (2026-10-16 qayta ishlandi)
 #

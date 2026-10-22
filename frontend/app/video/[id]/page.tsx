@@ -9,13 +9,14 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, ArrowRight, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles
+  MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles, Gift
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
 import ConfirmModal from '@/components/ConfirmModal'
+import FirstVideoDiscountModal from '@/components/FirstVideoDiscountModal'
 import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
@@ -248,6 +249,10 @@ export default function VideoPage() {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
 
+  const [showDiscountModal, setShowDiscountModal] = useState(false)
+  const [hasDismissedDiscount, setHasDismissedDiscount] = useState(false)
+  const [userEmailCopied, setUserEmailCopied] = useState(false)
+
   const handleStartAnalysis = async () => {
     if (job?.linked_analysis_id) {
       router.push(`/video-analysis/${job.linked_analysis_id}`)
@@ -286,6 +291,27 @@ export default function VideoPage() {
       }
     }
   }, [job?.tts_provider, job?.speaker_gender])
+
+  useEffect(() => {
+    if (job?.status === 'completed' && job?.discount_offer?.active) {
+      const storageKey = `dismissed_discount_${job.job_id || id}`
+      const isDismissed = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null
+      if (!isDismissed && !hasDismissedDiscount) {
+        const timer = setTimeout(() => {
+          setShowDiscountModal(true)
+        }, 2000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [job?.status, job?.discount_offer?.active, job?.job_id, id, hasDismissedDiscount])
+
+  const handleCloseDiscountModal = () => {
+    setShowDiscountModal(false)
+    setHasDismissedDiscount(true)
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`dismissed_discount_${job?.job_id || id}`, '1')
+    }
+  }
 
   const handleGoHome = () => {
     clearJobId()
@@ -522,6 +548,36 @@ export default function VideoPage() {
           <div className={theaterMode ? 'w-full' : 'lg:col-span-2 space-y-4'}>
             {job.status === 'completed' ? (
               <div className="space-y-4">
+                {/* 10% First Video Welcome Discount Banner */}
+                {job.discount_offer?.active && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-indigo-500/15 to-purple-500/20 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                        <Gift className="w-5 h-5 animate-bounce" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                            Maxsus Taklif • 10% Chegirma
+                          </span>
+                          <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-300 font-mono font-bold">
+                            24 SOAT
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
+                          Ilk videongiz tayyor bo&apos;ldi! Barcha paketlar va tariflarga 10% chegirmadan foydalaning.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowDiscountModal(true)}
+                      className="w-full sm:w-auto py-2 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-gray-950 font-bold text-xs shadow-md transition-all shrink-0 cursor-pointer text-center"
+                    >
+                      Chegirmani olish ⚡
+                    </button>
+                  </div>
+                )}
+
                 {job.is_preview && (
                   <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-600/15 via-purple-600/10 to-indigo-600/15 border border-violet-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
                     <div className="flex items-center gap-2.5">
@@ -1377,6 +1433,130 @@ export default function VideoPage() {
                 )}
               </div>
 
+              {/* Admin-only Video Owner (User) Information Card */}
+              {isAdmin && (
+                <div className="glass-card border border-amber-500/30 rounded-[24px] p-5 space-y-3.5 shadow-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <span>👤</span> Video Egasi (Admin)
+                    </span>
+                    <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-300 font-mono font-bold">
+                      ADMIN
+                    </span>
+                  </div>
+
+                  {job.user_info ? (
+                    job.user_info.anonymous ? (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                        <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                          <span>⚠️</span> Anonim Foydalanuvchi
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-gray-300 leading-relaxed">
+                          Ushbu video saytga kirmagan (tizimda ro&apos;yxatdan o&apos;tmagan) mehmon tomonidan bepul sinov sifatida yuborilgan.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        <InfoRow label="Ism-familiya" value={job.user_info.name || '—'} />
+                        {job.user_info.email && (
+                          <div className="flex items-center justify-between py-0.5 text-sm">
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">Email:</span>
+                            <div className="flex items-center gap-1.5">
+                              <a
+                                href={`mailto:${job.user_info.email}`}
+                                className="font-semibold text-blue-400 hover:underline text-xs"
+                              >
+                                {job.user_info.email}
+                              </a>
+                              <button
+                                onClick={() => {
+                                  if (job.user_info?.email) {
+                                    navigator.clipboard.writeText(job.user_info.email)
+                                    setUserEmailCopied(true)
+                                    setTimeout(() => setUserEmailCopied(false), 2000)
+                                  }
+                                }}
+                                title="Emailni nusxalash"
+                                className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition"
+                              >
+                                {userEmailCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {job.user_info.phone && (
+                          <div className="flex items-center justify-between py-0.5 text-sm">
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">Telefon:</span>
+                            <a
+                              href={`tel:${job.user_info.phone}`}
+                              className="font-semibold text-emerald-400 font-mono hover:underline text-xs"
+                            >
+                              {job.user_info.phone}
+                            </a>
+                          </div>
+                        )}
+                        {job.user_info.telegram_chat_id && (
+                          <InfoRow label="Telegram ID" value={job.user_info.telegram_chat_id} />
+                        )}
+                        <InfoRow
+                          label="Tarif (Obuna)"
+                          value={
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              {job.user_info.plan || 'Free'}
+                            </span>
+                          }
+                        />
+                        {job.user_info.minutes && (
+                          <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] font-mono">
+                            <div className="flex justify-between text-gray-400">
+                              <span>Mavjud balans:</span>
+                              <span className="font-bold text-emerald-400">{job.user_info.minutes.total_available} daq</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500 text-[10px]">
+                              <span>Sotib olingan (kuymas):</span>
+                              <span>{job.user_info.minutes.purchased} daq</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500 text-[10px]">
+                              <span>Oylik qolgan:</span>
+                              <span>{job.user_info.minutes.monthly_remaining} / {job.user_info.minutes.monthly_cap} daq</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="pt-2 border-t border-white/5 space-y-1">
+                          <InfoRow
+                            label="Jami videolari"
+                            value={`${job.user_info.jobs_count ?? 0} ta (${job.user_info.completed_jobs_count ?? 0} tayyor)`}
+                          />
+                          <InfoRow
+                            label="Jami to'lovlari (LTV)"
+                            value={`~${(job.user_info.payments_total_uzs ?? 0).toLocaleString()} UZS (${job.user_info.payments_count ?? 0} ta)`}
+                          />
+                          {job.user_info.created_at && (
+                            <InfoRow label="Ro'yxatdan o'tgan" value={formatTashkentDateTime(job.user_info.created_at)} />
+                          )}
+                          {job.user_info.last_active_at && (
+                            <InfoRow label="Oxirgi faollik" value={formatTashkentDateTime(job.user_info.last_active_at)} />
+                          )}
+                          <InfoRow label="Kirish usuli" value={job.user_info.auth_provider || 'parol'} />
+                        </div>
+                        <div className="pt-2 mt-2 border-t border-white/10 flex justify-between items-center text-[10px]">
+                          <span className="font-mono text-gray-500">ID: {job.user_info.id.slice(0, 8)}...</span>
+                          <Link
+                            href={`/admin?search=${encodeURIComponent(job.user_info.email || job.user_info.id)}`}
+                            className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 hover:underline"
+                          >
+                            <span>Admin boshqaruvida ochish</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-xs text-gray-400">Foydalanuvchi ma&apos;lumotlari yuklanmoqda...</div>
+                  )}
+                </div>
+              )}
+
               {/* AI Video Tahlili Sidebar CTA */}
               {job.status === 'completed' && Boolean(job.youtube_url || job.linked_analysis_id) && (
                 <div className="glass-card border border-blue-500/30 rounded-[24px] p-5 space-y-3 shadow-xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-purple-500/10">
@@ -1569,11 +1749,20 @@ export default function VideoPage() {
         cancelText="Ortga"
         danger
       />
+
+      {/* 24-Hour 10% Welcome Discount Modal for First Video */}
+      {job?.discount_offer && (
+        <FirstVideoDiscountModal
+          discount={job.discount_offer}
+          isOpen={showDiscountModal}
+          onClose={handleCloseDiscountModal}
+        />
+      )}
     </div>
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between items-start gap-2 text-sm">
       <span className="text-gray-500 dark:text-gray-400">{label}</span>
