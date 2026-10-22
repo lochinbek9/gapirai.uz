@@ -121,11 +121,29 @@ export interface AdminUserItem {
   }
 }
 
+export interface AdminUsersSummary {
+  total: number
+  paid_count: number
+  free_count: number
+  has_package_count: number
+  zero_balance_count: number
+  unverified_count: number
+  period_label: string
+}
+
+export interface AdminUserInsight {
+  type: 'warning' | 'caution' | 'success' | 'info'
+  title: string
+  description: string
+}
+
 export interface AdminUsersResponse {
   total: number
   page: number
   limit: number
   users: AdminUserItem[]
+  summary?: AdminUsersSummary
+  insights?: AdminUserInsight[]
 }
 
 export async function apiAdminListUsers(

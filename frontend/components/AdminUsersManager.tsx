@@ -25,6 +25,8 @@ import {
 } from 'lucide-react'
 import {
   AdminUserItem,
+  AdminUsersSummary,
+  AdminUserInsight,
   apiAdminListUsers,
   apiAdminAddMinutes,
   apiAdminSetPlan,
@@ -93,6 +95,8 @@ function AdminUsersManagerInner() {
   const [dateRange, setDateRange] = useState<DateRangeValue>('all')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+  const [summary, setSummary] = useState<AdminUsersSummary | null>(null)
+  const [serverInsights, setServerInsights] = useState<AdminUserInsight[]>([])
 
   // Minute Top-up / Deduct modal state
   const [minuteModalUser, setMinuteModalUser] = useState<AdminUserItem | null>(null)
@@ -139,12 +143,18 @@ function AdminUsersManagerInner() {
       if (data && Array.isArray(data.users)) {
         setUsers(data.users)
         setTotal(data.total || 0)
+        setSummary(data.summary || null)
+        setServerInsights(data.insights || [])
       } else {
         setUsers([])
         setTotal(0)
+        setSummary(null)
+        setServerInsights([])
       }
     } catch (err: any) {
       setUsers([])
+      setSummary(null)
+      setServerInsights([])
       setError(err?.response?.data?.detail || "Foydalanuvchilarni yuklashda xatolik. Backend qayta ishga tushirilganini tekshiring.")
     } finally {
       setLoading(false)
@@ -282,8 +292,20 @@ function AdminUsersManagerInner() {
   ]
 
   const insights = useMemo(() => {
+    if (serverInsights && serverInsights.length > 0) {
+      return serverInsights
+    }
     const list: { type: 'warning' | 'caution' | 'success' | 'info'; title: string; description: string }[] = []
     if (safeUsers.length === 0) return list
+
+    const periodName = summary?.period_label || (
+      dateRange === 'today' ? 'Bugun' :
+      dateRange === '7d' ? 'So\'nggi 7 kun' :
+      dateRange === '14d' ? 'So\'nggi 14 kun' :
+      dateRange === '30d' ? 'So\'nggi 30 kun' :
+      dateRange === '90d' ? 'So\'nggi 90 kun' :
+      dateRange === 'custom' ? 'Tanlangan oraliq' : 'Barcha davr'
+    )
 
     const freeCount = safeUsers.filter((u) => (u.plan || 'free').toLowerCase() === 'free').length
     const paidCount = safeUsers.filter((u) => ['standard', 'pro'].includes((u.plan || '').toLowerCase())).length
@@ -291,32 +313,32 @@ function AdminUsersManagerInner() {
     const hasPurchasedCount = safeUsers.filter((u) => (u.balance?.purchased ?? 0) > 0).length
     const unverifiedCount = safeUsers.filter((u) => !u.is_verified).length
 
-    if (zeroBalCount > 0) {
-      list.push({
-        type: 'warning',
-        title: `${zeroBalCount} ta foydalanuvchida daqiqa tugagan`,
-        description: `Ko'rsatilgan ro'yxatdagi foydalanuvchilarning balansi 0 daqiqa bo'lib qolgan. Ularga daqiqa paketlari (Starter 15 daqiqa) taklifini ko'rsatish konversiyani oshiradi.`,
-      })
-    }
-
     if (paidCount > 0) {
       list.push({
         type: 'success',
-        title: `${paidCount} ta faol pullik mijoz (Standart/Pro)`,
+        title: `${periodName}: ${paidCount} ta faol pullik mijoz (Standart/Pro)`,
         description: `Platformaga to'lov qilayotgan obunachilar. Ularning limitsiz tahlil va tezkor audio generatsiyadan foydalanishini nazorat qilib boring.`,
       })
     } else if (freeCount > 0 && total > 0) {
       list.push({
         type: 'info',
-        title: `Obunalarga konversiya kutilmoqda`,
-        description: `Ko'rsatilgan foydalanuvchilar bepul sinov tarifida. Qulay paketlar va aksiyalar ularning faolligini oshiradi.`,
+        title: `${periodName}: ${total} ta yangi foydalanuvchi (bepul sinovda)`,
+        description: `Tanlangan davrda ro'yxatdan o'tgan foydalanuvchilar bepul sinov tarifida. Qulay starter paketlar va aksiyalar ularning faolligini oshiradi.`,
+      })
+    }
+
+    if (zeroBalCount > 0) {
+      list.push({
+        type: 'warning',
+        title: `${periodName}: ${zeroBalCount} ta foydalanuvchida daqiqa tugagan`,
+        description: `Ko'rsatilgan ro'yxatdagi foydalanuvchilarning balansi 0 daqiqa bo'lib qolgan. Ularga daqiqa paketlari (Starter 15 daqiqa) taklifini ko'rsatish konversiyani oshiradi.`,
       })
     }
 
     if (hasPurchasedCount > 0) {
       list.push({
         type: 'info',
-        title: `${hasPurchasedCount} ta foydalanuvchida kuymas daqiqalar mavjud`,
+        title: `${periodName}: ${hasPurchasedCount} ta foydalanuvchida kuymas daqiqalar mavjud`,
         description: `Ushbu daqiqalar bir martalik xarid qilingan bo'lib, oylik muddatga bog'liq emas va hech qachon kuymaydi.`,
       })
     }
@@ -324,13 +346,13 @@ function AdminUsersManagerInner() {
     if (unverifiedCount > 0) {
       list.push({
         type: 'caution',
-        title: `${unverifiedCount} ta tasdiqlanmagan profil`,
+        title: `${periodName}: ${unverifiedCount} ta tasdiqlanmagan profil`,
         description: `Ushbu akkauntlar ro'yxatdan o'tgan, biroq email manzilini hali tasdiqlamagan.`,
       })
     }
 
     return list
-  }, [safeUsers, total])
+  }, [serverInsights, safeUsers, total, summary, dateRange])
 
   return (
     <section className="space-y-4">
@@ -351,11 +373,11 @@ function AdminUsersManagerInner() {
           value={dateRange}
           onChange={(newRange, start, end) => {
             setDateRange(newRange)
-            if (start) setStartDate(start)
-            if (end) setEndDate(end)
+            setStartDate(start || '')
+            setEndDate(end || '')
             setPage(1)
           }}
-          onRefresh={() => fetchUsers(search, page, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)}
+          onRefresh={() => fetchUsers(search, 1, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)}
           loading={loading}
           startDate={startDate}
           endDate={endDate}
@@ -462,10 +484,34 @@ function AdminUsersManagerInner() {
       {/* Tizimning Avtomatik Xulosalari va Tavsiyalari (User Insights) */}
       {insights.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Info className="w-4 h-4 text-blue-400" />
-            Tizimning Avtomatik Xulosalari va Tavsiyalari
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Info className="w-4 h-4 text-blue-400" />
+              <span>Tizimning Avtomatik Xulosalari va Tavsiyalari</span>
+              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                {summary?.period_label || (
+                  dateRange === 'today' ? 'Bugun' :
+                  dateRange === '7d' ? 'So\'nggi 7 kun' :
+                  dateRange === '14d' ? 'So\'nggi 14 kun' :
+                  dateRange === '30d' ? 'So\'nggi 30 kun' :
+                  dateRange === '90d' ? 'So\'nggi 90 kun' :
+                  dateRange === 'custom' ? 'Oraliq' : 'Barcha davr'
+                )}
+              </span>
+            </h3>
+
+            {summary && (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 backdrop-blur-sm">
+                <span className="text-gray-400">Jami: <strong className="text-white font-mono">{summary.total.toLocaleString()}</strong></span>
+                <span className="text-gray-600">•</span>
+                <span className="text-gray-400">Pullik: <strong className="text-amber-400 font-mono">{summary.paid_count}</strong></span>
+                <span className="text-gray-600">•</span>
+                <span className="text-gray-400">Kuymas paket: <strong className="text-emerald-400 font-mono">{summary.has_package_count}</strong></span>
+                <span className="text-gray-600">•</span>
+                <span className="text-gray-400">Balansi 0: <strong className="text-rose-400 font-mono">{summary.zero_balance_count}</strong></span>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {insights.map((ins, i) => (
               <div

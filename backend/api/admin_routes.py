@@ -494,6 +494,7 @@ def admin_list_users(
                 )
 
         # Date range filter for user registration
+        period_label = "Barcha davr"
         if date_range and date_range.strip().lower() not in ("all", ""):
             TASHKENT_OFFSET = timedelta(hours=5)
             tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
@@ -502,21 +503,27 @@ def admin_list_users(
             u_end_utc = None
             dr = date_range.strip().lower()
             if dr == "today":
+                period_label = "Bugun"
                 dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
                 u_start_utc = dt - TASHKENT_OFFSET
             elif dr == "7d":
+                period_label = "So'nggi 7 kun"
                 dt = tashkent_today_date - timedelta(days=6)
                 u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
             elif dr == "14d":
+                period_label = "So'nggi 14 kun"
                 dt = tashkent_today_date - timedelta(days=13)
                 u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
             elif dr == "30d":
+                period_label = "So'nggi 30 kun"
                 dt = tashkent_today_date - timedelta(days=29)
                 u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
             elif dr == "90d":
+                period_label = "So'nggi 90 kun"
                 dt = tashkent_today_date - timedelta(days=89)
                 u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
             elif dr == "custom" and start_date:
+                period_label = f"{start_date} ~ {end_date or start_date}"
                 try:
                     s_parts = [int(p) for p in start_date.split("-")]
                     u_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
@@ -530,7 +537,83 @@ def admin_list_users(
             if u_end_utc:
                 query = query.filter(User.created_at < u_end_utc)
 
-        total = query.count()
+        # Single efficient aggregation query across all matching users for this filter/period
+        calc_is_zero_balance = and_(
+            or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0),
+            case(
+                (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) >= 60),
+                (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) >= 20),
+                else_=func.coalesce(Subscription.monthly_minutes_used, 0) >= 5,
+            )
+        )
+        calc_is_paid = Subscription.plan.in_([PlanTier.STANDARD, PlanTier.PRO])
+        calc_has_pkg = func.coalesce(Subscription.purchased_minutes, 0) > 0
+        calc_is_unverified = User.is_verified.is_(False)
+
+        agg = query.with_entities(
+            func.count(User.id).label("total"),
+            func.count(case((calc_is_paid, 1))).label("paid_count"),
+            func.count(case((calc_has_pkg, 1))).label("has_package_count"),
+            func.count(case((calc_is_zero_balance, 1))).label("zero_balance_count"),
+            func.count(case((calc_is_unverified, 1))).label("unverified_count"),
+        ).first()
+
+        total = (agg[0] if agg else 0) or 0
+        paid_count = (agg[1] if agg else 0) or 0
+        has_package_count = (agg[2] if agg else 0) or 0
+        zero_balance_count = (agg[3] if agg else 0) or 0
+        unverified_count = (agg[4] if agg else 0) or 0
+        free_count = max(0, total - paid_count)
+
+        insights = []
+        if total == 0:
+            insights.append({
+                "type": "info",
+                "title": f"{period_label}da yangi foydalanuvchilar topilmadi",
+                "description": "Tanlangan vaqt oralig'i yoki filtr parametrlari bo'yicha birorta ham profil ro'yxatdan o'tmagan."
+            })
+        else:
+            if paid_count > 0:
+                conv_rate = round(paid_count / total * 100, 1)
+                insights.append({
+                    "type": "success",
+                    "title": f"{period_label}: {paid_count:,} ta pullik obunachi (Standart/Pro)",
+                    "description": f"Tanlangan davrdagi {total:,} ta foydalanuvchidan {paid_count:,} tasi faol obunachi ({conv_rate}% konversiya). Qolgan {free_count:,} tasi bepul sinov tarifida."
+                })
+            else:
+                insights.append({
+                    "type": "info",
+                    "title": f"{period_label}: {total:,} ta foydalanuvchi (bepul sinovda)",
+                    "description": f"Ushbu davrda ro'yxatdan o'tgan barcha {total:,} ta foydalanuvchi hozircha bepul sinov tarifida. Ularga boshlang'ich starter paketlar yoki aksiyalar taklif qilish konversiyani oshiradi."
+                })
+
+            if zero_balance_count > 0:
+                insights.append({
+                    "type": "warning",
+                    "title": f"{period_label}: {zero_balance_count:,} ta foydalanuvchida daqiqa tugagan",
+                    "description": f"Ko'rsatilgan foydalanuvchilar orasida {zero_balance_count:,} tasining balansi 0 daqiqa bo'lib qolgan. Aynan shu segmentga Starter paketi (15 daqiqa) taklif qilinsa, to'lov konversiyasi maksimal bo'ladi."
+                })
+
+            if has_package_count > 0:
+                insights.append({
+                    "type": "info",
+                    "title": f"{period_label}: {has_package_count:,} ta foydalanuvchida kuymas paket mavjud",
+                    "description": f"Ushbu {has_package_count:,} ta foydalanuvchi bir martalik kuymas daqiqa paketlarini xarid qilgan bo'lib, daqiqalari oylik muddatga bog'liq emas va hech qachon kuymaydi."
+                })
+
+            if unverified_count > 0:
+                insights.append({
+                    "type": "caution",
+                    "title": f"{period_label}: {unverified_count:,} ta tasdiqlanmagan profil",
+                    "description": f"Ushbu {unverified_count:,} ta profil ro'yxatdan o'tgan, lekin email manzilini hali tasdiqlamagan. Eslatma xati yuborish ularni platformaga qaytarishi mumkin."
+                })
+
+            if paid_count == 0 and has_package_count == 0 and zero_balance_count == 0 and total > 0:
+                insights.append({
+                    "type": "info",
+                    "title": f"Yangi ro'yxatdan o'tganlar uchun sinov davri",
+                    "description": f"{period_label}da qo'shilgan {total:,} ta yangi foydalanuvchiga 5 daqiqalik bepul sinov ajratilgan. Ularning birinchi dublyaj urinishini kuzatib borish va qiyinchilik bo'lsa yordam berish tavsiya etiladi."
+                })
 
         # Sorting logic
         calc_balance_expr = (
@@ -589,6 +672,16 @@ def admin_list_users(
             "page": page,
             "limit": limit,
             "users": result,
+            "summary": {
+                "total": total,
+                "paid_count": paid_count,
+                "free_count": free_count,
+                "has_package_count": has_package_count,
+                "zero_balance_count": zero_balance_count,
+                "unverified_count": unverified_count,
+                "period_label": period_label,
+            },
+            "insights": insights,
         }
     finally:
         db.close()
