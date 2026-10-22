@@ -720,6 +720,7 @@ export default function AdminPage() {
             {/* Quick Recent Jobs with 1-Click Retry */}
             <section className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
+                <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
                       Bugungi dublyaj ishlari (Jonli navbat & holat)
