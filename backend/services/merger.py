@@ -223,7 +223,24 @@ def merge_video_audio(
     audio_dur = _get_duration(dubbed_audio_path)
     has_orig_audio = _has_audio_stream(video_path)
 
-    target_dur = video_dur if audio_dur <= video_dur else None
+    # Agar o'zbekcha audio videodan uzun bo'lsa, videoni behuda bir necha daqiqaga
+    # muzlatib (freeze-frame) cho'zmaslik uchun maksimal ruxsat etilgan farq 2.5 soniya.
+    # Undan ortiq bo'lsa, audio video uzunligi + 2.5s ga cheklanadi.
+    max_extra_allowed = 2.5
+    if audio_dur > video_dur + max_extra_allowed:
+        logger.warning(
+            f"Dublyaj audio ({audio_dur:.1f}s) video ({video_dur:.1f}s) dan ancha uzun! "
+            f"Videoni behuda cho'zmaslik uchun audio {video_dur + max_extra_allowed:.1f}s ga cheklanmoqda."
+        )
+        target_dur = video_dur + max_extra_allowed
+        extra = max_extra_allowed
+    elif audio_dur > video_dur:
+        target_dur = None
+        extra = audio_dur - video_dur
+    else:
+        target_dur = video_dur
+        extra = 0.0
+
     audio_filter = _build_audio_filtergraph(
         target_dur=target_dur,
         audio_mix_mode=audio_mix_mode,
@@ -234,7 +251,6 @@ def merge_video_audio(
     needs_transcode = vcodec not in ("h264", "avc1")
 
     use_watermark = WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
-    extra = audio_dur - video_dur if audio_dur > video_dur else 0.0
 
     def _build_cmd(with_watermark: bool) -> list[str]:
         if with_watermark:

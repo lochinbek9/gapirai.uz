@@ -788,6 +788,25 @@ def process_video(self: Task, job_id: str) -> dict:
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
+
+            # Gallyutsinatsiya yoki xato timestamp'larni tozalash:
+            # Segment start vaqti video_duration dan katta bo'lsa (masalan, musiqa ustiga
+            # Whisper to'qib chiqargan soxta gaplar) tashlab ketiladi.
+            if getattr(job, "video_duration", None) and job.video_duration > 0:
+                valid_segs = []
+                for s in transcript["segments"]:
+                    if s.get("start", 0) >= job.video_duration:
+                        logger.warning(
+                            f"[JOB {job_id}] STT segment start ({s.get('start')}s) video davomiyligidan "
+                            f"({job.video_duration}s) katta — tashlab ketilmoqda: {s.get('text', '')[:40]}"
+                        )
+                        continue
+                    if s.get("end", 0) > job.video_duration:
+                        s["end"] = round(float(job.video_duration), 2)
+                    valid_segs.append(s)
+                if valid_segs:
+                    transcript["segments"] = valid_segs
+
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]

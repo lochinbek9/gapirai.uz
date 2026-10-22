@@ -81,9 +81,7 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
     candidate_models = [
         primary_model,
         "gemini-3.8-flash-lite-tts",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.5-flash-preview-tts",
+        "gemini-3.8-flash",
     ]
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
@@ -180,10 +178,11 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
                 is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
                 is_503 = "503" in err_str or "UNAVAILABLE" in err_str
                 is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
+                is_not_found = "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str
 
-                if is_unauth:
-                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: yaroqsiz kalit")
-                    logger.warning(f"Gemini TTS [{key[:10]}...] 401 yaroqsiz kalit — o'chirildi.")
+                if is_unauth or is_not_found:
+                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401/404: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 401/404 yaroqsiz kalit yoki model — o'chirildi.")
                     continue
 
                 if is_rate_limit:
