@@ -970,22 +970,27 @@ def retry_job(
     duration_minutes = max(0.1, round((duration_seconds or 60.0) / 60.0, 2))
 
     # 2. Balansdan daqiqa yechish:
-    # - Admin uchun bepul (is_user_admin).
-    # - Agar job avval FAILED bo'lgan bo'lsa va undan daqiqa yechilgan bo'lsa (quota_consumed=True),
-    #   qayta urinish uchun ikkinchi marta daqiqa yechilmaydi!
-    # - Faqat COMPLETED videoni qayta yaratish (regenerate) yoki avval daqiqa yechilmagan holatda yechiladi.
-    needs_quota = is_regenerate or not getattr(job, "quota_consumed", False)
-    if needs_quota and not is_user_admin(db, current_user.id):
-        target_user_id = job.user_id or current_user.id
-        has_quota, shortfall = check_and_consume_quota(db, target_user_id, duration_minutes)
-        if not has_quota:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
-            )
-        job.quota_consumed = True
-    elif not getattr(job, "quota_consumed", False):
-        job.quota_consumed = True
+    # - 2 daqiqalik parchalar (is_preview=True) HAR DOIM bepul: balansdan yechilmaydi va qaytarilmaydi!
+    # - Admin sinov/qayta ishga tushirishi bepul (is_user_admin). Ilgari yechilmagan job sun'iy quota_consumed=True qilinmaydi!
+    # - Agar job avval FAILED bo'lgan bo'lsa va undan daqiqa yechilgan bo'lsa (quota_consumed=True), qayta yechilmaydi.
+    # - Faqat oddiy foydalanuvchi COMPLETED videoni qayta yaratganda yoki ilgari yechilmaganda balansdan yechiladi.
+    is_preview = bool(getattr(job, "is_preview", False))
+    if is_preview:
+        job.quota_consumed = False
+    elif is_user_admin(db, current_user.id):
+        # Admin sinovi bepul: foydalanuvchiga ta'sir qilmaydi, quota_consumed flagi o'zgarmaydi
+        pass
+    else:
+        needs_quota = is_regenerate or not getattr(job, "quota_consumed", False)
+        if needs_quota:
+            target_user_id = job.user_id or current_user.id
+            has_quota, shortfall = check_and_consume_quota(db, target_user_id, duration_minutes)
+            if not has_quota:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
+                )
+            job.quota_consumed = True
 
 
     # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
@@ -1547,8 +1552,8 @@ def cancel_job(
     job.error_message = "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
     job.updated_at = datetime.utcnow()
 
-    # Agar kvota sarflangan bo'lsa, foydalanuvchiga qaytarish
-    if getattr(job, "quota_consumed", False):
+    # Agar kvota sarflangan bo'lsa, foydalanuvchiga qaytarish (preview bundan mustasno)
+    if getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False):
         try:
             from backend.services.plans import refund_quota
             refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)

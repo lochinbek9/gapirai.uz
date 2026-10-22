@@ -364,10 +364,11 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
 def refund_quota(db, user_id, duration_minutes: float) -> None:
     """consume_quota() bilan sarflangan daqiqalarni qaytaradi -- job pipeline
     muvaffaqiyatsiz tugasa (backend/workers/tasks.py) yoki bekor qilinsa.
-    consume'ning teskarisi: avval sotib olingan daqiqalarga (agar shu jobda
-    ishlatilgan bo'lsa), keyin oylikka qaytaradi -- soddaroq qilib, hammasini
-    oylik hisoblagichdan ayiramiz, purchased qoldig'i esa faqat oylik 0'ga
-    yetganda oshadi."""
+    Oylik byudjetdan sarflangan qismini monthly_minutes_used hisoblagichidan ayiramiz.
+    Sotib olingan daqiqalarga (purchased_minutes) faqat va faqat foydalanuvchi
+    haqiqatan to'lov orqali daqiqa sotib olgan bo'lsa va joriy purchased_minutes
+    xarid qilingan limitdan kam bo'lsagina qaytariladi. Hech qachon bepul foydalanuvchiga
+    sun'iy sotib olingan daqiqa qo'shilmaydi!"""
     if not user_id or duration_minutes <= 0:
         return
     sub = get_or_create_subscription(db, user_id, for_update=True)
@@ -376,7 +377,18 @@ def refund_quota(db, user_id, duration_minutes: float) -> None:
     remainder = duration_minutes - give_back_to_monthly
     sub.monthly_minutes_used = max(0.0, used - give_back_to_monthly)
     if remainder > 0:
-        sub.purchased_minutes = (sub.purchased_minutes or 0.0) + remainder
+        from backend.models.payment import Payment, PaymentStatus
+        approved_payments = db.query(Payment).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+            Payment.minutes_purchased.isnot(None),
+            Payment.minutes_purchased > 0
+        ).all()
+        total_paid_minutes = sum(float(p.minutes_purchased or 0) for p in approved_payments)
+        current_purchased = float(sub.purchased_minutes or 0.0)
+        if total_paid_minutes > 0 and current_purchased < total_paid_minutes:
+            allowed_to_add = min(remainder, total_paid_minutes - current_purchased)
+            sub.purchased_minutes = round(current_purchased + allowed_to_add, 2)
     db.commit()
 
 

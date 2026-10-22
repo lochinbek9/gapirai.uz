@@ -400,6 +400,12 @@ def _refund_job_quota_or_flag_payment(job_id: str, is_recovery_job: bool = False
         if not fresh_job:
             return
 
+        # Agar bu preview (2 daqiqalik parcha) bo'lsa, u bepul, hech qachon kvota qaytarilmaydi!
+        if getattr(fresh_job, "is_preview", False):
+            fresh_job.quota_consumed = False
+            refund_db.commit()
+            return
+
         # Agar bu eski completed job'ning on-demand qayta tiklanishi bo'lsa,
         # foydalanuvchiga allaqachon avval video yetkazilgan, kvota qaytarilmaydi.
         if is_recovery_job or fresh_job.completed_at is not None:
