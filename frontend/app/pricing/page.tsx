@@ -212,13 +212,16 @@ export default function PricingPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 dark:text-slate-300 leading-relaxed">
-            Ortiqcha studiya xarajatlarisiz, daqiqasiga atigi <span className="font-bold text-violet-600 dark:text-violet-400">140 so'mdan</span> professional dublyaj qiling. Xarid qilingan daqiqa paketlari <span className="font-bold text-emerald-600 dark:text-emerald-400">HECH QACHON KUYMAYDI</span> — oylik muddatga bog'liq emas va muddatsiz saqlanadi!
+            Ortiqcha studiya xarajatlarisiz, daqiqasiga atigi <span className="font-bold text-violet-600 dark:text-violet-400">140 so'mdan</span> professional dublyaj qiling. Doimiy foydalanish uchun <span className="font-bold text-violet-600 dark:text-violet-400">oylik tejamkor obunalar</span> yoki muddatsiz saqlanadigan <span className="font-bold text-emerald-600 dark:text-emerald-400">kuymaydigan daqiqa paketlari</span>ni tanlang!
           </p>
 
           {/* Value Pills */}
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 font-semibold">
+              <Check className="w-3.5 h-3.5 text-violet-500" /> Oylik qulay tariflar
+            </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-semibold">
-              <Check className="w-3.5 h-3.5 text-emerald-500" /> Kuymaydigan daqiqalar
+              <Check className="w-3.5 h-3.5 text-emerald-500" /> Paketlar kuymaydi
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-semibold">
               <Clock className="w-3.5 h-3.5 text-blue-500" /> 1-2 daqiqada tayyor
@@ -388,7 +391,7 @@ export default function PricingPage() {
                         <li className="flex items-center gap-2.5">
                           <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
                           <span>
-                            <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> dublyaj
+                            <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> oylik kvota (oy oxirida yangilanadi)
                           </span>
                         </li>
                         <li className="flex items-center gap-2.5">
@@ -625,7 +628,7 @@ export default function PricingPage() {
                   <td className="p-3.5 sm:p-4 font-medium text-gray-900 dark:text-white">Daqiqalar muddati</td>
                   <td className="p-3.5 sm:p-4 text-gray-500 dark:text-slate-400">Mavjud emas</td>
                   <td className="p-3.5 sm:p-4 text-emerald-600 dark:text-emerald-400 font-bold bg-violet-500/[0.06]">
-                    Hech qachon kuymaydi
+                    Paketlar kuymaydi (muddatsiz) • Obunada oylik kvota
                   </td>
                 </tr>
                 <tr>
@@ -669,12 +672,16 @@ export default function PricingPage() {
           <div className="space-y-2.5 max-w-3xl mx-auto">
             {[
               {
-                q: "Xarid qilingan daqiqa paketlari qachondir kuydimi yoki o'chib ketadimi?",
-                a: "Yo'q! Paket sifatida sotib olingan barcha daqiqalar hech qachon kuymaydi. Ular hisobingizda muddatsiz saqlanadi va istalgan paytda foydalanishingiz mumkin.",
+                q: "Obunadagi daqiqalar oy oxirida nima bo'ladi (kuyadimi)?",
+                a: "Ha, obuna (Standart, Pro) har oy uchun ajratiladigan oylik kvotadir va yangi to'lov davrida yangilanadi (foydalanilmagan qoldiq keyingi oyga o'tmaydi, ya'ni kuyadi). Agar sizga muddatsiz, hech qachon kuymaydigan daqiqalar kerak bo'lsa, 'Kuymaydigan Daqiqa Paketlari' bo'limidan bir martalik paket xarid qilishingiz mumkin — ularning muddati cheksiz!",
+              },
+              {
+                q: "Alohida xarid qilingan daqiqa paketlari qachondir kuydimi yoki o'chib ketadimi?",
+                a: "Yo'q! Paket sifatida sotib olingan barcha daqiqalar (Starter, 35, 70, 140, 350 daqiqa) hech qachon kuymaydi. Ular hisobingizda muddatsiz saqlanadi va obunangiz tugasa ham saqlanib qoladi.",
               },
               {
                 q: "Oylik obunadagi daqiqalar bilan paket daqiqalari qanday sarflanadi?",
-                a: "Tizim har doim foydalanuvchi foydasiga ishlaydi: avval oylik obuna bergan daqiqalar ishlatiladi. Agar ular tugasa, xarid qilingan kuymas paket daqiqalaringiz avtomatik tarzda sarflana boshlaydi.",
+                a: "Tizim har doim foydalanuvchi foydasiga ishlaydi: avval oylik obuna bergan daqiqalar ishlatiladi (chunki ular oy oxirida yangilanadi). Agar oylik kvota tugasa, xarid qilingan kuymas paket daqiqalaringiz sarflana boshlaydi.",
               },
               {
                 q: "Video davomiyligi qanday hisoblanadi?",
