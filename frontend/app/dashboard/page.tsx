@@ -15,7 +15,7 @@ import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
-  Sparkles, FileText,
+  Sparkles, FileText, Zap, Package, X,
 } from 'lucide-react'
 import { formatTashkentDate } from '@/lib/timestamp'
 
@@ -581,6 +581,103 @@ function MeshBackground() {
   );
 }
 
+/**
+ * FreeTierConversionBanner — only shown to free-plan users.
+ * Offers a quick jump to /pricing with Starter pack & subscription highlights.
+ */
+function FreeTierConversionBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="relative mb-6 rounded-2xl overflow-hidden border border-violet-500/30 shadow-2xl shadow-violet-900/20">
+      {/* Gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/80 via-indigo-950/80 to-slate-900/90 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_60%)]" />
+
+      {/* Dismiss button */}
+      <button
+        onClick={onDismiss}
+        className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition"
+        aria-label="Yopish"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+
+      <div className="relative z-10 p-5 sm:p-6">
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h3 className="text-white font-extrabold text-sm sm:text-base leading-tight">
+              Bepul daqiqalaringiz tugamoqda?
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">
+              Bir necha soniyada daqiqa paketi olib, dublyajni to'xtovsiz davom ettiring.
+            </p>
+          </div>
+        </div>
+
+        {/* Cards row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Starter pack */}
+          <Link
+            href="/pricing#packages"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 hover:bg-emerald-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-emerald-300 font-extrabold text-xs uppercase tracking-wider">Starter paketi</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">+15 daqiqa</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              Bir martalik maxsus taklif. Tez sinab ko'rish uchun ideal.
+            </p>
+            <span className="mt-auto self-start text-emerald-400 text-[11px] font-bold group-hover:underline">
+              Sotib olish →
+            </span>
+          </Link>
+
+          {/* Standart plan */}
+          <Link
+            href="/pricing#plans"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 hover:bg-blue-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="text-blue-300 font-extrabold text-xs uppercase tracking-wider">Standart tarif</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">350 daq / oy</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              720p sifat, yuqori ustuvorlik navbati, oylik abonement.
+            </p>
+            <span className="mt-auto self-start text-blue-400 text-[11px] font-bold group-hover:underline">
+              Tarifni ko'rish →
+            </span>
+          </Link>
+
+          {/* Pro plan */}
+          <Link
+            href="/pricing#plans"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-violet-500/10 border border-violet-500/25 hover:border-violet-400/50 hover:bg-violet-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-violet-400 shrink-0" />
+              <span className="text-violet-300 font-extrabold text-xs uppercase tracking-wider">Pro tarif</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">600 daq / oy</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              1080p sifat, Azure Neural TTS, eng yuqori ustuvorlik.
+            </p>
+            <span className="mt-auto self-start text-violet-400 text-[11px] font-bold group-hover:underline">
+              Pro olish →
+            </span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
@@ -593,6 +690,7 @@ export default function DashboardPage() {
   const [jobsStats, setJobsStats] = useState<JobsStats | null>(null)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
   const [renewing, setRenewing] = useState(false)
+  const [conversionBannerDismissed, setConversionBannerDismissed] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -787,6 +885,12 @@ export default function DashboardPage() {
         </div>
 
         <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
+
+        {/* Conversion banner: only for free users who haven't dismissed it */}
+        {subscription?.plan === 'free' && !conversionBannerDismissed && (
+          <FreeTierConversionBanner onDismiss={() => setConversionBannerDismissed(true)} />
+        )}
+
         <BillingCard />
         <PushOptIn />
         <DonateCTA className="mb-6" />
