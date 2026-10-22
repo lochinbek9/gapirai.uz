@@ -13,7 +13,17 @@ export default function PwaProvider() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    if (process.env.NODE_ENV !== 'production') {
+      // Dev'da /_next/static chunk nomlari hash'siz va o'zgarmaydi -- sw.js'ning
+      // cache-first strategiyasi eski kodni berib, kod o'zgarishlari brauzerga
+      // yetib bormasdi. Avval o'rnatilgan SW va uning keshini ham tozalaymiz.
+      navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {})
+      if ('caches' in window) {
+        caches.keys().then((keys) => keys.filter((k) => k.startsWith('gapirai-')).forEach((k) => caches.delete(k))).catch(() => {})
+      }
+    } else {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
 
     const dismissed = (() => {
       try { return localStorage.getItem('pwa_install_dismissed') === '1' } catch { return false }

@@ -780,10 +780,13 @@ def delete_job(
     except Exception as e:
         logger.warning(f"Celery taskini bekor qilishda xatolik ({job.id}): {e}")
 
-    # 2. Checkpointlarni tozalash (Redis/disk)
+    # 2. S3 checkpointlarini tozalash -- delete_checkpoint fayl nomini ham talab
+    # qiladi (ilgari faqat job_id bilan chaqirilib, har safar TypeError bilan
+    # jim o'tib ketardi va checkpointlar S3'da qolib ketardi).
     try:
         from backend.services.job_checkpoint import delete_checkpoint
-        delete_checkpoint(str(job.id))
+        for checkpoint_name in ("video.mp4", "audio.wav", "dubbed_audio.wav", "dubbed_final.mp4"):
+            delete_checkpoint(str(job.id), checkpoint_name)
     except Exception as e:
         logger.warning(f"Checkpointni tozalashda xatolik ({job.id}): {e}")
 
@@ -1312,14 +1315,24 @@ def download_video(
     variant_name = f"dubbed{suffix}.mp4"
 
     settings = get_settings()
-    if settings.AWS_BUCKET_NAME:
+    # S3 faqat bucket VA kalitlar sozlangan bo'lsa ishlaydi (storage._get_s3_client
+    # bilan bir xil shart). Ilgari faqat AWS_BUCKET_NAME tekshirilardi -- kalitsiz
+    # muhitda (local dev) yoki fayl S3'ga yuklanmay qolganda (worker checkpoint
+    # "S3'ga yuklanmadi") diskdagi tayyor video bo'lsa ham doim 410 qaytardi.
+    s3_enabled = bool(settings.AWS_BUCKET_NAME and settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY)
+    s3_missing = False
+    if s3_enabled:
         from backend.services.storage import generate_presigned_download_url, s3_object_exists
         s3_key = f"dubber/{job.storage_id}/{variant_name}"
-        if not s3_object_exists(s3_key):
-            raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
-        presigned_url = generate_presigned_download_url(s3_key)
-        if presigned_url:
-            return Response(status_code=307, headers={"Location": presigned_url})
+        if s3_object_exists(s3_key):
+            # <video> keyingi qismlarni (Range) shu imzolangan URL'dan so'raydi --
+            # standart 1 soat uzun videoni pauza bilan ko'rganda o'rtada 403 bilan
+            # to'xtatib qo'yardi (oxirini ko'rib bo'lmasdi). 12 soat yetarli zaxira.
+            presigned_url = generate_presigned_download_url(s3_key, expiration=12 * 3600)
+            if presigned_url:
+                return Response(status_code=307, headers={"Location": presigned_url})
+        else:
+            s3_missing = True
 
     video_path = None
     if resolution in ("360p", "1080p"):
@@ -1345,6 +1358,10 @@ def download_video(
                     video_path = str(direct_candidate)
 
     if not video_path or not Path(video_path).exists():
+        if s3_missing:
+            # S3 lifecycle (3 kun) bo'yicha o'chirilgan -- avvalgidek 410, qayta
+            # tiklash (to'liq qayta dublyaj) bu yerda ishga tushirilmaydi.
+            raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
         if resolution not in ("360p", "1080p"):
             from backend.services.job_recovery import can_recover_job, trigger_ondemand_recovery
             if can_recover_job(job):
