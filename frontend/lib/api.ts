@@ -41,6 +41,10 @@ export interface Job {
   speaker_gender?: string
   uzbek_srt_content?: string
   expected_end_time?: string
+  can_refund_on_cancel?: boolean
+  cancel_refund_seconds_left?: number
+  initial_stage?: string | null
+  current_stage?: string | null
   rating?: number
   feedback_comment?: string
   content_flagged?: boolean

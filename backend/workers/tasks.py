@@ -154,6 +154,32 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
 _STAGE_ICONS = {"ok": "✅", "skipped": "⏭️", "error": "❌"}
 
 
+def _start_stage(job_id: str, stage: str) -> None:
+    """Bosqich boshlanganda chaqiriladi — cancel policy uchun faol bosqichni qayd etadi."""
+    try:
+        from backend.services.cancel_policy import record_stage_transition
+        record_stage_transition(job_id, stage, is_skipped=False)
+    except Exception:
+        pass
+
+
+def _clamp_segments_to_video(segments: list | None, video_duration: float | None) -> list | None:
+    """Segmentlarni video davomiyligiga qat'iy cheklaydi — ortiqcha daqiqalar qo'shilishini oldini oladi."""
+    if not segments or not video_duration or video_duration <= 0:
+        return segments
+    max_d = float(video_duration)
+    valid = []
+    for s in segments:
+        st = s.get("start", 0)
+        if st >= max_d + 0.5:
+            continue
+        en = s.get("end", st)
+        if en > max_d + 1.0:
+            s["end"] = round(max_d + 1.0, 2)
+        valid.append(s)
+    return valid
+
+
 def _record_stage(stage_timings: dict, job_id: str, stage: str, start: float, status: str, detail: str = "") -> None:
     """Bir bosqich tugagach chaqiriladi — davomiylikni saqlaydi va bitta
     izchil formatli log qatorini chiqaradi (masalan monitoring/log
@@ -163,6 +189,11 @@ def _record_stage(stage_timings: dict, job_id: str, stage: str, start: float, st
     icon = _STAGE_ICONS.get(status, "•")
     suffix = f" — {detail}" if detail else ""
     logger.info(f"[{job_id}] STAGE={stage} duration={duration:.1f}s status={status} {icon}{suffix}")
+    try:
+        from backend.services.cancel_policy import record_stage_transition
+        record_stage_transition(job_id, stage, is_skipped=(status == "skipped"))
+    except Exception:
+        pass
 
 
 def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, final_status: str) -> None:
@@ -648,12 +679,12 @@ def process_video(self: Task, job_id: str) -> dict:
                 job.video_duration = job.video_duration or donor_j.video_duration
                 job.video_thumbnail = job.video_thumbnail or donor_j.video_thumbnail
                 job.transcript_text = job.transcript_text or donor_j.transcript_text
-                job.transcript_segments = job.transcript_segments or donor_j.transcript_segments
+                job.transcript_segments = _clamp_segments_to_video(job.transcript_segments or donor_j.transcript_segments, job.video_duration)
                 job.srt_content = job.srt_content or donor_j.srt_content
                 job.translated_text = job.translated_text or donor_j.translated_text
-                job.translated_segments = job.translated_segments or donor_j.translated_segments
+                job.translated_segments = _clamp_segments_to_video(job.translated_segments or donor_j.translated_segments, job.video_duration)
                 job.uzbek_srt_content = job.uzbek_srt_content or donor_j.uzbek_srt_content
-                job.speech_segments = job.speech_segments or donor_j.speech_segments
+                job.speech_segments = _clamp_segments_to_video(job.speech_segments or donor_j.speech_segments, job.video_duration)
 
                 # Agar original video diskda hali mavjud bo'lsa, qayta yuklashni ham chetlab o'tamiz
                 if not has_video:
@@ -704,6 +735,7 @@ def process_video(self: Task, job_id: str) -> dict:
             audio_path = found_audio
             _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
         else:
+            _start_stage(job_id, "DOWNLOAD")
             # Telegram bot orqali yuborilgan video fayl job'ining youtube_url'i
             # sintetik ("telegram://file/..."), haqiqiy YouTube havolasi emas.
             # Odatda lokal audio.wav/video hali joyida bo'lgani uchun yuqoridagi
@@ -746,11 +778,13 @@ def process_video(self: Task, job_id: str) -> dict:
         uzbek_source = is_uzbek_source(job)
         if job.transcript_segments:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
-            segments = job.transcript_segments
+            segments = _clamp_segments_to_video(job.transcript_segments, job.video_duration)
+            job.transcript_segments = segments
             transcript_text = job.transcript_text or ""
             if not getattr(job, "stt_model", None):
                 job.stt_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
+            _start_stage(job_id, "TRANSCRIBE")
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             # Subtitr rejimi yoki uzbek_source uchun STT doim Gemini (Google AI Studio) bo'ladi.
             # OpenAI Whisper o'zbek tilini yaxshi tushunmaydi va tez-tez turkcha/xato chiqaradi.
@@ -928,10 +962,12 @@ def process_video(self: Task, job_id: str) -> dict:
         stage_t0 = time.monotonic()
         if job.translated_segments:
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
-            translated_segments = job.translated_segments
+            translated_segments = _clamp_segments_to_video(job.translated_segments, job.video_duration)
+            job.translated_segments = translated_segments
             if not getattr(job, "translation_model", None):
                 job.translation_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
+            _start_stage(job_id, "TRANSLATE")
             if uzbek_source:
                 # Nutq allaqachon o'zbekcha: tarjima ham, qisqartirish ham kerak emas.
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "Subtitr tayyorlanmoqda...")
@@ -1022,10 +1058,13 @@ def process_video(self: Task, job_id: str) -> dict:
         stage_t0 = time.monotonic()
         if job.speech_segments:
             _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "skipped")
-            speech_segments = job.speech_segments
+            speech_segments = _clamp_segments_to_video(job.speech_segments, job.video_duration)
+            job.speech_segments = speech_segments
         else:
+            _start_stage(job_id, "SPEECH_OPT")
             _update_job(db, job, JobStatus.SYNCING, 50.0, "Matn tabiiy talaffuzga moslashtirilmoqda...")
             speech_segments = speech_optimizer.optimize_segments(translated_segments)
+            speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             job.speech_segments = speech_segments
             db.commit()
             _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "ok")
@@ -1048,6 +1087,7 @@ def process_video(self: Task, job_id: str) -> dict:
             # balansi tekshiruvi o'tkazib yuboriladi.
             actual_timings = None
         else:
+            _start_stage(job_id, "TTS")
             from backend.services.job_progress import set_subprogress
             from backend.services.plans import get_tts_provider_for_job
 
@@ -1088,6 +1128,7 @@ def process_video(self: Task, job_id: str) -> dict:
             # shunda ovoz yuqori sifatli, tabiiy, va tezkor sintez bo'ladi (rate limitga uchramaydi).
             tts_is_paid = True if tts_provider == "gemini" else is_paid_job
 
+            speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
@@ -1127,6 +1168,7 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
             final_output = job.output_video_path
         else:
+            _start_stage(job_id, "MERGE")
             _update_job(db, job, JobStatus.MERGING, 85.0, "Video birlashtirilmoqda...")
             final_output_dir = output_dir / "video"
             final_output_dir.mkdir(parents=True, exist_ok=True)

@@ -1739,8 +1739,14 @@ export default function VideoPage() {
 
       {/* Modern Cancel Confirmation Modal */}
       {(() => {
-        const currentElapsedSec = getElapsedSeconds(job, currentTime, sessionStartRef.current);
-        const isCancelPastOneMinute = currentElapsedSec > 60;
+        const canRefund = job?.can_refund_on_cancel !== undefined
+          ? job.can_refund_on_cancel
+          : (getElapsedSeconds(job, currentTime, sessionStartRef.current) <= 30);
+        const secLeft = job?.cancel_refund_seconds_left !== undefined
+          ? Math.max(0, Math.round(job.cancel_refund_seconds_left))
+          : Math.max(0, 30 - Math.round(getElapsedSeconds(job, currentTime, sessionStartRef.current)));
+        const stageName = job?.initial_stage || "boshlang'ich";
+
         return (
           <ConfirmModal
             isOpen={confirmCancelOpen}
@@ -1749,11 +1755,11 @@ export default function VideoPage() {
             loading={cancelLoading}
             title="Dublyaj jarayonini bekor qilish"
             message={
-              isCancelPastOneMinute
-                ? "⚠️ Diqqat: Jarayon boshlanganiga 1 daqiqadan oshdi! Server va AI resurslari (STT, tarjima va ovoz yozish) sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
-                : "Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz? Dastlabki 1 daqiqa ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi."
+              !canRefund
+                ? "⚠️ Diqqat: Dublyajning dastlabki bosqichi (30 soniya) yakunlangan yoki keyingi bosqichga o'tib bo'lgan! Server va AI resurslari sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
+                : `Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz? Dastlabki bosqich (${stageName}) vaqti (30 soniya, qolgan vaqt: ${secLeft}s) ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi.`
             }
-            confirmText={isCancelPastOneMinute ? "Ha, limit qaytarilmasligiga roziman" : "Ha, bekor qilinsin"}
+            confirmText={!canRefund ? "Ha, limit qaytarilmasligiga roziman" : "Ha, bekor qilinsin"}
             cancelText="Ortga (davom ettirish)"
             danger
           />

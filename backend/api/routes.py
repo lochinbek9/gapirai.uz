@@ -122,6 +122,10 @@ class JobResponse(BaseModel):
     costs: Optional[Dict[str, Any]] = None
     user_info: Optional[Dict[str, Any]] = None
     discount_offer: Optional[Dict[str, Any]] = None
+    can_refund_on_cancel: Optional[bool] = None
+    cancel_refund_seconds_left: Optional[float] = None
+    initial_stage: Optional[str] = None
+    current_stage: Optional[str] = None
 
 
 def _normalize_audio_mix_mode(mode: str | None) -> str:
@@ -232,6 +236,30 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         "cost_per_minute_uzs": cost_per_minute_uzs,
     }
 
+    can_ref_cancel = None
+    ref_sec_left = None
+    init_stage = None
+    curr_stage = None
+    if raw_status in (
+        JobStatus.PENDING,
+        JobStatus.AWAITING_PAYMENT,
+        JobStatus.DOWNLOADING,
+        JobStatus.TRANSCRIBING,
+        JobStatus.TRANSLATING,
+        JobStatus.SYNTHESIZING,
+        JobStatus.SYNCING,
+        JobStatus.MERGING,
+    ):
+        try:
+            from backend.services.cancel_policy import check_cancel_refund_eligibility
+            can_ref_cancel, ref_sec_left, _, init_stage, curr_stage = check_cancel_refund_eligibility(
+                str(job.id),
+                raw_status.value if hasattr(raw_status, "value") else str(raw_status),
+                job.created_at,
+            )
+        except Exception:
+            pass
+
     return JobResponse(
         job_id=str(job.id),
         status=status_str,
@@ -282,6 +310,10 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         is_preview=bool(getattr(job, "is_preview", False)),
         audio_mix_mode=_normalize_audio_mix_mode(getattr(job, "audio_mix_mode", None) or getattr(settings, "AUDIO_MIX_MODE", "dubbed_only")),
         costs=costs,
+        can_refund_on_cancel=can_ref_cancel,
+        cancel_refund_seconds_left=ref_sec_left,
+        initial_stage=init_stage,
+        current_stage=curr_stage,
     )
 
 
@@ -1622,12 +1654,20 @@ def cancel_job(
     
     now_utc = datetime.utcnow()
     created_at = job.created_at or now_utc
-    elapsed_seconds = (now_utc - created_at).total_seconds()
     limit_refunded = False
 
-    # 2026-10-22: Sekundomer 1 daqiqadan (60 soniyadan) o'tgach bekor qilish kvotani/limitni qaytarmaydi.
-    # Server va AI resurslari (STT, tarjima, ovoz yaratish) allaqachon sarflangan bo'ladi.
-    if elapsed_seconds <= 60.0:
+    # 2026-10-22: Bekor qilishda kvotani qaytarish yangi qoidasi:
+    # 1. Boshlang'ich faol bosqich (tayyor kesh/donor skip qilinadi) uchun maksimal 30 soniya vaqt beriladi.
+    # 2. Agar 1-bosqich ishlab, 2-bosqichga o'tgan bo'lsa (hatto 30s ichida bo'lsa ham), limit qaytarilmaydi (balansdan yechiladi).
+    # 3. Boshlang'ich bosqich 30 soniyadan oshsa ham limit qaytarilmaydi.
+    from backend.services.cancel_policy import check_cancel_refund_eligibility
+    can_refund, seconds_left, reason, initial_stage, current_stage = check_cancel_refund_eligibility(
+        str(job.id),
+        job.status.value if hasattr(job.status, "value") else str(job.status),
+        job.created_at,
+    )
+
+    if can_refund:
         if getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False):
             try:
                 from backend.services.plans import refund_quota
@@ -1636,14 +1676,17 @@ def cancel_job(
                 limit_refunded = True
             except Exception:
                 pass
-        msg = "Dublyaj bekor qilindi. Sarflangan daqiqalar hisobingizga qaytarildi."
+        msg = (
+            f"Dublyaj bekor qilindi. Boshlang'ich bosqich ({initial_stage or 'boshlanish'}) "
+            f"vaqti (30 soniya) ichida bekor qilingani uchun sarflangan daqiqalar hisobingizga to'liq qaytarildi."
+        )
         status_msg = "Foydalanuvchi tomonidan bekor qilindi (daqiqalar qaytarildi)."
     else:
         logger.info(
-            f"Job {job_id} bekor qilindi, lekin ishga tushganiga {elapsed_seconds:.1f}s (>60s) bo'lgani sababli kvota qaytarilmadi."
+            f"Job {job_id} bekor qilindi, lekin limit qaytarilmadi: {reason}"
         )
-        msg = "Dublyaj bekor qilindi. Jarayon boshlanganiga 1 daqiqadan oshgani sababli sarflangan daqiqalar qaytarilmadi."
-        status_msg = "Foydalanuvchi tomonidan bekor qilindi (1 daqiqadan oshgani sababli limit qaytarilmadi)."
+        msg = f"Dublyaj bekor qilindi. {reason}"
+        status_msg = f"Foydalanuvchi tomonidan bekor qilindi (limit qaytarilmadi)."
 
     job.status = JobStatus.FAILED
     job.status_message = status_msg

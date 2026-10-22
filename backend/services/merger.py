@@ -93,7 +93,11 @@ def _get_duration(file_path: str) -> float:
 def _build_dubbed_only_filtergraph(target_dur: float | None = None) -> str:
     """Process the TTS track without feeding the original speech into the mix."""
     s = settings
-    dub_pad = f"apad=whole_dur={target_dur:.3f}," if isinstance(target_dur, (int, float)) and target_dur > 0 else ""
+    dub_pad = (
+        f"atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,apad=whole_dur={target_dur:.3f},"
+        if isinstance(target_dur, (int, float)) and target_dur > 0
+        else ""
+    )
     return (
         f"[1:a]{dub_pad}aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
         f"highpass=f={s.VOICE_HIGHPASS_HZ},"
@@ -131,7 +135,11 @@ def _build_audio_filtergraph(
         f"attack={s.DUCKING_ATTACK_MS}:release={s.DUCKING_RELEASE_MS}:makeup=1"
     )
     orig_vol = getattr(s, "ORIGINAL_AUDIO_VOLUME", 0.22)
-    dub_pad = f"apad=whole_dur={target_dur:.3f}," if isinstance(target_dur, (int, float)) and target_dur > 0 else ""
+    dub_pad = (
+        f"atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,apad=whole_dur={target_dur:.3f},"
+        if isinstance(target_dur, (int, float)) and target_dur > 0
+        else ""
+    )
     return (
         f"[0:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,volume={orig_vol}[orig];"
         f"[1:a]{dub_pad}aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,"
@@ -235,7 +243,7 @@ def merge_video_audio(
         target_dur = video_dur + max_extra_allowed
         extra = max_extra_allowed
     elif audio_dur > video_dur:
-        target_dur = None
+        target_dur = audio_dur
         extra = audio_dur - video_dur
     else:
         target_dur = video_dur
@@ -332,9 +340,15 @@ def merge_video_audio(
                     output_path,
                 ]
 
+        # Qat'iy davomiylik chegarasi: video_dur + extra dan oshmasligi SHART.
+        # Bu audio qoldig'i yoki freeze-frame hisobiga video uzayib (masalan 3:19 o'rniga 4:17 bo'lib)
+        # qolishining butunlay oldini oladi.
+        actual_limit_dur = (video_dur + extra) if video_dur > 0 else 0.0
         if max_duration and max_duration > 0:
+            actual_limit_dur = min(actual_limit_dur, max_duration) if actual_limit_dur > 0 else max_duration
+        if actual_limit_dur > 0:
             c.insert(-1, "-t")
-            c.insert(-1, str(max_duration))
+            c.insert(-1, f"{actual_limit_dur:.3f}")
         return c
 
     cmd = _build_cmd(with_watermark=use_watermark)
