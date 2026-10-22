@@ -81,13 +81,11 @@ export default function FirstVideoDiscountModal({
   const adminContacts = [
     {
       handle: '@goldendevuz',
-      id: '557407324',
       url: `https://t.me/goldendevuz?text=${telegramPreFilledMsg}`,
       role: 'Bosh Dasturchi & Admin',
     },
     {
       handle: '@mentor_lochinbek',
-      id: '1758736133',
       url: `https://t.me/mentor_lochinbek?text=${telegramPreFilledMsg}`,
       role: 'Loyiha Rahbari & Mentor',
     },
@@ -241,7 +239,7 @@ export default function FirstVideoDiscountModal({
                     <div className="font-semibold text-xs text-white group-hover:text-blue-300 transition-colors">
                       {admin.handle}
                     </div>
-                    <div className="text-[10px] text-gray-400">ID: {admin.id}</div>
+                    <div className="text-[10px] text-gray-400">{admin.role}</div>
                   </div>
                 </div>
                 <ExternalLink className="w-3.5 h-3.5 text-blue-400 opacity-60 group-hover:opacity-100 transition-opacity" />

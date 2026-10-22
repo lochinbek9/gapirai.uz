@@ -200,9 +200,12 @@ def _synthesize_text(
         # Azure yiqilsa, Edge'ga o'tadi (ovoz 100% bir xil: Sardor / Madina)
         fallback_chain.append("edge")
     elif primary.name == "gemini":
-        # Gemini (Charon / Autonoe) faqat o'zining ichki modellar hovuzi va pullik kalitlari orqali qayta urinadi.
-        # Azure yoki Edge ga o'tib ketilmaydi — ovoz bitta videoda boshidan oxirigacha 100% bir xil saqlanadi.
-        pass
+        # Gemini asosiy provayder. Agar barcha Gemini modellari va kalitlari vaqtinchalik
+        # yiqilsa, dublyaj 'TTS_INVALID_AUDIO' bilan to'xtab qolmasligi uchun
+        # ishonchli zaxira sifatida Edge -> Azure ga o'tadi (Madina/Sardor ovozlariga avtomatik xaritlanadi).
+        fallback_chain.append("edge")
+        if has_azure:
+            fallback_chain.append("azure")
     else:
         if has_azure:
             fallback_chain.append("azure")

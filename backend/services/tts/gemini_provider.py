@@ -134,41 +134,20 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
                 client = _get_client(api_key=key)
                 raw_data = None
 
-                # 1. Agar model interactions model bo'lsa (gemini-3.8-flash-tts)
-                if hasattr(client, "interactions") and ("-tts" in model_name or "3.8" in model_name):
-                    try:
-                        interaction = client.interactions.create(
-                            model=model_name,
-                            input=[{
-                                "type": "user_input",
-                                "content": [{"type": "text", "text": contents}],
-                            }],
-                            response_format={"type": "audio", "mime_type": "audio/l16", "sample_rate": 24000},
-                            generation_config={"speech_config": [{"voice": voice}]},
-                        )
-                        if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
-                            import base64
-                            raw_data = base64.b64decode(interaction.output_audio.data)
-                    except Exception as iexc:
-                        logger.debug(f"Interactions TTS ({model_name}) xato: {iexc} — generate_content'ga o'tilmoqda")
-
-                # 2. Standart generate_content (gemini-2.5-flash / gemini-2.0-flash)
-                if not raw_data:
-                    gen_model = "gemini-2.5-flash" if "-tts" in model_name else model_name
-                    response = client.models.generate_content(
-                        model=gen_model,
-                        contents=contents,
-                        config=config,
+                # Interactions API orqali TTS audio yaratish
+                if hasattr(client, "interactions"):
+                    interaction = client.interactions.create(
+                        model=model_name,
+                        input=[{
+                            "type": "user_input",
+                            "content": [{"type": "text", "text": contents}],
+                        }],
+                        response_format={"type": "audio"},
+                        generation_config={"speech_config": [{"voice": voice}]},
                     )
-                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                        for part in response.candidates[0].content.parts:
-                            inline_data = getattr(part, "inline_data", None)
-                            if inline_data and getattr(inline_data, "data", None):
-                                raw_data = inline_data.data
-                                if isinstance(raw_data, str):
-                                    import base64
-                                    raw_data = base64.b64decode(raw_data)
-                                break
+                    if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
+                        import base64
+                        raw_data = base64.b64decode(interaction.output_audio.data)
 
                 if raw_data:
                     record_model_success(key, model_name)
@@ -180,9 +159,14 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
                 is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
                 is_not_found = "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str
 
-                if is_unauth or is_not_found:
-                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401/404: {err_str[:60]}")
-                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 401/404 yaroqsiz kalit yoki model — o'chirildi.")
+                if is_unauth:
+                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 401 yaroqsiz kalit — o'chirildi.")
+                    continue
+
+                if is_not_found:
+                    mark_model_cooldown(key, model_name, 86400.0 * 7, reason=f"404: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{model_name}] 404 model mavjud emas.")
                     continue
 
                 if is_rate_limit:
@@ -192,7 +176,7 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
                     continue
 
                 if is_503:
-                    mark_model_cooldown(key, model_name, 120.0, reason="503 server band")
+                    mark_model_cooldown(key, model_name, 30.0, reason="503 server band")
                     logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 503 server band — navbatdagi kalitga o'tilmoqda.")
                     continue
 
@@ -220,21 +204,20 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
     time.sleep(wait_time)
     try:
         client = _get_client(api_key=best_key)
-        response = client.models.generate_content(
+        interaction = client.interactions.create(
             model=best_model,
-            contents=contents,
-            config=config,
+            input=[{
+                "type": "user_input",
+                "content": [{"type": "text", "text": contents}],
+            }],
+            response_format={"type": "audio"},
+            generation_config={"speech_config": [{"voice": voice}]},
         )
-        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                inline_data = getattr(part, "inline_data", None)
-                if inline_data and getattr(inline_data, "data", None):
-                    raw_data = inline_data.data
-                    if isinstance(raw_data, str):
-                        import base64
-                        raw_data = base64.b64decode(raw_data)
-                    record_model_success(best_key, best_model)
-                    return raw_data
+        if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
+            import base64
+            raw_data = base64.b64decode(interaction.output_audio.data)
+            record_model_success(best_key, best_model)
+            return raw_data
     except Exception as e:
         logger.error(f"Gemini TTS oxirgi urinish ham xato berdi ({best_model}): {e}")
 

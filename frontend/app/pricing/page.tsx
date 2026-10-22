@@ -285,7 +285,7 @@ export default function PricingPage() {
         )}
 
         {/* Expired Discount Soft-Landing with Admin Contacts */}
-        {discountOffer?.expired && (
+        {discountOffer?.expired && !isPaidCustomer && (
           <div className="max-w-2xl mx-auto p-4 rounded-3xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 text-gray-900 dark:text-white shadow-md space-y-3">
             <div className="flex items-center gap-2.5">
               <Clock className="w-5 h-5 text-blue-400 shrink-0" />
@@ -305,7 +305,7 @@ export default function PricingPage() {
               >
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-blue-400" />
-                  <span>@goldendevuz (557407324)</span>
+                  <span>@goldendevuz</span>
                 </div>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
               </a>
@@ -317,7 +317,7 @@ export default function PricingPage() {
               >
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-blue-400" />
-                  <span>@mentor_lochinbek (1758736133)</span>
+                  <span>@mentor_lochinbek</span>
                 </div>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
               </a>

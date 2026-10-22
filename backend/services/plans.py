@@ -122,8 +122,51 @@ def get_user_first_video_discount(db, user_id) -> dict:
             "first_job_id": None,
         }
     try:
-        from backend.models.database import DubbingJob, JobStatus
+        from backend.models.database import DubbingJob, JobStatus, Subscription, PlanTier, User
+        from backend.models.payment import Payment, PaymentStatus
         from backend.services.timezone_utils import to_tashkent_iso
+
+        # 1. Admin yoki ichki test xodimi bo'lsa chegirma takliflari ko'rsatilmaydi
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and (user.role == "admin" or getattr(user, "is_internal", False)):
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        # 2. Agar foydalanuvchida allaqachon pullik obuna bo'lsa (Standard, Pro)
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if sub and sub.plan != PlanTier.FREE:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        # 3. Agar foydalanuvchi allaqachon biror muvaffaqiyatli to'lov qilgan bo'lsa (pullik mijoz)
+        has_paid = db.query(Payment).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+        ).first() is not None
+        if has_paid:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
 
         first_job = (
             db.query(DubbingJob)
@@ -162,10 +205,13 @@ def get_user_first_video_discount(db, user_id) -> dict:
         is_active = now_utc < expires_at
         seconds_left = max(0, int((expires_at - now_utc).total_seconds()))
 
+        # Faqat chegirma tugaganidan keyingi 7 kun ichida "chegirmaga ulgurmagan" sifatida ko'rsatiladi
+        is_recently_expired = (not is_active) and (now_utc < expires_at + timedelta(days=7))
+
         return {
-            "eligible": True,
+            "eligible": is_active or is_recently_expired,
             "active": is_active,
-            "expired": not is_active,
+            "expired": is_recently_expired,
             "percent": FIRST_VIDEO_DISCOUNT_PERCENT if is_active else 0,
             "seconds_left": seconds_left,
             "expires_at": to_tashkent_iso(expires_at),

@@ -30,8 +30,9 @@ class TestGeminiAzureProviderConfig(unittest.TestCase):
             )
 
     def test_get_tts_provider_for_job(self):
-        """get_tts_provider_for_job must return 'gemini' for all jobs."""
+        """get_tts_provider_for_job must return 'gemini' for all jobs (unless legacy)."""
         mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = None
 
         # Anonymous job
         job_anon = MagicMock()
