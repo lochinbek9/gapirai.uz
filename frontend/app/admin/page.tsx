@@ -25,6 +25,10 @@ import {
   CheckCircle2,
   ExternalLink,
   RotateCcw,
+  Key,
+  Eye,
+  EyeOff,
+  X,
 } from 'lucide-react'
 import {
   AdminStats,
@@ -34,8 +38,9 @@ import {
   RefundsNeededReport,
   apiAdminRefundsNeeded,
   apiAdminRetryJob,
+  apiAdminChangeMyCredentials,
 } from '@/lib/admin'
-import { getToken } from '@/lib/auth'
+import { getToken, setToken, setStoredUser } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
 import AdminUsersManager from '@/components/AdminUsersManager'
 import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
@@ -320,6 +325,14 @@ export default function AdminPage() {
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
   const [retryToast, setRetryToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Change My Credentials modal
+  const [changeCredOpen, setChangeCredOpen] = useState(false)
+  const [changeCredForm, setChangeCredForm] = useState({ name: '', email: '', new_password: '' })
+  const [changeCredLoading, setChangeCredLoading] = useState(false)
+  const [changeCredError, setChangeCredError] = useState<string | null>(null)
+  const [changeCredSuccess, setChangeCredSuccess] = useState<string | null>(null)
+  const [showCredPassword, setShowCredPassword] = useState(false)
+
   // Sync tab with URL
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -398,6 +411,47 @@ export default function AdminPage() {
     setRefreshing(true)
     await loadStats()
     setRefreshing(false)
+  }
+
+  function openChangeCredModal() {
+    setChangeCredForm({ name: user?.name || '', email: user?.email || '', new_password: '' })
+    setChangeCredError(null)
+    setChangeCredSuccess(null)
+    setShowCredPassword(false)
+    setChangeCredOpen(true)
+  }
+
+  async function handleChangeCredSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const token = getToken()
+    if (!token) return
+    if (changeCredForm.new_password && changeCredForm.new_password.length < 6) {
+      setChangeCredError("Parol kamida 6 belgidan iborat bo'lishi kerak")
+      return
+    }
+    setChangeCredLoading(true)
+    setChangeCredError(null)
+    setChangeCredSuccess(null)
+    try {
+      const payload: any = {}
+      if (changeCredForm.name.trim()) payload.name = changeCredForm.name.trim()
+      if (changeCredForm.email.trim()) payload.email = changeCredForm.email.trim()
+      if (changeCredForm.new_password.trim()) payload.new_password = changeCredForm.new_password.trim()
+      const res = await apiAdminChangeMyCredentials(token, payload)
+      // If token changed, update it
+      if (res.access_token) {
+        setToken(res.access_token)
+      }
+      if (res.user) {
+        setStoredUser(res.user)
+      }
+      setChangeCredSuccess(res.message || "Ma'lumotlar muvaffaqiyatli yangilandi!")
+      setTimeout(() => setChangeCredOpen(false), 1800)
+    } catch (err: any) {
+      setChangeCredError(err?.response?.data?.detail || "Xatolik yuz berdi")
+    } finally {
+      setChangeCredLoading(false)
+    }
   }
 
   async function handleOverviewRetry(jobId: string) {
@@ -524,6 +578,15 @@ export default function AdminPage() {
               <span className="font-bold text-white">{currentTime}</span>
               <span className="text-[10px] text-gray-500">Toshkent (UTC+5)</span>
             </div>
+
+            {/* Change My Credentials */}
+            <button
+              onClick={openChangeCredModal}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/30 text-gray-400 hover:text-amber-400 transition"
+              title="Login va parolni o'zgartirish"
+            >
+              <Key className="w-4 h-4" />
+            </button>
 
             {/* Refresh */}
             <button
@@ -1109,6 +1172,123 @@ export default function AdminPage() {
           </section>
         )}
       </div>
+
+      {/* ===== CHANGE MY CREDENTIALS MODAL ===== */}
+      {changeCredOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-extrabold text-white">Login va parolni o'zgartirish</h2>
+                  <p className="text-[11px] text-gray-400">Administrator hisob ma'lumotlarini yangilash</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setChangeCredOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleChangeCredSubmit} className="p-6 space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Ism
+                </label>
+                <input
+                  type="text"
+                  value={changeCredForm.name}
+                  onChange={(e) => setChangeCredForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Ism (ixtiyoriy)"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Email (login)
+                </label>
+                <input
+                  type="email"
+                  value={changeCredForm.email}
+                  onChange={(e) => setChangeCredForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="yangi@email.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition"
+                />
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Yangi parol <span className="text-gray-600 normal-case font-normal">(bo'sh qolsa o'zgarmaydi)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCredPassword ? 'text' : 'password'}
+                    value={changeCredForm.new_password}
+                    onChange={(e) => setChangeCredForm(f => ({ ...f, new_password: e.target.value }))}
+                    placeholder="Kamida 6 belgi"
+                    autoComplete="new-password"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCredPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
+                  >
+                    {showCredPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error / Success messages */}
+              {changeCredError && (
+                <div className="flex items-center gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3.5 py-2.5">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>{changeCredError}</span>
+                </div>
+              )}
+              {changeCredSuccess && (
+                <div className="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-2.5">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{changeCredSuccess}</span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setChangeCredOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold text-sm transition"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={changeCredLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {changeCredLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /><span>Saqlanmoqda...</span></>
+                  ) : (
+                    <><Key className="w-4 h-4" /><span>Saqlash</span></>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Floating Scroll To Top Button */}
       {showScrollTop && (

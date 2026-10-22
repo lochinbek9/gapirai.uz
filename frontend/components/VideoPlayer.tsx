@@ -198,7 +198,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 }, ref) => {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const barRef       = useRef<HTMLDivElement>(null);
+  const ctrlBarRef   = useRef<HTMLDivElement>(null);
   const hideTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Oxirgi bosish turi -- telefonda videoga teginish ijroni to'xtatmasligi,
+  // faqat boshqaruv panelini ko'rsatishi/yashirishi kerak (YouTube kabi).
+  const lastPointerType = useRef<string>("mouse");
+  const [isTouch,        setIsTouch]        = useState(false);
+  const [scrubbing,      setScrubbing]      = useState(false);
+  const [ctrlBarHeight,  setCtrlBarHeight]  = useState(76);
 
   const [resolvedTitle, setResolvedTitle] = useState<string>(videoTitle || "");
   const [resolvedChannel, setResolvedChannel] = useState<string>(channelName || "");
@@ -424,6 +432,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     [cues, progress]
   );
 
+  const resetHideTimer = useCallback(() => {
+    setShowControls(true);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
+    }, 3000);
+  }, []);
+
   /* ── Events ───────────────────────────────────── */
   useEffect(() => {
     const v = videoRef.current;
@@ -434,10 +450,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     };
     const onDur   = () => setDuration(v.duration);
     const onBuf   = () => v.buffered.length > 0 && setBuffered(v.buffered.end(v.buffered.length - 1));
-    const onEnd   = () => setPlaying(false);
-    const onPlay  = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onFS    = () => setFullscreen(!!document.fullscreenElement);
+    // Video tugaganda panel qaytadi -- aks holda telefonda (sichqoncha harakati
+    // yo'q) yakuniy holatda boshqaruv yashirin qolib ketardi.
+    const onEnd   = () => { setPlaying(false); setShowControls(true); clearTimeout(hideTimer.current); };
+    // Ijro boshlanganda yashirish taymeri ishga tushadi -- ilgari faqat
+    // mousemove'da boshlanardi, telefonda panel videoni doim yopib turardi.
+    const onPlay  = () => { setPlaying(true); resetHideTimer(); };
+    const onPause = () => { setPlaying(false); setShowControls(true); };
+    const d = document as Document & { webkitFullscreenElement?: Element | null };
+    const onFS    = () => setFullscreen(!!(document.fullscreenElement || d.webkitFullscreenElement));
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("durationchange", onDur);
     v.addEventListener("progress", onBuf);
@@ -445,6 +466,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
     document.addEventListener("fullscreenchange", onFS);
+    document.addEventListener("webkitfullscreenchange", onFS);
     return () => {
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("durationchange", onDur);
@@ -453,15 +475,22 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
       document.removeEventListener("fullscreenchange", onFS);
+      document.removeEventListener("webkitfullscreenchange", onFS);
     };
-  }, []);
+  }, [resetHideTimer]);
 
-  const resetHideTimer = useCallback(() => {
-    setShowControls(true);
-    clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
-    }, 3000);
+  // Subtitr boshqaruv panelining ustida turishi uchun panel balandligini
+  // o'lchaymiz (ilgari qattiq 76/118px edi -- telefonda panel boshqacha
+  // balandlikda bo'lgani uchun subtitr video o'rtasiga chiqib qolardi).
+  useEffect(() => {
+    const el = ctrlBarRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const padTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      setCtrlBarHeight(Math.round(el.offsetHeight - padTop + 8));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   /* ── Controls ─────────────────────────────────── */
@@ -483,12 +512,61 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     resetHideTimer();
   };
 
-  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+  /* ── Progress bar: sichqoncha VA barmoq bilan surish (pointer events) ── */
+  const seekToClientX = (clientX: number) => {
     const v = videoRef.current;
-    if (!v || !duration) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    v.currentTime = ((e.clientX - r.left) / r.width) * duration;
+    const bar = barRef.current;
+    const dur = v?.duration || duration;
+    if (!v || !bar || !dur || !isFinite(dur)) return;
+    const r = bar.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    v.currentTime = ratio * dur;
+    setProgress(ratio * dur);
+  };
+
+  const onBarPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    // Capture -- barmoq bar'dan chiqib ketsa ham surish davom etadi. Ba'zi
+    // brauzerlar (eski iOS WebView) xato tashlaydi -- seek baribir ishlashi kerak.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    setScrubbing(true);
+    seekToClientX(e.clientX);
     resetHideTimer();
+  };
+
+  const onBarPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbing) return;
+    seekToClientX(e.clientX);
+    resetHideTimer();
+  };
+
+  const onBarPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbing) return;
+    setScrubbing(false);
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    resetHideTimer();
+  };
+
+  /* ── Videoga bosish ───────────────────────────── */
+  const onVideoPointerDown = (e: React.PointerEvent) => {
+    lastPointerType.current = e.pointerType;
+    if (e.pointerType === "touch" && !isTouch) setIsTouch(true);
+  };
+
+  const onVideoClick = () => {
+    // Telefonda teginish ijroni to'xtatmaydi -- faqat panelni ko'rsatadi/yashiradi.
+    // Pauza/ijro markazdagi tugma orqali (ilgari panelni ochish uchun videoni
+    // to'xtatishga majbur bo'lardi).
+    if (lastPointerType.current === "touch") {
+      if (playing && showControls) {
+        clearTimeout(hideTimer.current);
+        setShowControls(false);
+      } else {
+        resetHideTimer();
+      }
+      return;
+    }
+    togglePlay();
   };
 
   const toggleMute = () => {
@@ -507,12 +585,39 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   };
 
   const toggleFS = async () => {
-    if (!document.fullscreenElement) await containerRef.current?.requestFullscreen();
-    else await document.exitFullscreen();
+    type WebkitEl = HTMLElement & { webkitRequestFullscreen?: () => void };
+    type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+    type WebkitDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+    const c = containerRef.current as WebkitEl | null;
+    const v = videoRef.current as WebkitVideo | null;
+    const d = document as WebkitDoc;
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    try {
+      if (!(document.fullscreenElement || d.webkitFullscreenElement)) {
+        if (c?.requestFullscreen) await c.requestFullscreen();
+        else if (c?.webkitRequestFullscreen) c.webkitRequestFullscreen();
+        // iPhone Safari'da div'ni to'liq ekranga chiqarib bo'lmaydi
+        // (requestFullscreen yo'q) -- ilgari tugma umuman ishlamasdi.
+        else if (v?.webkitEnterFullscreen) { v.webkitEnterFullscreen(); return; }
+        // Telefonda gorizontal videoni avtomatik yotiq holatga burish (Android).
+        if (v && v.videoWidth >= v.videoHeight) await orientation?.lock?.("landscape").catch(() => {});
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else d.webkitExitFullscreen?.();
+        orientation?.unlock?.();
+      }
+    } catch {
+      // Brauzer to'liq ekranni rad etsa -- jim o'tamiz, pleer ishlashda davom etadi.
+    }
   };
 
-  const fmt = (s: number) =>
-    `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+  const fmt = (s: number) => {
+    if (!isFinite(s) || s < 0) return "0:00";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, "0");
+    return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+  };
 
   const progressPct = duration ? (progress / duration) * 100 : 0;
   const bufferedPct = duration ? (buffered / duration) * 100 : 0;
@@ -531,8 +636,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     <div
       ref={containerRef}
       className={`relative bg-black overflow-hidden aspect-video group select-none ${className}`}
-      onMouseMove={resetHideTimer}
-      onMouseLeave={() => playing && setShowControls(false)}
+      onPointerDownCapture={onVideoPointerDown}
+      onMouseMove={() => { if (lastPointerType.current !== "touch") resetHideTimer(); }}
+      onMouseLeave={() => playing && lastPointerType.current !== "touch" && setShowControls(false)}
       onKeyDown={e => {
         if (e.code === "Space" || e.key === "k") { e.preventDefault(); togglePlay(); }
         if (e.code === "ArrowRight") { if (videoRef.current) videoRef.current.currentTime += 5; }
@@ -545,8 +651,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         ref={videoRef}
         src={effectiveSrc}
         className="w-full h-full object-contain"
-        onClick={togglePlay}
-        onDoubleClick={toggleFS}
+        onClick={onVideoClick}
+        onDoubleClick={() => { if (lastPointerType.current !== "touch") toggleFS(); }}
         onLoadedMetadata={handleLoadedMetadata}
         playsInline
         preload="metadata"
@@ -565,7 +671,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         <div
           className="absolute left-0 right-0 flex justify-center px-6 pointer-events-none"
           style={{
-            bottom: ctrlVisible ? ((resolvedTitle || resolvedChannel) ? "118px" : "76px") : "16px",
+            bottom: ctrlVisible ? `${ctrlBarHeight}px` : "16px",
             transition: "bottom 0.25s ease",
             zIndex: 20,
           }}
@@ -588,15 +694,24 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         />
       )}
 
-      {/* Big play button */}
-      {!playing && (
+      {/* Big play button -- pauzada butun maydon bosiladi; telefonda ijro
+          paytida panel ochiq bo'lsa markazda pauza tugmasi chiqadi, qolgan
+          maydon esa videoga o'tadi (panelni yashirish uchun). */}
+      {(!playing || (isTouch && ctrlVisible)) && (
         <div
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
+          onClick={playing ? undefined : togglePlay}
+          className={`absolute inset-0 flex items-center justify-center z-10 ${playing ? "pointer-events-none" : "cursor-pointer"}`}
         >
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl">
-            <Play className="w-8 h-8 text-white ml-1" fill="white" />
-          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+            aria-label={playing ? "Pauza" : "Ijro"}
+            className="pointer-events-auto w-14 h-14 sm:w-20 sm:h-20 bg-black/40 sm:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl"
+          >
+            {playing
+              ? <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="white" />
+              : <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white ml-1" fill="white" />}
+          </button>
         </div>
       )}
 
@@ -606,10 +721,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         style={{ opacity: ctrlVisible ? 1 : 0, pointerEvents: ctrlVisible ? "auto" : "none" }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
-        <div className="relative px-3.5 sm:px-6 pb-3 sm:pb-4 pt-14">
-          {/* Video Title, Channel Name & Watermark (YouTube style) */}
+        <div ref={ctrlBarRef} className="relative px-3 sm:px-6 pb-2 sm:pb-4 pt-8 sm:pt-14">
+          {/* Video Title, Channel Name & Watermark (YouTube style) -- telefonda
+              faqat to'liq ekranda: kichik pleerda u videoning yarmini yopardi. */}
           {(resolvedTitle || resolvedChannel) && (
-            <div className="flex items-end justify-between gap-4 mb-2.5 sm:mb-3 select-none">
+            <div className={`${fullscreen ? "flex" : "hidden sm:flex"} items-end justify-between gap-4 mb-2.5 sm:mb-3 select-none`}>
               <div className="min-w-0 flex-1">
                 {resolvedTitle && (
                   <h3
@@ -631,19 +747,35 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             </div>
           )}
 
-          {/* YouTube-style Red Progress Bar */}
-          <div className="mb-2 sm:mb-3 cursor-pointer group/bar py-1.5" onClick={seek}>
-            <div className="h-1 group-hover/bar:h-1.5 bg-white/25 rounded-full relative transition-all duration-100">
+          {/* YouTube-style Red Progress Bar -- pointer events: sichqoncha bilan
+              bosish/surish VA telefonda barmoq bilan surish. touch-none sahifa
+              scroll bo'lib ketmasligi uchun; py-3 barmoq uchun kattaroq maydon. */}
+          <div
+            ref={barRef}
+            className="mb-1 sm:mb-3 cursor-pointer group/bar py-3 sm:py-1.5 touch-none"
+            onPointerDown={onBarPointerDown}
+            onPointerMove={onBarPointerMove}
+            onPointerUp={onBarPointerUp}
+            onPointerCancel={onBarPointerUp}
+            role="slider"
+            aria-label="Video vaqti"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration || 0)}
+            aria-valuenow={Math.round(progress)}
+          >
+            <div className={`${scrubbing ? "h-1.5" : "h-1"} group-hover/bar:h-1.5 bg-white/25 rounded-full relative transition-all duration-100`}>
               <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full" style={{ width: `${bufferedPct}%` }} />
               <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-red-600 rounded-full shadow-lg scale-0 group-hover/bar:scale-100 transition-transform"
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-red-600 rounded-full shadow-lg transition-transform ${
+                  scrubbing || isTouch ? "scale-100" : "scale-0 group-hover/bar:scale-100"
+                }`}
                 style={{ left: `${progressPct}%` }}
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
@@ -671,16 +803,19 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               >
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
+              {/* Telefonda ovoz tugmalar orqali boshqariladi (iOS volume'ni
+                  JS'dan o'zgartirishga umuman ruxsat bermaydi) -- slayder joy egallab
+                  to'liq ekran tugmasini ekrandan siqib chiqarardi. */}
               <input
                 type="range" min="0" max="1" step="0.05"
                 value={muted ? 0 : volume}
                 onChange={changeVol}
-                className="w-16 sm:w-20 accent-red-600 cursor-pointer"
+                className="hidden sm:block w-20 accent-red-600 cursor-pointer"
               />
             </div>
 
             {/* Time */}
-            <span className="text-white/80 text-xs sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0">
+            <span className="text-white/80 text-[11px] sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0 whitespace-nowrap">
               {fmt(progress)} / {fmt(duration)}
             </span>
 
@@ -796,7 +931,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                 href={audioDownloadUrl}
                 download
                 title="Audio yuklab olish (MP3)"
-                className="flex-shrink-0 text-white/50 hover:text-white transition"
+                className="hidden sm:inline-flex flex-shrink-0 text-white/50 hover:text-white transition"
                 onClick={e => e.stopPropagation()}
               >
                 <HeadphonesIcon />
@@ -808,7 +943,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               <button
                 onClick={onTheaterToggle}
                 title={theaterMode ? "Oddiy ko'rinish" : "Keng ekran (Theater)"}
-                className="flex-shrink-0 text-white/50 hover:text-white transition"
+                className="hidden sm:inline-flex flex-shrink-0 text-white/50 hover:text-white transition"
               >
                 {theaterMode
                   ? <Rows3 className="w-5 h-5" />
@@ -817,7 +952,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             )}
 
             {/* Fullscreen */}
-            <button onClick={toggleFS} className="text-white hover:text-blue-400 transition flex-shrink-0">
+            <button onClick={toggleFS} title="To'liq ekran" className="text-white hover:text-blue-400 transition flex-shrink-0 p-0.5">
               {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
