@@ -86,6 +86,21 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
+    def _extract_audio_bytes(response) -> bytes | None:
+        if not response:
+            return None
+        candidates = getattr(response, "candidates", None)
+        if candidates and candidates[0].content and candidates[0].content.parts:
+            for part in candidates[0].content.parts:
+                inline = getattr(part, "inline_data", None)
+                if inline and getattr(inline, "data", None):
+                    d = inline.data
+                    if isinstance(d, str):
+                        import base64
+                        d = base64.b64decode(d)
+                    return d
+        return None
+
     if settings.GEMINI_USE_VERTEX:
         max_attempts = 3
         for model_name in candidate_models:
@@ -96,15 +111,9 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
                         contents=contents,
                         config=config,
                     )
-                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                        for part in response.candidates[0].content.parts:
-                            inline_data = getattr(part, "inline_data", None)
-                            if inline_data and getattr(inline_data, "data", None):
-                                raw_data = inline_data.data
-                                if isinstance(raw_data, str):
-                                    import base64
-                                    raw_data = base64.b64decode(raw_data)
-                                return raw_data
+                    raw_data = _extract_audio_bytes(response)
+                    if raw_data:
+                        return raw_data
                 except Exception as e:
                     if attempt == max_attempts - 1:
                         logger.warning(f"Vertex Gemini TTS [{model_name}] xato: {e}")
@@ -132,23 +141,12 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
             record_model_request(key, model_name)
             try:
                 client = _get_client(api_key=key)
-                raw_data = None
-
-                # Interactions API orqali TTS audio yaratish
-                if hasattr(client, "interactions"):
-                    interaction = client.interactions.create(
-                        model=model_name,
-                        input=[{
-                            "type": "user_input",
-                            "content": [{"type": "text", "text": contents}],
-                        }],
-                        response_format={"type": "audio"},
-                        generation_config={"speech_config": [{"voice": voice}]},
-                    )
-                    if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
-                        import base64
-                        raw_data = base64.b64decode(interaction.output_audio.data)
-
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+                raw_data = _extract_audio_bytes(response)
                 if raw_data:
                     record_model_success(key, model_name)
                     return raw_data
@@ -204,18 +202,13 @@ def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -
     time.sleep(wait_time)
     try:
         client = _get_client(api_key=best_key)
-        interaction = client.interactions.create(
+        response = client.models.generate_content(
             model=best_model,
-            input=[{
-                "type": "user_input",
-                "content": [{"type": "text", "text": contents}],
-            }],
-            response_format={"type": "audio"},
-            generation_config={"speech_config": [{"voice": voice}]},
+            contents=contents,
+            config=config,
         )
-        if hasattr(interaction, "output_audio") and interaction.output_audio and getattr(interaction.output_audio, "data", None):
-            import base64
-            raw_data = base64.b64decode(interaction.output_audio.data)
+        raw_data = _extract_audio_bytes(response)
+        if raw_data:
             record_model_success(best_key, best_model)
             return raw_data
     except Exception as e:
@@ -271,7 +264,8 @@ class GeminiProvider(TTSProvider):
         voice_name: str | None = None,
         is_paid: bool | None = None,
     ) -> bool:
-        if not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
+        from backend.services.gemini_quota_manager import get_all_gemini_api_keys
+        if not get_all_gemini_api_keys() and not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
             return False
 
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
