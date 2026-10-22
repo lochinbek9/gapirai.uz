@@ -11,6 +11,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   variant?: "danger" | "warning" | "info";
+  danger?: boolean;
   loading?: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -23,10 +24,12 @@ export default function ConfirmModal({
   confirmText = "Ha, bekor qilish",
   cancelText = "Ortga",
   variant = "danger",
+  danger,
   loading = false,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
+  const effectiveVariant = danger ? "danger" : variant;
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,8 +45,8 @@ export default function ConfirmModal({
 
   if (!isOpen) return null;
 
-  const isDanger = variant === "danger";
-  const isWarning = variant === "warning";
+  const isDanger = effectiveVariant === "danger";
+  const isWarning = effectiveVariant === "warning";
 
   return (
     <AnimatePresence>

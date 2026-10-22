@@ -715,6 +715,9 @@ export interface UnactivatedUserItem {
 
 export interface UnactivatedUsersResponse {
   summary: {
+    date_range?: string
+    start_date?: string | null
+    end_date?: string | null
     total_users: number
     completed_users: number
     completed_pct: number
@@ -748,7 +751,10 @@ export async function apiGetUnactivatedUsers(
   pageSize: number = 25,
   filterType: string = 'all',
   search?: string,
-  sortBy: string = 'newest'
+  sortBy: string = 'newest',
+  dateRange: string = 'today',
+  startDate?: string,
+  endDate?: string
 ): Promise<UnactivatedUsersResponse> {
   const res = await axios.get(`${API_URL}/admin/unactivated-users`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -758,6 +764,9 @@ export async function apiGetUnactivatedUsers(
       filter_type: filterType,
       search: search || undefined,
       sort_by: sortBy,
+      date_range: dateRange,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
     },
   })
   return res.data

@@ -22,6 +22,8 @@ export interface VideoInfo {
 
 export interface Job {
   job_id: string
+  id?: string
+  updated_at?: string
   status: JobStatus
   progress: number
   status_message?: string
@@ -726,6 +728,7 @@ export interface VideoAnalysis {
   error_message?: string
   error_code?: string
   created_at?: string
+  linked_job_id?: string | null
 }
 
 export async function createAnalysis(

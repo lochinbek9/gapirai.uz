@@ -78,7 +78,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [retryModalJob, setRetryModalJob] = useState<AdminJobCostItem | null>(null)
   const [retryTtsOption, setRetryTtsOption] = useState<'gemini_paid' | 'edge' | 'gemini_free' | 'azure'>('gemini_paid')
   const [retrySttOption, setRetrySttOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
-  const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
+  const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
 
   // Bepul kalitlarning cooldown holati va aniq tiklanish vaqti
   const freeKeys = geminiOverview?.free_keys || []

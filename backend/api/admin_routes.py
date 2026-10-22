@@ -3063,13 +3063,57 @@ def get_unactivated_users(
     filter_type: str = Query(default="all"),
     search: str | None = Query(default=None),
     sort_by: str = Query(default="newest"),
+    date_range: str = Query(default="today"),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
     Birinchi dublyajni tugatmagan (unactivated / drop-off) foydalanuvchilar tahlili va ro'yxati.
+    Default: 'today' (Toshkent vaqti UTC+5 bo'yicha bugun ro'yxatdan o'tganlar).
+    Oraliqlar: today, 7d, 14d, 30d, 90d, all, custom.
     """
     db = SessionLocal()
     try:
+        # 0. Sana oralig'i filtri (Toshkent vaqti UTC+5)
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        date_start_utc = None
+        date_end_utc = None
+
+        dr = (date_range or "today").strip().lower()
+        if dr == "today":
+            dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+            date_start_utc = dt - TASHKENT_OFFSET
+        elif dr == "7d":
+            dt = tashkent_today_date - timedelta(days=6)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "14d":
+            dt = tashkent_today_date - timedelta(days=13)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "30d":
+            dt = tashkent_today_date - timedelta(days=29)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "90d":
+            dt = tashkent_today_date - timedelta(days=89)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "custom" and start_date:
+            try:
+                s_parts = [int(p) for p in start_date.split("-")]
+                date_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                if end_date:
+                    e_parts = [int(p) for p in end_date.split("-")]
+                    date_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+            except Exception:
+                pass
+
+        user_date_filters = []
+        if date_start_utc:
+            user_date_filters.append(User.created_at >= date_start_utc)
+        if date_end_utc:
+            user_date_filters.append(User.created_at < date_end_utc)
+
         # 1. Muvaffaqiyatli dublyajga ega bo'lgan foydalanuvchilar
         completed_user_ids_sub = (
             db.query(distinct(DubbingJob.user_id))
@@ -3082,14 +3126,16 @@ def get_unactivated_users(
         base_unactivated = db.query(User).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         )
 
         total_unactivated = base_unactivated.count()
 
         total_real_users = db.query(User).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         ).count()
 
         completed_users_count = max(0, total_real_users - total_unactivated)
@@ -3114,7 +3160,8 @@ def get_unactivated_users(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
             User.id.notin_(internal_ids_sub),
-            or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
+            or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0),
+            *user_date_filters
         ).count()
 
         attempted_count = max(0, total_unactivated - never_attempted_count)
@@ -3126,13 +3173,20 @@ def get_unactivated_users(
             User.id.notin_(completed_user_ids_sub),
             User.id.notin_(internal_ids_sub),
             user_jobs_agg.c.awaiting_jobs > 0,
-            user_jobs_agg.c.failed_jobs == 0
+            user_jobs_agg.c.failed_jobs == 0,
+            *user_date_filters
         ).count()
 
         failed_attempt_count = max(0, attempted_count - awaiting_payment_count)
 
         # Top error reasons among failed first jobs
-        error_reasons_sql = """
+        date_clause = ""
+        if date_start_utc:
+            date_clause += f" AND u.created_at >= '{date_start_utc.strftime('%Y-%m-%d %H:%M:%S')}'"
+        if date_end_utc:
+            date_clause += f" AND u.created_at < '{date_end_utc.strftime('%Y-%m-%d %H:%M:%S')}'"
+
+        error_reasons_sql = f"""
             WITH first_jobs AS (
                 SELECT 
                     j.user_id,
@@ -3143,6 +3197,7 @@ def get_unactivated_users(
                 JOIN users u ON u.id = j.user_id
                 WHERE (u.is_internal IS FALSE OR u.is_internal IS NULL)
                   AND j.user_id NOT IN (SELECT DISTINCT user_id FROM dubbing_jobs WHERE status = 'COMPLETED' AND user_id IS NOT NULL)
+                  {date_clause}
             )
             SELECT 
                 COALESCE(error_code, CASE WHEN status IN ('AWAITING_PAYMENT', 'PENDING') THEN 'AWAITING_PAYMENT' ELSE 'UNKNOWN' END) as code,
@@ -3187,7 +3242,8 @@ def get_unactivated_users(
         ).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         )
 
         if filter_type == "never_attempted":
@@ -3280,6 +3336,9 @@ def get_unactivated_users(
 
         return {
             "summary": {
+                "date_range": dr,
+                "start_date": start_date,
+                "end_date": end_date,
                 "total_users": total_real_users,
                 "completed_users": completed_users_count,
                 "completed_pct": calc_pct(completed_users_count, total_real_users),
