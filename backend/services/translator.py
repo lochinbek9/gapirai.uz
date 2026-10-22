@@ -338,12 +338,9 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict], is
     candidate_models = [
         _gemini_text_model(),
         "gemini-3.8-flash",
-        "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
+        "gemini-3.8-flash-lite",
         "gemini-3.7-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
         "gemini-flash-lite-latest",
     ]
     seen = set()
@@ -390,7 +387,7 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict], is
                     err_str = str(e)
                     is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
                     is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
-                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str
+                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str
                     is_bad_json = isinstance(e, json.JSONDecodeError)
                     is_auth_error = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str
 

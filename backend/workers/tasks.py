@@ -755,12 +755,13 @@ def process_video(self: Task, job_id: str) -> dict:
             # Subtitr rejimi yoki uzbek_source uchun STT doim Gemini (Google AI Studio) bo'ladi.
             # OpenAI Whisper o'zbek tilini yaxshi tushunmaydi va tez-tez turkcha/xato chiqaradi.
             stt_primary = "gemini" if (job.subtitle_only or uzbek_source or settings.STT_PROVIDER == "gemini") else "openai"
+            stt_is_paid = True
             try:
                 transcript = transcriber.transcribe_audio(
                     audio_path,
                     language="uz" if uzbek_source else None,
                     primary=stt_primary,
-                    is_paid=is_paid_job,
+                    is_paid=stt_is_paid,
                 )
             except transcriber.WrongLanguageError as exc:
                 if uzbek_source:
@@ -776,7 +777,7 @@ def process_video(self: Task, job_id: str) -> dict:
                         audio_path,
                         language=None,
                         primary=stt_primary,
-                        is_paid=is_paid_job,
+                        is_paid=stt_is_paid,
                     )
                 else:
                     _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
@@ -937,7 +938,8 @@ def process_video(self: Task, job_id: str) -> dict:
                 translated_segments = translator.passthrough_segments(segments)
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
-                translated_segments = translator.translate_segments(segments, is_paid=is_paid_job)
+                translate_is_paid = True
+                translated_segments = translator.translate_segments(segments, is_paid=translate_is_paid)
 
             # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
             # uzunroq chiqqan tarjimalar BIR MARTA qisqartiriladi (haqiqiy
