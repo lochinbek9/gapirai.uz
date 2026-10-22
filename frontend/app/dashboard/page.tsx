@@ -165,14 +165,12 @@ function VideoCard({
   onRetry,
   isRetrying,
   isDeleting = false,
-  isAdmin = false,
 }: {
   job: Job
   onDelete: (id: string) => void
   onRetry: (id: string, isRegenerate?: boolean) => void
   isRetrying: boolean
   isDeleting?: boolean
-  isAdmin?: boolean
 }) {
   const thumbnail = job.video_thumbnail || `https://img.youtube.com/vi/${job.job_id}/mqdefault.jpg`
   const duration = job.video_duration ? formatDuration(job.video_duration) : '--:--'
@@ -291,31 +289,6 @@ function VideoCard({
             Ohang: {styleDisplayName}
           </span>
         </div>
-
-        {/* Admin exact metadata inspection */}
-        {isAdmin && (
-          <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono text-amber-600 dark:text-amber-400 space-y-1">
-            <div className="flex items-center justify-between font-bold text-amber-500">
-              <span className="flex items-center gap-1"><span>🛠</span> AI MODELLAR (ADMIN)</span>
-              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20">{prov}</span>
-            </div>
-            <div className="text-[9px] text-gray-700 dark:text-gray-300 space-y-0.5">
-              <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || '— (eski job)'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || '— (eski job)'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || (prov === 'azure' ? `azure-neural (${voiceDisplayName})` : prov === 'edge' ? `edge-tts (${voiceDisplayName})` : `gemini-tts (${voiceDisplayName})`)}</span></div>
-              <div className="flex justify-between pt-1 border-t border-amber-500/10 text-amber-500 font-semibold">
-                <span>Tannarx:</span>
-                <span className="font-mono">
-                  {job.costs?.total_cost_uzs !== undefined
-                    ? `~${job.costs.total_cost_uzs.toLocaleString()} UZS (~$${job.costs.total_cost_usd.toFixed(4)})`
-                    : prov === 'edge'
-                    ? '0 UZS ($0.00)'
-                    : `~${Math.round(((job.video_duration || 0) / 60) * 1000 * 0.0175 * 12.85).toLocaleString()} UZS`}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="flex items-center justify-between">
           <StatusBadge status={job.status} errorCode={job.error_code} errorMessage={job.error_message} />
@@ -954,7 +927,6 @@ export default function DashboardPage() {
                   onRetry={handleRetry}
                   isRetrying={retryingId === job.job_id}
                   isDeleting={deletingId === job.job_id}
-                  isAdmin={user?.role === 'admin'}
                 />
               ))}
             </div>
