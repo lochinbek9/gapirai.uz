@@ -162,21 +162,32 @@ def initiate_subscription_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.services.plans import PLANS
+    from backend.services.plans import PLANS, apply_user_discount
     if req.plan not in PLANS or req.plan == "free":
         raise HTTPException(status_code=400, detail="Noto'g'ri tarif tanlandi.")
     plan = PLANS[req.plan]
+    amount, _ = apply_user_discount(db, current_user.id, plan.price)
 
-    payment = Payment(
-        user_id=current_user.id, plan=req.plan, amount=plan.price,
-        provider=PaymentProvider.PAYME, status=PaymentStatus.PENDING,
-    )
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
+    payment = db.query(Payment).filter(
+        Payment.user_id == current_user.id,
+        Payment.plan == req.plan,
+        Payment.status == PaymentStatus.PENDING,
+        Payment.provider == PaymentProvider.PAYME,
+    ).first()
+    if not payment:
+        payment = Payment(
+            user_id=current_user.id, plan=req.plan, amount=amount,
+            provider=PaymentProvider.PAYME, status=PaymentStatus.PENDING,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+    elif payment.amount != amount:
+        payment.amount = amount
+        db.commit()
 
     payment_url = _build_checkout_url(request, payment, "/dashboard")
-    return {"success": True, "payment_url": payment_url, "payment_id": str(payment.id), "amount": plan.price}
+    return {"success": True, "payment_url": payment_url, "payment_id": str(payment.id), "amount": amount}
 
 
 # ─────────────────────────────────────────────────────────────────────────

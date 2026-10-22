@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl,
   getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats,
-  listUserAnalyses, deleteAnalysis, VideoAnalysis,
+  listUserAnalyses, deleteAnalysis, retryAnalysis, VideoAnalysis,
 } from '@/lib/api'
 import { extractYouTubeId } from '@/lib/youtube'
 import PushOptIn from '@/components/PushOptIn'
@@ -15,7 +15,7 @@ import DonateCTA from '@/components/DonateCTA'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
-  Sparkles, FileText,
+  Sparkles, FileText, Zap, Package, X,
 } from 'lucide-react'
 import { formatTashkentDate } from '@/lib/timestamp'
 
@@ -25,7 +25,8 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   if (!sub) return null
   const planName = PLAN_NAMES[sub.plan] || sub.plan
   const expiresSoon = sub.expires_at && new Date(sub.expires_at).getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000
-  const isAdmin = sub.is_admin || sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
+  const isAdmin = sub.is_admin
+  const isUnlimited = sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
 
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
@@ -47,7 +48,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
         <div className="sm:ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 w-full sm:w-auto">
           {sub.minutes && (
             <>
-              {isAdmin ? (
+              {isUnlimited ? (
                 <p>
                   <span className="font-bold text-violet-600 dark:text-violet-400">Cheksiz daqiqa</span>
                   <span className="text-gray-500 text-[11px] ml-1.5 font-medium">(Barcha AI provayderlar faol)</span>
@@ -63,21 +64,21 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
                   {sub.minutes.monthly_used} daqiqa ishlatildi
                 </p>
               )}
-              {sub.minutes.purchased > 0 && !isAdmin && (
+              {sub.minutes.purchased > 0 && !isUnlimited && (
                 <p className="text-violet-500 dark:text-violet-400 font-semibold">
                   + {sub.minutes.purchased} sotib olingan daqiqa
                 </p>
               )}
             </>
           )}
-          {sub.plan !== 'free' && sub.expires_at && !isAdmin && (
+          {sub.plan !== 'free' && sub.expires_at && !isUnlimited && (
             <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
               {formatTashkentDate(sub.expires_at)} gacha
             </p>
           )}
         </div>
       </div>
-      {!isAdmin && (
+      {!isUnlimited && (
         <Link
           href="/pricing"
           onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
@@ -302,6 +303,16 @@ function VideoCard({
               <div className="flex justify-between"><span className="text-gray-500">STT:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.stt_model || '— (eski job)'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Tarjima:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.translation_model || '— (eski job)'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">TTS:</span> <span className="font-semibold text-gray-900 dark:text-gray-100">{job.tts_model || (prov === 'azure' ? `azure-neural (${voiceDisplayName})` : prov === 'edge' ? `edge-tts (${voiceDisplayName})` : `gemini-tts (${voiceDisplayName})`)}</span></div>
+              <div className="flex justify-between pt-1 border-t border-amber-500/10 text-amber-500 font-semibold">
+                <span>Tannarx:</span>
+                <span className="font-mono">
+                  {job.costs?.total_cost_uzs !== undefined
+                    ? `~${job.costs.total_cost_uzs.toLocaleString()} UZS (~$${job.costs.total_cost_usd.toFixed(4)})`
+                    : prov === 'edge'
+                    ? '0 UZS ($0.00)'
+                    : `~${Math.round(((job.video_duration || 0) / 60) * 1000 * 0.0175 * 12.85).toLocaleString()} UZS`}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -373,11 +384,15 @@ function VideoCard({
 function AnalysisCard({
   analysis,
   onDelete,
+  onRetry,
   isDeleting = false,
+  isRetrying = false,
 }: {
   analysis: VideoAnalysis
   onDelete: (id: string) => void
+  onRetry?: (id: string) => void
   isDeleting?: boolean
+  isRetrying?: boolean
 }) {
   const ytId = extractYouTubeId(analysis.youtube_url)
   const thumbnail =
@@ -511,16 +526,36 @@ function AnalysisCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {isFailed && onRetry && (
+            <button
+              onClick={() => onRetry(analysis.id)}
+              disabled={isRetrying}
+              title="Qayta urinish (Retry)"
+              className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+            >
+              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
+            </button>
+          )}
+          {isReady && onRetry && (
+            <button
+              onClick={() => onRetry(analysis.id)}
+              disabled={isRetrying}
+              title="Qayta tahlil qilish (Regenerate)"
+              className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+            >
+              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
+            </button>
+          )}
           <Link
             href={`/video-analysis/${analysis.id}`}
-            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold"
+            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold whitespace-nowrap"
           >
             Ko'rish →
           </Link>
           <button
             onClick={() => onDelete(analysis.id)}
-            disabled={isDeleting}
+            disabled={isDeleting || isRetrying}
             className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             title="O'chirish"
           >
@@ -546,6 +581,103 @@ function MeshBackground() {
   );
 }
 
+/**
+ * FreeTierConversionBanner — only shown to free-plan users.
+ * Offers a quick jump to /pricing with Starter pack & subscription highlights.
+ */
+function FreeTierConversionBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="relative mb-6 rounded-2xl overflow-hidden border border-violet-500/30 shadow-2xl shadow-violet-900/20">
+      {/* Gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/80 via-indigo-950/80 to-slate-900/90 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_60%)]" />
+
+      {/* Dismiss button */}
+      <button
+        onClick={onDismiss}
+        className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition"
+        aria-label="Yopish"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+
+      <div className="relative z-10 p-5 sm:p-6">
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h3 className="text-white font-extrabold text-sm sm:text-base leading-tight">
+              Bepul daqiqalaringiz tugamoqda?
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">
+              Bir necha soniyada daqiqa paketi olib, dublyajni to'xtovsiz davom ettiring.
+            </p>
+          </div>
+        </div>
+
+        {/* Cards row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Starter pack */}
+          <Link
+            href="/pricing#packages"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 hover:bg-emerald-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-emerald-300 font-extrabold text-xs uppercase tracking-wider">Starter paketi</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">+15 daqiqa</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              Bir martalik maxsus taklif. Tez sinab ko'rish uchun ideal.
+            </p>
+            <span className="mt-auto self-start text-emerald-400 text-[11px] font-bold group-hover:underline">
+              Sotib olish →
+            </span>
+          </Link>
+
+          {/* Standart plan */}
+          <Link
+            href="/pricing#plans"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 hover:bg-blue-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="text-blue-300 font-extrabold text-xs uppercase tracking-wider">Standart tarif</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">350 daq / oy</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              720p sifat, yuqori ustuvorlik navbati, oylik abonement.
+            </p>
+            <span className="mt-auto self-start text-blue-400 text-[11px] font-bold group-hover:underline">
+              Tarifni ko'rish →
+            </span>
+          </Link>
+
+          {/* Pro plan */}
+          <Link
+            href="/pricing#plans"
+            className="group flex flex-col gap-2 p-4 rounded-xl bg-violet-500/10 border border-violet-500/25 hover:border-violet-400/50 hover:bg-violet-500/15 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-violet-400 shrink-0" />
+              <span className="text-violet-300 font-extrabold text-xs uppercase tracking-wider">Pro tarif</span>
+            </div>
+            <p className="text-white font-bold text-base leading-none">600 daq / oy</p>
+            <p className="text-gray-400 text-[11px] leading-relaxed">
+              1080p sifat, Azure Neural TTS, eng yuqori ustuvorlik.
+            </p>
+            <span className="mt-auto self-start text-violet-400 text-[11px] font-bold group-hover:underline">
+              Pro olish →
+            </span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
@@ -558,6 +690,7 @@ export default function DashboardPage() {
   const [jobsStats, setJobsStats] = useState<JobsStats | null>(null)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
   const [renewing, setRenewing] = useState(false)
+  const [conversionBannerDismissed, setConversionBannerDismissed] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -603,6 +736,26 @@ export default function DashboardPage() {
       alert(err?.response?.data?.detail || "Tahlilni o'chirishda xatolik yuz berdi.")
     } finally {
       setDeletingAnalysisId(null)
+    }
+  }
+
+  const [retryingAnalysisId, setRetryingAnalysisId] = useState<string | null>(null)
+
+  async function handleRetryAnalysis(id: string) {
+    setRetryingAnalysisId(id)
+    try {
+      await retryAnalysis(id)
+      setAnalyses((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, status: 'pending', status_message: "Qayta navbatga qo'shildi..." }
+            : a
+        )
+      )
+      router.push(`/video-analysis/${id}`)
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || "Tahlilni qayta ishga tushirishda xatolik yuz berdi.")
+      setRetryingAnalysisId(null)
     }
   }
 
@@ -732,6 +885,12 @@ export default function DashboardPage() {
         </div>
 
         <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
+
+        {/* Conversion banner: only for free users who haven't dismissed it */}
+        {subscription?.plan === 'free' && !conversionBannerDismissed && (
+          <FreeTierConversionBanner onDismiss={() => setConversionBannerDismissed(true)} />
+        )}
+
         <BillingCard />
         <PushOptIn />
         <DonateCTA className="mb-6" />
@@ -825,7 +984,9 @@ export default function DashboardPage() {
                   key={analysis.id}
                   analysis={analysis}
                   onDelete={handleDeleteAnalysis}
+                  onRetry={handleRetryAnalysis}
                   isDeleting={deletingAnalysisId === analysis.id}
+                  isRetrying={retryingAnalysisId === analysis.id}
                 />
               ))}
             </div>

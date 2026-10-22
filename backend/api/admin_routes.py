@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, date
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from pydantic import BaseModel
 from sqlalchemy import func, or_, and_, select, case, distinct, text
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail, TTSUsageLog, JobStatus
@@ -126,10 +126,17 @@ def admin_stats(
             for u in recent_u_q.order_by(User.created_at.desc()).limit(10).all()
         ]
 
-        # ── So'nggi joblar ──
+        # ── Toshkent vaqti bo'yicha Bugun va Kecha (UTC+5) ──
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        today_start_utc = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day) - TASHKENT_OFFSET
+
+        # ── So'nggi joblar (Faqat bugungi kun, Toshkent vaqti bo'yicha, max 50 ta) ──
         recent_jobs_query = (
             db.query(DubbingJob, User.email)
             .outerjoin(User, DubbingJob.user_id == User.id)
+            .filter(DubbingJob.created_at >= today_start_utc)
         )
         if recent_jobs_user_filter is not None:
             recent_jobs_query = recent_jobs_query.filter(recent_jobs_user_filter)
@@ -152,11 +159,6 @@ def admin_stats(
             }
             for job, email in recent_jobs_rows
         ]
-
-        # ── Toshkent vaqti bo'yicha Bugun va Kecha (UTC+5) ──
-        TASHKENT_OFFSET = timedelta(hours=5)
-        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
-        tashkent_today_date = tashkent_now.date()
 
         # Trendlar (faqat real mijozlar)
         trend_since = now - timedelta(days=TREND_DAYS)
@@ -403,6 +405,8 @@ class AddMinutesRequest(BaseModel):
     amount_uzs: float | None = None
     rate_per_minute: float = 500.0
     action: str = "add"  # "add" | "deduct"
+    target: str = "purchased"  # "purchased" (kuymas) | "monthly" (tarif)
+    balance_type: str | None = None  # alias: "kuymas" | "purchased" | "monthly" | "tarif"
     reason: str | None = None
 
 
@@ -416,19 +420,26 @@ class SetPlanRequest(BaseModel):
 def admin_list_users(
     q: str | None = None,
     filter_type: str | None = Query(None, description="all | customers | internal"),
+    plan_filter: str | None = Query(None, description="all | free | paid | standard | pro | has_package"),
+    balance_filter: str | None = Query(None, description="all | has_balance | no_balance | has_purchased | no_purchased"),
+    sort_by: str = Query("newest", description="newest | oldest | balance_desc | balance_asc | purchased_desc | alphabetical"),
+    date_range: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
     current_user: User = Depends(get_current_admin_user),
 ):
-    """Admin panel: foydalanuvchilarni qidirish va ularning obuna/daqiqa holatini ko'rish."""
+    """Admin panel: foydalanuvchilarni qidirish, tarif, balans va ro'yxatdan o'tgan sana bo'yicha saralash."""
     db = SessionLocal()
     try:
-        query = db.query(User)
+        query = db.query(User, Subscription).outerjoin(Subscription, User.id == Subscription.user_id)
         if filter_type == "customers":
             query = query.filter(User.is_internal.is_(False))
         elif filter_type == "internal":
             query = query.filter(User.is_internal.is_(True))
 
+        # Search term
         if q and q.strip():
             term = f"%{q.strip()}%"
             query = query.filter(
@@ -439,24 +450,206 @@ def admin_list_users(
                 )
             )
 
-        total = query.count()
-        users = query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+        # Plan filter
+        if plan_filter and plan_filter.strip().lower() not in ("all", ""):
+            pf = plan_filter.strip().lower()
+            if pf == "free":
+                query = query.filter(or_(Subscription.plan == PlanTier.FREE, Subscription.plan.is_(None)))
+            elif pf == "paid":
+                query = query.filter(Subscription.plan.in_([PlanTier.STANDARD, PlanTier.PRO]))
+            elif pf == "standard":
+                query = query.filter(Subscription.plan == PlanTier.STANDARD)
+            elif pf == "pro":
+                query = query.filter(Subscription.plan == PlanTier.PRO)
+            elif pf == "has_package":
+                query = query.filter(Subscription.purchased_minutes > 0)
 
-        user_ids = [u.id for u in users]
-        existing_subs = {
-            s.user_id: s
-            for s in db.query(Subscription).filter(Subscription.user_id.in_(user_ids)).all()
-        } if user_ids else {}
+        # Balance filter
+        if balance_filter and balance_filter.strip().lower() not in ("all", ""):
+            bf = balance_filter.strip().lower()
+            if bf == "has_purchased":
+                query = query.filter(Subscription.purchased_minutes > 0)
+            elif bf == "no_purchased":
+                query = query.filter(or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0))
+            elif bf == "has_balance":
+                query = query.filter(
+                    or_(
+                        Subscription.purchased_minutes > 0,
+                        case(
+                            (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) < 60),
+                            (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) < 20),
+                            else_=func.coalesce(Subscription.monthly_minutes_used, 0) < 5,
+                        )
+                    )
+                )
+            elif bf == "no_balance":
+                query = query.filter(
+                    and_(
+                        or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0),
+                        case(
+                            (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) >= 60),
+                            (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) >= 20),
+                            else_=func.coalesce(Subscription.monthly_minutes_used, 0) >= 5,
+                        )
+                    )
+                )
+
+        # Date range filter for user registration
+        period_label = "Barcha davr"
+        if date_range and date_range.strip().lower() not in ("all", ""):
+            TASHKENT_OFFSET = timedelta(hours=5)
+            tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+            tashkent_today_date = tashkent_now.date()
+            u_start_utc = None
+            u_end_utc = None
+            dr = date_range.strip().lower()
+            if dr == "today":
+                period_label = "Bugun"
+                dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+                u_start_utc = dt - TASHKENT_OFFSET
+            elif dr == "7d":
+                period_label = "So'nggi 7 kun"
+                dt = tashkent_today_date - timedelta(days=6)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "14d":
+                period_label = "So'nggi 14 kun"
+                dt = tashkent_today_date - timedelta(days=13)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "30d":
+                period_label = "So'nggi 30 kun"
+                dt = tashkent_today_date - timedelta(days=29)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "90d":
+                period_label = "So'nggi 90 kun"
+                dt = tashkent_today_date - timedelta(days=89)
+                u_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+            elif dr == "custom" and start_date:
+                period_label = f"{start_date} ~ {end_date or start_date}"
+                try:
+                    s_parts = [int(p) for p in start_date.split("-")]
+                    u_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                    if end_date:
+                        e_parts = [int(p) for p in end_date.split("-")]
+                        u_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+                except Exception:
+                    pass
+            if u_start_utc:
+                query = query.filter(User.created_at >= u_start_utc)
+            if u_end_utc:
+                query = query.filter(User.created_at < u_end_utc)
+
+        # Single efficient aggregation query across all matching users for this filter/period
+        calc_is_zero_balance = and_(
+            or_(Subscription.purchased_minutes.is_(None), Subscription.purchased_minutes <= 0),
+            case(
+                (Subscription.plan == PlanTier.PRO, func.coalesce(Subscription.monthly_minutes_used, 0) >= 60),
+                (Subscription.plan == PlanTier.STANDARD, func.coalesce(Subscription.monthly_minutes_used, 0) >= 20),
+                else_=func.coalesce(Subscription.monthly_minutes_used, 0) >= 5,
+            )
+        )
+        calc_is_paid = Subscription.plan.in_([PlanTier.STANDARD, PlanTier.PRO])
+        calc_has_pkg = func.coalesce(Subscription.purchased_minutes, 0) > 0
+        calc_is_unverified = User.is_verified.is_(False)
+
+        agg = query.with_entities(
+            func.count(User.id).label("total"),
+            func.count(case((calc_is_paid, 1))).label("paid_count"),
+            func.count(case((calc_has_pkg, 1))).label("has_package_count"),
+            func.count(case((calc_is_zero_balance, 1))).label("zero_balance_count"),
+            func.count(case((calc_is_unverified, 1))).label("unverified_count"),
+        ).first()
+
+        total = (agg[0] if agg else 0) or 0
+        paid_count = (agg[1] if agg else 0) or 0
+        has_package_count = (agg[2] if agg else 0) or 0
+        zero_balance_count = (agg[3] if agg else 0) or 0
+        unverified_count = (agg[4] if agg else 0) or 0
+        free_count = max(0, total - paid_count)
+
+        insights = []
+        if total == 0:
+            insights.append({
+                "type": "info",
+                "title": f"{period_label}da yangi foydalanuvchilar topilmadi",
+                "description": "Tanlangan vaqt oralig'i yoki filtr parametrlari bo'yicha birorta ham profil ro'yxatdan o'tmagan."
+            })
+        else:
+            if paid_count > 0:
+                conv_rate = round(paid_count / total * 100, 1)
+                insights.append({
+                    "type": "success",
+                    "title": f"{period_label}: {paid_count:,} ta pullik obunachi (Standart/Pro)",
+                    "description": f"Tanlangan davrdagi {total:,} ta foydalanuvchidan {paid_count:,} tasi faol obunachi ({conv_rate}% konversiya). Qolgan {free_count:,} tasi bepul sinov tarifida."
+                })
+            else:
+                insights.append({
+                    "type": "info",
+                    "title": f"{period_label}: {total:,} ta foydalanuvchi (bepul sinovda)",
+                    "description": f"Ushbu davrda ro'yxatdan o'tgan barcha {total:,} ta foydalanuvchi hozircha bepul sinov tarifida. Ularga boshlang'ich starter paketlar yoki aksiyalar taklif qilish konversiyani oshiradi."
+                })
+
+            if zero_balance_count > 0:
+                insights.append({
+                    "type": "warning",
+                    "title": f"{period_label}: {zero_balance_count:,} ta foydalanuvchida daqiqa tugagan",
+                    "description": f"Ko'rsatilgan foydalanuvchilar orasida {zero_balance_count:,} tasining balansi 0 daqiqa bo'lib qolgan. Aynan shu segmentga Starter paketi (15 daqiqa) taklif qilinsa, to'lov konversiyasi maksimal bo'ladi."
+                })
+
+            if has_package_count > 0:
+                insights.append({
+                    "type": "info",
+                    "title": f"{period_label}: {has_package_count:,} ta foydalanuvchida kuymas paket mavjud",
+                    "description": f"Ushbu {has_package_count:,} ta foydalanuvchi bir martalik kuymas daqiqa paketlarini xarid qilgan bo'lib, daqiqalari oylik muddatga bog'liq emas va hech qachon kuymaydi."
+                })
+
+            if unverified_count > 0:
+                insights.append({
+                    "type": "caution",
+                    "title": f"{period_label}: {unverified_count:,} ta tasdiqlanmagan profil",
+                    "description": f"Ushbu {unverified_count:,} ta profil ro'yxatdan o'tgan, lekin email manzilini hali tasdiqlamagan. Eslatma xati yuborish ularni platformaga qaytarishi mumkin."
+                })
+
+            if paid_count == 0 and has_package_count == 0 and zero_balance_count == 0 and total > 0:
+                insights.append({
+                    "type": "info",
+                    "title": f"Yangi ro'yxatdan o'tganlar uchun sinov davri",
+                    "description": f"{period_label}da qo'shilgan {total:,} ta yangi foydalanuvchiga 5 daqiqalik bepul sinov ajratilgan. Ularning birinchi dublyaj urinishini kuzatib borish va qiyinchilik bo'lsa yordam berish tavsiya etiladi."
+                })
+
+        # Sorting logic
+        calc_balance_expr = (
+            func.coalesce(Subscription.purchased_minutes, 0.0) +
+            func.greatest(
+                0.0,
+                case(
+                    (Subscription.plan == PlanTier.PRO, 60.0),
+                    (Subscription.plan == PlanTier.STANDARD, 20.0),
+                    else_=5.0,
+                ) - func.coalesce(Subscription.monthly_minutes_used, 0.0)
+            )
+        )
+        if sort_by == "oldest":
+            query = query.order_by(User.created_at.asc())
+        elif sort_by == "balance_desc":
+            query = query.order_by(calc_balance_expr.desc(), User.created_at.desc())
+        elif sort_by == "balance_asc":
+            query = query.order_by(calc_balance_expr.asc(), User.created_at.desc())
+        elif sort_by == "purchased_desc":
+            query = query.order_by(func.coalesce(Subscription.purchased_minutes, 0).desc(), User.created_at.desc())
+        elif sort_by == "alphabetical":
+            query = query.order_by(func.coalesce(User.name, User.email).asc())
+        else: # "newest"
+            query = query.order_by(User.created_at.desc())
+
+        rows = query.offset((page - 1) * limit).limit(limit).all()
 
         result = []
-        for u in users:
-            sub = existing_subs.get(u.id)
+        for u, sub in rows:
             if not sub:
                 sub = Subscription(user_id=u.id, plan=PlanTier.FREE, period_started_at=datetime.utcnow())
                 db.add(sub)
                 db.commit()
                 db.refresh(sub)
-                existing_subs[u.id] = sub
 
             bal = get_minute_balance(db, u.id)
             result.append({
@@ -481,6 +674,16 @@ def admin_list_users(
             "page": page,
             "limit": limit,
             "users": result,
+            "summary": {
+                "total": total,
+                "paid_count": paid_count,
+                "free_count": free_count,
+                "has_package_count": has_package_count,
+                "zero_balance_count": zero_balance_count,
+                "unverified_count": unverified_count,
+                "period_label": period_label,
+            },
+            "insights": insights,
         }
     finally:
         db.close()
@@ -727,6 +930,8 @@ def admin_add_minutes(
         raise HTTPException(status_code=400, detail="Daqiqa yoki summa 0 dan katta bo'lishi kerak")
 
     is_deduct = str(req.action or "").lower() in ["deduct", "subtract", "minus", "ayirish"]
+    target_type = str(req.balance_type or req.target or "purchased").lower().strip()
+    is_monthly = target_type in ["monthly", "tarif", "tariff", "oylik"]
 
     db = SessionLocal()
     try:
@@ -738,40 +943,51 @@ def admin_add_minutes(
         from backend.services.plans import PLANS
         plan = PLANS[sub.plan.value]
 
-        if is_deduct:
-            # 1. Avval kuymaydigan (purchased_minutes) dan ayiramiz
-            purchased = float(sub.purchased_minutes or 0.0)
-            if purchased >= mins:
-                sub.purchased_minutes = round(purchased - mins, 1)
+        if is_monthly:
+            current_used = float(sub.monthly_minutes_used or 0.0)
+            if is_deduct:
+                # Oylik sarflangan daqiqalarni oshiramiz (mavjud qoldiq kamayadi)
+                sub.monthly_minutes_used = round(min(float(plan.monthly_minutes), current_used + mins), 1)
+                action_text = f"{mins} daqiqa oylik tarif kvotasidan muvaffaqiyatli ayirildi"
             else:
-                leftover = mins - purchased
-                sub.purchased_minutes = 0.0
-                # Qolganini joriy oylik kvotadan ayiramiz (monthly_minutes_used ni oshirish orqali)
-                current_used = float(sub.monthly_minutes_used or 0.0)
-                sub.monthly_minutes_used = round(min(float(plan.monthly_minutes), current_used + leftover), 1)
+                # Oylik sarflangan daqiqalarni kamaytiramiz (mavjud qoldiq oshadi)
+                sub.monthly_minutes_used = round(current_used - mins, 1)
+                action_text = f"{mins} daqiqa oylik tarif kvotasiga muvaffaqiyatli qo'shildi"
 
             db.commit()
             db.refresh(sub)
-
             bal = get_minute_balance(db, user.id)
             return {
                 "success": True,
-                "message": f"{mins} daqiqa muvaffaqiyatli ayirildi",
-                "deducted_minutes": mins,
+                "message": action_text,
+                "target": "monthly",
+                "action": "deduct" if is_deduct else "add",
+                "minutes": mins,
+                "monthly_minutes_used": sub.monthly_minutes_used,
                 "purchased_minutes": sub.purchased_minutes,
                 "balance": bal,
             }
         else:
-            sub.purchased_minutes = round(float(sub.purchased_minutes or 0.0) + float(mins), 1)
+            # Kuymas daqiqalar (purchased_minutes)
+            purchased = float(sub.purchased_minutes or 0.0)
+            if is_deduct:
+                sub.purchased_minutes = round(max(0.0, purchased - mins), 1)
+                action_text = f"{mins} daqiqa kuymas balansdan muvaffaqiyatli ayirildi"
+            else:
+                sub.purchased_minutes = round(purchased + float(mins), 1)
+                action_text = f"{mins} daqiqa kuymas balansga muvaffaqiyatli qo'shildi"
+
             db.commit()
             db.refresh(sub)
-
             bal = get_minute_balance(db, user.id)
             return {
                 "success": True,
-                "message": f"{mins} daqiqa muvaffaqiyatli qo'shildi",
-                "added_minutes": mins,
+                "message": action_text,
+                "target": "purchased",
+                "action": "deduct" if is_deduct else "add",
+                "minutes": mins,
                 "purchased_minutes": sub.purchased_minutes,
+                "monthly_minutes_used": sub.monthly_minutes_used,
                 "balance": bal,
             }
     finally:
@@ -887,15 +1103,80 @@ def admin_system_health(current_user: User = Depends(get_current_admin_user)):
 @router.post("/jobs/{job_id}/retry")
 def admin_retry_job(
     job_id: str,
+    payload: dict | None = Body(None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """Admin panel orqali xatolikka uchragan yoki to'xtab qolgan job'ni bevosita qayta navbatga qo'yish."""
-    from backend.api.routes import retry_job
+    from backend.api.routes import retry_job, RegenerateJobRequest
+    req_obj = RegenerateJobRequest(**payload) if payload else None
     db = SessionLocal()
     try:
-        return retry_job(job_id=job_id, payload=None, db=db, current_user=current_user)
+        return retry_job(job_id=job_id, payload=req_obj, db=db, current_user=current_user)
     finally:
         db.close()
+
+
+@router.post("/jobs/{job_id}/cancel")
+def admin_cancel_job(
+    job_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel orqali istalgan jarayondagi job'ni to'xtatish va bekor qilish."""
+    from backend.models.database import DubbingJob, JobStatus
+    from backend.workers.celery_app import celery_app
+    db = SessionLocal()
+    try:
+        job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job topilmadi")
+        
+        try:
+            celery_app.control.revoke(str(job.id), terminate=True, signal="SIGTERM")
+        except Exception as e:
+            logger.warning(f"Admin cancel: celery revoke error for {job.id}: {e}")
+
+        job.status = JobStatus.FAILED
+        job.status_message = "Admin tomonidan bekor qilindi"
+        job.error_message = "Admin tomonidan to'xtatildi va bekor qilindi."
+        job.error_code = "ADMIN_CANCELLED"
+        job.processing_claim_token = None
+        job.processing_lease_expires_at = None
+        db.commit()
+        return {"status": "success", "message": f"Job {job_id} bekor qilindi"}
+    finally:
+        db.close()
+
+
+@router.post("/analyses/{analysis_id}/cancel")
+def admin_cancel_analysis(
+    analysis_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel orqali istalgan video tahlilini to'xtatish va bekor qilish."""
+    from backend.models.database import VideoAnalysis, AnalysisStatus
+    from backend.workers.celery_app import celery_app
+    db = SessionLocal()
+    try:
+        va = db.query(VideoAnalysis).filter(VideoAnalysis.id == analysis_id).first()
+        if not va:
+            raise HTTPException(status_code=404, detail="Video tahlil topilmadi")
+        
+        try:
+            celery_app.control.revoke(str(va.id), terminate=True, signal="SIGTERM")
+        except Exception as e:
+            logger.warning(f"Admin cancel: celery revoke error for {va.id}: {e}")
+
+        va.status = AnalysisStatus.FAILED
+        va.status_message = "Admin tomonidan bekor qilindi"
+        va.error_message = "Admin tomonidan to'xtatildi va bekor qilindi."
+        va.error_code = "ADMIN_CANCELLED"
+        va.processing_claim_token = None
+        va.processing_lease_expires_at = None
+        db.commit()
+        return {"status": "success", "message": f"Video tahlil {analysis_id} bekor qilindi"}
+    finally:
+        db.close()
+
 
 
 
@@ -2370,6 +2651,101 @@ def get_gemini_quota(current_admin: User = Depends(get_current_admin_user)):
     return get_gemini_quota_status()
 
 
+class AdminGeminiModeRequest(BaseModel):
+    mode: str  # "free" | "paid"
+
+
+class AdminGeminiBalanceRequest(BaseModel):
+    initial_balance: float
+
+
+class AdminGeminiResetCooldownRequest(BaseModel):
+    key_masked: str
+    model: str | None = None
+
+
+@router.get("/gemini-keys/overview")
+def get_gemini_keys_overview(
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Barcha Gemini API kalitlari (pullik va 36+ bepul), ularning rasmiy limitlari,
+    muvaffaqiyatli videolar soni, umumiy davomiyligi, hisoblangan tannarxi (USD/UZS)
+    va alohida pullik kalit bloki ma'lumotlarini qaytaradi.
+    Shuningdek Groq Cloud kalitlari blokini alohida aralashtirmagan holda taqdim etadi.
+    """
+    from backend.services.gemini_quota_manager import get_gemini_keys_detailed_stats
+    from backend.services.groq_service import get_groq_keys_detailed_stats
+    db = SessionLocal()
+    try:
+        stats = get_gemini_keys_detailed_stats(db)
+        stats["groq"] = get_groq_keys_detailed_stats(db)
+        return stats
+    finally:
+        db.close()
+
+
+@router.get("/groq-keys/overview")
+def get_groq_keys_overview_endpoint(
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Groq Cloud API kalitlari ro'yxati, bepul limitlar ($0.00 / 0 UZS) va holatini qaytaradi."""
+    from backend.services.groq_service import get_groq_keys_detailed_stats
+    db = SessionLocal()
+    try:
+        return get_groq_keys_detailed_stats(db)
+    finally:
+        db.close()
+
+
+class AdminGroqResetCooldownRequest(BaseModel):
+    key_masked: str
+
+
+@router.post("/groq-keys/reset-cooldown")
+def reset_admin_groq_cooldown_endpoint(
+    req: AdminGroqResetCooldownRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Groq kalit cooldownini qo'lda tozalash."""
+    from backend.services.groq_service import reset_groq_key_cooldown
+    ok = reset_groq_key_cooldown(req.key_masked)
+    return {"status": "ok" if ok else "not_found", "key_masked": req.key_masked}
+
+
+@router.post("/gemini-keys/admin-mode")
+def set_admin_gemini_mode_endpoint(
+    req: AdminGeminiModeRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Admin dublyaj/tahlil qilganda qaysi kalit ishlasin: 'free' (default) yoki 'paid'."""
+    from backend.services.gemini_quota_manager import set_admin_gemini_mode
+    res_mode = set_admin_gemini_mode(req.mode)
+    return {"status": "ok", "mode": res_mode, "message": f"Admin rejimi '{res_mode}' ga o'zgartirildi."}
+
+
+@router.post("/gemini-keys/initial-balance")
+def set_admin_gemini_balance_endpoint(
+    req: AdminGeminiBalanceRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Pullik kalitning boshlang'ich kiritilgan balansini sozlash."""
+    from backend.services.gemini_quota_manager import set_paid_initial_balance
+    bal = set_paid_initial_balance(req.initial_balance)
+    return {"status": "ok", "initial_balance": bal, "message": f"Boshlang'ich balans ${bal:.2f} qilib belgilandi."}
+
+
+@router.post("/gemini-keys/reset-cooldown")
+def reset_admin_gemini_cooldown_endpoint(
+    req: AdminGeminiResetCooldownRequest,
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """Kalit yoki model cooldownini zudlik bilan tozalash."""
+    from backend.services.gemini_quota_manager import reset_gemini_key_cooldown
+    ok = reset_gemini_key_cooldown(req.key_masked, req.model)
+    return {"status": "ok" if ok else "not_found", "key_masked": req.key_masked}
+
+
 class ExcludedEmailCreateRequest(BaseModel):
     email: str
     reason: str = "Dasturchi / Test"
@@ -2480,20 +2856,29 @@ def admin_jobs_cost(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
     tts_provider: str | None = Query(default=None),
+    plan: str | None = Query(default=None),
+    error_code: str | None = Query(default=None),
     include_internal: bool = Query(default=False),
     sort_by: str = Query(default="newest"),
+    date_range: str = Query(default="today"),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
-    Har bir dublyaj job uchun xarajatlar taqsimoti (TTS, STT, LLM) va batafsil statuslar.
+    Har bir dublyaj job uchun xarajatlar taqsimoti (TTS, STT, LLM), sana oraliq filtri va batafsil statuslar.
     """
     import uuid as _uuid
     db = SessionLocal()
     try:
         internal_ids_select = select(User.id).filter(User.is_internal.is_(True))
 
-        # Base query joined with User
-        base_query = db.query(DubbingJob, User).outerjoin(User, DubbingJob.user_id == User.id)
+        # Base query joined with User and Subscription
+        base_query = (
+            db.query(DubbingJob, User)
+            .outerjoin(User, DubbingJob.user_id == User.id)
+            .outerjoin(Subscription, User.id == Subscription.user_id)
+        )
 
         # Exclude internal accounts unless explicitly requested
         if not include_internal:
@@ -2506,11 +2891,66 @@ def admin_jobs_cost(
             clean_prov = tts_provider.strip().lower()
             base_query = base_query.filter(func.lower(DubbingJob.tts_provider) == clean_prov)
 
+        # Plan / Tarif filter
+        if plan and plan.strip().lower() not in ("all", ""):
+            clean_plan = plan.strip().lower()
+            if clean_plan == "admin":
+                base_query = base_query.filter(User.role == "admin")
+            elif clean_plan == "free":
+                base_query = base_query.filter(
+                    or_(
+                        Subscription.plan == PlanTier.FREE,
+                        Subscription.plan.is_(None),
+                        DubbingJob.user_id.is_(None),
+                    )
+                )
+            elif clean_plan in ("standard", "standart"):
+                base_query = base_query.filter(Subscription.plan == PlanTier.STANDARD)
+            elif clean_plan == "pro":
+                base_query = base_query.filter(Subscription.plan == PlanTier.PRO)
+
+        # Error code filter
+        if error_code and error_code.strip().upper() not in ("ALL", ""):
+            ec = error_code.strip().upper()
+            if ec == "DOWNLOAD_ERROR":
+                base_query = base_query.filter(
+                    or_(
+                        DubbingJob.error_code.ilike("%DOWNLOAD%"),
+                        DubbingJob.error_code.in_([
+                            "EXTRACTOR_ERROR", "PO_TOKEN_REQUIRED", "VIDEO_UNAVAILABLE",
+                            "PROXY_ERROR", "PROXY_BILLING_ERROR", "NETWORK_ERROR",
+                            "HTTP_403", "HTTP_429", "UPSTREAM_ERROR"
+                        ])
+                    )
+                )
+            elif ec == "TRANSCRIBE_ERROR":
+                base_query = base_query.filter(DubbingJob.error_code.ilike("%TRANSCRIB%"))
+            elif ec == "TRANSLATE_ERROR":
+                base_query = base_query.filter(DubbingJob.error_code.ilike("%TRANSLAT%"))
+            elif ec == "SYNTHESIS_ERROR":
+                base_query = base_query.filter(or_(DubbingJob.error_code.ilike("%SYNTHES%"), DubbingJob.error_code.ilike("%TTS%")))
+            elif ec == "MERGE_ERROR":
+                base_query = base_query.filter(or_(DubbingJob.error_code.ilike("%MERG%"), DubbingJob.error_code.ilike("%SYNC%")))
+            elif ec == "OTHER":
+                known = ["NO_SPEECH_FOUND", "AUTH_ERROR", "CONTENT_BLOCKED", "TIMEOUT"]
+                base_query = base_query.filter(
+                    DubbingJob.error_code.isnot(None),
+                    ~DubbingJob.error_code.in_(known),
+                    ~DubbingJob.error_code.ilike("%DOWNLOAD%"),
+                    ~DubbingJob.error_code.ilike("%TRANSCRIB%"),
+                    ~DubbingJob.error_code.ilike("%TRANSLAT%"),
+                    ~DubbingJob.error_code.ilike("%SYNTHES%"),
+                    ~DubbingJob.error_code.ilike("%MERG%"),
+                )
+            else:
+                base_query = base_query.filter(DubbingJob.error_code == ec)
+
         # Status filter
         if status and status.strip().upper() not in ("ALL", ""):
             clean_status = status.strip().upper()
             if clean_status == "PROCESSING":
                 base_query = base_query.filter(DubbingJob.status.in_([
+                    JobStatus.PENDING,
                     JobStatus.DOWNLOADING,
                     JobStatus.TRANSCRIBING,
                     JobStatus.TRANSLATING,
@@ -2519,16 +2959,51 @@ def admin_jobs_cost(
                     JobStatus.MERGING,
                 ]))
             elif clean_status in ("AWAITING", "AWAITING_PAYMENT"):
-                base_query = base_query.filter(DubbingJob.status.in_([
-                    JobStatus.AWAITING_PAYMENT,
-                    JobStatus.PENDING,
-                ]))
+                base_query = base_query.filter(DubbingJob.status == JobStatus.AWAITING_PAYMENT)
             else:
                 try:
                     js = JobStatus(clean_status)
                     base_query = base_query.filter(DubbingJob.status == js)
                 except ValueError:
                     base_query = base_query.filter(func.upper(func.cast(DubbingJob.status, func.text)) == clean_status)
+
+        # Date range filter (default: "today" in Tashkent UTC+5)
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        date_start_utc = None
+        date_end_utc = None
+
+        dr = (date_range or "today").strip().lower()
+        if dr == "today":
+            dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+            date_start_utc = dt - TASHKENT_OFFSET
+        elif dr == "7d":
+            dt = tashkent_today_date - timedelta(days=6)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "14d":
+            dt = tashkent_today_date - timedelta(days=13)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "30d":
+            dt = tashkent_today_date - timedelta(days=29)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "90d":
+            dt = tashkent_today_date - timedelta(days=89)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "custom" and start_date:
+            try:
+                s_parts = [int(p) for p in start_date.split("-")]
+                date_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                if end_date:
+                    e_parts = [int(p) for p in end_date.split("-")]
+                    date_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+            except Exception:
+                pass
+
+        if date_start_utc:
+            base_query = base_query.filter(DubbingJob.created_at >= date_start_utc)
+        if date_end_utc:
+            base_query = base_query.filter(DubbingJob.created_at < date_end_utc)
 
         # Search filter
         if search and search.strip():
@@ -2641,6 +3116,13 @@ def admin_jobs_cost(
                         "paid_at": to_tashkent_iso(p.created_at),
                     }
 
+        # Batch load subscriptions & balances for users on current page
+        user_ids = [u.id for _, u in page_rows if u]
+        user_subs = {
+            s.user_id: s
+            for s in db.query(Subscription).filter(Subscription.user_id.in_(user_ids)).all()
+        } if user_ids else {}
+
         USD_TO_UZS = 12800
 
         # Build job response items
@@ -2661,10 +3143,28 @@ def admin_jobs_cost(
             dur_sec = float(job.video_duration or 0.0)
             dur_min = dur_sec / 60.0
 
-            # STT Cost estimation (Whisper $0.006/min; Gemini $0.002/min)
+            # STT Cost estimation and Groq identification
             stt_model = job.stt_model or "gemini-3.8-flash"
-            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT):
-                stt_rate = 0.002 if "gemini" in stt_model.lower() else 0.006
+            gemini_key_used = getattr(job, "gemini_key_used", None) or ""
+            is_groq = "groq" in stt_model.lower() or gemini_key_used.startswith("groq:")
+            if is_groq:
+                stt_display = "Groq Whisper (Turbo)"
+                stt_provider_name = "groq"
+            elif "gemini" in stt_model.lower():
+                stt_display = "Gemini Flash STT"
+                stt_provider_name = "gemini"
+            elif "whisper" in stt_model.lower():
+                stt_display = "OpenAI Whisper"
+                stt_provider_name = "openai"
+            else:
+                stt_display = stt_model
+                stt_provider_name = "other"
+
+            # STT Cost estimation:
+            # Foydalanuvchi talabi: STT to'liq bepul, faqat pullik Gemini STT ishlatilgandagina xarajat chiqadi, aks holda $0!
+            is_paid_gemini_stt = getattr(job, "gemini_key_tier", None) == "paid" and "gemini" in stt_model.lower() and not is_groq
+            if dur_sec > 0 and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT) and is_paid_gemini_stt:
+                stt_rate = 0.002
                 stt_cost_usd = round(dur_min * stt_rate, 4)
             else:
                 stt_cost_usd = 0.0
@@ -2672,17 +3172,44 @@ def admin_jobs_cost(
             # LLM Translation Cost estimation (~$0.0005 per 1k characters)
             llm_model = job.translation_model or "gemini-1.5-flash"
             llm_cost_usd = 0.0
+            chars = 0
             if job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
                 if job.translated_text:
                     chars = len(job.translated_text)
                     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
                 elif dur_sec > 0:
-                    chars = int(dur_min * 1200)
+                    chars = int(dur_min * 1000)
                     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
 
-            tts_usd = round(tts_info["cost_usd"], 4)
-            tts_uzs = round(tts_info["cost_uzs"])
-            total_usd = round(tts_usd + (tts_uzs / USD_TO_UZS) + stt_cost_usd + llm_cost_usd, 4)
+            # TTS Cost estimation: Edge bepul ($0.0), Azure ($0.016 / 1k), Gemini ($0.017 / 1k)
+            tts_provider_clean = (job.tts_provider or ("edge" if "edge" in (job.tts_model or "").lower() else ("azure" if "azure" in (job.tts_model or "").lower() else "gemini"))).lower()
+            tts_usd = round(tts_info.get("cost_usd", 0.0), 4)
+            tts_uzs = round(tts_info.get("cost_uzs", 0.0))
+
+            tts_char_count = tts_info.get("characters", 0)
+            full_text_chars = len(job.translated_text) if getattr(job, "translated_text", None) else 0
+            if full_text_chars > 0:
+                est_chars = full_text_chars
+            elif tts_char_count and tts_char_count > 0 and tts_char_count >= int(dur_min * 600):
+                est_chars = tts_char_count
+            elif chars > 0:
+                est_chars = chars
+            else:
+                est_chars = int(dur_min * 1200)
+
+            if tts_provider_clean == "edge":
+                tts_usd = 0.0
+                tts_uzs = 0
+            elif (dur_sec > 0 or est_chars > 0) and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
+                if tts_provider_clean == "azure":
+                    calculated_azure_tts = round((est_chars / 1000.0) * 0.016, 4)
+                    tts_usd = max(tts_usd, calculated_azure_tts)
+                else:  # gemini
+                    calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
+                    tts_usd = max(tts_usd, calculated_gemini_tts)
+                tts_uzs = int(round(tts_usd * USD_TO_UZS))
+
+            total_usd = round(tts_usd + stt_cost_usd + llm_cost_usd, 4)
             total_uzs = int(round(total_usd * USD_TO_UZS))
 
             cost_per_min_uzs = int(round(total_uzs / dur_min)) if dur_min > 0 else 0
@@ -2714,6 +3241,12 @@ def admin_jobs_cost(
                     "avg_score": avg_score,
                 }
 
+            # User plan & balance
+            u_sub = user_subs.get(user.id) if user else None
+            plan_name = (u_sub.plan.value if hasattr(u_sub.plan, "value") else str(u_sub.plan)).capitalize() if u_sub else "Bepul"
+            u_bal = get_minute_balance(db, user.id) if user else None
+            bal_minutes = u_bal.get("total_available", 0.0) if u_bal else 0.0
+
             items.append({
                 "id": j_id,
                 "video_title": job.video_title or "Nomsiz video",
@@ -2731,16 +3264,23 @@ def admin_jobs_cost(
                 "subtitle_only": bool(job.subtitle_only),
                 "source_language": job.source_language,
                 "models": {
-                    "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "edge"),
+                    "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "gemini"),
                     "voice_name": job.voice_name,
                     "voice_style": job.voice_style,
                     "stt_model": stt_model,
+                    "stt_display": stt_display,
+                    "stt_provider_name": stt_provider_name,
+                    "is_groq": is_groq,
                     "translation_model": llm_model,
+                    "gemini_key_tier": getattr(job, "gemini_key_tier", None) or "free",
+                    "gemini_key_used": getattr(job, "gemini_key_used", None),
+                    "has_transcript": bool(job.transcript_segments),
+                    "has_translation": bool(job.translated_segments),
                 },
                 "costs": {
                     "tts_cost_usd": tts_usd,
                     "tts_cost_uzs": tts_uzs,
-                    "tts_characters": tts_info["characters"],
+                    "tts_characters": est_chars,
                     "tts_duration_seconds": round(tts_info["duration_seconds"], 1),
                     "tts_calls_count": tts_info["calls_count"],
                     "cache_hits_count": tts_info["cache_hits_count"],
@@ -2764,14 +3304,23 @@ def admin_jobs_cost(
                     "email": user.email if user else None,
                     "phone": user.phone if user else None,
                     "is_internal": bool(getattr(user, "is_internal", False)) if user else False,
+                    "plan": plan_name,
+                    "balance_minutes": bal_minutes,
                 },
                 "error_code": job.error_code,
                 "error_message": job.error_message,
                 "qa_summary": qa_summary,
             })
 
-        # Summary KPIs (fast on DubbingJob table)
-        stat_filter = or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select)) if not include_internal else None
+        # Summary KPIs (calculated according to the selected date_range)
+        stat_filter_list = []
+        if not include_internal:
+            stat_filter_list.append(or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select)))
+        if date_start_utc:
+            stat_filter_list.append(DubbingJob.created_at >= date_start_utc)
+        if date_end_utc:
+            stat_filter_list.append(DubbingJob.created_at < date_end_utc)
+        stat_filter = and_(*stat_filter_list) if stat_filter_list else None
 
         q_stat = db.query(DubbingJob.status, func.count(DubbingJob.id))
         if stat_filter is not None:
@@ -2803,16 +3352,26 @@ def admin_jobs_cost(
         page_total_uzs = sum(item["costs"]["total_cost_uzs"] for item in items)
         page_avg_job_uzs = round(page_total_uzs / len(items)) if items else 0
 
+        active_pipeline_count = sum(status_counts.get(s, 0) for s in [
+            JobStatus.DOWNLOADING, JobStatus.TRANSCRIBING, JobStatus.TRANSLATING,
+            JobStatus.SYNTHESIZING, JobStatus.SYNCING, JobStatus.MERGING
+        ])
+        pending_count = status_counts.get(JobStatus.PENDING, 0)
+        total_active = active_pipeline_count + pending_count
+
+        worker_concurrency = 2
+        actual_processing = min(worker_concurrency, total_active)
+        queued_count = max(0, total_active - worker_concurrency)
+
         return {
             "summary": {
+                "date_range": dr,
                 "total_jobs": total_all_jobs,
                 "completed_jobs": completed_all,
                 "failed_jobs": failed_all,
-                "processing_jobs": sum(status_counts.get(s, 0) for s in [
-                    JobStatus.DOWNLOADING, JobStatus.TRANSCRIBING, JobStatus.TRANSLATING,
-                    JobStatus.SYNTHESIZING, JobStatus.SYNCING, JobStatus.MERGING
-                ]),
-                "awaiting_payment_jobs": status_counts.get(JobStatus.AWAITING_PAYMENT, 0) + status_counts.get(JobStatus.PENDING, 0),
+                "processing_jobs": actual_processing,
+                "queued_jobs": queued_count,
+                "awaiting_payment_jobs": status_counts.get(JobStatus.AWAITING_PAYMENT, 0),
                 "success_rate_pct": success_rate,
                 "total_completed_duration_min": total_dur_min,
                 "providers": prov_counts,
@@ -2839,13 +3398,66 @@ def get_unactivated_users(
     filter_type: str = Query(default="all"),
     search: str | None = Query(default=None),
     sort_by: str = Query(default="newest"),
+    date_range: str = Query(default="today"),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
     current_user: User = Depends(get_current_admin_user),
 ):
     """
     Birinchi dublyajni tugatmagan (unactivated / drop-off) foydalanuvchilar tahlili va ro'yxati.
+    Default: 'today' (Toshkent vaqti UTC+5 bo'yicha bugun ro'yxatdan o'tganlar).
+    Oraliqlar: today, 7d, 14d, 30d, 90d, all, custom.
     """
     db = SessionLocal()
     try:
+        # Normalize Query params if called programmatically
+        page_val = page if isinstance(page, int) else 1
+        page_size_val = page_size if isinstance(page_size, int) else 25
+        filter_type_val = filter_type if isinstance(filter_type, str) else "all"
+        search_val = search.strip() if isinstance(search, str) and search.strip() else None
+        sort_by_val = sort_by if isinstance(sort_by, str) else "newest"
+        dr = (date_range if isinstance(date_range, str) else "today").strip().lower()
+        start_date_val = start_date if isinstance(start_date, str) else None
+        end_date_val = end_date if isinstance(end_date, str) else None
+
+        # 0. Sana oralig'i filtri (Toshkent vaqti UTC+5)
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        date_start_utc = None
+        date_end_utc = None
+
+        if dr == "today":
+            dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
+            date_start_utc = dt - TASHKENT_OFFSET
+        elif dr == "7d":
+            dt = tashkent_today_date - timedelta(days=6)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "14d":
+            dt = tashkent_today_date - timedelta(days=13)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "30d":
+            dt = tashkent_today_date - timedelta(days=29)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "90d":
+            dt = tashkent_today_date - timedelta(days=89)
+            date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
+        elif dr == "custom" and start_date_val:
+            try:
+                s_parts = [int(p) for p in start_date_val.split("-")]
+                date_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
+                if end_date_val:
+                    e_parts = [int(p) for p in end_date_val.split("-")]
+                    date_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
+            except Exception:
+                pass
+
+        user_date_filters = []
+        if date_start_utc:
+            user_date_filters.append(User.created_at >= date_start_utc)
+        if date_end_utc:
+            user_date_filters.append(User.created_at < date_end_utc)
+
         # 1. Muvaffaqiyatli dublyajga ega bo'lgan foydalanuvchilar
         completed_user_ids_sub = (
             db.query(distinct(DubbingJob.user_id))
@@ -2858,14 +3470,16 @@ def get_unactivated_users(
         base_unactivated = db.query(User).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         )
 
         total_unactivated = base_unactivated.count()
 
         total_real_users = db.query(User).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         ).count()
 
         completed_users_count = max(0, total_real_users - total_unactivated)
@@ -2890,7 +3504,8 @@ def get_unactivated_users(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
             User.id.notin_(internal_ids_sub),
-            or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
+            or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0),
+            *user_date_filters
         ).count()
 
         attempted_count = max(0, total_unactivated - never_attempted_count)
@@ -2902,13 +3517,20 @@ def get_unactivated_users(
             User.id.notin_(completed_user_ids_sub),
             User.id.notin_(internal_ids_sub),
             user_jobs_agg.c.awaiting_jobs > 0,
-            user_jobs_agg.c.failed_jobs == 0
+            user_jobs_agg.c.failed_jobs == 0,
+            *user_date_filters
         ).count()
 
         failed_attempt_count = max(0, attempted_count - awaiting_payment_count)
 
         # Top error reasons among failed first jobs
-        error_reasons_sql = """
+        date_clause = ""
+        if date_start_utc:
+            date_clause += f" AND u.created_at >= '{date_start_utc.strftime('%Y-%m-%d %H:%M:%S')}'"
+        if date_end_utc:
+            date_clause += f" AND u.created_at < '{date_end_utc.strftime('%Y-%m-%d %H:%M:%S')}'"
+
+        error_reasons_sql = f"""
             WITH first_jobs AS (
                 SELECT 
                     j.user_id,
@@ -2919,6 +3541,7 @@ def get_unactivated_users(
                 JOIN users u ON u.id = j.user_id
                 WHERE (u.is_internal IS FALSE OR u.is_internal IS NULL)
                   AND j.user_id NOT IN (SELECT DISTINCT user_id FROM dubbing_jobs WHERE status = 'COMPLETED' AND user_id IS NOT NULL)
+                  {date_clause}
             )
             SELECT 
                 COALESCE(error_code, CASE WHEN status IN ('AWAITING_PAYMENT', 'PENDING') THEN 'AWAITING_PAYMENT' ELSE 'UNKNOWN' END) as code,
@@ -2963,23 +3586,24 @@ def get_unactivated_users(
         ).filter(
             or_(User.is_internal.is_(False), User.is_internal.is_(None)),
             User.id.notin_(completed_user_ids_sub),
-            User.id.notin_(internal_ids_sub)
+            User.id.notin_(internal_ids_sub),
+            *user_date_filters
         )
 
-        if filter_type == "never_attempted":
+        if filter_type_val == "never_attempted":
             q_users = q_users.filter(
                 or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
             )
-        elif filter_type == "failed_attempt":
+        elif filter_type_val == "failed_attempt":
             q_users = q_users.filter(user_jobs_agg.c.failed_jobs > 0)
-        elif filter_type == "awaiting_payment":
+        elif filter_type_val == "awaiting_payment":
             q_users = q_users.filter(
                 user_jobs_agg.c.awaiting_jobs > 0,
                 user_jobs_agg.c.failed_jobs == 0
             )
 
-        if search and search.strip():
-            term = f"%{search.strip()}%"
+        if search_val:
+            term = f"%{search_val}%"
             q_users = q_users.filter(
                 or_(
                     User.email.ilike(term),
@@ -2989,17 +3613,17 @@ def get_unactivated_users(
             )
 
         total_filtered = q_users.count()
-        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        total_pages = max(1, (total_filtered + page_size_val - 1) // page_size_val)
 
-        if sort_by == "oldest":
+        if sort_by_val == "oldest":
             q_users = q_users.order_by(User.created_at.asc())
-        elif sort_by == "most_attempts":
+        elif sort_by_val == "most_attempts":
             q_users = q_users.order_by(user_jobs_agg.c.total_jobs.desc().nullslast(), User.created_at.desc())
         else: # newest
             q_users = q_users.order_by(User.created_at.desc())
 
-        offset = (page - 1) * page_size
-        user_rows = q_users.offset(offset).limit(page_size).all()
+        offset = (page_val - 1) * page_size_val
+        user_rows = q_users.offset(offset).limit(page_size_val).all()
 
         page_user_ids = [u.id for u, _, _, _, _ in user_rows]
         latest_jobs_by_user = {}
@@ -3056,6 +3680,9 @@ def get_unactivated_users(
 
         return {
             "summary": {
+                "date_range": dr,
+                "start_date": start_date_val,
+                "end_date": end_date_val,
                 "total_users": total_real_users,
                 "completed_users": completed_users_count,
                 "completed_pct": calc_pct(completed_users_count, total_real_users),
@@ -3070,8 +3697,8 @@ def get_unactivated_users(
             },
             "top_reasons": top_reasons,
             "pagination": {
-                "page": page,
-                "page_size": page_size,
+                "page": page_val,
+                "page_size": page_size_val,
                 "total_items": total_filtered,
                 "total_pages": total_pages,
             },

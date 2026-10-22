@@ -10,7 +10,7 @@ class TestMergerAudioPadding(unittest.TestCase):
     def test_filtergraph_pads_audio_when_target_dur_provided(self):
         graph = merger._build_audio_filtergraph(target_dur=26.0)
         self.assertIn("apad=whole_dur=26.000", graph)
-        self.assertIn("[1:a]apad=whole_dur=26.000,aformat=", graph)
+        self.assertIn("atrim=0:26.000", graph)
 
     def test_filtergraph_no_pad_when_target_dur_none(self):
         graph = merger._build_audio_filtergraph(target_dur=None)

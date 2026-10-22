@@ -184,10 +184,11 @@ def initiate_subscription_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.services.plans import PLANS
+    from backend.services.plans import PLANS, apply_user_discount
     if req.plan not in PLANS or req.plan == "free":
         raise HTTPException(status_code=400, detail="Noto'g'ri tarif tanlandi.")
     plan = PLANS[req.plan]
+    amount, _ = apply_user_discount(db, current_user.id, plan.price)
 
     payment = db.query(Payment).filter(
         Payment.user_id == current_user.id, Payment.plan == req.plan,
@@ -195,12 +196,15 @@ def initiate_subscription_payment(
     ).first()
     if not payment:
         payment = Payment(
-            user_id=current_user.id, plan=req.plan, amount=plan.price,
+            user_id=current_user.id, plan=req.plan, amount=amount,
             provider=PaymentProvider.UZUM, status=PaymentStatus.PENDING,
         )
         db.add(payment)
         db.commit()
         db.refresh(payment)
+    elif payment.amount != amount:
+        payment.amount = amount
+        db.commit()
     return uzum_account_response(db, payment)
 
 
@@ -214,7 +218,13 @@ def initiate_minutes_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from backend.services.plans import MINUTE_PACKS, LEGACY_MINUTE_PACKS, STARTER_PACK_MINUTES, has_purchased_starter_pack
+    from backend.services.plans import (
+        MINUTE_PACKS,
+        LEGACY_MINUTE_PACKS,
+        STARTER_PACK_MINUTES,
+        has_purchased_starter_pack,
+        apply_user_discount,
+    )
     all_packs = {**LEGACY_MINUTE_PACKS, **MINUTE_PACKS}
     if req.pack not in all_packs:
         raise HTTPException(status_code=400, detail=f"Noto'g'ri paket. Mavjud: {sorted(MINUTE_PACKS)}")
@@ -223,7 +233,8 @@ def initiate_minutes_payment(
             status_code=400,
             detail="Starter paketi (15 daqiqa) bir martalik maxsus taklif hisoblanadi va siz uni allaqachon xarid qilgansiz. Iltimos, boshqa paketlarni tanlang.",
         )
-    amount = all_packs[req.pack]
+    base_amount = all_packs[req.pack]
+    amount, _ = apply_user_discount(db, current_user.id, base_amount)
 
     payment = db.query(Payment).filter(
         Payment.user_id == current_user.id, Payment.minutes_purchased == req.pack,
@@ -237,6 +248,9 @@ def initiate_minutes_payment(
         db.add(payment)
         db.commit()
         db.refresh(payment)
+    elif payment.amount != amount:
+        payment.amount = amount
+        db.commit()
     return uzum_account_response(db, payment)
 
 

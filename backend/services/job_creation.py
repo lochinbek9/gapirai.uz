@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
-from backend.models.database import DubbingJob, JobStatus, User, ContentViolation
+from backend.models.database import DubbingJob, JobStatus, User, ContentViolation, VideoAnalysis
 from backend.models.payment import Payment, PaymentStatus, PaymentProvider
 from backend.services.downloader import get_video_info
 from backend.services.content_safety import check_safety
@@ -191,7 +191,7 @@ def _quota_or_autotopup(db: Session, user_id, duration_minutes: float) -> tuple[
 
 
 async def create_dubbing_job(
-    db: Session, user: User, youtube_url: str, voice_gender: str = "male", subtitle_only: bool = False,
+    db: Session, user: User, youtube_url: str, voice_gender: str = "auto", subtitle_only: bool = False,
     source_language: str | None = None,
     tts_provider: str | None = None,
     voice_name: str | None = None,
@@ -246,6 +246,10 @@ async def create_dubbing_job(
                     "autonoe": "Autonoe", "aoede": "Aoede", "kore": "Kore",
                 }
                 voice_name = gemini_map.get(v_low, voice_name.strip())
+    else:
+        # voice_gender == "auto": Oldindan erkak ovozini (Charon) majburlamaymiz!
+        # AI transcript va sarlavhadan spiker jinsini aniqlaydi va tasks.py unga mos ovoz tanlaydi.
+        voice_name = None
 
     # Kesh: agar shu video ALLAQACHON dublyaj qilingan bo'lsa,
     # LEKIN barcha parametrlar (jins, provider, ovoz, ohang) 100% mos kelsagina keshdan olinadi.
@@ -262,6 +266,9 @@ async def create_dubbing_job(
         # 1. Jins parametri
         if voice_gender in ("male", "female"):
             cache_query = cache_query.filter(DubbingJob.speaker_gender == voice_gender)
+        else:
+            # "auto" rejimida kesh faqat AI jinsni avtomatik aniqlagan (voice_gender_setting="auto") job'lardan olinadi
+            cache_query = cache_query.filter(DubbingJob.voice_gender_setting == "auto")
 
         # 2. TTS Provider parametri (bitta parametr o'zgarsa ham yangidek hisoblanadi)
         if clean_provider:
@@ -324,6 +331,15 @@ async def create_dubbing_job(
         thumbnail = donor_job.video_thumbnail
         duration_minutes = duration / 60.0
         metadata_flagged = bool(donor_job.content_flagged)
+
+        from backend.services.downloader import check_music_copyright_restriction
+        is_music, music_reason = check_music_copyright_restriction({"title": title})
+        if is_music:
+            return JobCreationResult(
+                outcome="music_copyright",
+                video_title=title,
+                error_detail=music_reason,
+            )
     else:
         try:
             info = await asyncio.to_thread(get_video_info, youtube_url)
@@ -342,6 +358,16 @@ async def create_dubbing_job(
         duration = info.get("duration", 0)
         thumbnail = info.get("thumbnail")
         duration_minutes = duration / 60.0
+
+        # Mualliflik huquqi va qo'shiq/Lyrics tekshiruvi (Kredit yechilmasdan darhol rad etiladi):
+        from backend.services.downloader import check_music_copyright_restriction
+        is_music, music_reason = check_music_copyright_restriction(info)
+        if is_music:
+            return JobCreationResult(
+                outcome="music_copyright",
+                video_title=title,
+                error_detail=music_reason,
+            )
 
         # Safety Gate -- 1-bosqich (metadata). Faqat CSAM (sexual_minors)
         # hali ham bloklaydi -- qolgan kategoriyalar endi faqat ogohlantirish
@@ -434,10 +460,18 @@ async def create_dubbing_job(
                     reused_video_path = str(pv)
                     break
 
+    linked_analysis = None
+    if video_id and user:
+        linked_analysis = db.query(VideoAnalysis).filter(
+            VideoAnalysis.user_id == user.id,
+            VideoAnalysis.youtube_video_id == video_id,
+        ).order_by(VideoAnalysis.created_at.desc()).first()
+
     job_id = str(uuid.uuid4())
     job = DubbingJob(
         id=job_id,
         user_id=user.id,
+        linked_analysis_id=linked_analysis.id if linked_analysis else None,
         youtube_url=youtube_url,
         youtube_video_id=video_id,
         video_title=title,

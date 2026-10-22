@@ -154,6 +154,32 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
 _STAGE_ICONS = {"ok": "✅", "skipped": "⏭️", "error": "❌"}
 
 
+def _start_stage(job_id: str, stage: str) -> None:
+    """Bosqich boshlanganda chaqiriladi — cancel policy uchun faol bosqichni qayd etadi."""
+    try:
+        from backend.services.cancel_policy import record_stage_transition
+        record_stage_transition(job_id, stage, is_skipped=False)
+    except Exception:
+        pass
+
+
+def _clamp_segments_to_video(segments: list | None, video_duration: float | None) -> list | None:
+    """Segmentlarni video davomiyligiga qat'iy cheklaydi — ortiqcha daqiqalar qo'shilishini oldini oladi."""
+    if not segments or not video_duration or video_duration <= 0:
+        return segments
+    max_d = float(video_duration)
+    valid = []
+    for s in segments:
+        st = s.get("start", 0)
+        if st >= max_d + 0.5:
+            continue
+        en = s.get("end", st)
+        if en > max_d + 1.0:
+            s["end"] = round(max_d + 1.0, 2)
+        valid.append(s)
+    return valid
+
+
 def _record_stage(stage_timings: dict, job_id: str, stage: str, start: float, status: str, detail: str = "") -> None:
     """Bir bosqich tugagach chaqiriladi — davomiylikni saqlaydi va bitta
     izchil formatli log qatorini chiqaradi (masalan monitoring/log
@@ -163,6 +189,11 @@ def _record_stage(stage_timings: dict, job_id: str, stage: str, start: float, st
     icon = _STAGE_ICONS.get(status, "•")
     suffix = f" — {detail}" if detail else ""
     logger.info(f"[{job_id}] STAGE={stage} duration={duration:.1f}s status={status} {icon}{suffix}")
+    try:
+        from backend.services.cancel_policy import record_stage_transition
+        record_stage_transition(job_id, stage, is_skipped=(status == "skipped"))
+    except Exception:
+        pass
 
 
 def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, final_status: str) -> None:
@@ -179,18 +210,24 @@ def _log_pipeline_summary(job_id: str, stage_timings: dict, total_start: float, 
 
 
 _GENDER_SYSTEM_PROMPT = (
-    "You analyze video transcripts and determine the speaker's gender. "
-    "Reply with ONLY one word: 'male' or 'female'. "
-    "If unclear or multiple speakers, reply 'male'."
+    "You are an expert AI that determines whether the primary speaker or singer in a video is 'male' or 'female'. "
+    "Analyze the video title, artist/channel name, and spoken or sung transcript carefully. "
+    "Look for female names (e.g. Taylor Swift, Dua Lipa, Selena Gomez, Sarah, Elena, Madina, Malika, etc.), "
+    "female grammatical markers in Russian/Uzbek/Spanish ('я пошла', 'men o'zim qildim', 'onasi', etc.), "
+    "or female self-introductions. "
+    "Reply with ONLY ONE WORD: 'female' or 'male'. "
+    "If the primary speaker/singer is female, return 'female'. "
+    "If male, return 'male'. If truly indeterminable, return 'male'."
 )
 
 
-def _detect_gender(transcript_text: str) -> str:
+def _detect_gender(transcript_text: str, title: str = "") -> str:
     """Detect speaker gender -- TRANSLATE_PROVIDER='gemini' bo'lsa Gemini birinchi,
     aks holda OpenAI birinchi, ikkalasi ham ishlamasa 'male'ga tushiriladi."""
     from backend.services.openai_compat import light_model_kwargs
 
-    snippet = transcript_text[:1000]
+    snippet = (transcript_text or "")[:3500]
+    prompt_text = f"Video Title: {title}\n\nTranscript:\n{snippet}" if title else f"Transcript:\n{snippet}"
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
     prefer_gemini = settings.TRANSLATE_PROVIDER == "gemini" or not openai_ok
@@ -208,7 +245,7 @@ def _detect_gender(transcript_text: str) -> str:
         for k in keys:
             try:
                 response = _get_gemini_client(api_key=k).models.generate_content(
-                    model=_gemini_text_model(), contents=f"Transcript: {snippet}", config=config,
+                    model=_gemini_text_model(), contents=prompt_text, config=config,
                 )
                 result = (response.text or "").strip().lower()
                 return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
@@ -225,7 +262,7 @@ def _detect_gender(transcript_text: str) -> str:
             model=settings.OPENAI_LIGHT_MODEL,
             messages=[
                 {"role": "system", "content": _GENDER_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Transcript: {snippet}"},
+                {"role": "user", "content": prompt_text},
             ],
             **light_model_kwargs(temperature=0, max_tokens=5),
         )
@@ -394,6 +431,12 @@ def _refund_job_quota_or_flag_payment(job_id: str, is_recovery_job: bool = False
         if not fresh_job:
             return
 
+        # Agar bu preview (2 daqiqalik parcha) bo'lsa, u bepul, hech qachon kvota qaytarilmaydi!
+        if getattr(fresh_job, "is_preview", False):
+            fresh_job.quota_consumed = False
+            refund_db.commit()
+            return
+
         # Agar bu eski completed job'ning on-demand qayta tiklanishi bo'lsa,
         # foydalanuvchiga allaqachon avval video yetkazilgan, kvota qaytarilmaydi.
         if is_recovery_job or fresh_job.completed_at is not None:
@@ -476,6 +519,25 @@ def process_video(self: Task, job_id: str) -> dict:
         job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
         if not job:
             raise ValueError(f"Job topilmadi: {job_id}")
+
+        # Pullik/bepul kalit ajratish (2026-10-20):
+        # 1. 2-daqiqalik sinov dublyaji (is_preview=True) bo'lsa -> FAQAT bepul kalitlar
+        # 2. Bepul tarifdagi foydalanuvchilar (PlanTier.FREE va sotib olingan daqiqasi yo'q) -> FAQAT bepul kalitlar (oylik 5 daqiqa bepul kvotasi ham bepul hovuzdan ishlanadi)
+        # 3. FAQAT haqiqiy pullik obunasi borlar (Standard/Pro), daqiqa paketi sotib olganlar yoki adminlar -> Pullik kalit
+        from backend.services.plans import is_user_paid_tier
+        if getattr(job, "is_preview", False):
+            is_paid_job = False
+        elif job.gemini_key_tier in ("free", "paid"):
+            is_paid_job = (job.gemini_key_tier == "paid")
+        elif job.user_id:
+            is_paid_job = is_user_paid_tier(db, job.user_id)
+        else:
+            is_paid_job = False
+
+        job.gemini_key_tier = "paid" if is_paid_job else "free"
+        if not is_paid_job:
+            job.gemini_key_used = None
+        db.commit()
 
         is_recovery_job = bool(job.completed_at is not None)
 
@@ -617,12 +679,12 @@ def process_video(self: Task, job_id: str) -> dict:
                 job.video_duration = job.video_duration or donor_j.video_duration
                 job.video_thumbnail = job.video_thumbnail or donor_j.video_thumbnail
                 job.transcript_text = job.transcript_text or donor_j.transcript_text
-                job.transcript_segments = job.transcript_segments or donor_j.transcript_segments
+                job.transcript_segments = _clamp_segments_to_video(job.transcript_segments or donor_j.transcript_segments, job.video_duration)
                 job.srt_content = job.srt_content or donor_j.srt_content
                 job.translated_text = job.translated_text or donor_j.translated_text
-                job.translated_segments = job.translated_segments or donor_j.translated_segments
+                job.translated_segments = _clamp_segments_to_video(job.translated_segments or donor_j.translated_segments, job.video_duration)
                 job.uzbek_srt_content = job.uzbek_srt_content or donor_j.uzbek_srt_content
-                job.speech_segments = job.speech_segments or donor_j.speech_segments
+                job.speech_segments = _clamp_segments_to_video(job.speech_segments or donor_j.speech_segments, job.video_duration)
 
                 # Agar original video diskda hali mavjud bo'lsa, qayta yuklashni ham chetlab o'tamiz
                 if not has_video:
@@ -673,6 +735,7 @@ def process_video(self: Task, job_id: str) -> dict:
             audio_path = found_audio
             _record_stage(stage_timings, job_id, "DOWNLOAD", stage_t0, "skipped")
         else:
+            _start_stage(job_id, "DOWNLOAD")
             # Telegram bot orqali yuborilgan video fayl job'ining youtube_url'i
             # sintetik ("telegram://file/..."), haqiqiy YouTube havolasi emas.
             # Odatda lokal audio.wav/video hali joyida bo'lgani uchun yuqoridagi
@@ -715,20 +778,24 @@ def process_video(self: Task, job_id: str) -> dict:
         uzbek_source = is_uzbek_source(job)
         if job.transcript_segments:
             _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "skipped")
-            segments = job.transcript_segments
+            segments = _clamp_segments_to_video(job.transcript_segments, job.video_duration)
+            job.transcript_segments = segments
             transcript_text = job.transcript_text or ""
             if not getattr(job, "stt_model", None):
                 job.stt_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
+            _start_stage(job_id, "TRANSCRIBE")
             _update_job(db, job, JobStatus.TRANSCRIBING, 20.0, "Nutq matnga aylantirilmoqda...")
             # Subtitr rejimi yoki uzbek_source uchun STT doim Gemini (Google AI Studio) bo'ladi.
             # OpenAI Whisper o'zbek tilini yaxshi tushunmaydi va tez-tez turkcha/xato chiqaradi.
             stt_primary = "gemini" if (job.subtitle_only or uzbek_source or settings.STT_PROVIDER == "gemini") else "openai"
+            stt_is_paid = True
             try:
                 transcript = transcriber.transcribe_audio(
                     audio_path,
                     language="uz" if uzbek_source else None,
                     primary=stt_primary,
+                    is_paid=stt_is_paid,
                 )
             except transcriber.WrongLanguageError as exc:
                 if uzbek_source:
@@ -744,6 +811,7 @@ def process_video(self: Task, job_id: str) -> dict:
                         audio_path,
                         language=None,
                         primary=stt_primary,
+                        is_paid=stt_is_paid,
                     )
                 else:
                     _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "til mos kelmadi")
@@ -755,10 +823,31 @@ def process_video(self: Task, job_id: str) -> dict:
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, job_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
+
+            # Gallyutsinatsiya yoki xato timestamp'larni tozalash:
+            # Segment start vaqti video_duration dan katta bo'lsa (masalan, musiqa ustiga
+            # Whisper to'qib chiqargan soxta gaplar) tashlab ketiladi.
+            if getattr(job, "video_duration", None) and job.video_duration > 0:
+                valid_segs = []
+                for s in transcript["segments"]:
+                    if s.get("start", 0) >= job.video_duration:
+                        logger.warning(
+                            f"[JOB {job_id}] STT segment start ({s.get('start')}s) video davomiyligidan "
+                            f"({job.video_duration}s) katta — tashlab ketilmoqda: {s.get('text', '')[:40]}"
+                        )
+                        continue
+                    if s.get("end", 0) > job.video_duration:
+                        s["end"] = round(float(job.video_duration), 2)
+                    valid_segs.append(s)
+                if valid_segs:
+                    transcript["segments"] = valid_segs
+
             job.transcript_text = transcript["text"]
             job.srt_content = transcript["srt"]
             job.transcript_segments = transcript["segments"]
-            job.stt_model = transcript.get("model") or getattr(settings, "GEMINI_STT_MODEL", "gemini-3.8-flash")
+            job.gemini_key_tier = "paid" if is_paid_job else "free"
+            if transcript.get("gemini_key_used"):
+                job.gemini_key_used = transcript.get("gemini_key_used")
 
             # Agar STT manba tilini o'zbekcha ('uz') deb aniqlasa, lekin foydalanuvchi 'auto' tanlagan bo'lsa,
             # subtitr rejimida video o'zbekcha deb belgilanadi (tarjimasiz toza subtitr hosil bo'ladi)
@@ -836,28 +925,35 @@ def process_video(self: Task, job_id: str) -> dict:
         # keyingi bosqichlarni "bu tugal gap" deb aldab qo'yadi.
         segments = synthesizer.group_segments_into_sentences(segments)
 
-        # BOSQICH 3: Jins aniqlash (foydalanuvchi tanlamagan bo'lsa avtomatik)
+        # BOSQICH 3: Jins aniqlash (foydalanuvchi yangi videoda qo'lda tanlagan bo'lsa o'sha olinadi, qolganlarida AI aniqlaydi)
         current_stage = "GENDER"
         stage_t0 = time.monotonic()
-        if job.speaker_gender:
-            gender = job.speaker_gender
-            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped")
-        else:
-            setting = job.voice_gender_setting or "male"
-            if setting in ("male", "female"):
-                gender = setting
-            elif job.subtitle_only:
-                # "Subtitr" rejimida ovoz yaratilmaydi -- jins hech qayerda
-                # ishlatilmaydi, shuning uchun bekorga LLM chaqirmaymiz.
-                gender = "male"
-            elif donor_j and donor_j.speaker_gender in ("male", "female"):
-                gender = donor_j.speaker_gender
-            else:
-                _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
-                gender = _detect_gender(transcript_text)
+        user_choice = getattr(job, "voice_gender_setting", None)
+        if user_choice in ("male", "female"):
+            # Foydalanuvchi yangi videoda jinsni qo'lda tanlagan
+            gender = user_choice
             job.speaker_gender = gender
             db.commit()
-            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "ok")
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"User setting: {user_choice}")
+        elif job.subtitle_only:
+            gender = "male"
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", "subtitle-only")
+        elif getattr(job, "speaker_gender", None) in ("male", "female"):
+            gender = job.speaker_gender
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"Already set: {gender}")
+        elif donor_j and getattr(donor_j, "voice_gender_setting", None) == "auto" and donor_j.speaker_gender in ("male", "female"):
+            gender = donor_j.speaker_gender
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"Donor auto: {gender}")
+        else:
+            _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
+            gender = _detect_gender(transcript_text, title=getattr(job, "video_title", "") or "")
+            job.speaker_gender = gender
+            db.commit()
+            _record_stage(stage_timings, job_id, "GENDER", stage_t0, "ok", f"Detected: {gender}")
 
         # BOSQICH 4: Tarjima
         # Checkpoint: tarjima qilingan segmentlar saqlanadi — Google
@@ -866,17 +962,20 @@ def process_video(self: Task, job_id: str) -> dict:
         stage_t0 = time.monotonic()
         if job.translated_segments:
             _record_stage(stage_timings, job_id, "TRANSLATE", stage_t0, "skipped")
-            translated_segments = job.translated_segments
+            translated_segments = _clamp_segments_to_video(job.translated_segments, job.video_duration)
+            job.translated_segments = translated_segments
             if not getattr(job, "translation_model", None):
                 job.translation_model = "gemini-3.8-flash (donor kesh)" if job.source_job_id else "gemini-3.8-flash"
         else:
+            _start_stage(job_id, "TRANSLATE")
             if uzbek_source:
                 # Nutq allaqachon o'zbekcha: tarjima ham, qisqartirish ham kerak emas.
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "Subtitr tayyorlanmoqda...")
                 translated_segments = translator.passthrough_segments(segments)
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
-                translated_segments = translator.translate_segments(segments)
+                translate_is_paid = True
+                translated_segments = translator.translate_segments(segments, is_paid=translate_is_paid)
 
             # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
             # uzunroq chiqqan tarjimalar BIR MARTA qisqartiriladi (haqiqiy
@@ -938,6 +1037,15 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.COMPLETED, 100.0, "Subtitr tayyor!")
             job.completed_at = datetime.utcnow()
             db.commit()
+
+            # Foydalanuvchiga email yuborish
+            if job.user_id and job.user and job.user.email and not is_recovery_job:
+                try:
+                    from backend.services.email_service import send_subtitles_complete_email
+                    send_subtitles_complete_email(job.user.email, job.user.name or "", job.video_title or "Video", job_id)
+                except Exception as email_err:
+                    logger.warning(f"Subtitr tayyor email yuborilmadi (job {job_id}): {email_err}")
+
             _cleanup_upload_dir(job_id)
             _log_pipeline_summary(job_id, stage_timings, pipeline_start, "COMPLETED (subtitle-only)")
             return {"job_id": job_id, "status": "completed"}
@@ -950,10 +1058,13 @@ def process_video(self: Task, job_id: str) -> dict:
         stage_t0 = time.monotonic()
         if job.speech_segments:
             _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "skipped")
-            speech_segments = job.speech_segments
+            speech_segments = _clamp_segments_to_video(job.speech_segments, job.video_duration)
+            job.speech_segments = speech_segments
         else:
+            _start_stage(job_id, "SPEECH_OPT")
             _update_job(db, job, JobStatus.SYNCING, 50.0, "Matn tabiiy talaffuzga moslashtirilmoqda...")
             speech_segments = speech_optimizer.optimize_segments(translated_segments)
+            speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             job.speech_segments = speech_segments
             db.commit()
             _record_stage(stage_timings, job_id, "SPEECH_OPT", stage_t0, "ok")
@@ -976,6 +1087,7 @@ def process_video(self: Task, job_id: str) -> dict:
             # balansi tekshiruvi o'tkazib yuboriladi.
             actual_timings = None
         else:
+            _start_stage(job_id, "TTS")
             from backend.services.job_progress import set_subprogress
             from backend.services.plans import get_tts_provider_for_job
 
@@ -984,16 +1096,25 @@ def process_video(self: Task, job_id: str) -> dict:
 
             # Provayder va jinsga qarab aniq ovoz nomini tanlash
             if tts_provider in ("azure", "edge"):
-                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                default_voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             elif tts_provider == "gemini":
-                voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
+                default_voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
             else:
-                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                default_voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
 
-            if getattr(job, "voice_name", None):
-                voice = job.voice_name
+            user_chose_gender = getattr(job, "voice_gender_setting", None) in ("male", "female")
+            if user_chose_gender and getattr(job, "voice_name", None):
+                candidate_voice = job.voice_name
+                if tts_provider in ("azure", "edge"):
+                    voice = candidate_voice if "neural" in candidate_voice.lower() else default_voice
+                elif tts_provider == "gemini":
+                    voice = candidate_voice if "neural" not in candidate_voice.lower() else default_voice
+                else:
+                    voice = candidate_voice
             else:
-                job.voice_name = voice
+                voice = default_voice
+
+            job.voice_name = voice
 
             if not getattr(job, "voice_style", None):
                 job.voice_style = "neutral"
@@ -1002,12 +1123,19 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'} ovozi)...")
             tts_dir = str(output_dir / "audio" / "tts_segments")
+            # Yangi qoida: Agar tts_provider == 'gemini' bo'lsa, hatto yangi bepul (preview)
+            # foydalanuvchilar uchun ham pullik Gemini kalitlaridan foydalaniladi (is_paid=True),
+            # shunda ovoz yuqori sifatli, tabiiy, va tezkor sintez bo'ladi (rate limitga uchramaydi).
+            tts_is_paid = True if tts_provider == "gemini" else is_paid_job
+
+            speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
                 existing_qa=job.segment_qa,
                 progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
                 provider_name=tts_provider,
+                is_paid=tts_is_paid,
             )
             job.dubbed_audio_path = dubbed_audio_path
             if tts_provider == "gemini":
@@ -1040,6 +1168,7 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "MERGE", stage_t0, "skipped")
             final_output = job.output_video_path
         else:
+            _start_stage(job_id, "MERGE")
             _update_job(db, job, JobStatus.MERGING, 85.0, "Video birlashtirilmoqda...")
             final_output_dir = output_dir / "video"
             final_output_dir.mkdir(parents=True, exist_ok=True)
@@ -1117,27 +1246,6 @@ def process_video(self: Task, job_id: str) -> dict:
         _update_job(db, job, JobStatus.COMPLETED, 100.0, "Dublyaj tayyor!")
         job.completed_at = datetime.utcnow()
         db.commit()
-
-        # Agar job dastlabki xatolikdan so'ng qayta urinishda muvaffaqiyatli yakunlansa, adminlarga xabar berish
-        if getattr(self.request, "retries", 0) > 0:
-            try:
-                from backend.services.telegram_notify import send_telegram_message
-                if getattr(settings, "ADMIN_TG_IDS", None):
-                    v_title = getattr(job, "video_title", None) or "Video"
-                    fe_url = (getattr(settings, "FRONTEND_URL", None) or "https://gapirai.uz").rstrip("/")
-                    for a_id in settings.ADMIN_TG_IDS.split(","):
-                        a_id = a_id.strip().strip('"').strip("'")
-                        if a_id:
-                            send_telegram_message(
-                                a_id,
-                                f"✅ <b>Job qayta urinishda muvaffaqiyatli yakunlandi!</b>\n\n"
-                                f"🆔 Job: <code>{job_id}</code>\n"
-                                f"🎬 Video: {v_title}\n"
-                                f"🔄 Urinish: {self.request.retries}/{self.max_retries}\n"
-                                f"🔗 <a href=\"{fe_url}/video/{job_id}\">Natijani ko'rish</a>",
-                            )
-            except Exception as notify_exc:
-                logger.warning(f"[JOB {job_id}] Admin muvaffaqiyat xabari yuborilmadi: {notify_exc}")
 
         # On-demand tiklash Redis lock'ini tozalash
         try:

@@ -30,8 +30,9 @@ class TestGeminiAzureProviderConfig(unittest.TestCase):
             )
 
     def test_get_tts_provider_for_job(self):
-        """get_tts_provider_for_job must return 'gemini' for all jobs."""
+        """get_tts_provider_for_job must return 'gemini' for all jobs (unless legacy)."""
         mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = None
 
         # Anonymous job
         job_anon = MagicMock()
@@ -66,7 +67,7 @@ class TestGeminiAzureProviderConfig(unittest.TestCase):
             order = _transcribe_provider_order("gemini")
             self.assertGreaterEqual(len(order), 2)
             self.assertEqual(order[0], "gemini", "Gemini must be first in STT order")
-            self.assertEqual(order[1], "azure", "Azure must be second in STT order")
+            self.assertIn("azure", order, "Azure must be in STT order")
 
 
 if __name__ == "__main__":

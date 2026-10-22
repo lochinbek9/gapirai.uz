@@ -123,7 +123,7 @@ export default function UrlInput({
             value={url}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Video havolasini joylashtiring..."
-            className="flex-1 bg-transparent text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 text-xs sm:text-sm focus:outline-none font-medium"
+            className="flex-1 min-w-0 bg-transparent text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 text-xs sm:text-sm focus:outline-none font-medium"
           />
           <button
             type="button"

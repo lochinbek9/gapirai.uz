@@ -4,17 +4,35 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight,
+  ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
+  CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X, ChevronDown, ChevronUp, Copy, Check, XCircle,
 } from "lucide-react";
 import {
   ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
-  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
+  searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, cancelAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
+  getPlans, PlanDef, MinutePack, CurrentSubscription,
 } from "@/lib/api";
+
+const ANALYSIS_TIPS = [
+  "AI intellekti videoning eng muhim joylarini ajratib, qisqa konspekt tuzmoqda...",
+  "Transkript orqali videodagi istalgan so'z va daqiqani soniyalarda qidirishingiz mumkin...",
+  "Tahlil tugagach, video mazmuni bo'yicha interaktiv test va AI bilan suhbat ochiladi...",
+  "Barcha asosiy g'oyalar va bo'limlar daqiqama-daqiqa ajratib beriladi...",
+];
+
+function getAnalysisStageIndex(status: string): number {
+  if (status === "pending" || status === "downloading" || status === "extracting_audio") return 0;
+  if (status === "transcribing") return 1;
+  if (status === "analyzing") return 2;
+  if (status === "generating_results" || status === "completed") return 3;
+  return 0;
+}
 import { useAnalysisPolling } from "@/hooks/useAnalysisPolling";
 import YouTubePlayer, { YouTubePlayerHandle } from "@/components/YouTubePlayer";
 import NotesTab from "@/components/analysis/NotesTab";
 import QuizTab from "@/components/analysis/QuizTab";
 import QATab from "@/components/analysis/QATab";
+import ConfirmModal from "@/components/ConfirmModal";
 import { formatTs } from "@/lib/timestamp";
 import { extractYouTubeId } from "@/lib/youtube";
 
@@ -22,27 +40,47 @@ type Tab = "summary" | "chapters" | "transcript" | "notes" | "quiz" | "qa";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "summary", label: "Xulosa" },
-  { key: "chapters", label: "Chapterlar" },
+  { key: "chapters", label: "Boblar" },
   { key: "transcript", label: "Transkript" },
   { key: "notes", label: "Konspekt" },
   { key: "quiz", label: "Test" },
   { key: "qa", label: "Savol-javob" },
 ];
 
+function formatHumanDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return "0 soniya";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h} soat ${m} daqiqa${s > 0 ? ` ${s} soniya` : ""}`;
+  }
+  if (m > 0) {
+    return `${m} daqiqa${s > 0 ? ` ${s} soniya` : ""}`;
+  }
+  return `${s} soniya`;
+}
+
 export default function VideoAnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { analysis, error, is404, refetch } = useAnalysisPolling(id);
   const playerRef = useRef<YouTubePlayerHandle>(null);
+  const htmlVideoRef = useRef<HTMLVideoElement>(null);
   const [tab, setTab] = useState<Tab>("summary");
   const [retrying, setRetrying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
+  const [copiedError, setCopiedError] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [qaHistory, setQaHistory] = useState<QAEntry[]>([]);
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesStartTime, setNotesStartTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TranscriptSegment[] | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
@@ -50,7 +88,39 @@ export default function VideoAnalysisPage() {
   const [transcriptView, setTranscriptView] = useState<"normal" | "bilingual">("normal");
   const [bilingual, setBilingual] = useState<BilingualSegment[] | null>(null);
   const [bilingualLoading, setBilingualLoading] = useState(false);
+  const [plans, setPlans] = useState<PlanDef[]>([]);
+  const [minutePacks, setMinutePacks] = useState<MinutePack[]>([]);
+  const [currentSub, setCurrentSub] = useState<CurrentSubscription | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
 
+  const isAnalysisActive = Boolean(analysis && analysis.status !== "completed" && analysis.status !== "failed");
+
+  useEffect(() => {
+    if (!isAnalysisActive) return;
+    const timer = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isAnalysisActive]);
+
+  useEffect(() => {
+    if (!isAnalysisActive) return;
+    const timer = setInterval(() => {
+      setTipIndex((i) => (i + 1) % ANALYSIS_TIPS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [isAnalysisActive]);
+
+  useEffect(() => {
+    getPlans()
+      .then((res) => {
+        if (res.plans) setPlans(res.plans);
+        if (res.minute_packs) setMinutePacks(res.minute_packs);
+        if (res.current) setCurrentSub(res.current);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (analysis?.qa_history) setQaHistory(analysis.qa_history);
@@ -64,6 +134,14 @@ export default function VideoAnalysisPage() {
     }
   }, [analysis?.status, id]);
 
+  const [toast, setToast] = useState<{ type: "error" | "success"; message: string } | null>(null);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+
+  const showToast = (message: string, type: "error" | "success" = "error") => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 6000);
+  };
+
   const handleRetry = async () => {
     if (!id || retrying) return;
     setRetrying(true);
@@ -71,13 +149,45 @@ export default function VideoAnalysisPage() {
       await retryAnalysis(id);
       await refetch();
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.");
+      showToast(e?.response?.data?.detail || "Qayta urinishda xatolik yuz berdi.");
     } finally {
       setRetrying(false);
     }
   };
 
-  const seek = (seconds: number) => playerRef.current?.seekTo(seconds);
+  const handleCancel = () => {
+    if (!id || cancelling) return;
+    setConfirmCancelOpen(true);
+  };
+
+  const executeCancel = async () => {
+    setCancelling(true);
+    try {
+      await cancelAnalysis(id);
+      showToast("Video tahlili muvaffaqiyatli bekor qilindi.", "success");
+      setConfirmCancelOpen(false);
+      await refetch();
+    } catch (e: any) {
+      showToast(e?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleCopyError = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedError(true);
+    setTimeout(() => setCopiedError(false), 2000);
+  };
+
+  const seek = (seconds: number) => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(seconds);
+    } else if (htmlVideoRef.current) {
+      htmlVideoRef.current.currentTime = seconds;
+      htmlVideoRef.current.play().catch(() => {});
+    }
+  };
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +198,7 @@ export default function VideoAnalysisPage() {
       setQaHistory((prev) => [...prev, entry]);
       setQuestion("");
     } catch {
-      alert("Savolga javob berishda xatolik yuz berdi.");
+      showToast("Savolga javob berishda xatolik yuz berdi.");
     } finally {
       setAsking(false);
     }
@@ -96,27 +206,33 @@ export default function VideoAnalysisPage() {
 
   const handleGenerateQuiz = async () => {
     if (!id) return;
+    setQuizStartTime(Date.now());
     setQuizLoading(true);
     try {
       const res = await generateQuiz(id);
       setQuiz(res.quiz);
+      showToast("Test savollari muvaffaqiyatli tayyorlandi!", "success");
     } catch {
-      alert("Test yaratishda xatolik yuz berdi.");
+      showToast("Test yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setQuizLoading(false);
+      setQuizStartTime(null);
     }
   };
 
-  const handleGenerateNotes = async () => {
+  const handleGenerateNotes = async (force: boolean = false) => {
     if (!id) return;
+    setNotesStartTime(Date.now());
     setNotesLoading(true);
     try {
-      const res = await generateNotes(id);
+      const res = await generateNotes(id, force);
       setNotes(res.notes);
+      showToast(force ? "Konspekt yangilandi!" : "Konspekt muvaffaqiyatli yaratildi!", "success");
     } catch {
-      alert("Konspekt yaratishda xatolik yuz berdi.");
+      showToast("Konspekt yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     } finally {
       setNotesLoading(false);
+      setNotesStartTime(null);
     }
   };
 
@@ -132,7 +248,7 @@ export default function VideoAnalysisPage() {
       const res = await generateBilingual(id);
       setBilingual(res.segments);
     } catch {
-      alert("Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
+      showToast("Bilingual ko'rinishni yaratishda xatolik yuz berdi.");
       setTranscriptView("normal");
     } finally {
       setBilingualLoading(false);
@@ -235,52 +351,305 @@ export default function VideoAnalysisPage() {
   return (
     <div className="min-h-screen bg-slate-900">
       <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={() => { clearAnalysisId(); router.push("/"); }}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
-            aria-label="Orqaga qaytish"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
-            <span className="text-lg font-black tracking-tight text-white">
-              GapirAI<span className="text-violet-500">.uz</span>
-            </span>
-          </Link>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => { clearAnalysisId(); router.push("/"); }}
+              className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
+              aria-label="Orqaga qaytish"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
+              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
+              <span className="text-lg font-black tracking-tight text-white">
+                GapirAI<span className="text-violet-500">.uz</span>
+              </span>
+            </Link>
+          </div>
+
+          {analysis.linked_job_id && (
+            <Link
+              href={`/video/${analysis.linked_job_id}`}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/25 transition active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">Dublyaj sahifasiga o'tish</span>
+              <span className="sm:hidden">Dublyaj</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-        {!isDone && !isFailed && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-4">
-            <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto" />
-            <h2 className="text-lg font-bold text-white">
-              {ANALYSIS_STATUS_LABELS[analysis.status]}
-            </h2>
-            <div className="w-full max-w-sm mx-auto h-2 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-500"
-                style={{ width: `${analysis.progress}%` }}
-              />
+        {/* Modern Toast Notification */}
+        {toast && (
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+              toast.type === "error"
+                ? "bg-red-950/80 border-red-500/40 text-red-200"
+                : "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              {toast.type === "error" ? (
+                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              )}
+              <p className="text-xs sm:text-sm font-semibold">{toast.message}</p>
             </div>
-            <p className="text-sm text-gray-400">{analysis.status_message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {!isDone && !isFailed && (
+          <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+            {/* Top row: Video Thumbnail & Info + Elapsed Time */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-white/10">
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                {analysis.video_thumbnail ? (
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                    <img
+                      src={analysis.video_thumbnail}
+                      alt={analysis.video_title || "Video"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center flex-shrink-0">
+                    <VideoIcon className="w-7 h-7 text-blue-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold text-white line-clamp-2">
+                    {analysis.video_title || "Video tahlili tayyorlanmoqda..."}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                    {analysis.video_duration ? (
+                      <span>Davomiyligi: {formatHumanDuration(analysis.video_duration)}</span>
+                    ) : null}
+                    <span className="flex items-center gap-1 text-blue-400 font-medium">
+                      <Clock className="w-3.5 h-3.5" /> {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
+                <div className="flex items-center sm:flex-col sm:items-end gap-2 sm:gap-0.5">
+                  <span className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                    {Math.round(analysis.progress)}%
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    Jarayonda
+                  </span>
+                </div>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-rose-300 hover:text-rose-200 transition active:scale-95 disabled:opacity-50 shadow-sm"
+                  title="Tahlilni to'xtatish va bekor qilish"
+                >
+                  {cancelling ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5" />
+                  )}
+                  <span>Bekor qilish</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Glowing Progress Bar */}
+            <div className="space-y-2">
+              <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden p-0.5 border border-white/10">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(139,92,246,0.5)]"
+                  style={{ width: `${Math.max(5, analysis.progress)}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-xs text-gray-400">
+                <span>{analysis.status_message || ANALYSIS_STATUS_LABELS[analysis.status]}</span>
+                <span>Taxminan: 30-60 soniya</span>
+              </div>
+            </div>
+
+            {/* 4-Stage Visual Stepper */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+              {[
+                {
+                  idx: 0,
+                  title: "1. Media & Audio",
+                  desc: "Yuklab olish va tayyorlash",
+                  icon: VideoIcon,
+                },
+                {
+                  idx: 1,
+                  title: "2. Nutq Transkripti",
+                  desc: "Groq Whisper (so'zma-so'z)",
+                  icon: FileText,
+                },
+                {
+                  idx: 2,
+                  title: "3. Sun'iy Intellekt Tahlili",
+                  desc: "Xulosa va boblar",
+                  icon: Brain,
+                },
+                {
+                  idx: 3,
+                  title: "4. Yakuniy Natijalar",
+                  desc: "Konspekt va testlar",
+                  icon: Sparkles,
+                },
+              ].map((stage) => {
+                const currentStageIdx = getAnalysisStageIndex(analysis.status);
+                const isPassed = currentStageIdx > stage.idx;
+                const isCurrent = currentStageIdx === stage.idx;
+                const StageIcon = stage.icon;
+
+                return (
+                  <div
+                    key={stage.idx}
+                    className={`relative p-3.5 rounded-2xl border transition-all duration-300 ${
+                      isCurrent
+                        ? "bg-gradient-to-b from-blue-500/15 to-violet-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30"
+                        : isPassed
+                        ? "bg-emerald-500/5 border-emerald-500/30 text-gray-300"
+                        : "bg-white/[0.02] border-white/5 opacity-60 text-gray-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 mb-1.5">
+                      <div
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                          isCurrent
+                            ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 animate-pulse"
+                            : isPassed
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                            : "bg-white/10 text-gray-400"
+                        }`}
+                      >
+                        {isPassed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : isCurrent ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        ) : (
+                          <StageIcon className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <span className={`text-xs font-bold leading-tight ${isCurrent ? "text-white" : isPassed ? "text-gray-200" : "text-gray-400"}`}>
+                        {stage.title}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-tight pl-9">
+                      {stage.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Rotating Tips Box & Cancel */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                </div>
+                <p className="text-xs text-gray-300 transition-all duration-500">
+                  {ANALYSIS_TIPS[tipIndex]}
+                </p>
+              </div>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-xs font-semibold text-gray-400 hover:text-rose-300 transition shrink-0 active:scale-95 disabled:opacity-50"
+                title="Tahlilni to'xtatish"
+              >
+                {cancelling ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5" />
+                )}
+                <span>To'xtatish</span>
+              </button>
+            </div>
           </div>
         )}
 
         {isFailed && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center space-y-4">
-            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
-            <h2 className="text-lg font-bold text-white">Xatolik yuz berdi</h2>
-            <p className="text-sm text-gray-400 max-w-lg mx-auto">
-              {analysis.error_message || "Videoni tahlil qilishda xatolik yuz berdi. Iltimos, birozdan keyin qayta urinib ko'ring."}
-            </p>
-            <div className="pt-2">
+          <div className="relative overflow-hidden rounded-3xl border border-rose-500/20 bg-gradient-to-b from-rose-950/20 via-slate-900/90 to-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl space-y-8">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Top Video Header Card */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10 relative z-10">
+              <div className="flex items-center gap-4 min-w-0">
+                {analysis.video_thumbnail ? (
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 shadow-md">
+                    <img
+                      src={analysis.video_thumbnail}
+                      alt={analysis.video_title || "Video"}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-rose-950/20" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                    <VideoIcon className="w-6 h-6 text-rose-400" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-lg">
+                    {analysis.video_title || "YouTube Video"}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 font-mono">
+                    {analysis.video_duration && analysis.video_duration > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-gray-500" />
+                        {formatHumanDuration(analysis.video_duration)}
+                      </span>
+                    )}
+                    <span>•</span>
+                    <span className="truncate max-w-[200px] text-gray-500">{analysis.youtube_url}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold shrink-0">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span>Tahlil to'xtatildi</span>
+              </div>
+            </div>
+
+            {/* Error Message & Friendly Diagnosis */}
+            <div className="text-center max-w-xl mx-auto space-y-3 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/5">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Tahlil jarayonida to'xtalish yuz berdi
+              </h2>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                Video hajmi katta bo'lgani yoki sun'iy intellekt serverlarida vaqtinchalik yuklama yuqori bo'lgani sababli jarayon to'xtab qoldi.
+                Balansingizdagi daqiqalar saqlab qolingan.
+              </p>
+            </div>
+
+            {/* Action Buttons Row */}
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 relative z-10">
               <button
                 onClick={handleRetry}
                 disabled={retrying}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-medium text-sm transition shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 active:scale-95 transition-all duration-300 disabled:opacity-50"
               >
                 {retrying ? (
                   <>
@@ -294,6 +663,76 @@ export default function VideoAnalysisPage() {
                   </>
                 )}
               </button>
+
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 text-gray-300 hover:text-rose-200 font-semibold text-sm transition active:scale-95 disabled:opacity-50"
+              >
+                {cancelling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                    <span>Bekor qilinmoqda...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 text-rose-400" />
+                    <span>Tahlilni bekor qilish</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => { clearAnalysisId(); router.push("/"); }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white font-semibold text-sm transition active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Boshqa video tahlil qilish</span>
+              </button>
+            </div>
+
+            {/* Collapsible Technical Details */}
+            <div className="pt-2 border-t border-white/5 relative z-10">
+              <button
+                onClick={() => setShowTechDetails((prev) => !prev)}
+                className="flex items-center justify-center gap-2 mx-auto text-xs text-gray-400 hover:text-gray-200 font-medium py-1 transition"
+              >
+                <span>Texnik xatolik tafsilotlari</span>
+                {showTechDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {showTechDetails && (
+                <div className="mt-3 p-4 rounded-2xl bg-black/40 border border-white/10 text-left space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono pb-2 border-b border-white/5">
+                    <span>ID: {analysis.id}</span>
+                    <button
+                      onClick={() => handleCopyError(`${analysis.error_message || ''}\nCode: ${analysis.error_code || ''}\nID: ${analysis.id}`)}
+                      className="flex items-center gap-1 text-gray-400 hover:text-white transition"
+                    >
+                      {copiedError ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedError ? "Nusxalandi" : "Nusxa olish"}</span>
+                    </button>
+                  </div>
+                  {analysis.error_code && (
+                    <p className="text-xs font-mono text-rose-300">
+                      Kod: <span className="text-white font-bold">{analysis.error_code}</span>
+                    </p>
+                  )}
+                  <p className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                    {analysis.error_message || "Noma'lum xatolik yuz berdi."}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Helpful Advice Banner */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start sm:items-center gap-3 text-xs text-gray-300 relative z-10">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <p className="leading-relaxed">
+                <span className="font-semibold text-white">Foydali tavsiya:</span> Katta hajmdagi videolarda (1 soatdan ortiq) AI tahlili bo'lib-bo'lib amalga oshiriladi. <strong>«Qaytadan urinish»</strong> tugmasini bosganingizda tizim avtomatik ravishda optimal modelni ishga tushiradi.
+              </p>
             </div>
           </div>
         )}
@@ -302,6 +741,13 @@ export default function VideoAnalysisPage() {
           <>
             {videoId ? (
               <YouTubePlayer ref={playerRef} videoId={videoId} />
+            ) : analysis?.video_url ? (
+              <video
+                ref={htmlVideoRef}
+                src={analysis.video_url}
+                controls
+                className="w-full aspect-video rounded-2xl bg-black object-contain shadow-2xl border border-white/10"
+              />
             ) : (
               <div className="aspect-video bg-black rounded-2xl flex items-center justify-center text-gray-500 text-sm">
                 Video ko'rsatib bo'lmadi
@@ -320,34 +766,131 @@ export default function VideoAnalysisPage() {
               </span>
             </div>
 
-            {/* ── Dubbing Lead Magnet Banner (Growth Experiment 2) ── */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
-              <div className="space-y-1 text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
-                    🎙️ Ovozli Dublyaj
-                  </span>
-                  <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    Starter: 4,900 so&apos;m
-                  </span>
-                </div>
-                <h3 className="text-sm sm:text-base font-extrabold text-white">
-                  Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
-                </h3>
-                <p className="text-xs text-gray-300">
-                  Sun&apos;iy intellekt orqali professional ovozda to&apos;liq tarjima qiling.
-                </p>
-              </div>
+            {/* ── Dubbing Lead Magnet Banner (Faqat chet tildagi videolar uchun) ── */}
+            {Boolean(analysis.video_language && !analysis.video_language.toLowerCase().startsWith("uz")) && (() => {
+              const durationSec = analysis.video_duration || 0;
+              const videoMinutes = Math.max(1, Math.ceil(durationSec / 60));
+              const availableMinutes = currentSub?.minutes?.total_available ?? 5;
+              const neededMinutes = Math.max(0, videoMinutes - availableMinutes);
 
-              <Link
-                href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
-                className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
-              >
-                <Sparkles size={16} />
-                <span>O&apos;zbekcha dublyaj qilish</span>
-                <ArrowRight size={14} />
-              </Link>
-            </div>
+              const packs = minutePacks.length > 0 ? minutePacks : [
+                { minutes: 15, price: 4900, one_time: true },
+                { minutes: 35, price: 15000 },
+                { minutes: 70, price: 25000 },
+                { minutes: 140, price: 45000 },
+                { minutes: 350, price: 100000 },
+              ];
+
+              const eligiblePacks = packs.filter((p) => !p.already_purchased);
+              const recPack = eligiblePacks.find((p) => p.minutes >= neededMinutes) || eligiblePacks[eligiblePacks.length - 1];
+
+              const recPlan = neededMinutes <= 350
+                ? (plans.find((p) => p.id === "standard") || { id: "standard", name: "Standart", monthly_minutes: 350, price: 49000 })
+                : (plans.find((p) => p.id === "pro") || { id: "pro", name: "Pro", monthly_minutes: 600, price: 199000 });
+
+              const formattedDur = formatHumanDuration(durationSec);
+
+              if (neededMinutes <= 0) {
+                return (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-600/20 via-teal-600/20 to-blue-600/20 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-emerald-500/10">
+                    <div className="space-y-1 text-center sm:text-left">
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                          🎙️ Ovozli Dublyaj
+                        </span>
+                        <span className="text-[11px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          Balansingiz yetarli ({availableMinutes} daqiqa)
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-extrabold text-white">
+                        Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
+                      </h3>
+                      <p className="text-xs text-gray-300">
+                        Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa). Balansingizdagi daqiqalar yetarli — videoni to&apos;liq dublyaj qilishingiz mumkin.
+                      </p>
+                    </div>
+
+                    <Link
+                      href={analysis.linked_job_id ? `/video/${analysis.linked_job_id}` : `/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                      className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+                    >
+                      <Sparkles size={16} />
+                      <span>{analysis.linked_job_id ? "Tayyor dublyajni ochish" : "O'zbekcha dublyaj qilish"}</span>
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+                  <div className="space-y-2 text-center md:text-left max-w-2xl">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
+                        🎙️ Ovozli Dublyaj
+                      </span>
+                      {recPack && (
+                        <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          Tavsiya paket: +{recPack.minutes} daqiqa ({recPack.price.toLocaleString("uz-UZ")} so&apos;m)
+                        </span>
+                      )}
+                      {recPlan && (
+                        <span className="text-[11px] text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 rounded-full">
+                          yoki {recPlan.name} tarifi ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy)
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-white">
+                      Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
+                    </h3>
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa).{" "}
+                      Balansingizda {availableMinutes} daqiqa mavjud — to&apos;liq dublyaj qilish uchun{" "}
+                      <strong className="text-amber-300">{neededMinutes} daqiqa</strong> yetishmayapti.{" "}
+                      Ushbu videoni dublyaj qilish uchun{" "}
+                      {recPack && (
+                        <>
+                          <strong className="text-emerald-300">+{recPack.minutes} daqiqalik paketni</strong> ({recPack.price.toLocaleString("uz-UZ")} so&apos;m) olishni{" "}
+                        </>
+                      )}
+                      yoki{" "}
+                      <strong className="text-violet-300">{recPlan.name} tarifiga</strong> ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy) o&apos;tishni tavsiya qilamiz!
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                    {analysis.linked_job_id ? (
+                      <Link
+                        href={`/video/${analysis.linked_job_id}`}
+                        className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Sparkles size={15} />
+                        <span>Dublyaj sahifasiga o'tish</span>
+                        <ArrowRight size={13} />
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          href={`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(neededMinutes)}&duration=${encodeURIComponent(videoMinutes)}`}
+                          className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                        >
+                          <CreditCard size={15} />
+                          <span>Paket yoki tarif olish</span>
+                        </Link>
+                        <Link
+                          href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
+                          className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-white/10"
+                        >
+                          <Sparkles size={14} className="text-amber-400" />
+                          <span>2 daqiqa bepul sinash</span>
+                          <ArrowRight size={13} />
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">
               {TABS.map((t) => (
@@ -420,7 +963,7 @@ export default function VideoAnalysisPage() {
                     </button>
                   ))}
                   {(!analysis.chapters || analysis.chapters.length === 0) && (
-                    <p className="text-sm text-gray-500">Chapterlar topilmadi.</p>
+                    <p className="text-sm text-gray-500">Boblar topilmadi.</p>
                   )}
                 </div>
               )}
@@ -501,7 +1044,14 @@ export default function VideoAnalysisPage() {
               )}
 
               {tab === "notes" && (
-                <NotesTab notes={notes} loading={notesLoading} onGenerate={handleGenerateNotes} />
+                <NotesTab
+                  notes={notes}
+                  loading={notesLoading}
+                  onGenerate={() => handleGenerateNotes(false)}
+                  onRegenerate={() => handleGenerateNotes(true)}
+                  startTime={notesStartTime}
+                  videoDuration={analysis?.video_duration}
+                />
               )}
 
               {tab === "quiz" && (
@@ -512,6 +1062,8 @@ export default function VideoAnalysisPage() {
                   onGenerate={handleGenerateQuiz}
                   onAnswer={(qi, oi) => setQuizAnswers((prev) => ({ ...prev, [qi]: oi }))}
                   onSeek={seek}
+                  startTime={quizStartTime}
+                  videoDuration={analysis?.video_duration}
                 />
               )}
 
@@ -529,6 +1081,19 @@ export default function VideoAnalysisPage() {
           </>
         )}
       </div>
+
+      {/* Modern Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmCancelOpen}
+        onClose={() => setConfirmCancelOpen(false)}
+        onConfirm={executeCancel}
+        loading={cancelling}
+        title="Video tahlilini bekor qilish"
+        message="Haqiqatan ham ushbu video tahlilini to'xtatib bekor qilmoqchimisiz?"
+        confirmText="Ha, bekor qilinsin"
+        cancelText="Ortga"
+        danger
+      />
     </div>
   );
 }

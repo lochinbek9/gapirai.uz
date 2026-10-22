@@ -111,7 +111,7 @@ class TestPerSegmentRetry(unittest.TestCase):
     def test_corrupt_segment_is_retried_and_succeeds_on_second_attempt(self):
         call_count = {"n": 0}
 
-        def fake_synthesize_text(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None):
+        def fake_synthesize_text(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None, *args, **kwargs):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 # First attempt: simulate the exact production corruption --
@@ -142,7 +142,7 @@ class TestPerSegmentRetry(unittest.TestCase):
     # dub that is entirely original audio. (A MINORITY of failed segments is
     # tolerated instead -- see test_minority_failed_segments_are_dropped.)
     def test_all_segments_failing_raises_clear_error(self):
-        def always_corrupt(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None):
+        def always_corrupt(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None, *args, **kwargs):
             Path(output_path).write_bytes(b"\x00" * 44)
             return "azure"
 
@@ -173,7 +173,7 @@ class TestPerSegmentRetry(unittest.TestCase):
             {"id": 3, "start": 6.0, "end": 7.0, "text": "tortinchi"},
         ]
 
-        def one_bad(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None):
+        def one_bad(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None, *args, **kwargs):
             if text == "uchinchi":
                 Path(output_path).write_bytes(b"\x00" * 44)  # always corrupt
             else:
@@ -204,7 +204,7 @@ class TestPerSegmentRetry(unittest.TestCase):
         ]
         seen: list[tuple[int, int]] = []
 
-        def fake_tts(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None):
+        def fake_tts(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None, *args, **kwargs):
             _write_valid_wav(output_path)
             return "azure"
 
@@ -236,7 +236,7 @@ class TestPerSegmentRetry(unittest.TestCase):
         ]
         calls: dict[str, int] = {}
 
-        def fake_synthesize_text(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None):
+        def fake_synthesize_text(text, output_path, voice_name=None, video_id=None, user_id=None, provider_name=None, *args, **kwargs):
             calls[text] = calls.get(text, 0) + 1
             if text == "birinchi" and calls[text] == 1:
                 Path(output_path).write_bytes(b"\x00" * 44)  # corrupt on first attempt only

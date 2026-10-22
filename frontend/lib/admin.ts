@@ -123,16 +123,51 @@ export interface AdminUserItem {
   }
 }
 
+export interface AdminUsersSummary {
+  total: number
+  paid_count: number
+  free_count: number
+  has_package_count: number
+  zero_balance_count: number
+  unverified_count: number
+  period_label: string
+}
+
+export interface AdminUserInsight {
+  type: 'warning' | 'caution' | 'success' | 'info'
+  title: string
+  description: string
+}
+
 export interface AdminUsersResponse {
   total: number
   page: number
   limit: number
   users: AdminUserItem[]
+  summary?: AdminUsersSummary
+  insights?: AdminUserInsight[]
 }
 
-export async function apiAdminListUsers(token: string, q?: string, page: number = 1, limit: number = 25): Promise<AdminUsersResponse> {
+export async function apiAdminListUsers(
+  token: string,
+  q?: string,
+  page: number = 1,
+  limit: number = 25,
+  planFilter?: string,
+  balanceFilter?: string,
+  sortBy: string = 'newest',
+  dateRange?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<AdminUsersResponse> {
   const params: Record<string, any> = { page, limit }
   if (q && q.trim()) params.q = q.trim()
+  if (planFilter && planFilter !== 'all') params.plan_filter = planFilter
+  if (balanceFilter && balanceFilter !== 'all') params.balance_filter = balanceFilter
+  if (sortBy) params.sort_by = sortBy
+  if (dateRange && dateRange !== 'all') params.date_range = dateRange
+  if (startDate) params.start_date = startDate
+  if (endDate) params.end_date = endDate
   const res = await axios.get(`${API_URL}/admin/users`, {
     headers: { Authorization: `Bearer ${token}` },
     params,
@@ -143,7 +178,15 @@ export async function apiAdminListUsers(token: string, q?: string, page: number 
 export async function apiAdminAddMinutes(
   token: string,
   userId: string,
-  payload: { minutes?: number; amount_uzs?: number; rate_per_minute?: number; action?: 'add' | 'deduct'; reason?: string }
+  payload: {
+    minutes?: number
+    amount_uzs?: number
+    rate_per_minute?: number
+    action?: 'add' | 'deduct'
+    target?: 'purchased' | 'monthly' | 'kuymas' | 'tarif'
+    balance_type?: 'purchased' | 'monthly' | 'kuymas' | 'tarif'
+    reason?: string
+  }
 ) {
   const res = await axios.post(`${API_URL}/admin/users/${userId}/add-minutes`, payload, {
     headers: { Authorization: `Bearer ${token}` },
@@ -598,6 +641,7 @@ export interface AdminJobCostSummary {
   completed_jobs: number
   failed_jobs: number
   processing_jobs: number
+  queued_jobs?: number
   awaiting_payment_jobs: number
   success_rate_pct: number
   total_completed_duration_min: number
@@ -628,7 +672,14 @@ export interface AdminJobCostItem {
     voice_name: string | null
     voice_style: string | null
     stt_model: string | null
+    stt_display?: string | null
+    stt_provider_name?: string | null
+    is_groq?: boolean
     translation_model: string | null
+    gemini_key_tier?: 'paid' | 'free' | null
+    gemini_key_used?: string | null
+    has_transcript?: boolean
+    has_translation?: boolean
   }
   costs: {
     tts_cost_usd: number
@@ -657,6 +708,8 @@ export interface AdminJobCostItem {
     email: string | null
     phone: string | null
     is_internal: boolean
+    plan?: string
+    balance_minutes?: number
   }
   error_code: string | null
   error_message: string | null
@@ -669,7 +722,7 @@ export interface AdminJobCostItem {
 }
 
 export interface AdminJobsCostResponse {
-  summary: AdminJobCostSummary
+  summary: AdminJobCostSummary & { date_range?: string }
   pagination: {
     page: number
     page_size: number
@@ -687,7 +740,12 @@ export async function apiAdminJobsCost(
   search?: string,
   ttsProvider?: string,
   includeInternal: boolean = false,
-  sortBy: string = 'newest'
+  sortBy: string = 'newest',
+  dateRange: string = 'today',
+  startDate?: string,
+  endDate?: string,
+  plan?: string,
+  errorCode?: string
 ): Promise<AdminJobsCostResponse> {
   const res = await axios.get(`${API_URL}/admin/jobs-cost`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -697,8 +755,13 @@ export async function apiAdminJobsCost(
       status: status || undefined,
       search: search || undefined,
       tts_provider: ttsProvider || undefined,
+      plan: plan && plan !== 'ALL' ? plan : undefined,
+      error_code: errorCode && errorCode !== 'ALL' ? errorCode : undefined,
       include_internal: includeInternal,
       sort_by: sortBy,
+      date_range: dateRange,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
     },
   })
   return res.data
@@ -728,6 +791,9 @@ export interface UnactivatedUserItem {
 
 export interface UnactivatedUsersResponse {
   summary: {
+    date_range?: string
+    start_date?: string | null
+    end_date?: string | null
     total_users: number
     completed_users: number
     completed_pct: number
@@ -761,7 +827,10 @@ export async function apiGetUnactivatedUsers(
   pageSize: number = 25,
   filterType: string = 'all',
   search?: string,
-  sortBy: string = 'newest'
+  sortBy: string = 'newest',
+  dateRange: string = 'today',
+  startDate?: string,
+  endDate?: string
 ): Promise<UnactivatedUsersResponse> {
   const res = await axios.get(`${API_URL}/admin/unactivated-users`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -771,6 +840,9 @@ export async function apiGetUnactivatedUsers(
       filter_type: filterType,
       search: search || undefined,
       sort_by: sortBy,
+      date_range: dateRange,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
     },
   })
   return res.data
@@ -868,9 +940,165 @@ export async function apiAdminSystemHealth(token: string): Promise<SystemHealthR
   return res.data
 }
 
-export async function apiAdminRetryJob(token: string, jobId: string): Promise<{ success: boolean; message: string }> {
-  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, {}, {
+export async function apiAdminRetryJob(
+  token: string,
+  jobId: string,
+  payload?: {
+    gemini_key_tier?: string
+    tts_provider?: string
+    voice_name?: string
+    stt_provider?: string
+    translation_model?: string
+    reuse_transcript?: boolean
+    reuse_translation?: boolean
+    force_regenerate?: boolean
+  }
+): Promise<{ success: boolean; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/retry`, payload || {}, {
     headers: { Authorization: `Bearer ${token}` },
   })
   return res.data
 }
+
+export async function apiAdminCancelJob(token: string, jobId: string): Promise<{ status: string; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/cancel`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminCancelAnalysis(token: string, analysisId: string): Promise<{ status: string; message: string }> {
+  const res = await axios.post(`${API_URL}/admin/analyses/${analysisId}/cancel`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+
+export interface GeminiKeyItem {
+  key_masked: string
+  tier: 'paid' | 'free'
+  status: 'active' | 'cooldown'
+  remaining_seconds: number
+  remaining_human: string
+  cooldown_reason: string
+  limits: {
+    rpm: number
+    rpd: string | number
+    tpm: string
+    label: string
+  }
+  total_jobs: number
+  total_duration_sec: number
+  total_duration_formatted: string
+  total_cost_usd: number
+  total_cost_uzs: number
+  total_requests: number
+  success_count: number
+  rate_limit_count: number
+  initial_balance_usd?: number
+  remaining_balance_usd?: number
+  remaining_balance_uzs?: number
+  google_balance_note?: string
+}
+
+export interface GeminiKeysOverviewResponse {
+  admin_mode: 'free' | 'paid'
+  paid_key_initial_balance: number
+  paid_key: GeminiKeyItem | null
+  free_keys: GeminiKeyItem[]
+  summary: {
+    total_keys: number
+    total_paid_keys: number
+    total_free_keys: number
+    total_active_keys: number
+    total_cooldown_keys: number
+    total_jobs_all: number
+    total_cost_all_usd: number
+  }
+  groq?: GroqKeysOverviewResponse
+}
+
+export interface GroqKeyItem {
+  key_masked: string
+  tier: 'free'
+  tier_label: string
+  status: 'active' | 'cooldown'
+  remaining_seconds: number
+  remaining_human: string
+  cooldown_reason: string
+  models: string[]
+  limits: {
+    rpm: number
+    rpd: number
+    tpm: string
+    label: string
+  }
+  total_jobs: number
+  total_duration_sec: number
+  total_cost_usd: number
+  total_cost_uzs: number
+  total_requests: number
+  success_count: number
+  rate_limit_count: number
+}
+
+export interface GroqKeysOverviewResponse {
+  summary: {
+    provider: string
+    tier: string
+    total_keys: number
+    total_active_keys: number
+    total_cooldown_keys: number
+    total_jobs_all: number
+    total_requests_all: number
+    total_cost_all_usd: number
+    total_cost_all_uzs: number
+    cost_status_label: string
+    description: string
+  }
+  keys: GroqKeyItem[]
+}
+
+export async function apiAdminGeminiKeysOverview(token: string): Promise<GeminiKeysOverviewResponse> {
+  const res = await axios.get(`${API_URL}/admin/gemini-keys/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminGroqKeysOverview(token: string): Promise<GroqKeysOverviewResponse> {
+  const res = await axios.get(`${API_URL}/admin/groq-keys/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminResetGroqCooldown(token: string, key_masked: string): Promise<{ status: string }> {
+  const res = await axios.post(`${API_URL}/admin/groq-keys/reset-cooldown`, { key_masked }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminSetGeminiAdminMode(token: string, mode: 'free' | 'paid'): Promise<{ status: string; mode: string }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/admin-mode`, { mode }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminSetGeminiInitialBalance(token: string, initial_balance: number): Promise<{ status: string; initial_balance: number }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/initial-balance`, { initial_balance }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminResetGeminiCooldown(token: string, key_masked: string, model?: string): Promise<{ status: string }> {
+  const res = await axios.post(`${API_URL}/admin/gemini-keys/reset-cooldown`, { key_masked, model }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+

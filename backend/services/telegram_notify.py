@@ -64,6 +64,26 @@ def should_throttle_alert(alert_key: str, throttle_seconds: int = 600) -> bool:
         return False
 
 
+# Ushbu admin ID ga xatoliklar va alertlar bormasin (faqat 557407324 ga borsa yetadi):
+EXCLUDED_ADMIN_TG_IDS = {"1758736133"}
+
+
+def get_admin_tg_ids(exclude_blocked: bool = True) -> list[str]:
+    """Admin Telegram ID lar ro'yxatini qaytaradi."""
+    settings = get_settings()
+    if not settings.ADMIN_TG_IDS:
+        return []
+    ids = []
+    for raw_id in str(settings.ADMIN_TG_IDS).split(","):
+        clean_id = raw_id.strip().strip('"').strip("'")
+        if not clean_id:
+            continue
+        if exclude_blocked and clean_id in EXCLUDED_ADMIN_TG_IDS:
+            continue
+        ids.append(clean_id)
+    return ids
+
+
 def send_alert_to_admins(
     text: str,
     *,
@@ -78,15 +98,7 @@ def send_alert_to_admins(
         logger.info(f"Admin ogohlantirishi cheklandi (throttled): {alert_key}")
         return False
 
-    settings = get_settings()
-    if not settings.ADMIN_TG_IDS:
-        return False
-
-    admin_ids = [
-        id.strip().strip('"').strip("'")
-        for id in settings.ADMIN_TG_IDS.split(",")
-        if id.strip().strip('"').strip("'")
-    ]
+    admin_ids = get_admin_tg_ids(exclude_blocked=True)
     if not admin_ids:
         return False
 
@@ -165,15 +177,7 @@ def send_error_to_admins(
     import re
     import uuid
 
-    settings = get_settings()
-    if not settings.ADMIN_TG_IDS:
-        return
-    
-    admin_ids = [
-        id.strip().strip('"').strip("'")
-        for id in settings.ADMIN_TG_IDS.split(",")
-        if id.strip().strip('"').strip("'")
-    ]
+    admin_ids = get_admin_tg_ids(exclude_blocked=True)
     if not admin_ids:
         return
 
@@ -315,15 +319,7 @@ def send_content_blocked_to_admins(
     adminlarga tekshirish uchun video havolasi va sababini Telegram orqali yuboradi."""
     import html
 
-    settings = get_settings()
-    if not settings.ADMIN_TG_IDS:
-        return
-
-    admin_ids = [
-        id.strip().strip('"').strip("'")
-        for id in settings.ADMIN_TG_IDS.split(",")
-        if id.strip().strip('"').strip("'")
-    ]
+    admin_ids = get_admin_tg_ids(exclude_blocked=True)
     if not admin_ids:
         return
 

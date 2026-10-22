@@ -192,7 +192,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [voiceGender, setVoiceGender] = useState("male");
+  const [voiceGender, setVoiceGender] = useState("auto");
   const [voiceName, setVoiceName] = useState<string>("");
   const [ttsProvider, setTtsProvider] = useState<string>("gemini");
   const [isProUser, setIsProUser] = useState<boolean>(false);
@@ -235,12 +235,23 @@ export default function Home() {
 
   const handleCancel = async () => {
     if (!jobId) return;
-    if (!confirm("Rostdan ham jarayonni bekor qilmoqchimisiz?")) return;
+    const canRefund = job?.can_refund_on_cancel !== undefined
+      ? job.can_refund_on_cancel
+      : ((elapsed || 0) <= 30);
+    const secLeft = job?.cancel_refund_seconds_left !== undefined
+      ? Math.max(0, Math.round(job.cancel_refund_seconds_left))
+      : Math.max(0, 30 - Math.round(elapsed || 0));
+    const stageName = job?.initial_stage || "boshlang'ich";
+
+    const confirmMsg = !canRefund
+      ? "⚠️ Diqqat: Dublyajning dastlabki bosqichi (30 soniya) yakunlangan yoki keyingi bosqichga o'tib bo'lgan! Server va AI resurslari sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
+      : `Haqiqatan ham jarayonni bekor qilmoqchimisiz? Dastlabki bosqich (${stageName}) vaqti (30 soniya, qolgan vaqt: ${secLeft}s) ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi.`;
+    if (!confirm(confirmMsg)) return;
     setCancelLoading(true);
     try {
       const res = await cancelJob(jobId);
       if (res.success) {
-        alert("Jarayon muvaffaqiyatli bekor qilindi.");
+        alert(res.message || "Jarayon muvaffaqiyatli bekor qilindi.");
         clearJobId();
         setJobId(null);
       } else {

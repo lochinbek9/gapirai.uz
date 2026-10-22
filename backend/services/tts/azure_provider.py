@@ -105,6 +105,18 @@ class AzureProvider(TTSProvider):
         # Azure Neural TTS: ~$16 per 1M chars = $0.016 per 1K chars
         return 0.016
 
+    @property
+    def key(self) -> str | None:
+        k = settings.AZURE_SPEECH_KEY
+        return k if (k and k not in ("", "your-azure-key")) else None
+
+    @property
+    def subscription_key(self) -> str | None:
+        return self.key
+
+    def is_available(self) -> bool:
+        return bool(self.key)
+
     def synthesize(
         self,
         text: str,
@@ -117,9 +129,11 @@ class AzureProvider(TTSProvider):
             logger.warning("AZURE_SPEECH_KEY topilmadi — Azure o'tkazib yuborildi.")
             return False
 
-        chosen_voice = voice_name or (
-            self.DEFAULT_VOICE_FEMALE if self._is_female(voice_name) else self.DEFAULT_VOICE_MALE
-        )
+        is_female = self._is_female(voice_name)
+        if not voice_name or "neural" not in voice_name.lower():
+            chosen_voice = self.DEFAULT_VOICE_FEMALE if is_female else self.DEFAULT_VOICE_MALE
+        else:
+            chosen_voice = voice_name
 
         try:
             speech_config = speechsdk.SpeechConfig(
@@ -151,10 +165,9 @@ class AzureProvider(TTSProvider):
                     f"Azure TTS bekor qilindi: reason={cd.reason}, "
                     f"error_code={cd.error_code}, details={cd.error_details}"
                 )
-                # Autentifikatsiya/kvota xatosi qayta urinish bilan tuzatilmaydi —
-                # har bir urinish bir xil natija beradi, shuning uchun darhol
-                # to'xtatiladi (aks holda har segment uchun keraksiz 2x2s kutish).
-                if cd.error_code == speechsdk.CancellationErrorCode.AuthenticationFailure:
+                # Autentifikatsiya/kvota yoki noto'g'ri so'rov (BadRequest) qayta urinish bilan tuzatilmaydi —
+                # har bir urinish bir xil natija beradi, shuning uchun darhol to'xtatiladi.
+                if cd.error_code in (speechsdk.CancellationErrorCode.AuthenticationFailure, speechsdk.CancellationErrorCode.BadRequest):
                     break
                 if attempt < retries - 1:
                     time.sleep(2)

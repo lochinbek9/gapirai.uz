@@ -140,6 +140,15 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             )
             return {"analysis_id": analysis_id, "status": "skipped_duplicate_claim"}
 
+        # Pullik/bepul kalit ajratish (2026-10-20):
+        # FAQAT haqiqiy pullik obunasi borlar (Standard/Pro), daqiqa paketi sotib olganlar yoki adminlar -> Pullik kalit
+        from backend.services.plans import is_user_paid_tier
+        is_paid_analysis = is_user_paid_tier(db, analysis.user_id) if analysis.user_id else False
+        analysis.gemini_key_tier = "paid" if is_paid_analysis else "free"
+        if not is_paid_analysis:
+            analysis.gemini_key_used = None
+        db.commit()
+
         # video-analysis o'zining uploads/ papkasini dublyajnikidan alohida
         # ushlaydi (bir xil job_id ehtimoli yo'q — UUID) — shuning uchun
         # downloader.download_video()ga alohida "job_id" sifatida uzatiladi.
@@ -193,12 +202,15 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.TRANSCRIBING, 35.0, "Nutq matnga aylantirilmoqda...")
-            transcript = transcriber.transcribe_audio(audio_path, primary="gemini")
+            transcript = transcriber.transcribe_audio(audio_path, primary="groq", is_paid=is_paid_analysis)
             if not transcript["segments"] or not transcriber.has_speech(transcript["segments"]):
                 _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "error", "nutq topilmadi")
                 raise NoSpeechFoundError("Bu videoda nutq topilmadi.", code="NO_SPEECH_FOUND")
             analysis.transcript_segments = transcript["segments"]
             analysis.video_language = normalize_video_language(transcript.get("language"))
+            analysis.gemini_key_tier = transcript.get("gemini_key_tier") or ("paid" if is_paid_analysis else "free")
+            if transcript.get("gemini_key_used"):
+                analysis.gemini_key_used = transcript.get("gemini_key_used")
             db.commit()
             _record_stage(stage_timings, analysis_id, "TRANSCRIBE", stage_t0, "ok")
 
@@ -227,24 +239,38 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         if analysis.summary and analysis.key_points and analysis.chapters and analysis.five_minute_summary:
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "skipped")
         else:
-            _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 70.0, "AI tahlil qilinmoqda...")
-            analysis.summary = _service.generate_summary(segments, analysis.language)
-            analysis.key_points = _service.generate_key_points(segments, analysis.language)
-            analysis.chapters = _service.generate_chapters(segments, analysis.video_duration or 0.0, analysis.language)
-            analysis.five_minute_summary = _service.generate_five_minute_summary(segments, analysis.video_duration or 0.0, analysis.language)
+            _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 75.0, "AI xulosasi, boblari va konspekti tayyorlanmoqda...")
+            base_res = _service.generate_base_analysis(segments, analysis.video_duration or 0.0, analysis.language, is_paid=is_paid_analysis)
+            analysis.summary = base_res["summary"]
+            analysis.key_points = base_res["key_points"]
+            analysis.chapters = base_res["chapters"]
+            analysis.five_minute_summary = base_res["five_minute_summary"]
+            if is_paid_analysis and not analysis.gemini_key_used:
+                from backend.services.gemini_quota_manager import get_paid_gemini_api_keys, mask_key
+                paid_k = get_paid_gemini_api_keys()
+                if paid_k:
+                    analysis.gemini_key_used = mask_key(paid_k[0])
             db.commit()
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "ok")
 
         _update_analysis(db, analysis, AnalysisStatus.COMPLETED, 100.0, "Tahlil tayyor!")
         analysis.completed_at = datetime.utcnow()
-        # 2026-08-27 audit: muvaffaqiyatli yakunlangan analiz oldingi
-        # (keyinchalik muvaffaqiyatli bo'lgan) qayta urinishdan qolgan
-        # eski error_code/error_message'ni ko'rsatib turishi mumkin edi --
-        # funksional emas, faqat chalkashtiruvchi (masalan qo'llab-quvvatlash
-        # jamoasi "COMPLETED" qatorda hali ham xato kodini ko'rgan).
         analysis.error_code = None
         analysis.error_message = None
         db.commit()
+
+        # Foydalanuvchiga tahlil tayyorligi haqida email yuborish
+        if analysis.user_id and analysis.user and analysis.user.email:
+            try:
+                from backend.services.email_service import send_analysis_complete_email
+                send_analysis_complete_email(
+                    analysis.user.email,
+                    analysis.user.name or "",
+                    analysis.video_title or "Video",
+                    str(analysis_id),
+                )
+            except Exception as email_err:
+                logger.warning(f"Tahlil tayyor email yuborilmadi (analysis {analysis_id}): {email_err}")
 
         _cleanup_analysis_dirs(analysis_id)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "COMPLETED")

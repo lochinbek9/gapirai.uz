@@ -243,9 +243,17 @@ class Settings(BaseSettings):
     # Google AI Studio / Gemini API
     GEMINI_API_KEY: str = ""
     GEMINI_API_KEYS: str = ""
+    GEMINI_PAID_API_KEY: str = ""
+    GEMINI_PAID_API_KEYS: str = ""
     GOOGLE_GENERATIVE_AI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
     GEMINI_STT_MODEL: str = "gemini-3.8-flash"
+
+    # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
+    GROQ_API_KEY: str = ""
+    GROQ_API_KEYS: str = ""
+    GROQ_STT_MODEL: str = "whisper-large-v3-turbo"
+    GROQ_CHAT_MODEL: str = "qwen/qwen3.8-27b"
 
     # Tarjima provayderi: "openai" | "gemini". OpenAI krediti tugaganda
     # yoki Gemini'dan foydalanish kerak bo'lganda "gemini" qilib sozlanadi.

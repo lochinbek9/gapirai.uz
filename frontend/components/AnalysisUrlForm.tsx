@@ -83,7 +83,7 @@ export default function AnalysisUrlForm() {
           ))}
         </select>
         <p className="text-[10px] text-slate-400 dark:text-gray-600 ml-1">
-          Transkript doim video'ning original tilida qoladi — bu faqat xulosa, chapterlar, konspekt va test qaysi tilda chiqishini belgilaydi.
+          Transkript doim video'ning original tilida qoladi — bu faqat xulosa, boblar, konspekt va test qaysi tilda chiqishini belgilaydi.
         </p>
       </div>
 

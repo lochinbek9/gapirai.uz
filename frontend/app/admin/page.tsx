@@ -26,6 +26,7 @@ import {
   ExternalLink,
   RotateCcw,
   Key,
+  XCircle,
   Eye,
   EyeOff,
   X,
@@ -38,6 +39,7 @@ import {
   RefundsNeededReport,
   apiAdminRefundsNeeded,
   apiAdminRetryJob,
+  apiAdminCancelJob,
   apiAdminChangeMyCredentials,
 } from '@/lib/admin'
 import { getToken, setToken, setStoredUser } from '@/lib/auth'
@@ -45,6 +47,7 @@ import { useAuth } from '@/hooks/useAuth'
 import AdminUsersManager from '@/components/AdminUsersManager'
 import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
 import AdminJobsCostManager from '@/components/AdminJobsCostManager'
+import AdminGeminiKeysManager from '@/components/AdminGeminiKeysManager'
 import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
 import AdminRetentionManager from '@/components/AdminRetentionManager'
@@ -81,6 +84,7 @@ const STATUS_LABELS: Record<string, string> = {
 type TabType =
   | 'overview'
   | 'jobs'
+  | 'gemini'
   | 'users'
   | 'analytics'
   | 'payments'
@@ -91,6 +95,7 @@ type TabType =
 const TABS: { id: TabType; label: string; icon: React.ReactNode; badge?: string }[] = [
   { id: 'overview', label: 'Umumiy', icon: <Activity className="w-4 h-4" /> },
   { id: 'jobs', label: 'Dublyaj & Xarajatlar', icon: <Video className="w-4 h-4" /> },
+  { id: 'gemini', label: 'API Kalitlar', icon: <Key className="w-4 h-4 text-amber-400" />, badge: '💎 Gemini + ⚡ Groq' },
   { id: 'users', label: 'Foydalanuvchilar', icon: <Users className="w-4 h-4" /> },
   { id: 'analytics', label: 'Analitika & Voronka', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'payments', label: "To'lovlar & Moliya", icon: <CreditCard className="w-4 h-4" /> },
@@ -323,6 +328,7 @@ export default function AdminPage() {
 
   // Retry state in Overview
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null)
   const [retryToast, setRetryToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Change My Credentials modal
@@ -470,6 +476,27 @@ export default function AdminPage() {
       })
     } finally {
       setRetryingJobId(null)
+      setTimeout(() => setRetryToast(null), 5000)
+    }
+  }
+
+  async function handleAdminCancel(jobId: string) {
+    const token = getToken()
+    if (!token) return
+    if (!confirm("Ushbu videoni to'xtatish va bekor qilishni tasdiqlaysizmi?")) return
+    try {
+      setCancellingJobId(jobId)
+      setRetryToast(null)
+      const res = await apiAdminCancelJob(token, jobId)
+      setRetryToast({ type: 'success', text: res.message || 'Video muvaffaqiyatli bekor qilindi!' })
+      await loadStats()
+    } catch (err: any) {
+      setRetryToast({
+        type: 'error',
+        text: err?.response?.data?.detail || err?.message || 'Bekor qilishda xatolik',
+      })
+    } finally {
+      setCancellingJobId(null)
       setTimeout(() => setRetryToast(null), 5000)
     }
   }
@@ -756,10 +783,15 @@ export default function AdminPage() {
             <section className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
-                    So‘nggi dublyaj ishlari (Jonli navbat & holat)
-                  </h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Oxirgi 50 ta video (Xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                      Bugungi dublyaj ishlari (Jonli navbat & holat)
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                      {stats.recent_jobs.length} ta bugun
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Faqat bugungi videolar (Maksimal 50 ta, xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
                 </div>
                 <button
                   onClick={() => handleTabChange('jobs')}
@@ -782,7 +814,14 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recent_jobs.slice(0, 15).map((j) => {
+                    {stats.recent_jobs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                          Bugun hali yangi dublyaj ishlari yaratilmagan.
+                        </td>
+                      </tr>
+                    ) : (
+                      stats.recent_jobs.slice(0, 50).map((j) => {
                       const isNoSpeech = j.error_code === 'NO_SPEECH_FOUND'
                       const isSuccess = j.status === 'COMPLETED'
                       const isFailed = j.status === 'FAILED'
@@ -829,21 +868,49 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            {isFailed && !isNoSpeech && (
-                              <button
-                                onClick={() => handleOverviewRetry(j.id)}
-                                disabled={retryingJobId === j.id}
-                                className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 mx-auto transition disabled:opacity-50"
-                                title="Qayta urinish"
-                              >
-                                <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
-                                <span>Qayta urinish</span>
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1.5">
+                              {isFailed && !isNoSpeech && (
+                                <button
+                                  onClick={() => handleOverviewRetry(j.id)}
+                                  disabled={retryingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  title="Qayta urinish"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
+                                  <span>Qayta urinish</span>
+                                </button>
+                              )}
+                              {isSuccess && (
+                                <button
+                                  onClick={() => handleOverviewRetry(j.id)}
+                                  disabled={retryingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm shadow-indigo-500/10"
+                                  title="Admin: Ushbu tayyor videoni qayta tayyorlash"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
+                                  <span>Qayta tayyorlash</span>
+                                </button>
+                              )}
+                              {!isSuccess && !isFailed && (
+                                <button
+                                  onClick={() => handleAdminCancel(j.id)}
+                                  disabled={cancellingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  title="To'xtatish va bekor qilish"
+                                >
+                                  {cancellingJobId === j.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-3 h-3" />
+                                  )}
+                                  <span>Bekor qilish</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -857,6 +924,15 @@ export default function AdminPage() {
         {activeTab === 'jobs' && (
           <section>
             <AdminJobsCostManager token={token} />
+          </section>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 2.5: GEMINI API KEYS & QUOTA MANAGEMENT */}
+        {/* ========================================================= */}
+        {activeTab === 'gemini' && (
+          <section>
+            <AdminGeminiKeysManager token={token} />
           </section>
         )}
 

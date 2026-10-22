@@ -318,7 +318,42 @@ def _extract_info_dict(ydl, youtube_url: str) -> dict:
         "thumbnail": info.get("thumbnail", ""),
         "uploader": info.get("uploader", ""),
         "description": info.get("description", ""),
+        "categories": info.get("categories") or [],
+        "track": info.get("track") or "",
+        "artist": info.get("artist") or "",
+        "album": info.get("album") or "",
     }
+
+
+def check_music_copyright_restriction(info: dict) -> tuple[bool, str]:
+    """Videoning mualliflik huquqi bilan himoyalangan qo'shiq/klip/lyrics ekanligini tekshiradi.
+    (True, reason) -> musiqiy video, rad etiladi;
+    (False, '') -> qabul qilinadi."""
+    title = (info.get("title") or "").strip()
+    desc = (info.get("description") or "").strip()
+    cat_id = str(info.get("category_id") or "")
+    categories = [str(c).lower() for c in (info.get("categories") or [])]
+    track = (info.get("track") or "").strip()
+    artist = (info.get("artist") or "").strip()
+
+    # 1. Sarlavhada "Lyrics" yoki "Lyric" so'zi bo'lsa (asosiy talab):
+    if re.search(r"\b(lyrics?|l-y-r-i-c-s)\b", title, re.IGNORECASE) or "(lyrics)" in title.lower() or "[lyrics]" in title.lower():
+        return True, "Mualliflik huquqi bilan himoyalangan qo'shiq (Lyrics) videolari qabul qilinmaydi. GapirAI nutqiy va ta'limiy videolarni dublyaj qilish uchun mo'ljallangan."
+
+    # 2. Sarlavhada rasmiy musiqa/klip belgilari:
+    if re.search(r"\b(official\s+music\s+video|official\s+lyric\s+video|music\s+video|official\s+audio)\b", title, re.IGNORECASE):
+        return True, "Mualliflik huquqi bilan himoyalangan musiqiy klip yoki audio treklar qabul qilinmaydi."
+
+    # 3. YouTube Content ID orqali aniqlangan rasmiy qo'shiq / artist metadata:
+    if track and artist:
+        return True, f"Mualliflik huquqi bilan himoyalangan qo'shiq aniqlandi ({artist} — {track}). Musiqiy videolar dublyaj qilinmaydi."
+
+    # 4. YouTube toifasi (Category ID 10 = Music) va musiqa litsenziyasi:
+    if cat_id == "10" or "music" in categories:
+        if "licensed to youtube by" in desc.lower() or "provided to youtube by" in desc.lower():
+            return True, "YouTube Content ID litsenziyasiga ega musiqiy treklar qabul qilinmaydi."
+
+    return False, ""
 
 
 _YT_VIDEO_ID_RE = re.compile(
@@ -380,6 +415,7 @@ def _get_video_info_via_api(youtube_url: str) -> dict | None:
             "thumbnail": thumbnail,
             "uploader": snippet.get("channelTitle", ""),
             "description": snippet.get("description", ""),
+            "category_id": snippet.get("categoryId", ""),
         }
     except Exception as e:
         logger.warning(f"YouTube Data API orqali metadata olishda xatolik ({e}) — yt-dlp'ga tushilmoqda.")

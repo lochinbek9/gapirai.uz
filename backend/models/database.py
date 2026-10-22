@@ -83,7 +83,7 @@ class DubbingJob(Base):
     # learn/[id]) shu orqali qaysi tahlilni ham poll qilishni biladi. Eski
     # oddiy dublyaj joblarida (yoki /api/learn'dan tashqarida yaratilganlarda)
     # NULL bo'lib qoladi.
-    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id"), nullable=True)
+    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id", ondelete="SET NULL"), nullable=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -95,6 +95,8 @@ class DubbingJob(Base):
     stt_model = Column(String(50), nullable=True)     # STT modeli: gemini-3.8-flash, whisper-1, etc.
     translation_model = Column(String(50), nullable=True)  # Tarjima modeli: gemini-3.8-flash, gpt-4o, etc.
     tts_model = Column(String(50), nullable=True)     # TTS modeli: gemini-3.8-flash-tts, edge-neural, etc.
+    gemini_key_tier = Column(String(20), nullable=True)  # "paid" | "free"
+    gemini_key_used = Column(String(64), nullable=True)  # mask_key (masalan: AQ.Ab8...WaETg)
     status = Column(Enum(JobStatus, values_callable=lambda obj: [e.value for e in obj]), default=JobStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
     status_message = Column(String(255))
@@ -252,6 +254,8 @@ class VideoAnalysis(Base):
     # quiz/notes/Q&A kabi "lazy" endpointlar uni qayta hal qilmasdan to'g'ridan-to'g'ri ishlatadi.
     language = Column(String(10), default="uz")
     video_language = Column(String(10), nullable=True)  # Whisper aniqlagan original til kodi
+    gemini_key_tier = Column(String(20), nullable=True)  # "paid" | "free"
+    gemini_key_used = Column(String(64), nullable=True)  # mask_key (masalan: AQ.Ab8...WaETg)
 
     status = Column(Enum(AnalysisStatus, values_callable=lambda obj: [e.value for e in obj]), default=AnalysisStatus.PENDING, nullable=False)
     progress = Column(Float, default=0.0)
@@ -533,4 +537,33 @@ def create_tables():
         pass
     # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
+
+    # 2026-10-22: dubbing_jobs.linked_analysis_id FK bo'yicha ON DELETE SET NULL ta'minlash
+    if engine.dialect.name == "postgresql":
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints 
+                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'dubbing_jobs_linked_analysis_id_fkey'
+                        ) THEN
+                            ALTER TABLE dubbing_jobs DROP CONSTRAINT dubbing_jobs_linked_analysis_id_fkey;
+                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
+                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
+                        ELSIF EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints 
+                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'fk_dubbing_jobs_linked_analysis_id'
+                        ) THEN
+                            ALTER TABLE dubbing_jobs DROP CONSTRAINT fk_dubbing_jobs_linked_analysis_id;
+                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
+                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                """))
+        except Exception:
+            pass
+
 

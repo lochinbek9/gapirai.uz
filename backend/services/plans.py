@@ -35,6 +35,32 @@ def is_user_admin(db, user_id) -> bool:
     except Exception:
         return False
 
+
+def is_user_paid_tier(db, user_id) -> bool:
+    """Tekshiradi: foydalanuvchi HAQIQATDA pullik tarifdami (Standard/Pro),
+    yoki qo'shimcha sotib olingan daqiqalari bormi, yoki adminmi.
+    Bepul tarifdagi (PlanTier.FREE) foydalanuvchilar oylik 5 daqiqa bepul kvotasini
+    ishlatsa ham, bu funksiya FALSE qaytaradi (ular bepul hisoblanadi)."""
+    if not user_id:
+        return False
+    try:
+        if is_user_admin(db, user_id):
+            # Admin o'zi tanlagan rejimga qaraydi:
+            # Agar admin "bepul" tanlagan bo'lsa (default) -> pullik kalitga tegilmaydi (False)
+            # Agar admin "pullik" tanlagan bo'lsa -> pullik kalit ishlatiladi (True)
+            from backend.services.gemini_quota_manager import get_admin_gemini_mode
+            return get_admin_gemini_mode() == "paid"
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if not sub:
+            return False
+        if sub.plan != PlanTier.FREE:
+            return True
+        if getattr(sub, "purchased_minutes", 0) and float(sub.purchased_minutes) > 0:
+            return True
+        return False
+    except Exception:
+        return False
+
 QUOTA_RESET_DAYS = 30  # oylik daqiqa kvotasi har doim shuncha kunda qayta boshlanadi
 
 # Bitta job uchun maksimal video davomiyligi (daqiqa) — barcha tariflar uchun
@@ -72,6 +98,144 @@ LEGACY_MINUTE_PACKS: dict[int, int] = {
     120: 45_000,
     300: 100_000,
 }
+
+FIRST_VIDEO_DISCOUNT_PERCENT = 10
+FIRST_VIDEO_DISCOUNT_HOURS = 24
+
+
+def get_user_first_video_discount(db, user_id) -> dict:
+    """Ilk videosi muvaffaqiyatli tugagan foydalanuvchilar uchun 24 soatlik 10% chegirma holatini tekshiradi.
+    - Foydalanuvchining ilk COMPLETED bo'lgan DubbingJob'ini topadi.
+    - completed_at dan boshlab 24 soat vaqt beriladi.
+    - Agar 24 soat ichida bo'lsa: active=True, percent=10, expires_at, seconds_left.
+    - Agar 24 soat o'tgan bo'lsa: active=False, expired=True.
+    - Agar birorta ham videosi tugallanmagan bo'lsa: eligible=False.
+    """
+    if not user_id:
+        return {
+            "eligible": False,
+            "active": False,
+            "expired": False,
+            "percent": 0,
+            "seconds_left": 0,
+            "expires_at": None,
+            "first_job_id": None,
+        }
+    try:
+        from backend.models.database import DubbingJob, JobStatus, Subscription, PlanTier, User
+        from backend.models.payment import Payment, PaymentStatus
+        from backend.services.timezone_utils import to_tashkent_iso
+
+        # 1. Admin yoki ichki test xodimi bo'lsa chegirma takliflari ko'rsatilmaydi
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and (user.role == "admin" or getattr(user, "is_internal", False)):
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        # 2. Agar foydalanuvchida allaqachon pullik obuna bo'lsa (Standard, Pro)
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if sub and sub.plan != PlanTier.FREE:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        # 3. Agar foydalanuvchi allaqachon biror muvaffaqiyatli to'lov qilgan bo'lsa (pullik mijoz)
+        has_paid = db.query(Payment).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+        ).first() is not None
+        if has_paid:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        first_job = (
+            db.query(DubbingJob)
+            .filter(
+                DubbingJob.user_id == user_id,
+                DubbingJob.status == JobStatus.COMPLETED,
+            )
+            .order_by(DubbingJob.completed_at.asc(), DubbingJob.created_at.asc())
+            .first()
+        )
+        if not first_job:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        base_time = first_job.completed_at or first_job.created_at
+        if not base_time:
+            return {
+                "eligible": False,
+                "active": False,
+                "expired": False,
+                "percent": 0,
+                "seconds_left": 0,
+                "expires_at": None,
+                "first_job_id": None,
+            }
+
+        expires_at = base_time + timedelta(hours=FIRST_VIDEO_DISCOUNT_HOURS)
+        now_utc = datetime.utcnow()
+        is_active = now_utc < expires_at
+        seconds_left = max(0, int((expires_at - now_utc).total_seconds()))
+
+        # Faqat chegirma tugaganidan keyingi 7 kun ichida "chegirmaga ulgurmagan" sifatida ko'rsatiladi
+        is_recently_expired = (not is_active) and (now_utc < expires_at + timedelta(days=7))
+
+        return {
+            "eligible": is_active or is_recently_expired,
+            "active": is_active,
+            "expired": is_recently_expired,
+            "percent": FIRST_VIDEO_DISCOUNT_PERCENT if is_active else 0,
+            "seconds_left": seconds_left,
+            "expires_at": to_tashkent_iso(expires_at),
+            "first_job_id": str(first_job.id),
+        }
+    except Exception:
+        return {
+            "eligible": False,
+            "active": False,
+            "expired": False,
+            "percent": 0,
+            "seconds_left": 0,
+            "expires_at": None,
+            "first_job_id": None,
+        }
+
+
+def apply_user_discount(db, user_id, amount: int) -> tuple[int, bool]:
+    """Agar foydalanuvchida 24 soatlik 10% chegirma faol bo'lsa, narxga chegirma qo'llaydi."""
+    disc = get_user_first_video_discount(db, user_id)
+    if disc.get("active"):
+        discounted = int(round(amount * (1.0 - (FIRST_VIDEO_DISCOUNT_PERCENT / 100.0))))
+        return max(1000, discounted), True
+    return amount, False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Celery navbat arxitekturasi (2026-10-16 qayta ishlandi)
@@ -182,13 +346,46 @@ def get_max_resolution_for_job(db, job) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
+LEGACY_TTS_CUTOFF = datetime(2026, 10, 22, 14, 0, 0)  # 2026-10-22 gacha paket/tarif olgan eski mijozlar
+
+
+def is_legacy_paid_customer(db, user_id) -> bool:
+    """2026-10-22 14:00 gacha paket yoki tarif xarid qilgan mavjud mijozlar.
+    Ular uchun Variant A (Edge TTS -> Azure zaxira) saqlanadi.
+    """
+    if not user_id:
+        return False
+    try:
+        from backend.models.payment import Payment, PaymentStatus
+        has_old_payment = db.query(Payment.id).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+            Payment.created_at < LEGACY_TTS_CUTOFF
+        ).first() is not None
+        if has_old_payment:
+            return True
+
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if sub and getattr(sub, "created_at", None) and sub.created_at < LEGACY_TTS_CUTOFF:
+            if sub.purchased_minutes > 0 or sub.plan in (PlanTier.STANDARD, PlanTier.PRO):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def get_tts_provider_for_job(db, job) -> str:
-    """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
-    Default tanlov barcha foydalanuvchilar uchun — gemini.
+    """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi:
+    1. Agar job.tts_provider qo'lda (admin yoki API orqali) ko'rsatilgan bo'lsa — o'sha ishlatiladi.
+    2. Agar foydalanuvchi 2026-10-22 gacha xarid qilgan eski mijoz bo'lsa — 'edge' (Variant A: Edge -> Azure).
+    3. Qolgan barcha holatlar (yangi xaridlar, yangi ro'yxatdan o'tganlar, preview bepul foydalanuvchilar) — 'gemini' (Pullik Gemini TTS).
     """
     tts = getattr(job, "tts_provider", None)
     if isinstance(tts, str) and tts.strip():
         return tts.lower().strip()
+
+    if getattr(job, "user_id", None) and is_legacy_paid_customer(db, job.user_id):
+        return "edge"
 
     return "gemini"
 
@@ -260,27 +457,6 @@ def get_minute_balance(db, user_id) -> dict:
       "total_available": float,    # monthly_remaining + purchased
     }
     """
-    if is_user_admin(db, user_id):
-        sub = get_or_create_subscription(db, user_id)
-        from backend.models.database import DubbingJob, JobStatus
-        from sqlalchemy import func
-        q = db.query(func.coalesce(func.sum(DubbingJob.video_duration), 0.0)).filter(
-            DubbingJob.user_id == user_id,
-            DubbingJob.status == JobStatus.COMPLETED
-        )
-        if sub.period_started_at:
-            q = q.filter(DubbingJob.created_at >= sub.period_started_at)
-        actual_sec = q.scalar() or 0.0
-        used = actual_sec / 60.0 if actual_sec > 0 else (sub.monthly_minutes_used or 0.0)
-        purchased = sub.purchased_minutes or 0.0
-        return {
-            "is_unlimited": True,
-            "monthly_cap": 999999.0,
-            "monthly_used": round(used, 1),
-            "monthly_remaining": 999999.0,
-            "purchased": round(purchased, 1),
-            "total_available": 999999.0,
-        }
     sub = get_or_create_subscription(db, user_id)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -304,8 +480,6 @@ def check_quota(db, user_id, duration_minutes: float) -> tuple[bool, int]:
     - covered=False -> shortfall_minutes = yetishmayotgan daqiqa (butun songa
       yaxlitlangan) -- frontend "Buy additional minutes" CTA'sida ko'rsatiladi
     """
-    if is_user_admin(db, user_id):
-        return True, 0
     bal = get_minute_balance(db, user_id)
     if duration_minutes <= bal["total_available"] + 1e-6:
         return True, 0
@@ -319,8 +493,6 @@ def check_and_consume_quota(db, user_id, duration_minutes: float) -> tuple[bool,
 
     Returns: (covered, shortfall_minutes)
     """
-    if is_user_admin(db, user_id):
-        return True, 0
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -346,8 +518,6 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
     """Video navbatga qo'yilganda chaqiriladi -- avval oylik byudjetdan,
     yetmasa sotib olingan daqiqalardan yechadi. Poyga xavfsizligi uchun
     for_update bilan qatorni qulflaydi."""
-    if is_user_admin(db, user_id):
-        return
     sub = get_or_create_subscription(db, user_id, for_update=True)
     plan = PLANS[sub.plan.value]
     used = sub.monthly_minutes_used or 0.0
@@ -365,13 +535,12 @@ def consume_quota(db, user_id, duration_minutes: float) -> None:
 def refund_quota(db, user_id, duration_minutes: float) -> None:
     """consume_quota() bilan sarflangan daqiqalarni qaytaradi -- job pipeline
     muvaffaqiyatsiz tugasa (backend/workers/tasks.py) yoki bekor qilinsa.
-    consume'ning teskarisi: avval sotib olingan daqiqalarga (agar shu jobda
-    ishlatilgan bo'lsa), keyin oylikka qaytaradi -- soddaroq qilib, hammasini
-    oylik hisoblagichdan ayiramiz, purchased qoldig'i esa faqat oylik 0'ga
-    yetganda oshadi."""
+    Oylik byudjetdan sarflangan qismini monthly_minutes_used hisoblagichidan ayiramiz.
+    Sotib olingan daqiqalarga (purchased_minutes) faqat va faqat foydalanuvchi
+    haqiqatan to'lov orqali daqiqa sotib olgan bo'lsa va joriy purchased_minutes
+    xarid qilingan limitdan kam bo'lsagina qaytariladi. Hech qachon bepul foydalanuvchiga
+    sun'iy sotib olingan daqiqa qo'shilmaydi!"""
     if not user_id or duration_minutes <= 0:
-        return
-    if is_user_admin(db, user_id):
         return
     sub = get_or_create_subscription(db, user_id, for_update=True)
     used = sub.monthly_minutes_used or 0.0
@@ -379,7 +548,18 @@ def refund_quota(db, user_id, duration_minutes: float) -> None:
     remainder = duration_minutes - give_back_to_monthly
     sub.monthly_minutes_used = max(0.0, used - give_back_to_monthly)
     if remainder > 0:
-        sub.purchased_minutes = (sub.purchased_minutes or 0.0) + remainder
+        from backend.models.payment import Payment, PaymentStatus
+        approved_payments = db.query(Payment).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+            Payment.minutes_purchased.isnot(None),
+            Payment.minutes_purchased > 0
+        ).all()
+        total_paid_minutes = sum(float(p.minutes_purchased or 0) for p in approved_payments)
+        current_purchased = float(sub.purchased_minutes or 0.0)
+        if total_paid_minutes > 0 and current_purchased < total_paid_minutes:
+            allowed_to_add = min(remainder, total_paid_minutes - current_purchased)
+            sub.purchased_minutes = round(current_purchased + allowed_to_add, 2)
     db.commit()
 
 

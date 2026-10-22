@@ -130,6 +130,7 @@ def _synthesize_text(
     video_id: str | None = None,
     user_id: str | None = None,
     provider_name: str | None = None,
+    is_paid: bool = False,
 ) -> str:
     """
     Matnni audioga aylantiradi.
@@ -170,27 +171,46 @@ def _synthesize_text(
         log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
         return primary.name
 
-    logger.info(f"TTS provider: {primary.name} | chars={len(text)}")
+    logger.info(f"TTS provider: {primary.name} | chars={len(text)} | is_paid={is_paid}")
 
     try:
-        if primary.synthesize(text, output_path, voice_name=voice_name):
+        synth_kwargs = {"voice_name": voice_name}
+        if primary.name == "gemini":
+            synth_kwargs["is_paid"] = is_paid
+        if primary.synthesize(text, output_path, **synth_kwargs):
             log_tts_usage(primary, text, output_path, video_id=video_id, user_id=user_id)
             return primary.name
     except PermanentTTSError as exc:
         logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
         raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    # Gemini TTS kvota yoki rate limit tufayli ishlamasa, butun jarayon to'xtab qolmasligi uchun
-    # ishonchli zaxira (Edge/Azure) orqali ovoz yaratishni davom ettiramiz:
-    if primary.name == "gemini" or provider_name == "gemini":
-        logger.warning(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — zaxira provayderga (Edge/Azure) xavfsiz fallback qilinmoqda.")
-
-    # --- Fallback zanjiri: Azure (kalit mavjud bo'lsa), so'ng har doim tayyor Edge ---
+    # --- Fallback zanjiri: faqat bitta ovoz oilasiga tegishli provayderlar bir-birini sug'urtalaydi ---
+    # Muhim qoida: Gemini ovozi (Charon/Autonoe) bilan Azure/Edge (Sardor/Madina) ovozi mutlaqo
+    # ikki xil odam. Video ichida ovoz o'zgarib ketmasligi uchun Gemini ovozi Azure/Edge ga
+    # fallback qilinmaydi (va aksincha).
     fallback_chain = []
     az = get_provider("azure")
-    if getattr(az, "subscription_key", None) or getattr(az, "key", None):
-        fallback_chain.append("azure")
-    fallback_chain.append("edge")
+    has_azure = az.is_available() if hasattr(az, "is_available") else bool(getattr(settings, "AZURE_SPEECH_KEY", None))
+
+    if primary.name == "edge":
+        # Edge yiqilsa, rasmiy Azure Neural'ga o'tadi (ovoz 100% bir xil: Sardor / Madina)
+        if has_azure:
+            fallback_chain.append("azure")
+    elif primary.name == "azure":
+        # Azure yiqilsa, Edge'ga o'tadi (ovoz 100% bir xil: Sardor / Madina)
+        fallback_chain.append("edge")
+    elif primary.name == "gemini":
+        # Gemini asosiy provayder. Agar barcha Gemini modellari va kalitlari vaqtinchalik
+        # yiqilsa, dublyaj 'TTS_INVALID_AUDIO' bilan to'xtab qolmasligi uchun
+        # ishonchli zaxira sifatida Edge -> Azure ga o'tadi (Madina/Sardor ovozlariga avtomatik xaritlanadi).
+        fallback_chain.append("edge")
+        if has_azure:
+            fallback_chain.append("azure")
+    else:
+        if has_azure:
+            fallback_chain.append("azure")
+        if primary.name != "edge":
+            fallback_chain.append("edge")
 
     for fb_candidate in fallback_chain:
         try:
@@ -198,20 +218,25 @@ def _synthesize_text(
             fb_voice = voice_name
             if fb_candidate in ("azure", "edge"):
                 if fb_voice not in ("uz-UZ-MadinaNeural", "uz-UZ-SardorNeural"):
-                    if fb_voice and any(f in fb_voice.lower() for f in ["female", "madina", "autonoe", "aoede", "kore"]):
+                    if fb_voice and any(f in str(fb_voice).lower() for f in ["female", "madina", "autonoe", "aoede", "kore"]):
                         fb_voice = "uz-UZ-MadinaNeural"
                     else:
                         fb_voice = "uz-UZ-SardorNeural"
+            elif fb_candidate == "gemini":
+                if fb_voice in ("uz-UZ-MadinaNeural", "uz-UZ-SardorNeural") or not fb_voice:
+                    fb_voice = "Autonoe" if fb_voice == "uz-UZ-MadinaNeural" else "Charon"
+
             if get_cached(text, fb_voice, fallback.name, output_path):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id, cache_hit=True)
                 return fallback.name
-            if fallback.synthesize(text, output_path, voice_name=fb_voice):
+            fb_kwargs = {"voice_name": fb_voice}
+            if fallback.name == "gemini":
+                fb_kwargs["is_paid"] = is_paid
+            if fallback.synthesize(text, output_path, **fb_kwargs):
                 log_tts_usage(fallback, text, output_path, video_id=video_id, user_id=user_id)
                 return fallback.name
         except PermanentTTSError as exc:
             logger.error(f"{fb_candidate} fallback doimiy xatolik: {exc}")
-        except Exception as exc:
-            logger.warning(f"{fb_candidate} fallback muvaffaqiyatsiz: {exc}")
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 
@@ -247,6 +272,7 @@ def synthesize_segments(
     existing_qa: dict | None = None,
     progress_cb=None,
     provider_name: str | None = None,
+    is_paid: bool = False,
 ) -> tuple[str, list[dict], dict]:
     """
     Har bir segmentni to'liq matn bilan ovozga aylantirish.
@@ -339,6 +365,14 @@ def synthesize_segments(
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         engine = "unknown"
+        def _call_synth() -> str:
+            try:
+                return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
+            except TypeError as te:
+                if "is_paid" in str(te):
+                    return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                raise
+
         # Checkpoint reuse: agar ushbu segment audio fayli diskda allaqachon mavjud va yaroqli bo'lsa,
         # API'ga qayta so'rov yuborilmaydi (qimmatli kvotani tejaydi va tez tugatadi):
         if seg_file.exists() and seg_file.stat().st_size > 500 and _validate_wav_file(str(seg_file))[0]:
@@ -348,7 +382,7 @@ def synthesize_segments(
             engine = get_provider(provider_name).name
         else:
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                engine = _call_synth()
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: dastlabki sintezda xatolik: {exc}")
                 engine = get_provider(provider_name).name
@@ -365,7 +399,7 @@ def synthesize_segments(
                 f"qayta sintez qilinmoqda (urinish {attempts}/{_WAV_MAX_VALIDATION_RETRIES})."
             )
             try:
-                engine = _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                engine = _call_synth()
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))
@@ -396,11 +430,11 @@ def synthesize_segments(
             "seg_id": seg["id"],
         })
 
-    # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit) —
-    # juda ko'p parallel oqim ba'zi segmentlarni Edge TTS'ga (boshqa ovozga)
-    # "fallback" qilib qo'yishi mumkin edi, natijada bitta dublyajda ikki xil
-    # odam ovozi eshitilardi. 5 oqim boshqa bosqichlar bilan mos va xavfsiz.
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit: 5).
+    # Edge TTS va Azure esa yuqori parallellikni muammosiz ko'tara oladi,
+    # shu sababli 8 ta oqim orqali sintez qilish vaqti 40-50% ga qisqaradi.
+    synth_workers = 8 if (provider_name in ("edge", "azure") or settings.FREE_MODE) else 5
+    with ThreadPoolExecutor(max_workers=synth_workers) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
     # Tuzatib bo'lmagan segmentlar (yuqoridagi "__failed__" sentinel) --

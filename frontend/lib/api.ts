@@ -22,6 +22,8 @@ export interface VideoInfo {
 
 export interface Job {
   job_id: string
+  id?: string
+  updated_at?: string
   status: JobStatus
   progress: number
   status_message?: string
@@ -39,6 +41,10 @@ export interface Job {
   speaker_gender?: string
   uzbek_srt_content?: string
   expected_end_time?: string
+  can_refund_on_cancel?: boolean
+  cancel_refund_seconds_left?: number
+  initial_stage?: string | null
+  current_stage?: string | null
   rating?: number
   feedback_comment?: string
   content_flagged?: boolean
@@ -65,6 +71,48 @@ export interface Job {
   translation_model?: string | null
   tts_model?: string | null
   is_preview?: boolean
+  costs?: {
+    stt_cost_usd: number
+    llm_cost_usd: number
+    tts_cost_usd: number
+    total_cost_usd: number
+    total_cost_uzs: number
+    cost_per_minute_uzs: number
+  }
+  user_info?: JobUserInfo | null
+  discount_offer?: JobDiscountOffer | null
+}
+
+export interface JobDiscountOffer {
+  eligible: boolean
+  active: boolean
+  expired: boolean
+  percent: number
+  seconds_left: number
+  expires_at: string | null
+  first_job_id: string | null
+}
+
+export interface JobUserInfo {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  telegram_chat_id?: string | null
+  auth_provider?: string
+  role?: string
+  is_internal?: boolean
+  plan?: string
+  plan_expires_at?: string | null
+  minutes?: MinuteBalance | null
+  created_at?: string | null
+  last_active_at?: string | null
+  jobs_count?: number
+  completed_jobs_count?: number
+  payments_total_uzs?: number
+  payments_count?: number
+  anonymous?: boolean
+  error?: string
 }
 
 export type JobStatus =
@@ -329,6 +377,7 @@ export interface PlanDef {
   id: string
   name: string
   price: number
+  discounted_price?: number | null
   monthly_minutes: number
   priority: boolean
   tts_tier: string
@@ -349,6 +398,7 @@ export interface MinuteBalance {
 export interface MinutePack {
   minutes: number
   price: number
+  discounted_price?: number | null
   one_time?: boolean
   already_purchased?: boolean
 }
@@ -372,12 +422,21 @@ export async function getJobsStats(): Promise<JobsStats> {
   return res.data
 }
 
-export async function getPlans(): Promise<{ plans: PlanDef[]; minute_packs: MinutePack[]; current: CurrentSubscription | null }> {
+export async function getPlans(): Promise<{
+  plans: PlanDef[]
+  minute_packs: MinutePack[]
+  current: CurrentSubscription | null
+  discount?: JobDiscountOffer | null
+}> {
   const res = await apiClient.get('/api/plans')
   return res.data
 }
 
-export async function getMinuteBalance(): Promise<{ balance: MinuteBalance; packs: MinutePack[] }> {
+export async function getMinuteBalance(): Promise<{
+  balance: MinuteBalance
+  packs: MinutePack[]
+  discount?: JobDiscountOffer | null
+}> {
   const res = await apiClient.get('/api/minutes')
   return res.data
 }
@@ -701,11 +760,13 @@ export interface VideoAnalysis {
   progress: number
   status_message?: string
   youtube_url: string
+  video_url?: string
   video_title?: string
   video_duration?: number
   video_thumbnail?: string
   language: string
   video_language?: string
+  gemini_key_tier?: string
   summary?: VideoAnalysisSummary
   key_points?: KeyPoint[]
   chapters?: Chapter[]
@@ -716,10 +777,15 @@ export interface VideoAnalysis {
   error_message?: string
   error_code?: string
   created_at?: string
+  linked_job_id?: string | null
 }
 
-export async function createAnalysis(youtube_url: string, language: string = 'uz'): Promise<{ analysis_id: string; status: string }> {
-  const res = await apiClient.post('/api/video-analysis', { youtube_url, language })
+export async function createAnalysis(
+  youtube_url: string,
+  language: string = 'uz',
+  job_id?: string
+): Promise<{ analysis_id: string; status: string }> {
+  const res = await apiClient.post('/api/video-analysis', { youtube_url, language, job_id })
   return res.data
 }
 
@@ -743,6 +809,21 @@ export async function retryAnalysis(analysisId: string): Promise<{ analysis_id: 
   return res.data
 }
 
+export async function cancelAnalysis(analysisId: string): Promise<{ analysis_id: string; status: string; message?: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/cancel`)
+  return res.data
+}
+
+export async function adminCancelJob(jobId: string): Promise<{ status: string; message: string }> {
+  const res = await apiClient.post(`/api/admin/jobs/${jobId}/cancel`)
+  return res.data
+}
+
+export async function adminCancelAnalysis(analysisId: string): Promise<{ status: string; message: string }> {
+  const res = await apiClient.post(`/api/admin/analyses/${analysisId}/cancel`)
+  return res.data
+}
+
 export async function getTranscript(analysisId: string): Promise<{ segments: TranscriptSegment[] }> {
   const res = await apiClient.get(`/api/video-analysis/${analysisId}/transcript`)
   return res.data
@@ -758,8 +839,8 @@ export async function generateQuiz(analysisId: string): Promise<{ quiz: QuizQues
   return res.data
 }
 
-export async function generateNotes(analysisId: string): Promise<{ notes: string }> {
-  const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes`)
+export async function generateNotes(analysisId: string, force: boolean = false): Promise<{ notes: string }> {
+  const res = await apiClient.post(`/api/video-analysis/${analysisId}/notes${force ? "?force=true" : ""}`)
   return res.data
 }
 

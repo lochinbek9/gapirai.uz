@@ -2,19 +2,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  ArrowLeft, Youtube, ChevronDown, ChevronUp,
+  ArrowLeft, ArrowRight, Youtube, ChevronDown, ChevronUp,
   Mic2, Clock, Loader2, CreditCard, AlertTriangle, Copy, Check, RotateCw,
-  MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles
+  MicOff, ShieldAlert, X, CircleSlash, Download, Sparkles, Gift
 } from 'lucide-react'
 import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
+import ConfirmModal from '@/components/ConfirmModal'
+import FirstVideoDiscountModal from '@/components/FirstVideoDiscountModal'
 import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
@@ -44,16 +46,47 @@ function formatRemainingTime(seconds: number): string {
   return `${s} soniya`
 }
 
-function getElapsedSeconds(job?: Job | null, currentTime?: number): number {
-  if (!job?.created_at) return 0
-  const start = parseApiDate(job.created_at)?.getTime() ?? 0
-  if (!start) return 0
-  return Math.max(0, Math.floor(((currentTime || Date.now()) - start) / 1000))
+function getElapsedSeconds(job?: Job | null, currentTime?: number, sessionStartTime?: number): number {
+  if (!job) return 0
+  const now = currentTime || Date.now()
+
+  // 1. Agar updated_at mavjud bo'lsa va 1 soatdan kam vaqt oldin bo'lsa:
+  if (job.updated_at) {
+    const upd = parseApiDate(job.updated_at)?.getTime() ?? 0
+    const diffUpd = (now - upd) / 1000
+    if (upd > 0 && diffUpd >= 0 && diffUpd < 3600) {
+      return Math.floor(diffUpd)
+    }
+  }
+
+  // 2. created_at tekshiruvi:
+  if (job.created_at) {
+    const start = parseApiDate(job.created_at)?.getTime() ?? 0
+    const diff = (now - start) / 1000
+    // Agar yaratilganiga 1 soatdan ko'p bo'lmagan bo'lsa, created_at'dan hisoblaymiz:
+    if (start > 0 && diff >= 0 && diff < 3600) {
+      return Math.floor(diff)
+    }
+  }
+
+  // 3. Agar video bir necha kun/soat oldin yaratilgan bo'lib, hozir qayta ishlanayotgan bo'lsa:
+  // noo'rin 9869:29 ko'rinmasligi uchun joriy sahifa sessiyasi / retry boshlangan vaqtdan hisoblanadi!
+  if (sessionStartTime) {
+    const sessionDiff = Math.floor((now - sessionStartTime) / 1000)
+    return Math.max(0, sessionDiff)
+  }
+
+  return 0
 }
 
 function formatElapsedTimer(seconds: number): string {
-  const m = Math.floor(seconds / 60)
+  if (!seconds || seconds <= 0) return '00:00'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
+  if (h > 0) {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
@@ -199,17 +232,48 @@ export default function VideoPage() {
   const [showSrtModal, setShowSrtModal] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
+  const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
   const [retryLoading, setRetryLoading] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
   const [regenProvider, setRegenProvider] = useState<'gemini' | 'edge' | 'azure'>('gemini')
   const [regenGender, setRegenGender] = useState<'male' | 'female'>('male')
   const [regenLoading, setRegenLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const sessionStartRef = useRef<number>(Date.now())
   const [isCopied, setIsCopied] = useState(false)
   const [isEnCopied, setIsEnCopied] = useState(false)
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+
+  const [showDiscountModal, setShowDiscountModal] = useState(false)
+  const [hasDismissedDiscount, setHasDismissedDiscount] = useState(false)
+  const [userEmailCopied, setUserEmailCopied] = useState(false)
+
+  const handleStartAnalysis = async () => {
+    if (job?.linked_analysis_id) {
+      router.push(`/video-analysis/${job.linked_analysis_id}`)
+      return
+    }
+    if (!job?.youtube_url && !job?.id) return
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+      return
+    }
+    setAnalysisLoading(true)
+    setAnalysisError(null)
+    try {
+      const { analysis_id } = await createAnalysis(job.youtube_url || `upload://${job.id}`, 'uz', job.id)
+      saveAnalysisId(analysis_id)
+      router.push(`/video-analysis/${analysis_id}`)
+    } catch (err: any) {
+      setAnalysisError(err?.response?.data?.detail || "Tahlilni boshlashda xatolik yuz berdi. Qayta urinib ko'ring.")
+      setAnalysisLoading(false)
+    }
+  }
 
   const job = polledJob
 
@@ -227,6 +291,27 @@ export default function VideoPage() {
       }
     }
   }, [job?.tts_provider, job?.speaker_gender])
+
+  useEffect(() => {
+    if (job?.status === 'completed' && job?.discount_offer?.active) {
+      const storageKey = `dismissed_discount_${job.job_id || id}`
+      const isDismissed = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null
+      if (!isDismissed && !hasDismissedDiscount) {
+        const timer = setTimeout(() => {
+          setShowDiscountModal(true)
+        }, 2000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [job?.status, job?.discount_offer?.active, job?.job_id, id, hasDismissedDiscount])
+
+  const handleCloseDiscountModal = () => {
+    setShowDiscountModal(false)
+    setHasDismissedDiscount(true)
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`dismissed_discount_${job?.job_id || id}`, '1')
+    }
+  }
 
   const handleGoHome = () => {
     clearJobId()
@@ -263,19 +348,25 @@ export default function VideoPage() {
     }
   }
 
-  const handleCancel = async () => {
+  const handleOpenCancel = () => {
+    setConfirmCancelOpen(true)
+  }
+
+  const handleExecuteCancel = async () => {
     if (!id) return
-    if (!window.confirm("Rostdan ham ushbu dublyajni bekor qilmoqchimisiz?")) return
     setCancelLoading(true)
     try {
       const res = await cancelJob(id)
       if (res.success) {
+        setConfirmCancelOpen(false)
         window.location.reload()
       } else {
-        alert(res.message || "Bekor qilishda xatolik yuz berdi.")
+        setToast({ type: 'error', message: res.message || "Bekor qilishda xatolik yuz berdi." })
+        setConfirmCancelOpen(false)
       }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi.")
+      setToast({ type: 'error', message: err?.response?.data?.detail || "Bekor qilishda xatolik yuz berdi." })
+      setConfirmCancelOpen(false)
     } finally {
       setCancelLoading(false)
     }
@@ -424,6 +515,30 @@ export default function VideoPage() {
         </div>
       </header>
 
+      {/* Toast Alert */}
+      {toast && (
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-4">
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+              toast.type === "error"
+                ? "bg-rose-950/80 border-rose-500/40 text-rose-200"
+                : "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <p className="text-xs sm:text-sm font-semibold">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={theaterMode ? 'w-full' : 'max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8'}>
         <div className={theaterMode
           ? 'flex flex-col gap-0'
@@ -433,6 +548,36 @@ export default function VideoPage() {
           <div className={theaterMode ? 'w-full' : 'lg:col-span-2 space-y-4'}>
             {job.status === 'completed' ? (
               <div className="space-y-4">
+                {/* 10% First Video Welcome Discount Banner */}
+                {job.discount_offer?.active && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-indigo-500/15 to-purple-500/20 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                        <Gift className="w-5 h-5 animate-bounce" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                            Maxsus Taklif • 10% Chegirma
+                          </span>
+                          <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-300 font-mono font-bold">
+                            24 SOAT
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
+                          Ilk videongiz tayyor bo&apos;ldi! Barcha paketlar va tariflarga 10% chegirmadan foydalaning.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowDiscountModal(true)}
+                      className="w-full sm:w-auto py-2 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-gray-950 font-bold text-xs shadow-md transition-all shrink-0 cursor-pointer text-center"
+                    >
+                      Chegirmani olish ⚡
+                    </button>
+                  </div>
+                )}
+
                 {job.is_preview && (
                   <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-600/15 via-purple-600/10 to-indigo-600/15 border border-violet-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
                     <div className="flex items-center gap-2.5">
@@ -681,21 +826,12 @@ export default function VideoPage() {
                         Ushbu video YouTube himoyasi bilan cheklangan
                       </h3>
                       <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                        YouTube bot himoyasi (Sign-in check), yosh chegarasi yoki hududiy cheklov sababli videoni avtomatik yuklab bo&apos;lmadi.
-                        Lekin dublyaj qilishning 2 ta oson va kafolatlangan usuli bor:
+                        Videoni to&apos;g&apos;ridan-to&apos;g&apos;ri fayl sifatida yuklab dublyajni davom ettirishingiz mumkin:
                       </p>
                     </div>
 
-                    {/* Solution 1: Direct File Upload */}
-                    <div className="max-w-md w-full bg-black/[0.02] dark:bg-white/[0.02] p-4 rounded-2xl border border-black/5 dark:border-white/10 space-y-3">
-                      <div className="text-left">
-                        <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                          <span>📁 1-Yechim:</span> Videoni fayl sifatida yuklash (100% ishlaydi)
-                        </div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                          Faylni to&apos;g&apos;ridan-to&apos;g&apos;ri yuklaganda YouTube blokirovkalari umuman bo&apos;lmaydi.
-                        </div>
-                      </div>
+                    {/* Direct File Upload */}
+                    <div className="max-w-md w-full">
                       <UploadRecoveryPrompt jobId={id} />
                     </div>
 
@@ -761,7 +897,7 @@ export default function VideoPage() {
               );
             })() : (() => {
               const activeStage = getActivePipelineStage(job);
-              const elapsedSec = getElapsedSeconds(job, currentTime);
+              const elapsedSec = getElapsedSeconds(job, currentTime, sessionStartRef.current);
               const isQueued = job.status === 'pending' || (job.progress || 0) <= 0;
 
               const stages = [
@@ -777,7 +913,7 @@ export default function VideoPage() {
                     {/* Yuqori xotirjam ko'rsatkich (Ko'zni charchatadigan aylanuvchi spinnerlarsiz) */}
                     <div className="flex items-center justify-between px-2 text-xs">
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold shadow-sm">
-                        <span className={`w-2 h-2 rounded-full ${isQueued ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                        <span className={`w-2 h-2 rounded-full ${isQueued ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`} />
                         <span>{isQueued ? "Navbatda turibdi" : "Sun'iy intellekt ishlamoqda"}</span>
                       </div>
                       
@@ -818,14 +954,19 @@ export default function VideoPage() {
                         )}
                       </div>
 
-                      <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative">
+                      <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden relative shadow-inner">
                         {isQueued ? (
-                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-500/20 via-violet-500/40 to-indigo-500/20" />
+                          <div className="h-full w-full rounded-full bg-gradient-to-r from-violet-500/20 via-violet-500/50 to-indigo-500/20 relative overflow-hidden animate-pulse">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                          </div>
                         ) : (
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-emerald-500 transition-[width] duration-700 ease-out shadow-sm"
+                            className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-emerald-500 transition-[width] duration-700 ease-out shadow-sm relative overflow-hidden"
                             style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
-                          />
+                          >
+                            {/* Harakatlanuvchi jonli nur (shimmer animation) */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -842,7 +983,7 @@ export default function VideoPage() {
                               isDone
                                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                                 : isCurrent
-                                ? 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200 ring-2 ring-violet-500/20 shadow-sm'
+                                ? 'border-violet-500/60 bg-violet-500/20 text-violet-800 dark:text-violet-200 ring-2 ring-violet-500/30 shadow-md shadow-violet-500/10'
                                 : 'border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] text-gray-400 dark:text-gray-500 opacity-60'
                             }`}
                           >
@@ -851,7 +992,10 @@ export default function VideoPage() {
                               {isDone ? (
                                 <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">✓ Tayyor</span>
                               ) : isCurrent ? (
-                                <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 bg-violet-500/20 px-1.5 py-0.5 rounded-full">Bajarilmoqda</span>
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-500/25 px-2 py-0.5 rounded-full border border-violet-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
+                                  <span>Bajarilmoqda</span>
+                                </span>
                               ) : (
                                 <span className="text-[10px] text-gray-400">Kutilmoqda</span>
                               )}
@@ -880,7 +1024,7 @@ export default function VideoPage() {
 
                     <div className="pt-1">
                       <button
-                        onClick={handleCancel}
+                        onClick={handleOpenCancel}
                         disabled={cancelLoading}
                         className="glass-input hover:text-red-600 dark:hover:text-red-400 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition duration-200 disabled:opacity-50 border border-gray-200/60 dark:border-white/10"
                       >
@@ -919,6 +1063,63 @@ export default function VideoPage() {
                   )}
                 </div>
               </div>
+
+              {/* ── AI Video Tahlili Lead Magnet Banner ── */}
+              {job.status === 'completed' && Boolean(job.youtube_url || job.linked_analysis_id) && (
+                <div className="p-4 sm:p-5 rounded-[24px] bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-purple-600/15 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl shadow-blue-500/5">
+                  <div className="space-y-2 text-center md:text-left max-w-2xl">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" /> AI Video Tahlili
+                      </span>
+                      <span className="text-[11px] text-indigo-600 dark:text-indigo-300 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                        ⚡ 15-20 soniyada tayyor
+                      </span>
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        📝 Konspekt + Testlar
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">
+                      Ushbu videoni sun&apos;iy intellekt orqali tahlil qilishni xohlaysizmi?
+                    </h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                      Videoni to&apos;liq ko&apos;rishga vaqt ketkazmasdan uning qisqa xulosasi, <strong className="text-blue-600 dark:text-blue-400">5 daqiqalik darsligi</strong>, to&apos;liq konspekti (notes) hamda bilimlarni mustahkamlash uchun <strong className="text-purple-600 dark:text-purple-400">test savollarini (quiz)</strong> oling!
+                    </p>
+                    {analysisError && (
+                      <p className="text-xs font-semibold text-red-500 dark:text-red-400 pt-1">
+                        {analysisError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                    <button
+                      onClick={handleStartAnalysis}
+                      disabled={analysisLoading}
+                      className="btn-premium w-full md:w-auto px-5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      {analysisLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Tahlil boshlanmoqda...</span>
+                        </>
+                      ) : job.linked_analysis_id ? (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Tayyor tahlilni ko&apos;rish</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Videoni tahlil qilish</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {job.status === 'completed' && job.content_flagged && (
                 <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-5 py-4">
@@ -1144,12 +1345,12 @@ export default function VideoPage() {
                   <InfoRow label="Subtitr" value="✅ Mavjud (To'liq matn pastda)" />
                 )}
 
-                {/* Admin-only AI models breakdown */}
+                {/* Admin-only AI models breakdown & Real Costs */}
                 {isAdmin && (
                   <div className="mt-4 pt-3 border-t border-amber-500/20 bg-amber-500/5 -mx-5 -mb-5 p-4 rounded-b-[24px] space-y-2.5">
                     <div className="flex items-center justify-between text-xs font-bold text-amber-500 uppercase tracking-wider">
                       <span className="flex items-center gap-1.5">
-                        <span>🛠</span> AI Modellar (Admin)
+                        <span>🛠</span> AI Modellar & Real Xarajat (Admin)
                       </span>
                       <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-300 font-mono font-bold">
                         ADMIN
@@ -1170,9 +1371,231 @@ export default function VideoPage() {
                           : '— (eski job)'))
                       }
                     />
+
+                    {/* Real Xarajat (Tannarx) */}
+                    {(() => {
+                      const durSec = job.video_duration || 0
+                      const durMin = durSec / 60
+                      const chars = job.translated_text ? job.translated_text.length : Math.round(durMin * 1000)
+                      const sttUsd = job.costs?.stt_cost_usd ?? 0.0
+                      const llmUsd = job.costs?.llm_cost_usd ?? (durSec > 0 ? Number(((chars / 1000) * 0.0005).toFixed(4)) : 0)
+                      const ttsProv = (job.tts_provider || (job.tts_model?.toLowerCase().includes('edge') ? 'edge' : job.tts_model?.toLowerCase().includes('azure') ? 'azure' : 'gemini')).toLowerCase()
+                      const isEdge = ttsProv === 'edge' || Boolean(job.tts_model?.toLowerCase().includes('edge'))
+                      const ttsUsd = isEdge ? 0.0 : (job.costs?.tts_cost_usd ?? (
+                        ttsProv === 'gemini'
+                          ? Number(((chars / 1000) * 0.017).toFixed(4))
+                          : ttsProv === 'azure'
+                          ? Number(((chars / 1000) * 0.016).toFixed(4))
+                          : 0.0
+                      ))
+                      const totalUsd = job.costs?.total_cost_usd ?? Number((sttUsd + llmUsd + ttsUsd).toFixed(4))
+                      const totalUzs = isEdge ? Math.round(Number((sttUsd + llmUsd).toFixed(4)) * 12850) : (job.costs?.total_cost_uzs ?? Math.round(totalUsd * 12850))
+                      const perMinUzs = durMin > 0 ? Math.round(totalUzs / durMin) : 0
+
+                      return (
+                        <div className="pt-2.5 mt-2.5 border-t border-amber-500/20 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold text-amber-500">
+                            <span className="flex items-center gap-1">
+                              <span>💰</span> Real Tannarx (Jami):
+                            </span>
+                            <span className="font-mono text-amber-400">
+                              ~{totalUzs.toLocaleString()} UZS (~${totalUsd.toFixed(4)})
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-400 dark:text-gray-300 space-y-1 pl-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">STT (Nutq):</span>
+                              <span className={sttUsd === 0 ? "text-emerald-400 font-semibold" : "text-gray-200"}>
+                                {sttUsd === 0 ? "$0.0000 (Bepul)" : `$${sttUsd.toFixed(4)}`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">Tarjima (LLM):</span>
+                              <span className="text-gray-200">${llmUsd.toFixed(4)} (~{Math.round(llmUsd * 12850)} UZS)</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-500">TTS (Ovoz):</span>
+                              <span className={ttsUsd === 0 ? "text-emerald-400" : "text-amber-300 font-semibold"}>
+                                {ttsUsd === 0 ? "$0.0000 (Edge Bepul)" : `$${ttsUsd.toFixed(4)} (~${Math.round(ttsUsd * 12850)} UZS)`}
+                              </span>
+                            </div>
+                            {durMin > 0 && (
+                              <div className="flex justify-between items-center text-[10px] text-amber-500/90 pt-1 border-t border-amber-500/10">
+                                <span>1 daqiqa tannarxi:</span>
+                                <span className="font-semibold font-mono">~{perMinUzs.toLocaleString()} UZS/daq</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
+
+              {/* Admin-only Video Owner (User) Information Card */}
+              {isAdmin && (
+                <div className="glass-card border border-amber-500/30 rounded-[24px] p-5 space-y-3.5 shadow-xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-500 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <span>👤</span> Video Egasi (Admin)
+                    </span>
+                    <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-300 font-mono font-bold">
+                      ADMIN
+                    </span>
+                  </div>
+
+                  {job.user_info ? (
+                    job.user_info.anonymous ? (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                        <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                          <span>⚠️</span> Anonim Foydalanuvchi
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-gray-300 leading-relaxed">
+                          Ushbu video saytga kirmagan (tizimda ro&apos;yxatdan o&apos;tmagan) mehmon tomonidan bepul sinov sifatida yuborilgan.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        <InfoRow label="Ism-familiya" value={job.user_info.name || '—'} />
+                        {job.user_info.email && (
+                          <div className="flex items-center justify-between py-0.5 text-sm">
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">Email:</span>
+                            <div className="flex items-center gap-1.5">
+                              <a
+                                href={`mailto:${job.user_info.email}`}
+                                className="font-semibold text-blue-400 hover:underline text-xs"
+                              >
+                                {job.user_info.email}
+                              </a>
+                              <button
+                                onClick={() => {
+                                  if (job.user_info?.email) {
+                                    navigator.clipboard.writeText(job.user_info.email)
+                                    setUserEmailCopied(true)
+                                    setTimeout(() => setUserEmailCopied(false), 2000)
+                                  }
+                                }}
+                                title="Emailni nusxalash"
+                                className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition"
+                              >
+                                {userEmailCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {job.user_info.phone && (
+                          <div className="flex items-center justify-between py-0.5 text-sm">
+                            <span className="text-gray-500 dark:text-gray-400 text-xs">Telefon:</span>
+                            <a
+                              href={`tel:${job.user_info.phone}`}
+                              className="font-semibold text-emerald-400 font-mono hover:underline text-xs"
+                            >
+                              {job.user_info.phone}
+                            </a>
+                          </div>
+                        )}
+                        {job.user_info.telegram_chat_id && (
+                          <InfoRow label="Telegram ID" value={job.user_info.telegram_chat_id} />
+                        )}
+                        <InfoRow
+                          label="Tarif (Obuna)"
+                          value={
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              {job.user_info.plan || 'Free'}
+                            </span>
+                          }
+                        />
+                        {job.user_info.minutes && (
+                          <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] font-mono">
+                            <div className="flex justify-between text-gray-400">
+                              <span>Mavjud balans:</span>
+                              <span className="font-bold text-emerald-400">{job.user_info.minutes.total_available} daq</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500 text-[10px]">
+                              <span>Sotib olingan (kuymas):</span>
+                              <span>{job.user_info.minutes.purchased} daq</span>
+                            </div>
+                            <div className="flex justify-between text-gray-500 text-[10px]">
+                              <span>Oylik qolgan:</span>
+                              <span>{job.user_info.minutes.monthly_remaining} / {job.user_info.minutes.monthly_cap} daq</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="pt-2 border-t border-white/5 space-y-1">
+                          <InfoRow
+                            label="Jami videolari"
+                            value={`${job.user_info.jobs_count ?? 0} ta (${job.user_info.completed_jobs_count ?? 0} tayyor)`}
+                          />
+                          <InfoRow
+                            label="Jami to'lovlari (LTV)"
+                            value={`~${(job.user_info.payments_total_uzs ?? 0).toLocaleString()} UZS (${job.user_info.payments_count ?? 0} ta)`}
+                          />
+                          {job.user_info.created_at && (
+                            <InfoRow label="Ro'yxatdan o'tgan" value={formatTashkentDateTime(job.user_info.created_at)} />
+                          )}
+                          {job.user_info.last_active_at && (
+                            <InfoRow label="Oxirgi faollik" value={formatTashkentDateTime(job.user_info.last_active_at)} />
+                          )}
+                          <InfoRow label="Kirish usuli" value={job.user_info.auth_provider || 'parol'} />
+                        </div>
+                        <div className="pt-2 mt-2 border-t border-white/10 flex justify-between items-center text-[10px]">
+                          <span className="font-mono text-gray-500">ID: {job.user_info.id.slice(0, 8)}...</span>
+                          <Link
+                            href={`/admin?search=${encodeURIComponent(job.user_info.email || job.user_info.id)}`}
+                            className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 hover:underline"
+                          >
+                            <span>Admin boshqaruvida ochish</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-xs text-gray-400">Foydalanuvchi ma&apos;lumotlari yuklanmoqda...</div>
+                  )}
+                </div>
+              )}
+
+              {/* AI Video Tahlili Sidebar CTA */}
+              {job.status === 'completed' && Boolean(job.youtube_url || job.linked_analysis_id) && (
+                <div className="glass-card border border-blue-500/30 rounded-[24px] p-5 space-y-3 shadow-xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-purple-500/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-blue-500/20 text-blue-500 shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        AI Video Tahlili
+                      </h3>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+                        Konspekt, test va xulosa
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Videoni ko&apos;rish bilan birga uning qisqa darsligi, konspekti va bilimni sinash testini oling.
+                  </p>
+                  <button
+                    onClick={handleStartAnalysis}
+                    disabled={analysisLoading}
+                    className="w-full btn-premium py-2.5 px-4 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+                  >
+                    {analysisLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Ochilmoqda...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{job.linked_analysis_id ? "Tahlilni ochish" : "Tahlil qilish"}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
               {job.transcript_text && (
                 <div className="glass-card border border-gray-200/60 dark:border-white/10 rounded-[24px] p-5 shadow-xl">
@@ -1313,11 +1736,49 @@ export default function VideoPage() {
           </div>
         </div>
       )}
+
+      {/* Modern Cancel Confirmation Modal */}
+      {(() => {
+        const canRefund = job?.can_refund_on_cancel !== undefined
+          ? job.can_refund_on_cancel
+          : (getElapsedSeconds(job, currentTime, sessionStartRef.current) <= 30);
+        const secLeft = job?.cancel_refund_seconds_left !== undefined
+          ? Math.max(0, Math.round(job.cancel_refund_seconds_left))
+          : Math.max(0, 30 - Math.round(getElapsedSeconds(job, currentTime, sessionStartRef.current)));
+        const stageName = job?.initial_stage || "boshlang'ich";
+
+        return (
+          <ConfirmModal
+            isOpen={confirmCancelOpen}
+            onClose={() => setConfirmCancelOpen(false)}
+            onConfirm={handleExecuteCancel}
+            loading={cancelLoading}
+            title="Dublyaj jarayonini bekor qilish"
+            message={
+              !canRefund
+                ? "⚠️ Diqqat: Dublyajning dastlabki bosqichi (30 soniya) yakunlangan yoki keyingi bosqichga o'tib bo'lgan! Server va AI resurslari sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
+                : `Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz? Dastlabki bosqich (${stageName}) vaqti (30 soniya, qolgan vaqt: ${secLeft}s) ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi.`
+            }
+            confirmText={!canRefund ? "Ha, limit qaytarilmasligiga roziman" : "Ha, bekor qilinsin"}
+            cancelText="Ortga (davom ettirish)"
+            danger
+          />
+        );
+      })()}
+
+      {/* 24-Hour 10% Welcome Discount Modal for First Video */}
+      {job?.discount_offer && (
+        <FirstVideoDiscountModal
+          discount={job.discount_offer}
+          isOpen={showDiscountModal}
+          onClose={handleCloseDiscountModal}
+        />
+      )}
     </div>
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between items-start gap-2 text-sm">
       <span className="text-gray-500 dark:text-gray-400">{label}</span>

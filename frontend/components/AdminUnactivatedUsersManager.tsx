@@ -37,6 +37,7 @@ import {
   apiAdminAddMinutes,
 } from '@/lib/admin'
 import { formatTashkentDateTimeObj } from '@/lib/timestamp'
+import DateRangePills, { DateRangeValue } from '@/components/DateRangePills'
 
 interface Props {
   token: string
@@ -46,6 +47,11 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
   const [data, setData] = useState<UnactivatedUsersResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Date range state (Default: 'today')
+  const [dateRange, setDateRange] = useState<DateRangeValue>('today')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
 
   // Filters state
   const [page, setPage] = useState(1)
@@ -82,7 +88,10 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
         pageSize,
         filterType,
         debouncedSearch || undefined,
-        sortBy
+        sortBy,
+        dateRange,
+        startDate,
+        endDate
       )
       setData(res)
     } catch (err: any) {
@@ -90,7 +99,7 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [token, page, pageSize, filterType, debouncedSearch, sortBy])
+  }, [token, page, pageSize, filterType, debouncedSearch, sortBy, dateRange, startDate, endDate])
 
   useEffect(() => {
     loadData()
@@ -162,7 +171,7 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
             <a
               href="#sec-broadcast"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg shadow-violet-500/20 transition"
@@ -170,14 +179,19 @@ export default function AdminUnactivatedUsersManager({ token }: Props) {
               <Send className="w-3.5 h-3.5" />
               <span>Broadcast Xabar Yuborish</span>
             </a>
-            <button
-              onClick={() => loadData()}
-              disabled={loading}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition border border-white/10"
-              title="Yangilash"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
-            </button>
+            <DateRangePills
+              value={dateRange}
+              onChange={(newRange, start, end) => {
+                setDateRange(newRange)
+                if (start !== undefined) setStartDate(start)
+                if (end !== undefined) setEndDate(end)
+                setPage(1)
+              }}
+              onRefresh={loadData}
+              loading={loading}
+              startDate={startDate}
+              endDate={endDate}
+            />
           </div>
         </div>
       </div>

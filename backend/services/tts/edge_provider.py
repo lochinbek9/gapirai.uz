@@ -7,8 +7,10 @@ import subprocess
 import tempfile
 
 from backend.services.tts.base import TTSProvider
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 def _prosody_for_text(text: str, is_female: bool) -> tuple[str, str]:
@@ -92,46 +94,75 @@ class EdgeProvider(TTSProvider):
 
             rate, pitch = _prosody_for_text(clean_text, is_female)
 
-            async def _run():
-                communicate = edge_tts.Communicate(clean_text, chosen_voice, rate=rate, pitch=pitch)
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-                    tmp_mp3 = tmp.name
-                try:
-                    await communicate.save(tmp_mp3)
-                    if os.path.exists(tmp_mp3) and os.path.getsize(tmp_mp3) > 100:
-                        subprocess.run(
-                            [
-                                "ffmpeg", "-y", "-i", tmp_mp3,
-                                "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1",
-                                output_path,
-                            ],
-                            check=True, capture_output=True,
-                        )
-                        logger.info(f"Edge TTS: voice={chosen_voice}, chars={len(clean_text)}")
-                        return True
-                    raise RuntimeError(f"Edge TTS fail: Saved mp3 file is empty or missing: {tmp_mp3}")
-                finally:
-                    if os.path.exists(tmp_mp3):
-                        try:
-                            os.remove(tmp_mp3)
-                        except Exception:
-                            pass
+            proxy_url = getattr(settings, "YOUTUBE_PROXY_URL", None) or os.environ.get("YOUTUBE_PROXY_URL")
 
-            # Event loop boshqaruvi
+            async def _run():
+                last_err = None
+                for attempt in range(3):
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                        tmp_mp3 = tmp.name
+                    try:
+                        # 1-urinishda prosody bilan to'g'ridan-to'g'ri, keyingi urinishlarda toza standart va proxy orqali sinash
+                        cur_rate = rate if attempt == 0 else "+0%"
+                        cur_pitch = pitch if attempt == 0 else "+0Hz"
+                        use_proxy = proxy_url if attempt > 0 else None
+                        communicate = edge_tts.Communicate(
+                            clean_text, chosen_voice,
+                            rate=cur_rate, pitch=cur_pitch,
+                            proxy=use_proxy,
+                            connect_timeout=6, receive_timeout=20,
+                        )
+                        await communicate.save(tmp_mp3)
+
+                        if os.path.exists(tmp_mp3) and os.path.getsize(tmp_mp3) > 100:
+                            parent_dir = os.path.dirname(output_path)
+                            if parent_dir:
+                                os.makedirs(parent_dir, exist_ok=True)
+
+                            res = subprocess.run(
+                                [
+                                    "ffmpeg", "-y", "-loglevel", "error", "-nostats",
+                                    "-i", tmp_mp3,
+                                    "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1",
+                                    output_path,
+                                ],
+                                capture_output=True,
+                            )
+                            if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 100:
+                                logger.info(f"Edge TTS: voice={chosen_voice}, chars={len(clean_text)}, attempt={attempt+1}")
+                                return True
+                            else:
+                                err_msg = res.stderr.decode("utf-8", errors="replace") if res.stderr else "FFmpeg dekod xatosi"
+                                raise RuntimeError(f"FFmpeg xatosi ({res.returncode}): {err_msg[:150]}")
+                        raise RuntimeError(f"Edge TTS bo'sh fayl yaratdi: {tmp_mp3}")
+                    except Exception as err:
+                        last_err = err
+                        logger.warning(f"Edge TTS urinish {attempt+1}/3 muvaffaqiyatsiz ({err})")
+                        if attempt < 2:
+                            await asyncio.sleep(0.4 * (attempt + 1))
+                    finally:
+                        if os.path.exists(tmp_mp3):
+                            try:
+                                os.remove(tmp_mp3)
+                            except Exception:
+                                pass
+
+                raise last_err or RuntimeError("Edge TTS barcha urinishlarda muvaffaqiyatsiz bo'ldi")
+
+            # Event loop boshqaruvi (thread-safe)
             try:
                 loop = asyncio.get_event_loop()
             except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                loop = None
 
-            if loop.is_running():
+            if loop is not None and loop.is_running():
                 new_loop = asyncio.new_event_loop()
                 try:
                     return new_loop.run_until_complete(_run())
                 finally:
                     new_loop.close()
             else:
-                return loop.run_until_complete(_run())
+                return asyncio.run(_run())
 
         except Exception as exc:
             logger.error(f"Edge TTS xato: {exc}", exc_info=True)

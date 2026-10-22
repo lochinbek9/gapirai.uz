@@ -148,12 +148,13 @@ tarjima qiling.
 JSON formatida qaytaring. Faqat "text" maydonini tarjima qiling."""
 
 
-def translate_segments(segments: list[dict]) -> list[dict]:
+def translate_segments(segments: list[dict], is_paid: bool = False) -> list[dict]:
     """
     Segmentlar ro'yxatini inglizchadan o'zbekchaga tarjima qilish.
 
     Args:
         segments: [{"id": 1, "start": 0.0, "end": 2.5, "text": "Hello world"}, ...]
+        is_paid: True bo'lsa pullik (balansli) Gemini kalitidan foydalanadi.
 
     Returns:
         Tarjima qilingan segmentlar ro'yxati.
@@ -172,10 +173,10 @@ def translate_segments(segments: list[dict]) -> list[dict]:
         return []
 
     if len(chunks) == 1:
-        return _translate_chunk(chunks[0])
+        return _translate_chunk(chunks[0], is_paid=is_paid)
 
     with ThreadPoolExecutor(max_workers=6) as executor:
-        chunk_results = list(executor.map(_translate_chunk, chunks))
+        chunk_results = list(executor.map(lambda c: _translate_chunk(c, is_paid=is_paid), chunks))
 
     translated = []
     for res in chunk_results:
@@ -307,16 +308,19 @@ def _translate_chunk_openai(segments: list[dict], clean_segments: list[dict]) ->
     return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
 
 
-def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict], is_paid: bool = False) -> list[dict]:
     """
     Gemini orqali segmentlarni o'zbek tiliga tarjima qilish:
     - Birinchi o'rinda eng sifatli Flash flagman modellar barcha mavjud API kalitlar orqali sinab chiqiladi.
+    - is_paid=True bo'lsa pullik (balansli) kalit(lar)ga ustunlik beriladi.
+    - is_paid=False bo'lsa FAQAT bepul kalitlar hovuzi ishlatiladi.
     - Agar 1-kalit kvota limiti olsa (429), navbat darhol sifatni tushirmasdan 2-3-4-kalitlarga o'tadi.
     - Faqat va faqat barcha kalitlar band bo'lgandagina zaxira (Flash-Lite) modellarga o'tiladi.
     """
     from google.genai import types
     from backend.services.gemini_quota_manager import (
         get_all_gemini_api_keys,
+        get_gemini_keys_for_request,
         is_model_available,
         mark_model_cooldown,
         record_model_request,
@@ -334,18 +338,15 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
     candidate_models = [
         _gemini_text_model(),
         "gemini-3.8-flash",
-        "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
+        "gemini-3.8-flash-lite",
         "gemini-3.7-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
         "gemini-flash-lite-latest",
     ]
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
-    api_keys = get_all_gemini_api_keys()
+    api_keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not api_keys:
         primary_k = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
         if primary_k:
@@ -386,7 +387,7 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict]) ->
                     err_str = str(e)
                     is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
                     is_server_error = "503" in err_str or "UNAVAILABLE" in err_str or "500" in err_str or "high demand" in err_str.lower()
-                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str
+                    is_not_found = "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str
                     is_bad_json = isinstance(e, json.JSONDecodeError)
                     is_auth_error = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str
 
@@ -441,39 +442,81 @@ def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:
         return list(executor.map(_translate_segment_free, segments))
 
 
-def _translate_chunk(segments: list[dict]) -> list[dict]:
+def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """Groq Cloud LPU orqali ultra-tez va 100% bepul tarjima (qwen/qwen3.8-27b)."""
+    from backend.services.groq_service import groq_chat_completion
+    instruction = _build_instruction(clean_segments)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": instruction},
+    ]
+    content, masked_k = groq_chat_completion(
+        messages=messages,
+        model="qwen/qwen3.8-27b",
+        json_mode=True,
+        temperature=0.35,
+    )
+    result = json.loads(content)
+    logger.info(f"Groq LLM tarjima muvaffaqiyatli yakunlandi ({masked_k}).")
+    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+
+
+def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
     """Bir bo'lak segmentlarni tarjima qilish -- TRANSLATE_PROVIDER ga qarab,
-    uch pog'onali zaxira bilan: OpenAI -> Gemini -> xom Google Translate
-    (oxirgi chora). Ilgari faqat ikki pog'ona bor edi (OpenAI -> Gemini) --
-    2026-09-12 ikkalasi ham bir vaqtda kvota tugashi (OpenAI insufficient_quota
-    + Gemini free-tier RESOURCE_EXHAUSTED) kuzatilgach, video butunlay
-    muvaffaqiyatsiz bo'lib qolmasligi uchun uchinchi pog'ona qo'shildi."""
+    ko'p pog'onali zaxira bilan: Gemini -> Groq LPU (bepul) -> xom Google Translate
+    (oxirgi chora). Video hech qachon tarjima sababli to'xtab qolmaydi."""
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
 
+    if settings.TRANSLATE_PROVIDER == "groq":
+        try:
+            return _translate_chunk_groq(segments, clean_segments)
+        except Exception as e:
+            logger.warning(f"Groq tarjima muvaffaqiyatsiz ({e}), Gemini'ga o'tilmoqda.")
+
     if settings.TRANSLATE_PROVIDER == "gemini":
         last_ex = None
         for attempt in range(3):
             try:
-                return _translate_chunk_gemini(segments, clean_segments)
+                return _translate_chunk_gemini(segments, clean_segments, is_paid=is_paid)
             except Exception as e:
                 last_ex = e
                 logger.warning(f"Gemini tarjima urinishi {attempt+1}/3 muvaffaqiyatsiz ({e}).")
                 if attempt < 2:
                     time.sleep(2.0 * (attempt + 1))
-        raise RuntimeError(f"Gemini tarjima barcha urinishlarda muvaffaqiyatsiz bo'ldi: {last_ex}")
+        # Bepul zaxira 1: Groq LPU (0 UZS, ultra-tez, sifatli)
+        try:
+            logger.info("Gemini tarjima muvaffaqiyatsiz bo'ldi — bepul Groq LPU orqali tarjima qilinmoqda...")
+            return _translate_chunk_groq(segments, clean_segments)
+        except Exception as groq_err:
+            logger.warning(f"Groq tarjima ham muvaffaqiyatsiz ({groq_err}) — bepul Google MT'ga (oxirgi chora) o'tilmoqda.")
+            return _translate_chunk_free_mt(segments)
 
     try:
         return _translate_chunk_openai(segments, clean_segments)
+    except Exception as e:
+        if not gemini_available:
+            try:
+                return _translate_chunk_groq(segments, clean_segments)
+            except Exception:
+                return _translate_chunk_free_mt(segments)
+        logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
+        try:
+            return _translate_chunk_gemini(segments, clean_segments, is_paid=is_paid)
+        except Exception as e2:
+            try:
+                return _translate_chunk_groq(segments, clean_segments)
+            except Exception:
+                return _translate_chunk_free_mt(segments)
     except Exception as e:
         if not gemini_available:
             logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) va Gemini kaliti yo'q — bepul (LLM'siz) tarjimaga o'tilmoqda.")
             return _translate_chunk_free_mt(segments)
         logger.warning(f"OpenAI tarjima muvaffaqiyatsiz ({e}) — Gemini'ga o'tilmoqda.")
         try:
-            return _translate_chunk_gemini(segments, clean_segments)
+            return _translate_chunk_gemini(segments, clean_segments, is_paid=is_paid)
         except Exception as e2:
             logger.warning(f"Gemini ham muvaffaqiyatsiz ({e2}) — bepul (LLM'siz) tarjimaga (oxirgi chora) o'tilmoqda.")
             return _translate_chunk_free_mt(segments)

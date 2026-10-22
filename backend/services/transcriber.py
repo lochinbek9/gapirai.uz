@@ -340,12 +340,15 @@ def _build_transcribe_prompt(language: str | None) -> str:
     )
 
 
-def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
+def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: str | None = None, is_paid: bool = False) -> tuple[list[dict], str, str, str, str]:
     """Google AI Studio / Vertex AI orqali Gemini bilan audio STT transkripsiya.
     Model ro'yxati va bir nechta API kalitlar asosida navbatma-navbat sinaydi."""
     from google.genai import types
     from backend.services.gemini_quota_manager import (
         get_all_gemini_api_keys,
+        get_gemini_keys_for_request,
+        is_paid_gemini_key,
+        mask_key,
         is_model_available,
         mark_model_cooldown,
         record_model_request,
@@ -364,7 +367,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     ]
 
     candidate_models = _get_gemini_candidate_models(_get_gemini_stt_model_name())
-    api_keys = get_all_gemini_api_keys()
+    api_keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not api_keys:
         primary_k = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
         if primary_k:
@@ -421,10 +424,12 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
                             "text": text,
                         })
 
+                    tier = "paid" if is_paid_gemini_key(api_key) else "free"
+                    masked_k = mask_key(api_key) if api_key else "none"
                     if api_key:
                         record_model_success(api_key, model_name)
 
-                    return segments, " ".join(text_parts), detected_lang or "uz"
+                    return segments, " ".join(text_parts), detected_lang or "uz", tier, masked_k
                 except Exception as e:
                     last_error = e
                     err_str = str(e)
@@ -471,7 +476,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     raise last_error or RuntimeError("Barcha Gemini STT modellari va API kalitlari muvaffaqiyatsiz bo'ldi")
 
 
-def transcribe_audio(audio_path: str, language: str | None = None, primary: str | None = None) -> dict:
+def transcribe_audio(audio_path: str, language: str | None = None, primary: str | None = None, is_paid: bool = False) -> dict:
     """
     Audio faylni matnga aylantirish (STT).
 
@@ -480,6 +485,7 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
     yoki dublyaj qilingan audio'ni QA orqali qayta tekshirish).
     primary: "gemini" (Google AI Studio) yoki "openai" (Whisper). Standart
     holatda settings.STT_PROVIDER ("gemini") ishlatiladi.
+    is_paid: True bo'lsa pullik (balansli) Gemini kalitiga ustunlik beradi.
     Returns:
         dict: {
             "text": str,           # To'liq matn
@@ -498,7 +504,7 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
         logger.error("Falling back to OpenAI...")
 
     try:
-        return _transcribe_via_api(audio_path, language, primary)
+        return _transcribe_via_api(audio_path, language, primary, is_paid=is_paid)
     except WrongLanguageError:
         raise   # boshqa tildagi matnni "oxirgi chora" bilan yashirmaymiz
     except Exception as e:
@@ -691,58 +697,95 @@ def _transcribe_chunk_azure(chunk_path: Path, offset_seconds: float, language: s
                 pass
 
 
-def _transcribe_provider_order(primary: str) -> list[str]:
+def _transcribe_chunk_groq(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str, str, str]:
+    """Groq Cloud API (Whisper Large v3 Turbo) orqali ultra-tezkor va 0 xarajatli audio transkripsiya."""
+    from backend.services.groq_service import groq_transcribe_audio, record_groq_job
+    segs, text, lang, masked_k = groq_transcribe_audio(str(chunk_path), language=language)
+    adjusted_segs = []
+    for s in segs:
+        adjusted_segs.append({
+            "start": round(s["start"] + offset_seconds, 3),
+            "end": round(s["end"] + offset_seconds, 3),
+            "text": s["text"],
+        })
+    dur = (adjusted_segs[-1]["end"] - adjusted_segs[0]["start"]) if adjusted_segs else 0.0
+    record_groq_job(masked_k, duration_sec=dur)
+    return adjusted_segs, text, lang, "free", f"groq:{masked_k}"
+
+
+def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     """API provayderlar tartibi:
-    1-o'rin: Gemini STT (Google AI Studio / Vertex AI)
-    2-o'rin: Azure STT (Cognitive Services)
-    3-o'rin: OpenAI Whisper
+    1-o'rin: Groq Whisper (ultra-tez LPU, 0 CPU/RAM, bepul kvota)
+    2-o'rin: Gemini STT (Google AI Studio / Vertex AI)
+    3-o'rin: Azure STT (Cognitive Services)
+    4-o'rin: OpenAI Whisper
     """
+    from backend.services.groq_service import is_groq_available
+    groq_ok = is_groq_available()
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
 
-    if primary == "azure":
-        order = ["azure", "gemini", "openai"]
-    elif primary == "gemini":
-        order = ["gemini", "azure", "openai"]
-    elif primary == "openai":
-        order = ["openai", "gemini", "azure"]
-    else:
-        # Default order: openai first if enabled, else gemini
-        order = ["openai", "gemini", "azure"] if getattr(settings, "OPENAI_ENABLED", True) else ["gemini", "azure", "openai"]
-
     active = []
-    for name in order:
-        if name == "gemini" and gemini_ok:
-            active.append("gemini")
-        elif name == "azure" and azure_ok:
-            active.append("azure")
-        elif name == "openai" and openai_ok:
-            active.append("openai")
-    return active or ["gemini"]
+    if groq_ok:
+        active.append("groq")
+    if gemini_ok:
+        active.append("gemini")
+    if azure_ok:
+        active.append("azure")
+    if openai_ok:
+        active.append("openai")
+
+    if primary in active:
+        order = [primary] + [p for p in active if p != primary]
+    else:
+        if getattr(settings, "OPENAI_ENABLED", True) and "openai" in active:
+            order = ["openai"] + [p for p in active if p != "openai"]
+        else:
+            order = active
+
+    return order or ["gemini"]
 
 
-def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini") -> dict:
-    """STT API (Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
-    transkripsiya qiladi. Gemini 1-o'rinda, Azure 2-o'rindagi zaxira."""
+def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini", is_paid: bool = False) -> dict:
+    """STT API (Groq / Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
+    transkripsiya qiladi. Groq 1-o'rinda (0 xarajat, ultra-tez), Gemini 2-o'rindagi ishonchli zaxira."""
     segments_list = []
     full_text_parts = []
     detected_language = language
+    used_tier = "free"
+    used_key = None
 
-    def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str]:
+    def _transcribe_chunk_with_fallback(cpath: Path, offset: float) -> tuple[list[dict], str, str, str, str]:
         last_error: Exception | None = None
         for name in _transcribe_provider_order(primary):
-            if name == "gemini":
+            if name == "groq":
+                fn = _transcribe_chunk_groq
+            elif name == "gemini":
                 fn = _transcribe_chunk_gemini
             elif name == "azure":
                 fn = _transcribe_chunk_azure
             else:
                 fn = _transcribe_chunk
             try:
-                segs, text, lang = fn(cpath, offset_seconds=offset, language=language)
+                if name == "gemini":
+                    try:
+                        res = fn(cpath, offset_seconds=offset, language=language, is_paid=is_paid)
+                    except TypeError:
+                        res = fn(cpath, offset_seconds=offset, language=language)
+                    if isinstance(res, (tuple, list)) and len(res) >= 5:
+                        segs, text, lang, tier, k_used = res[:5]
+                    else:
+                        segs, text, lang = res[0], res[1], res[2]
+                        tier, k_used = "free", name
+                elif name == "groq":
+                    segs, text, lang, tier, k_used = fn(cpath, offset_seconds=offset, language=language)
+                else:
+                    segs, text, lang = fn(cpath, offset_seconds=offset, language=language)
+                    tier, k_used = "free", name
                 if language == "uz" and looks_turkish(text):
                     raise WrongLanguageError(f"{name}: o'zbekcha nutq o'rniga turkcha matn qaytardi")
-                return segs, text, lang
+                return segs, text, lang, tier, k_used
             except Exception as e:
                 last_error = e
                 logger.warning(f"{name} transkripsiya muvaffaqiyatsiz ({e}) — keyingi provayderga o'tilmoqda.")
@@ -767,13 +810,17 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
                 chunk_results = list(executor.map(_process_chunk, enumerate(chunk_paths)))
 
         chunk_results.sort(key=lambda x: x[0])
-        for _, (chunk_segments, chunk_text, chunk_language) in chunk_results:
+        for _, (chunk_segments, chunk_text, chunk_language, chunk_tier, chunk_key) in chunk_results:
             if chunk_text:
                 full_text_parts.append(chunk_text)
             if chunk_segments:
                 segments_list.extend(chunk_segments)
             if chunk_language:
                 detected_language = chunk_language
+            if chunk_tier == "paid":
+                used_tier = "paid"
+            if chunk_key and not used_key:
+                used_key = chunk_key
 
     srt_lines = []
     for i, seg in enumerate(segments_list, start=1):
@@ -790,6 +837,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
         "segments": segments_list,
         "srt": "\n".join(srt_lines),
         "language": detected_language,
+        "gemini_key_tier": used_tier,
+        "gemini_key_used": used_key,
     }
 
 

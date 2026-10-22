@@ -61,11 +61,14 @@ def _config_for(voice: str):
     )
 
 
-def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
-    """Bitta so'rovni yuboradi. Barcha mavjud Gemini API kalitlari bo'yicha rotatsiya qiladi.
+def _generate_pcm_with_retry(contents: str, voice: str, is_paid: bool = False) -> bytes | None:
+    """Bitta so'rovni yuboradi. Barcha mavjud Gemini API kalitlari bo'yicha rotatsiya qiladi:
+    - is_paid=True bo'lsa pullik (balansli) kalit(lar)ga ustunlik beradi.
+    - is_paid=False bo'lsa FAQAT bepul kalitlar hovuzidan foydalanadi.
     429/503 bo'lsa, tegishli kalit cooldown'ga olinib, darhol keyingi toza kalitga o'tiladi."""
     from backend.services.gemini_quota_manager import (
         get_all_gemini_api_keys,
+        get_gemini_keys_for_request,
         is_model_available,
         mark_model_cooldown,
         record_model_request,
@@ -75,10 +78,28 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
 
     config = _config_for(voice)
     primary_model = settings.GEMINI_TTS_MODEL or "gemini-3.8-flash-tts"
-    candidate_models = [primary_model]
-    for alt_model in ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]:
-        if alt_model not in candidate_models:
-            candidate_models.append(alt_model)
+    candidate_models = [
+        primary_model,
+        "gemini-3.8-flash-lite-tts",
+        "gemini-3.8-flash",
+    ]
+    seen = set()
+    candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+
+    def _extract_audio_bytes(response) -> bytes | None:
+        if not response:
+            return None
+        candidates = getattr(response, "candidates", None)
+        if candidates and candidates[0].content and candidates[0].content.parts:
+            for part in candidates[0].content.parts:
+                inline = getattr(part, "inline_data", None)
+                if inline and getattr(inline, "data", None):
+                    d = inline.data
+                    if isinstance(d, str):
+                        import base64
+                        d = base64.b64decode(d)
+                    return d
+        return None
 
     if settings.GEMINI_USE_VERTEX:
         max_attempts = 3
@@ -90,15 +111,9 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                         contents=contents,
                         config=config,
                     )
-                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                        for part in response.candidates[0].content.parts:
-                            inline_data = getattr(part, "inline_data", None)
-                            if inline_data and getattr(inline_data, "data", None):
-                                raw_data = inline_data.data
-                                if isinstance(raw_data, str):
-                                    import base64
-                                    raw_data = base64.b64decode(raw_data)
-                                return raw_data
+                    raw_data = _extract_audio_bytes(response)
+                    if raw_data:
+                        return raw_data
                 except Exception as e:
                     if attempt == max_attempts - 1:
                         logger.warning(f"Vertex Gemini TTS [{model_name}] xato: {e}")
@@ -106,7 +121,7 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                         time.sleep(1.0 * (attempt + 1))
         return None
 
-    api_keys = get_all_gemini_api_keys()
+    api_keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not api_keys:
         primary = settings.GEMINI_API_KEY or getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", "") or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", "")
         if primary:
@@ -131,25 +146,25 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                     contents=contents,
                     config=config,
                 )
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        inline_data = getattr(part, "inline_data", None)
-                        if inline_data and getattr(inline_data, "data", None):
-                            raw_data = inline_data.data
-                            if isinstance(raw_data, str):
-                                import base64
-                                raw_data = base64.b64decode(raw_data)
-                            record_model_success(key, model_name)
-                            return raw_data
+                raw_data = _extract_audio_bytes(response)
+                if raw_data:
+                    record_model_success(key, model_name)
+                    return raw_data
             except Exception as e:
                 err_str = str(e)
                 is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
                 is_503 = "503" in err_str or "UNAVAILABLE" in err_str
                 is_unauth = "401" in err_str or "UNAUTHENTICATED" in err_str or "API key not valid" in err_str or "ACCESS_TOKEN_TYPE_UNSUPPORTED" in err_str
+                is_not_found = "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str
 
                 if is_unauth:
-                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: yaroqsiz kalit")
-                    logger.warning(f"Gemini TTS [{key[:10]}...] 401 yaroqsiz kalit — o'chirildi.")
+                    mark_model_cooldown(key, model_name, 86400.0 * 30, reason=f"401: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 401 yaroqsiz kalit — o'chirildi.")
+                    continue
+
+                if is_not_found:
+                    mark_model_cooldown(key, model_name, 86400.0 * 7, reason=f"404: {err_str[:60]}")
+                    logger.warning(f"Gemini TTS [{model_name}] 404 model mavjud emas.")
                     continue
 
                 if is_rate_limit:
@@ -159,7 +174,7 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
                     continue
 
                 if is_503:
-                    mark_model_cooldown(key, model_name, 120.0, reason="503 server band")
+                    mark_model_cooldown(key, model_name, 30.0, reason="503 server band")
                     logger.warning(f"Gemini TTS [{key[:10]}.../{model_name}] 503 server band — navbatdagi kalitga o'tilmoqda.")
                     continue
 
@@ -192,16 +207,10 @@ def _generate_pcm_with_retry(contents: str, voice: str) -> bytes | None:
             contents=contents,
             config=config,
         )
-        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                inline_data = getattr(part, "inline_data", None)
-                if inline_data and getattr(inline_data, "data", None):
-                    raw_data = inline_data.data
-                    if isinstance(raw_data, str):
-                        import base64
-                        raw_data = base64.b64decode(raw_data)
-                    record_model_success(best_key, best_model)
-                    return raw_data
+        raw_data = _extract_audio_bytes(response)
+        if raw_data:
+            record_model_success(best_key, best_model)
+            return raw_data
     except Exception as e:
         logger.error(f"Gemini TTS oxirgi urinish ham xato berdi ({best_model}): {e}")
 
@@ -236,6 +245,9 @@ _SILENCE_THRESH_OFFSET = 16
 class GeminiProvider(TTSProvider):
     """Gemini'ning tayyor ovozlari (Autonoe/Aoede/Charon/Fenrir/Puck)."""
 
+    def __init__(self, is_paid: bool = False):
+        self.is_paid = is_paid
+
     @property
     def name(self) -> str:
         return "gemini"
@@ -250,8 +262,10 @@ class GeminiProvider(TTSProvider):
         text: str,
         output_path: str,
         voice_name: str | None = None,
+        is_paid: bool | None = None,
     ) -> bool:
-        if not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
+        from backend.services.gemini_quota_manager import get_all_gemini_api_keys
+        if not get_all_gemini_api_keys() and not settings.GEMINI_API_KEY and not settings.GEMINI_USE_VERTEX:
             return False
 
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
@@ -266,12 +280,14 @@ class GeminiProvider(TTSProvider):
         else:
             voice = settings.GEMINI_FEMALE_VOICE if self._is_female(voice_name) else settings.GEMINI_MALE_VOICE
 
+        use_paid = self.is_paid if is_paid is None else is_paid
+
         try:
-            pcm_data = _generate_pcm_with_retry(clean_text, voice)
+            pcm_data = _generate_pcm_with_retry(clean_text, voice, is_paid=use_paid)
             if not pcm_data:
                 return False
             _write_wav(output_path, pcm_data)
-            logger.info(f"Gemini TTS: voice={voice}, chars={len(clean_text)}")
+            logger.info(f"Gemini TTS: voice={voice}, chars={len(clean_text)}, is_paid={use_paid}")
             return True
         except Exception as exc:
             logger.warning(f"Gemini TTS xato: {exc}")

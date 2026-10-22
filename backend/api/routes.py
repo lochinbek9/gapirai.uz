@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, Response, RedirectResponse, HTMLResp
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, defer
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant, VideoAnalysis
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
@@ -60,7 +60,12 @@ class RegenerateJobRequest(BaseModel):
     voice_name: Optional[str] = None
     speaker_gender: Optional[str] = None
     tts_provider: Optional[str] = None
+    gemini_key_tier: Optional[str] = None
     force_regenerate: Optional[bool] = None
+    stt_provider: Optional[str] = None
+    translation_model: Optional[str] = None
+    reuse_transcript: Optional[bool] = None
+    reuse_translation: Optional[bool] = None
 
 
 class VideoInfoResponse(BaseModel):
@@ -86,6 +91,7 @@ class JobResponse(BaseModel):
     error_message: Optional[str] = None
     error_code: Optional[str] = None
     created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     speaker_gender: Optional[str] = None
     voice_gender_setting: Optional[str] = None
     uzbek_srt_content: Optional[str] = None
@@ -113,6 +119,13 @@ class JobResponse(BaseModel):
     queue_eta_minutes: Optional[int] = None
     is_preview: bool = False
     audio_mix_mode: Optional[str] = None
+    costs: Optional[Dict[str, Any]] = None
+    user_info: Optional[Dict[str, Any]] = None
+    discount_offer: Optional[Dict[str, Any]] = None
+    can_refund_on_cancel: Optional[bool] = None
+    cancel_refund_seconds_left: Optional[float] = None
+    initial_stage: Optional[str] = None
+    current_stage: Optional[str] = None
 
 
 def _normalize_audio_mix_mode(mode: str | None) -> str:
@@ -167,7 +180,10 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         remaining_factor = max(0.1, (100.0 - live_progress) / 100.0)
         # Taxminiy qolgan vaqt to'g'ridan-to'g'ri joriy vaqtdan (now) hisoblanadi,
         # shunda navbatda kutgan vaqt hisob-kitobni buzib 0 soniya/noto'g'ri ko'rsatmaydi.
-        est_remaining_seconds = max(15.0, (20.0 + 0.35 * duration) * remaining_factor)
+        base_dur = 25.0 + 0.40 * duration
+        if status_str in ("synthesizing", "merging"):
+            base_dur = max(base_dur, 35.0 + 0.35 * duration)
+        est_remaining_seconds = max(15.0, base_dur * remaining_factor)
         expected_dt = datetime.utcnow() + timedelta(seconds=est_remaining_seconds)
         expected_end_time = to_tashkent_iso(expected_dt)
 
@@ -182,6 +198,69 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
                 channel_name = r_cli.get(f"yt:chan:{m.group(1)}")
         except Exception:
             channel_name = None
+
+    # Real Xarajat (Tannarx) hisoblash (Admin va xarajat monitoringi uchun)
+    dur_sec = float(job.video_duration or 0.0)
+    dur_min = dur_sec / 60.0
+    stt_model_val = getattr(job, "stt_model", None) or ""
+    gem_tier = getattr(job, "gemini_key_tier", None)
+    is_groq = "groq" in stt_model_val.lower() or (getattr(job, "gemini_key_used", None) or "").startswith("groq:")
+    if gem_tier == "paid" and "gemini" in stt_model_val.lower() and not is_groq and dur_sec > 0:
+        stt_cost_usd = round(dur_min * 0.002, 4)
+    else:
+        stt_cost_usd = 0.0
+
+    chars = len(job.translated_text) if getattr(job, "translated_text", None) else int(dur_min * 1200)
+    llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if (dur_sec > 0 or chars > 0) else 0.0
+
+    # Real TTS tannarxi provayderga qarab (Edge: bepul $0.00, Azure: $0.016, Gemini: $0.017)
+    _tts_p = getattr(job, "tts_provider", None)
+    _tts_m = getattr(job, "tts_model", "") or ""
+    tts_prov = (_tts_p or ("edge" if "edge" in _tts_m.lower() else ("azure" if "azure" in _tts_m.lower() else "gemini"))).lower()
+    est_chars = chars if chars > 0 else int(dur_min * 1200)
+    if tts_prov == "edge":
+        tts_cost_usd = 0.0
+    elif tts_prov == "azure":
+        tts_cost_usd = round((est_chars / 1000.0) * 0.016, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
+    else:
+        tts_cost_usd = round((est_chars / 1000.0) * 0.017, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
+
+    total_cost_usd = round(stt_cost_usd + llm_cost_usd + tts_cost_usd, 4)
+    total_cost_uzs = int(round(total_cost_usd * 12850))
+    cost_per_minute_uzs = int(round(total_cost_uzs / dur_min)) if dur_min > 0 else 0
+
+    costs = {
+        "stt_cost_usd": stt_cost_usd,
+        "llm_cost_usd": llm_cost_usd,
+        "tts_cost_usd": tts_cost_usd,
+        "total_cost_usd": total_cost_usd,
+        "total_cost_uzs": total_cost_uzs,
+        "cost_per_minute_uzs": cost_per_minute_uzs,
+    }
+
+    can_ref_cancel = None
+    ref_sec_left = None
+    init_stage = None
+    curr_stage = None
+    if raw_status in (
+        JobStatus.PENDING,
+        JobStatus.AWAITING_PAYMENT,
+        JobStatus.DOWNLOADING,
+        JobStatus.TRANSCRIBING,
+        JobStatus.TRANSLATING,
+        JobStatus.SYNTHESIZING,
+        JobStatus.SYNCING,
+        JobStatus.MERGING,
+    ):
+        try:
+            from backend.services.cancel_policy import check_cancel_refund_eligibility
+            can_ref_cancel, ref_sec_left, _, init_stage, curr_stage = check_cancel_refund_eligibility(
+                str(job.id),
+                raw_status.value if hasattr(raw_status, "value") else str(raw_status),
+                job.created_at,
+            )
+        except Exception:
+            pass
 
     return JobResponse(
         job_id=str(job.id),
@@ -203,6 +282,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         error_message=None if redact else job.error_message,
         error_code=None if redact else job.error_code,
         created_at=to_tashkent_iso(job.created_at) if job.created_at else None,
+        updated_at=to_tashkent_iso(job.updated_at) if getattr(job, "updated_at", None) else None,
         speaker_gender=job.speaker_gender,
         voice_gender_setting=job.voice_gender_setting,
         uzbek_srt_content=job.uzbek_srt_content,
@@ -227,18 +307,15 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
             else (f"azure-neural ({getattr(job, 'voice_name', None) or 'uz-UZ-SardorNeural'})" if (getattr(job, "tts_provider", None) == 'azure' or (getattr(job, "voice_name", None) and 'Neural' in str(job.voice_name)))
             else None))
         ),
-
-        # "Video hech qachon serverga tushmadi" -- error_code'ning aniq
-        # qaysi so'z bilan yozilganiga qaramasdan, o'zi to'liq va ishonchli
-        # signal (agar TRANSCRIBE yoki keyingi bosqichda muvaffaqiyatsiz
-        # bo'lgan bo'lsa, original_video_path allaqachon to'ldirilgan
-        # bo'ladi). error_code ro'yxatiga qarab tekshirish - eski,
-        # klassifikatordan OLDINGI "DOWNLOAD_FAILED" kabi qiymatlarni
-        # noto'g'ri chetlab qo'ygan edi (2026-08-23 aniqlangan).
         fallback_available=status_str == "failed" and not job.original_video_path,
         fallback_reason="YOUTUBE_DOWNLOAD_FAILED" if status_str == "failed" and not job.original_video_path else None,
         is_preview=bool(getattr(job, "is_preview", False)),
         audio_mix_mode=_normalize_audio_mix_mode(getattr(job, "audio_mix_mode", None) or getattr(settings, "AUDIO_MIX_MODE", "dubbed_only")),
+        costs=costs,
+        can_refund_on_cancel=can_ref_cancel,
+        cancel_refund_seconds_left=ref_sec_left,
+        initial_stage=init_stage,
+        current_stage=curr_stage,
     )
 
 
@@ -292,6 +369,11 @@ def _raise_for_outcome(result: JobCreationResult) -> None:
         raise HTTPException(
             status_code=403,
             detail=detail,
+        )
+    if result.outcome == "music_copyright":
+        raise HTTPException(
+            status_code=400,
+            detail=result.error_detail or "Mualliflik huquqi bilan himoyalangan qo'shiq va musiqiy videolarni dublyaj qilib bo'lmaydi."
         )
     if result.outcome == "too_long":
         raise HTTPException(
@@ -607,6 +689,78 @@ def get_job(
             response.status_message = (
                 f"Navbatda: {position}-o'rin, taxminan {queue_load.format_wait(eta)} kutish"
             )
+
+    # 1. Admin uchun video egasining to'liq ma'lumotlari (Ism-familiya, email, telefon, tarif, balans, LTV)
+    if is_admin:
+        if job.user_id:
+            try:
+                from sqlalchemy import func
+                from backend.models.payment import Payment, PaymentStatus
+                from backend.services.plans import get_or_create_subscription, get_minute_balance
+
+                owner = db.query(User).filter(User.id == job.user_id).first()
+                if owner:
+                    sub = get_or_create_subscription(db, owner.id)
+                    bal = get_minute_balance(db, owner.id)
+                    user_jobs_count = db.query(DubbingJob).filter(DubbingJob.user_id == owner.id).count()
+                    user_completed_count = db.query(DubbingJob).filter(
+                        DubbingJob.user_id == owner.id,
+                        DubbingJob.status == JobStatus.COMPLETED
+                    ).count()
+                    payments_total = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                        Payment.user_id == owner.id,
+                        Payment.status == PaymentStatus.APPROVED
+                    ).scalar() or 0
+                    payments_count = db.query(Payment).filter(
+                        Payment.user_id == owner.id,
+                        Payment.status == PaymentStatus.APPROVED
+                    ).count()
+
+                    response.user_info = {
+                        "id": str(owner.id),
+                        "name": owner.name,
+                        "email": owner.email,
+                        "phone": owner.phone,
+                        "telegram_chat_id": owner.telegram_chat_id,
+                        "auth_provider": owner.auth_provider,
+                        "role": owner.role,
+                        "is_internal": owner.is_internal,
+                        "plan": sub.plan.value if sub else "free",
+                        "plan_expires_at": to_tashkent_iso(sub.current_period_end) if sub and sub.current_period_end else None,
+                        "minutes": bal,
+                        "created_at": to_tashkent_iso(owner.created_at) if owner.created_at else None,
+                        "last_active_at": to_tashkent_iso(owner.last_active_at) if owner.last_active_at else None,
+                        "jobs_count": user_jobs_count,
+                        "completed_jobs_count": user_completed_count,
+                        "payments_total_uzs": int(payments_total),
+                        "payments_count": payments_count,
+                        "anonymous": False,
+                    }
+                else:
+                    response.user_info = {
+                        "anonymous": False,
+                        "id": str(job.user_id),
+                        "name": "Noma'lum foydalanuvchi",
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to fetch user_info for admin on job {job.id}: {e}")
+                response.user_info = {"anonymous": False, "id": str(job.user_id), "error": str(e)}
+        else:
+            response.user_info = {
+                "anonymous": True,
+                "name": "Anonim mehmon (ro'yxatdan o'tmagan)",
+            }
+
+    # 2. Foydalanuvchi o'zining ilk videosi tugallanganda 24 soatlik 10% chegirma holati
+    if current_user_id and is_owner and job.status == JobStatus.COMPLETED:
+        try:
+            from backend.services.plans import get_user_first_video_discount
+            disc = get_user_first_video_discount(db, current_user_id)
+            if disc and disc.get("eligible"):
+                response.discount_offer = disc
+        except Exception as e:
+            logger.warning(f"Failed to check discount_offer for user {current_user_id}: {e}")
+
     return response
 
 
@@ -885,8 +1039,35 @@ def retry_job(
             job.speaker_gender = payload.speaker_gender
         if payload.tts_provider:
             job.tts_provider = payload.tts_provider
-        if payload.voice_name:
+            gender = job.speaker_gender or "male"
+            if payload.tts_provider in ("azure", "edge"):
+                if payload.voice_name and "neural" in payload.voice_name.lower():
+                    job.voice_name = payload.voice_name
+                else:
+                    job.voice_name = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                job.tts_model = f"{payload.tts_provider}-tts ({job.voice_name})"
+            elif payload.tts_provider == "gemini":
+                if payload.voice_name and "neural" not in payload.voice_name.lower():
+                    job.voice_name = payload.voice_name
+                else:
+                    job.voice_name = "Autonoe" if gender == "female" else "Charon"
+                job.tts_model = f"gemini-3.8-flash-tts ({job.voice_name})"
+        elif payload.voice_name:
             job.voice_name = payload.voice_name
+        if payload.gemini_key_tier:
+            job.gemini_key_tier = payload.gemini_key_tier
+        if payload.stt_provider:
+            job.stt_model = payload.stt_provider
+        if payload.reuse_transcript is False:
+            job.transcript_segments = None
+            job.transcript_text = None
+            job.srt_content = None
+        if payload.translation_model:
+            job.translation_model = payload.translation_model
+        if payload.reuse_translation is False:
+            job.translated_segments = None
+            job.translated_text = None
+            job.uzbek_srt_content = None
 
     # 2. Balansdan daqiqa yechish (admin uchun cheksiz/bepul, oddiy user uchun balansdan yechiladi)
     duration_seconds = job.video_duration
@@ -900,22 +1081,27 @@ def retry_job(
     duration_minutes = max(0.1, round((duration_seconds or 60.0) / 60.0, 2))
 
     # 2. Balansdan daqiqa yechish:
-    # - Admin uchun bepul (is_user_admin).
-    # - Agar job avval FAILED bo'lgan bo'lsa va undan daqiqa yechilgan bo'lsa (quota_consumed=True),
-    #   qayta urinish uchun ikkinchi marta daqiqa yechilmaydi!
-    # - Faqat COMPLETED videoni qayta yaratish (regenerate) yoki avval daqiqa yechilmagan holatda yechiladi.
-    needs_quota = is_regenerate or not getattr(job, "quota_consumed", False)
-    if needs_quota and not is_user_admin(db, current_user.id):
-        target_user_id = job.user_id or current_user.id
-        has_quota, shortfall = check_and_consume_quota(db, target_user_id, duration_minutes)
-        if not has_quota:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
-            )
-        job.quota_consumed = True
-    elif not getattr(job, "quota_consumed", False):
-        job.quota_consumed = True
+    # - 2 daqiqalik parchalar (is_preview=True) HAR DOIM bepul: balansdan yechilmaydi va qaytarilmaydi!
+    # - Admin sinov/qayta ishga tushirishi bepul (is_user_admin). Ilgari yechilmagan job sun'iy quota_consumed=True qilinmaydi!
+    # - Agar job avval FAILED bo'lgan bo'lsa va undan daqiqa yechilgan bo'lsa (quota_consumed=True), qayta yechilmaydi.
+    # - Faqat oddiy foydalanuvchi COMPLETED videoni qayta yaratganda yoki ilgari yechilmaganda balansdan yechiladi.
+    is_preview = bool(getattr(job, "is_preview", False))
+    if is_preview:
+        job.quota_consumed = False
+    elif is_user_admin(db, current_user.id):
+        # Admin sinovi bepul: foydalanuvchiga ta'sir qilmaydi, quota_consumed flagi o'zgarmaydi
+        pass
+    else:
+        needs_quota = is_regenerate or not getattr(job, "quota_consumed", False)
+        if needs_quota:
+            target_user_id = job.user_id or current_user.id
+            has_quota, shortfall = check_and_consume_quota(db, target_user_id, duration_minutes)
+            if not has_quota:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Daqiqa balansingiz yetarli emas. Qayta yaratish uchun {shortfall} daqiqa kerak.",
+                )
+            job.quota_consumed = True
 
 
     # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
@@ -1069,6 +1255,7 @@ def retry_job(
     job.recovery_attempt_count = 0
     job.processing_claim_token = None
     job.processing_lease_expires_at = None
+    job.created_at = datetime.utcnow()
     job.completed_at = None
     db.commit()
 
@@ -1455,10 +1642,13 @@ def cancel_job(
     # bilgan ISTALGAN kishi (havola ulashish, log, referrer orqali) boshqa
     # birovning ishlayotgan job'ini bekor qila olardi. DELETE /jobs/{job_id}
     # (yuqorida) bilan bir xil naqsh -- so'rovning o'ziga user_id filtri.
-    job = db.query(DubbingJob).filter(
-        DubbingJob.id == job_id,
-        DubbingJob.user_id == current_user.id,
-    ).first()
+    from backend.services.plans import is_user_admin
+    is_admin = is_user_admin(db, current_user.id)
+
+    query = db.query(DubbingJob).filter(DubbingJob.id == job_id)
+    if not is_admin:
+        query = query.filter(DubbingJob.user_id == current_user.id)
+    job = query.first()
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
     
@@ -1481,20 +1671,47 @@ def cancel_job(
     except Exception:
         pass
     
-    job.status = JobStatus.FAILED
-    job.status_message = "Foydalanuvchi tomonidan bekor qilindi."
-    job.error_code = "USER_CANCELLED"
-    job.error_message = "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
-    job.updated_at = datetime.utcnow()
+    now_utc = datetime.utcnow()
+    created_at = job.created_at or now_utc
+    limit_refunded = False
 
-    # Agar kvota sarflangan bo'lsa, foydalanuvchiga qaytarish
-    if getattr(job, "quota_consumed", False):
-        try:
-            from backend.services.plans import refund_quota
-            refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)
-            job.quota_consumed = False
-        except Exception:
-            pass
+    # 2026-10-22: Bekor qilishda kvotani qaytarish yangi qoidasi:
+    # 1. Boshlang'ich faol bosqich (tayyor kesh/donor skip qilinadi) uchun maksimal 30 soniya vaqt beriladi.
+    # 2. Agar 1-bosqich ishlab, 2-bosqichga o'tgan bo'lsa (hatto 30s ichida bo'lsa ham), limit qaytarilmaydi (balansdan yechiladi).
+    # 3. Boshlang'ich bosqich 30 soniyadan oshsa ham limit qaytarilmaydi.
+    from backend.services.cancel_policy import check_cancel_refund_eligibility
+    can_refund, seconds_left, reason, initial_stage, current_stage = check_cancel_refund_eligibility(
+        str(job.id),
+        job.status.value if hasattr(job.status, "value") else str(job.status),
+        job.created_at,
+    )
+
+    if can_refund:
+        if getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False):
+            try:
+                from backend.services.plans import refund_quota
+                refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)
+                job.quota_consumed = False
+                limit_refunded = True
+            except Exception:
+                pass
+        msg = (
+            f"Dublyaj bekor qilindi. Boshlang'ich bosqich ({initial_stage or 'boshlanish'}) "
+            f"vaqti (30 soniya) ichida bekor qilingani uchun sarflangan daqiqalar hisobingizga to'liq qaytarildi."
+        )
+        status_msg = "Foydalanuvchi tomonidan bekor qilindi (daqiqalar qaytarildi)."
+    else:
+        logger.info(
+            f"Job {job_id} bekor qilindi, lekin limit qaytarilmadi: {reason}"
+        )
+        msg = f"Dublyaj bekor qilindi. {reason}"
+        status_msg = f"Foydalanuvchi tomonidan bekor qilindi (limit qaytarilmadi)."
+
+    job.status = JobStatus.FAILED
+    job.status_message = status_msg
+    job.error_code = "USER_CANCELLED"
+    job.error_message = msg
+    job.updated_at = now_utc
 
     db.commit()
 
@@ -1508,7 +1725,7 @@ def cancel_job(
             except Exception:
                 pass
 
-    return {"success": True, "message": "Dublyaj bekor qilindi."}
+    return {"success": True, "message": msg, "refunded": limit_refunded}
 
 
 class PlatformFeedbackRequest(BaseModel):
