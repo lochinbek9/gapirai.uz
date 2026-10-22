@@ -214,7 +214,9 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if (dur_sec > 0 or chars > 0) else 0.0
 
     # Real TTS tannarxi provayderga qarab (Edge: bepul $0.00, Azure: $0.016, Gemini: $0.017)
-    tts_prov = (job.tts_provider or ("edge" if "edge" in (job.tts_model or "").lower() else ("azure" if "azure" in (job.tts_model or "").lower() else "gemini"))).lower()
+    _tts_p = getattr(job, "tts_provider", None)
+    _tts_m = getattr(job, "tts_model", "") or ""
+    tts_prov = (_tts_p or ("edge" if "edge" in _tts_m.lower() else ("azure" if "azure" in _tts_m.lower() else "gemini"))).lower()
     est_chars = chars if chars > 0 else int(dur_min * 1200)
     if tts_prov == "edge":
         tts_cost_usd = 0.0
