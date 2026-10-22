@@ -817,6 +817,17 @@ export default function AdminPage() {
                                   <span>Qayta urinish</span>
                                 </button>
                               )}
+                              {isSuccess && (
+                                <button
+                                  onClick={() => handleOverviewRetry(j.id)}
+                                  disabled={retryingJobId === j.id}
+                                  className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm shadow-indigo-500/10"
+                                  title="Admin: Ushbu tayyor videoni qayta tayyorlash"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
+                                  <span>Qayta tayyorlash</span>
+                                </button>
+                              )}
                               {!isSuccess && !isFailed && (
                                 <button
                                   onClick={() => handleAdminCancel(j.id)}
