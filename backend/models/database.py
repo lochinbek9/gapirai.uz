@@ -83,7 +83,7 @@ class DubbingJob(Base):
     # learn/[id]) shu orqali qaysi tahlilni ham poll qilishni biladi. Eski
     # oddiy dublyaj joblarida (yoki /api/learn'dan tashqarida yaratilganlarda)
     # NULL bo'lib qoladi.
-    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id"), nullable=True)
+    linked_analysis_id = Column(UUID(as_uuid=True), ForeignKey("video_analyses.id", ondelete="SET NULL"), nullable=True)
     video_title = Column(String(500))
     video_duration = Column(Float)
     video_thumbnail = Column(String(500))
@@ -537,4 +537,33 @@ def create_tables():
         pass
     # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
+
+    # 2026-10-22: dubbing_jobs.linked_analysis_id FK bo'yicha ON DELETE SET NULL ta'minlash
+    if engine.dialect.name == "postgresql":
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints 
+                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'dubbing_jobs_linked_analysis_id_fkey'
+                        ) THEN
+                            ALTER TABLE dubbing_jobs DROP CONSTRAINT dubbing_jobs_linked_analysis_id_fkey;
+                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
+                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
+                        ELSIF EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints 
+                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'fk_dubbing_jobs_linked_analysis_id'
+                        ) THEN
+                            ALTER TABLE dubbing_jobs DROP CONSTRAINT fk_dubbing_jobs_linked_analysis_id;
+                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
+                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                """))
+        except Exception:
+            pass
+
 

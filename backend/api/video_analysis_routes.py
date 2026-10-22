@@ -155,8 +155,18 @@ def delete_analysis(
 ) -> dict:
     """Foydalanuvchining video tahlilini o'chirish."""
     analysis = _get_owned_analysis(analysis_id, db, current_user)
-    db.delete(analysis)
-    db.commit()
+    try:
+        # Bog'langan dublyaj joblari bo'lsa, ularning havolasini uzish (FK IntegrityError oldini olish)
+        db.query(DubbingJob).filter(DubbingJob.linked_analysis_id == analysis.id).update(
+            {DubbingJob.linked_analysis_id: None},
+            synchronize_session=False,
+        )
+        db.delete(analysis)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Tahlilni o'chirishda xatolik ({analysis_id}): {e}")
+        raise HTTPException(status_code=500, detail="Tahlilni o'chirishda xatolik yuz berdi.")
     return {"success": True}
 
 
