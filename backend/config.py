@@ -245,6 +245,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEYS: str = ""
     GEMINI_PAID_API_KEY: str = ""
     GEMINI_PAID_API_KEYS: str = ""
+    # True: BARCHA so'rovlar (bepul foydalanuvchilarniki ham) avval pullik kalit(lar)ni
+    # ishlatadi, bepul kalitlar faqat zaxira. Bepul kalit limiti ~20 so'rov/kun --
+    # ular bilan boshlash doimiy 429 + qayta urinishlarga olib kelardi (2026-10-23).
+    GEMINI_PAID_KEYS_FIRST_FOR_ALL: bool = True
     GOOGLE_GENERATIVE_AI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
     GEMINI_STT_MODEL: str = "gemini-3.8-flash"

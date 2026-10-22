@@ -209,7 +209,8 @@ def get_gemini_keys_for_request(is_paid: bool = False, allow_paid_fallback: bool
     - is_paid=True (Pullik tarifdagilar / sotib olingan daqiqali dublyajlar):
       Birinchi o'rinda pullik (balansli) kalit(lar), favqulodda zaxira sifatida bepul kalitlar.
     - is_paid=False (Bepul foydalanuvchilar, 2-daqiqalik sinov dublyajlari, bepul tahlillar):
-      Birinchi o'rinda bepul kalitlar (30+ hovuz). Agar barcha bepul kalitlar 429 kvota limiti
+      GEMINI_PAID_KEYS_FIRST_FOR_ALL=True (standart) bo'lsa -- xuddi pullikdagidek, pullik kalit
+      avval. False bo'lsa: birinchi o'rinda bepul kalitlar (30+ hovuz). Agar barcha bepul kalitlar 429 kvota limiti
       yoki cooldown sababli tugasa, foydalanuvchi ishi to'xtab qolmasligi uchun
       avtomatik ravishda pullik kalit(lar)ga favqulodda zaxira sifatida o'tiladi.
     """
@@ -225,11 +226,18 @@ def get_gemini_keys_for_request(is_paid: bool = False, allow_paid_fallback: bool
                 combined.append(k)
         return combined if combined else get_all_gemini_api_keys()
     else:
-        # Bepul foydalanuvchilar: birinchi navbatda bepul kalitlar,
-        # yetmasa pullik kalit(lar) favqulodda zaxira sifatida qo'shiladi.
+        # Bepul foydalanuvchilar: odatda (GEMINI_PAID_KEYS_FIRST_FOR_ALL=True) ular ham
+        # avval pullik kalitni ishlatadi -- bepul kalitlar ~20 so'rov/kun bilan tez tugaydi
+        # va 429/qayta urinishlar dublyajni daqiqalab sekinlashtirardi. False bo'lsa eski
+        # tartib: bepul kalitlar avval, pullik kalit(lar) favqulodda zaxira.
         combined = []
         seen = set()
-        keys_to_merge = (free_keys + paid_keys) if allow_paid_fallback else free_keys
+        if not allow_paid_fallback:
+            keys_to_merge = free_keys
+        elif getattr(get_settings(), "GEMINI_PAID_KEYS_FIRST_FOR_ALL", True):
+            keys_to_merge = paid_keys + free_keys
+        else:
+            keys_to_merge = free_keys + paid_keys
         for k in keys_to_merge:
             if k not in seen:
                 seen.add(k)
