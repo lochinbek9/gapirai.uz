@@ -106,7 +106,9 @@ export interface AdminUserItem {
   name: string | null
   phone: string | null
   role: string
+  is_internal?: boolean
   is_verified: boolean
+  is_active?: boolean
   created_at: string | null
   plan: 'free' | 'standard' | 'pro' | string
   expires_at: string | null
@@ -198,6 +200,54 @@ export async function apiAdminSetPlan(
   payload: { plan: string; days?: number; reset_monthly?: boolean }
 ) {
   const res = await axios.post(`${API_URL}/admin/users/${userId}/set-plan`, payload, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export interface AdminCreateUserPayload {
+  name: string
+  email: string
+  password: string
+  role?: 'user' | 'admin' | string
+  phone?: string
+  is_internal?: boolean
+  is_verified?: boolean
+}
+
+export interface AdminUpdateCredentialsPayload {
+  name?: string
+  email?: string
+  password?: string
+  role?: 'user' | 'admin' | string
+  phone?: string
+  is_internal?: boolean
+  is_verified?: boolean
+  is_active?: boolean
+}
+
+export interface AdminChangeSelfPayload {
+  name?: string
+  email?: string
+  new_password?: string
+}
+
+export async function apiAdminCreateUser(token: string, payload: AdminCreateUserPayload) {
+  const res = await axios.post(`${API_URL}/admin/users`, payload, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminUpdateUserCredentials(token: string, userId: string, payload: AdminUpdateCredentialsPayload) {
+  const res = await axios.patch(`${API_URL}/admin/users/${userId}/credentials`, payload, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminChangeMyCredentials(token: string, payload: AdminChangeSelfPayload) {
+  const res = await axios.post(`${API_URL}/admin/change-my-credentials`, payload, {
     headers: { Authorization: `Bearer ${token}` },
   })
   return res.data

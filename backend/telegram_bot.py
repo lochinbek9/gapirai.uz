@@ -41,6 +41,8 @@ from telegram.ext import (
     filters,
 )
 
+from telegram.error import BadRequest
+
 from backend.config import get_settings
 from backend.models.database import SessionLocal, User, DubbingJob, JobStatus
 from backend.services.job_creation import (
@@ -63,6 +65,16 @@ for _noisy in ("httpx", "httpcore", "telegram.ext.Application"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 logger = logging.getLogger("telegram_bot")
+
+
+async def _safe_edit_text(message, text: str) -> None:
+    """Holat xabarini tahrirlaydi. Tahrir muvaffaqiyatsiz bo'lsa (masalan,
+    tugma ikki marta bosilib, matn allaqachon bir xil -- "Message is not
+    modified") asosiy oqim to'xtab qolmasligi kerak, faqat log qilamiz."""
+    try:
+        await message.edit_text(text)
+    except BadRequest as e:
+        logger.warning(f"Xabarni tahrirlab bo'lmadi: {e}")
 
 settings = get_settings()
 
@@ -166,7 +178,12 @@ async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 def _donate_url() -> str:
-    return f"{(settings.FRONTEND_URL or 'https://gapirai.uz').rstrip('/')}/donate"
+    # Telegram inline-tugmada localhost/http manzilni rad etadi ("wrong http
+    # url") va butun menyu xabari yuborilmay qoladi -- dev'da sayt manziliga qaytamiz.
+    base = (settings.FRONTEND_URL or "").rstrip("/")
+    if not base.startswith("https://"):
+        base = "https://gapirai.uz"
+    return f"{base}/donate"
 
 
 def _miniapp_markup() -> InlineKeyboardMarkup | None:
@@ -384,7 +401,7 @@ async def handle_gender_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     gender_label = "👨 Erkak (Sardor)" if gender == "male" else "👩 Ayol (Madina)" if gender == "female" else "🤖 Avtomatik"
-    await query.message.edit_text(f"Tanlandi: {gender_label}\n\n⏳ Video tekshirilmoqda...")
+    await _safe_edit_text(query.message, f"Tanlandi: {gender_label}\n\n⏳ Video tekshirilmoqda...")
     await _execute_dubbing_job_flow(query.message, chat_id, url, voice_gender=gender, mode=mode)
 
 
@@ -402,6 +419,7 @@ async def _execute_dubbing_job_flow(
         result = await create_dubbing_job(
             db, user, url, voice_gender=voice_gender, subtitle_only=(mode == "subtitle")
         )
+        logger.info(f"[chat {chat_id_str}] dublyaj so'rovi: mode={mode} outcome={result.outcome} job={result.job_id}")
 
         frontend_url = (settings.FRONTEND_URL or "https://gapirai.uz").rstrip("/")
 
@@ -490,7 +508,7 @@ async def handle_file_gender_callback(update: Update, context: ContextTypes.DEFA
         return
 
     gender_label = "👨 Erkak (Sardor)" if gender == "male" else "👩 Ayol (Madina)" if gender == "female" else "🤖 Avtomatik (AI)"
-    await query.message.edit_text(f"Tanlandi: {gender_label}\n\n⏳ Video qabul qilinmoqda va navbatga qo'shilmoqda...")
+    await _safe_edit_text(query.message, f"Tanlandi: {gender_label}\n\n⏳ Video qabul qilinmoqda va navbatga qo'shilmoqda...")
     await _process_video_file_job(
         query.message,
         context.bot,
@@ -745,6 +763,23 @@ async def handle_delete_message_callback(update: Update, context: ContextTypes.D
         logger.warning(f"Admin xabarini o'chirishda xatolik: {e}")
 
 
+async def _on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler'larda tutilmagan xatolar -- to'liq traceback log'ga, foydalanuvchiga
+    esa jim qolib ketmaslik uchun qisqa xabar."""
+    logger.error("Tutilmagan xato", exc_info=context.error)
+    # Bot band bo'lib, tugma bosilishiga kech javob bergan -- foydalanuvchi
+    # uchun bu xato emas, har bir eskirgan bosish uchun xabar yubormaymiz.
+    if isinstance(context.error, BadRequest) and "query is too old" in str(context.error).lower():
+        return
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "Kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring yoki /menu yuboring."
+            )
+        except Exception:
+            pass
+
+
 def main() -> None:
     if not settings.TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN sozlanmagan -- bot ishga tushmaydi.")
@@ -775,6 +810,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_gender_callback, pattern=r"^vg:"))
     app.add_handler(CallbackQueryHandler(handle_file_gender_callback, pattern=r"^vg_file:"))
     app.add_handler(CallbackQueryHandler(handle_resolution_callback, pattern=r"^res:"))
+
+    app.add_error_handler(_on_error)
 
     logger.info("Telegram bot ishga tushdi (long polling).")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

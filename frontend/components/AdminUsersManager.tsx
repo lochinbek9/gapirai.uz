@@ -22,6 +22,12 @@ import {
   Clock,
   AlertTriangle,
   Package,
+  Key,
+  UserPlus,
+  Eye,
+  EyeOff,
+  Shield,
+  Lock,
 } from 'lucide-react'
 import {
   AdminUserItem,
@@ -30,6 +36,8 @@ import {
   apiAdminListUsers,
   apiAdminAddMinutes,
   apiAdminSetPlan,
+  apiAdminCreateUser,
+  apiAdminUpdateUserCredentials,
 } from '@/lib/admin'
 import { formatTashkentDate, formatTashkentDateTimeObj } from '@/lib/timestamp'
 import { getToken } from '@/lib/auth'
@@ -112,6 +120,33 @@ function AdminUsersManagerInner() {
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'pro'>('standard')
   const [planDays, setPlanDays] = useState<number>(30)
   const [resetMonthly, setResetMonthly] = useState<boolean>(true)
+
+  // Create User modal state
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'user' as 'user' | 'admin',
+    is_internal: false,
+  })
+  const [createLoading, setCreateLoading] = useState(false)
+
+  // Edit User Credentials modal state
+  const [editModalUser, setEditModalUser] = useState<AdminUserItem | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'user',
+    is_internal: false,
+    is_verified: true,
+    is_active: true,
+  })
+  const [editLoading, setEditLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const fetchUsers = useCallback(async (
     query: string = '',
@@ -354,6 +389,89 @@ function AdminUsersManagerInner() {
     return list
   }, [serverInsights, safeUsers, total, summary, dateRange])
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const token = getToken()
+    if (!token) return
+
+    if (!createForm.email.trim() || !createForm.password.trim()) {
+      setError("Email va parol kiritilishi shart")
+      return
+    }
+
+    if (createForm.password.trim().length < 6) {
+      setError("Parol kamida 6 belgidan iborat bo'lishi kerak")
+      return
+    }
+
+    setCreateLoading(true)
+    setError(null)
+    try {
+      const res = await apiAdminCreateUser(token, {
+        name: createForm.name.trim(),
+        email: createForm.email.trim(),
+        password: createForm.password.trim(),
+        phone: createForm.phone.trim() || undefined,
+        role: createForm.role,
+        is_internal: createForm.is_internal,
+        is_verified: true,
+      })
+      setSuccessMsg(res.message || "Yangi foydalanuvchi muvaffaqiyatli qo'shildi!")
+      setCreateModalOpen(false)
+      setCreateForm({ name: '', email: '', password: '', phone: '', role: 'user', is_internal: false })
+      fetchUsers(search, page)
+      setTimeout(() => setSuccessMsg(null), 4000)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Foydalanuvchi qo'shishda xatolik yuz berdi")
+    } finally {
+      setCreateLoading(false)
+    }
+  }
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editModalUser) return
+    const token = getToken()
+    if (!token) return
+
+    if (!editForm.email.trim()) {
+      setError("Email bo'sh bo'lishi mumkin emas")
+      return
+    }
+
+    if (editForm.password.trim() && editForm.password.trim().length < 6) {
+      setError("Yangi parol kamida 6 belgidan iborat bo'lishi kerak")
+      return
+    }
+
+    setEditLoading(true)
+    setError(null)
+    try {
+      const payload: any = {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || undefined,
+        role: editForm.role,
+        is_internal: editForm.is_internal,
+        is_verified: editForm.is_verified,
+        is_active: editForm.is_active,
+      }
+      if (editForm.password.trim()) {
+        payload.password = editForm.password.trim()
+      }
+
+      const res = await apiAdminUpdateUserCredentials(token, editModalUser.id, payload)
+      setSuccessMsg(res.message || "Foydalanuvchi ma'lumotlari muvaffaqiyatli yangilandi!")
+      setEditModalUser(null)
+      fetchUsers(search, page)
+      setTimeout(() => setSuccessMsg(null), 4000)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Ma'lumotlarni yangilashda xatolik yuz berdi")
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       {/* Top Header */}
@@ -368,6 +486,20 @@ function AdminUsersManagerInner() {
           </p>
         </div>
 
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateForm({ name: '', email: '', password: '', phone: '', role: 'user', is_internal: false })
+              setShowPassword(false)
+              setCreateModalOpen(true)
+              setError(null)
+            }}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-blue-500/25 shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Yangi odam qo'shish</span>
+          </button>
         {/* Date Range Pills & Refresh */}
         <DateRangePills
           value={dateRange}
@@ -382,6 +514,7 @@ function AdminUsersManagerInner() {
           startDate={startDate}
           endDate={endDate}
         />
+        </div>
       </div>
 
       {/* Filter and Search Bar with CustomSelect (No native white select glare!) */}
@@ -590,6 +723,18 @@ function AdminUsersManagerInner() {
                                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                               </span>
                             )}
+                            {u.role === 'admin' && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                                <Shield className="w-3 h-3" />
+                                ADMIN
+                              </span>
+                            )}
+                            {u.is_active === false && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                                <Lock className="w-3 h-3" />
+                                BLOKLANGAN
+                              </span>
+                            )}
                           </div>
                           {(u.name || u.phone) && u.email && (
                             <div className="text-[11px] text-gray-400 truncate max-w-[200px]">
@@ -682,6 +827,29 @@ function AdminUsersManagerInner() {
                         >
                           <Zap className="w-3.5 h-3.5" />
                           Tarif yoqish
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setEditModalUser(u)
+                            setEditForm({
+                              name: u.name || '',
+                              email: u.email || '',
+                              password: '',
+                              phone: u.phone || '',
+                              role: u.role === 'admin' ? 'admin' : 'user',
+                              is_internal: !!u.is_internal,
+                              is_verified: u.is_verified !== false,
+                              is_active: u.is_active !== false,
+                            })
+                            setShowPassword(false)
+                            setError(null)
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 font-semibold text-xs flex items-center gap-1 transition"
+                          title="Parol, rol va ma'lumotlarni o'zgartirish"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          Tahrirlash
                         </button>
                       </div>
                     </td>
@@ -1084,6 +1252,322 @@ function AdminUsersManagerInner() {
                 >
                   {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Tarifni faollashtirish
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: CREATE USER MODAL */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-blue-400" />
+                  Yangi odam qo'shish
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Oddiy foydalanuvchi yoki administrator yarating
+                </p>
+              </div>
+              <button
+                onClick={() => setCreateModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-red-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUser} noValidate className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300">Ism:</label>
+                <input
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Masalan: Aziz Karimov"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300">Email (login): *</label>
+                <input
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="user@example.com"
+                  autoComplete="off"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300">Parol: *</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="Kamida 6 belgi"
+                    autoComplete="new-password"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-3 pr-10 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    title={showPassword ? 'Yashirish' : "Ko'rsatish"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300">Telefon:</label>
+                <input
+                  type="tel"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="+998 90 123 45 67"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-300">Rol:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'user', label: 'Foydalanuvchi', desc: 'Oddiy hisob', icon: Sparkles },
+                    { id: 'admin', label: 'Administrator', desc: "Admin panelga to'liq kirish", icon: Shield },
+                  ].map((r) => {
+                    const Icon = r.icon
+                    const isSelected = createForm.role === r.id
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setCreateForm((f) => ({ ...f, role: r.id as 'user' | 'admin' }))}
+                        className={`p-3 rounded-xl border text-left transition ${
+                          isSelected
+                            ? r.id === 'admin'
+                              ? 'bg-violet-600/20 border-violet-500 text-white'
+                              : 'bg-blue-600/20 border-blue-500 text-white'
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <Icon className={`w-4 h-4 ${isSelected ? (r.id === 'admin' ? 'text-violet-400' : 'text-blue-400') : 'text-gray-400'}`} />
+                          {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                        </div>
+                        <div className="font-bold text-xs text-white">{r.label}</div>
+                        <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{r.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={createForm.is_internal}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, is_internal: e.target.checked }))}
+                  className="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-0"
+                />
+                <span>Ichki hisob (jamoa a'zosi — statistikaga kirmaydi)</span>
+              </label>
+
+              {createForm.role === 'admin' && (
+                <p className="text-[11px] text-violet-300 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 leading-relaxed">
+                  ⚠️ Administrator barcha foydalanuvchilar, to'lovlar va tizim sozlamalariga to'liq kirish huquqiga ega bo'ladi.
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={createLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                >
+                  {createLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  Qo'shish
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: EDIT CREDENTIALS / ROLE MODAL */}
+      {editModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Key className="w-5 h-5 text-amber-400" />
+                  Parol va rolni o'zgartirish
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
+                  {editModalUser.email || editModalUser.phone || editModalUser.name || 'Foydalanuvchi'}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditModalUser(null)}
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-red-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateCredentials} noValidate className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  Yangi parol:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={editForm.password}
+                    onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="O'zgartirmaslik uchun bo'sh qoldiring"
+                    autoComplete="new-password"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-3 pr-10 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    title={showPassword ? 'Yashirish' : "Ko'rsatish"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500">Kamida 6 belgi. Bo'sh qolsa, joriy parol saqlanadi.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-300">Rol:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'user', label: 'Foydalanuvchi', icon: Sparkles },
+                    { id: 'admin', label: 'Administrator', icon: Shield },
+                  ].map((r) => {
+                    const Icon = r.icon
+                    const isSelected = editForm.role === r.id
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setEditForm((f) => ({ ...f, role: r.id }))}
+                        className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                          isSelected
+                            ? r.id === 'admin'
+                              ? 'bg-violet-600/20 border-violet-500 text-white'
+                              : 'bg-blue-600/20 border-blue-500 text-white'
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {r.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-300">Ism:</label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-300">Telefon:</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-300">Email (login):</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  autoComplete="off"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              <div className="space-y-2 pt-1">
+                {[
+                  { key: 'is_active', label: 'Hisob faol (o\'chirilsa — foydalanuvchi bloklanadi)' },
+                  { key: 'is_verified', label: 'Email tasdiqlangan' },
+                  { key: 'is_internal', label: "Ichki hisob (statistikaga kirmaydi)" },
+                ].map((opt) => (
+                  <label key={opt.key} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm[opt.key as 'is_active' | 'is_verified' | 'is_internal']}
+                      onChange={(e) => setEditForm((f) => ({ ...f, [opt.key]: e.target.checked }))}
+                      className="rounded bg-white/5 border-white/10 text-amber-500 focus:ring-0"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditModalUser(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                >
+                  {editLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Saqlash
                 </button>
               </div>
             </form>

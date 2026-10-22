@@ -35,7 +35,10 @@ services:
     ports:
       - "${COMPOSE_HOST_IP:-127.0.0.1}:6379:6379"
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'cat /dev/null > /dev/tcp/localhost/6379' 2>/dev/null && echo ok || exit 1"]
+      # redis:7-alpine image'ida bash yo'q -- avvalgi /dev/tcp tekshiruvi doim
+      # yiqilardi (container doim "unhealthy", telegram_bot ishga tushmasdi).
+      # busybox nc bilan oddiy TCP tekshiruvi (parol talab qilmaydi).
+      test: ["CMD-SHELL", "nc -z localhost 6379 || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5

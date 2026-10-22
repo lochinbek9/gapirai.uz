@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from pydantic import BaseModel
@@ -5,7 +6,7 @@ from sqlalchemy import func, or_, and_, select, case, distinct, text
 from backend.models.database import SessionLocal, User, DubbingJob, ContentViolation, Subscription, PlanTier, BroadcastCampaign, ExcludedEmail, TTSUsageLog, JobStatus
 from backend.models.payment import Payment, PaymentStatus
 from backend.config import get_settings
-from backend.services.auth import get_current_admin_user
+from backend.services.auth import get_current_admin_user, hash_password, create_access_token
 from backend.services.plans import get_or_create_subscription, get_minute_balance, PLANS
 from backend.services.timezone_utils import to_tashkent_iso
 
@@ -659,6 +660,7 @@ def admin_list_users(
                 "role": u.role,
                 "is_internal": getattr(u, "is_internal", False),
                 "is_verified": u.is_verified,
+                "is_active": u.is_active,
                 "created_at": to_tashkent_iso(u.created_at),
                 "plan": sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan),
                 "expires_at": to_tashkent_iso(sub.expires_at),
@@ -682,6 +684,231 @@ def admin_list_users(
                 "period_label": period_label,
             },
             "insights": insights,
+        }
+    finally:
+        db.close()
+
+
+class AdminCreateUserRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str = "user"  # "user" | "admin"
+    phone: str | None = None
+    is_internal: bool = False
+    is_verified: bool = True
+
+
+class AdminUpdateUserCredentialsRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    password: str | None = None
+    role: str | None = None  # "user" | "admin"
+    phone: str | None = None
+    is_internal: bool | None = None
+    is_verified: bool | None = None
+    is_active: bool | None = None
+
+
+class AdminChangeSelfCredentialsRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    new_password: str | None = None
+
+
+@router.post("/users")
+def admin_create_user(
+    req: AdminCreateUserRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel: yangi foydalanuvchi yoki administrator qo'shish."""
+    email = req.email.lower().strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email kiritilishi shart.")
+    if len(req.password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="Parol kamida 6 belgidan iborat bo'lishi kerak.")
+
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(func.lower(User.email) == email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Ushbu email bilan foydalanuvchi allaqachon mavjud.")
+
+        phone = req.phone.strip() if req.phone and req.phone.strip() else None
+        if phone:
+            existing_phone = db.query(User).filter(User.phone == phone).first()
+            if existing_phone:
+                raise HTTPException(status_code=400, detail="Ushbu telefon raqami bilan foydalanuvchi allaqachon mavjud.")
+
+        role = req.role.strip().lower() if req.role else "user"
+        if role not in ("user", "admin"):
+            role = "user"
+
+        new_user = User(
+            id=uuid.uuid4(),
+            email=email,
+            name=req.name.strip() or email.split("@")[0],
+            phone=phone,
+            password_hash=hash_password(req.password.strip()),
+            role=role,
+            is_verified=req.is_verified,
+            is_active=True,
+            is_internal=req.is_internal,
+            created_at=datetime.utcnow(),
+            last_active_at=datetime.utcnow(),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        # Standart tarifini yaratish
+        get_or_create_subscription(db, new_user.id)
+
+        return {
+            "success": True,
+            "message": f"Foydalanuvchi muvaffaqiyatli yaratildi ({role})",
+            "user": {
+                "id": str(new_user.id),
+                "email": new_user.email,
+                "name": new_user.name,
+                "phone": new_user.phone,
+                "role": new_user.role,
+                "is_internal": new_user.is_internal,
+                "is_verified": new_user.is_verified,
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.patch("/users/{user_id}/credentials")
+def admin_update_user_credentials(
+    user_id: str,
+    req: AdminUpdateUserCredentialsRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel: istalgan foydalanuvchining login (email), parol, ism va rolini o'zgartirish."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+
+        # Admin o'zini o'zi admin'likdan tushirib yoki bloklab qo'ysa, panelga
+        # qaytib kira olmay qoladi -- buni faqat boshqa admin qila oladi.
+        if user.id == current_user.id:
+            if req.role is not None and req.role.strip().lower() != "admin":
+                raise HTTPException(status_code=400, detail="O'zingizning admin rolingizni olib tashlay olmaysiz.")
+            if req.is_active is False:
+                raise HTTPException(status_code=400, detail="O'z hisobingizni bloklay olmaysiz.")
+
+        if req.email is not None:
+            new_email = req.email.lower().strip()
+            if not new_email:
+                raise HTTPException(status_code=400, detail="Email bo'sh bo'lishi mumkin emas.")
+            if new_email != (user.email or "").lower():
+                conflict = db.query(User).filter(func.lower(User.email) == new_email, User.id != user.id).first()
+                if conflict:
+                    raise HTTPException(status_code=400, detail="Bu email allaqachon boshqa foydalanuvchiga tegishli.")
+                user.email = new_email
+
+        if req.name is not None and req.name.strip():
+            user.name = req.name.strip()
+
+        if req.phone is not None:
+            p = req.phone.strip() or None
+            if p and p != user.phone:
+                conflict_phone = db.query(User).filter(User.phone == p, User.id != user.id).first()
+                if conflict_phone:
+                    raise HTTPException(status_code=400, detail="Bu telefon raqam allaqachon ro'yxatdan o'tgan.")
+            user.phone = p
+
+        if req.password is not None and req.password.strip():
+            if len(req.password.strip()) < 6:
+                raise HTTPException(status_code=400, detail="Yangi parol kamida 6 belgidan iborat bo'lishi kerak.")
+            user.password_hash = hash_password(req.password.strip())
+
+        if req.role is not None:
+            r = req.role.strip().lower()
+            if r in ("user", "admin"):
+                user.role = r
+
+        if req.is_internal is not None:
+            user.is_internal = req.is_internal
+
+        if req.is_verified is not None:
+            user.is_verified = req.is_verified
+
+        if req.is_active is not None:
+            user.is_active = req.is_active
+
+        db.commit()
+        db.refresh(user)
+
+        return {
+            "success": True,
+            "message": "Foydalanuvchi ma'lumotlari muvaffaqiyatli yangilandi",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "phone": user.phone,
+                "role": user.role,
+                "is_internal": user.is_internal,
+                "is_verified": user.is_verified,
+                "is_active": user.is_active,
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/change-my-credentials")
+def admin_change_my_credentials(
+    req: AdminChangeSelfCredentialsRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin o'zining login (email), ism va/yoki yangi parolini o'zgartirishi."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == current_user.id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Hisob topilmadi.")
+
+        if req.email is not None:
+            new_email = req.email.lower().strip()
+            if not new_email:
+                raise HTTPException(status_code=400, detail="Email bo'sh bo'lishi mumkin emas.")
+            if new_email != (user.email or "").lower():
+                conflict = db.query(User).filter(func.lower(User.email) == new_email, User.id != user.id).first()
+                if conflict:
+                    raise HTTPException(status_code=400, detail="Bu email allaqachon boshqa foydalanuvchiga tegishli.")
+                user.email = new_email
+
+        if req.name is not None and req.name.strip():
+            user.name = req.name.strip()
+
+        if req.new_password is not None and req.new_password.strip():
+            if len(req.new_password.strip()) < 6:
+                raise HTTPException(status_code=400, detail="Yangi parol kamida 6 belgidan iborat bo'lishi kerak.")
+            user.password_hash = hash_password(req.new_password.strip())
+
+        db.commit()
+        db.refresh(user)
+
+        # Yangilangan email bilan yangi token yaratamiz
+        new_token = create_access_token(str(user.id), user.email)
+
+        return {
+            "success": True,
+            "message": "Login va parol muvaffaqiyatli o'zgartirildi!",
+            "access_token": new_token,
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "role": user.role,
+            },
         }
     finally:
         db.close()

@@ -389,8 +389,9 @@ def merge_video_audio(
                     f"STDERR:\n{fb_stderr}"
                 )
             raise RuntimeError(
-                f"FFmpeg xatoligi (suv belgisi va fallback ham muvaffaqiyatsiz):\n"
-                f"Returncode={result_fb.returncode}\nSTDERR:\n{fb_stderr}"
+                f"FFmpeg xatoligi (suv belgisi va fallback ham muvaffaqiyatsiz, exit={result_fb.returncode}): "
+                f"chiqish video fayli yaratilmadi yoki bo'sh (0 bayt): {output_path}\n"
+                f"STDERR:\n{fb_stderr}"
             )
 
         raise RuntimeError(
