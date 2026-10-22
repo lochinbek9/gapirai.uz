@@ -3075,6 +3075,16 @@ def get_unactivated_users(
     """
     db = SessionLocal()
     try:
+        # Normalize Query params if called programmatically
+        page_val = page if isinstance(page, int) else 1
+        page_size_val = page_size if isinstance(page_size, int) else 25
+        filter_type_val = filter_type if isinstance(filter_type, str) else "all"
+        search_val = search.strip() if isinstance(search, str) and search.strip() else None
+        sort_by_val = sort_by if isinstance(sort_by, str) else "newest"
+        dr = (date_range if isinstance(date_range, str) else "today").strip().lower()
+        start_date_val = start_date if isinstance(start_date, str) else None
+        end_date_val = end_date if isinstance(end_date, str) else None
+
         # 0. Sana oralig'i filtri (Toshkent vaqti UTC+5)
         TASHKENT_OFFSET = timedelta(hours=5)
         tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
@@ -3082,7 +3092,6 @@ def get_unactivated_users(
         date_start_utc = None
         date_end_utc = None
 
-        dr = (date_range or "today").strip().lower()
         if dr == "today":
             dt = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day)
             date_start_utc = dt - TASHKENT_OFFSET
@@ -3098,12 +3107,12 @@ def get_unactivated_users(
         elif dr == "90d":
             dt = tashkent_today_date - timedelta(days=89)
             date_start_utc = datetime(dt.year, dt.month, dt.day) - TASHKENT_OFFSET
-        elif dr == "custom" and start_date:
+        elif dr == "custom" and start_date_val:
             try:
-                s_parts = [int(p) for p in start_date.split("-")]
+                s_parts = [int(p) for p in start_date_val.split("-")]
                 date_start_utc = datetime(s_parts[0], s_parts[1], s_parts[2]) - TASHKENT_OFFSET
-                if end_date:
-                    e_parts = [int(p) for p in end_date.split("-")]
+                if end_date_val:
+                    e_parts = [int(p) for p in end_date_val.split("-")]
                     date_end_utc = datetime(e_parts[0], e_parts[1], e_parts[2]) + timedelta(days=1) - TASHKENT_OFFSET
             except Exception:
                 pass
@@ -3246,20 +3255,20 @@ def get_unactivated_users(
             *user_date_filters
         )
 
-        if filter_type == "never_attempted":
+        if filter_type_val == "never_attempted":
             q_users = q_users.filter(
                 or_(user_jobs_agg.c.total_jobs.is_(None), user_jobs_agg.c.total_jobs == 0)
             )
-        elif filter_type == "failed_attempt":
+        elif filter_type_val == "failed_attempt":
             q_users = q_users.filter(user_jobs_agg.c.failed_jobs > 0)
-        elif filter_type == "awaiting_payment":
+        elif filter_type_val == "awaiting_payment":
             q_users = q_users.filter(
                 user_jobs_agg.c.awaiting_jobs > 0,
                 user_jobs_agg.c.failed_jobs == 0
             )
 
-        if search and search.strip():
-            term = f"%{search.strip()}%"
+        if search_val:
+            term = f"%{search_val}%"
             q_users = q_users.filter(
                 or_(
                     User.email.ilike(term),
@@ -3269,17 +3278,17 @@ def get_unactivated_users(
             )
 
         total_filtered = q_users.count()
-        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        total_pages = max(1, (total_filtered + page_size_val - 1) // page_size_val)
 
-        if sort_by == "oldest":
+        if sort_by_val == "oldest":
             q_users = q_users.order_by(User.created_at.asc())
-        elif sort_by == "most_attempts":
+        elif sort_by_val == "most_attempts":
             q_users = q_users.order_by(user_jobs_agg.c.total_jobs.desc().nullslast(), User.created_at.desc())
         else: # newest
             q_users = q_users.order_by(User.created_at.desc())
 
-        offset = (page - 1) * page_size
-        user_rows = q_users.offset(offset).limit(page_size).all()
+        offset = (page_val - 1) * page_size_val
+        user_rows = q_users.offset(offset).limit(page_size_val).all()
 
         page_user_ids = [u.id for u, _, _, _, _ in user_rows]
         latest_jobs_by_user = {}
@@ -3337,8 +3346,8 @@ def get_unactivated_users(
         return {
             "summary": {
                 "date_range": dr,
-                "start_date": start_date,
-                "end_date": end_date,
+                "start_date": start_date_val,
+                "end_date": end_date_val,
                 "total_users": total_real_users,
                 "completed_users": completed_users_count,
                 "completed_pct": calc_pct(completed_users_count, total_real_users),
@@ -3353,8 +3362,8 @@ def get_unactivated_users(
             },
             "top_reasons": top_reasons,
             "pagination": {
-                "page": page,
-                "page_size": page_size,
+                "page": page_val,
+                "page_size": page_size_val,
                 "total_items": total_filtered,
                 "total_pages": total_pages,
             },
