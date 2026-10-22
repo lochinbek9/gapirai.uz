@@ -184,32 +184,28 @@ def _synthesize_text(
         logger.error(f"{primary.name} TTS doimiy xatolik — fallbackka urinilmaydi: {exc}")
         raise RuntimeError(f"{primary.name} TTS doimiy xatolik: {exc}") from exc
 
-    # Gemini TTS kvota yoki rate limit tufayli ishlamasa, butun jarayon to'xtab qolmasligi uchun
-    # ishonchli zaxira (Edge/Azure) orqali ovoz yaratishni davom ettiramiz:
-    if primary.name == "gemini" or provider_name == "gemini":
-        logger.warning(f"Gemini TTS ovoz yarata olmadi ({voice_name}) — zaxira provayderga (Edge/Azure) xavfsiz fallback qilinmoqda.")
-
-    # --- Fallback zanjiri: Azure, Gemini va Edge o'zaro bir-birini sug'urtalaydi ---
+    # --- Fallback zanjiri: faqat bitta ovoz oilasiga tegishli provayderlar bir-birini sug'urtalaydi ---
+    # Muhim qoida: Gemini ovozi (Charon/Autonoe) bilan Azure/Edge (Sardor/Madina) ovozi mutlaqo
+    # ikki xil odam. Video ichida ovoz o'zgarib ketmasligi uchun Gemini ovozi Azure/Edge ga
+    # fallback qilinmaydi (va aksincha).
     fallback_chain = []
     az = get_provider("azure")
     has_azure = az.is_available() if hasattr(az, "is_available") else bool(getattr(settings, "AZURE_SPEECH_KEY", None))
 
     if primary.name == "edge":
+        # Edge yiqilsa, rasmiy Azure Neural'ga o'tadi (ovoz 100% bir xil: Sardor / Madina)
         if has_azure:
             fallback_chain.append("azure")
-        fallback_chain.append("gemini")
-    elif primary.name == "gemini":
-        if has_azure:
-            fallback_chain.append("azure")
-        fallback_chain.append("edge")
     elif primary.name == "azure":
-        fallback_chain.append("gemini")
+        # Azure yiqilsa, Edge'ga o'tadi (ovoz 100% bir xil: Sardor / Madina)
         fallback_chain.append("edge")
+    elif primary.name == "gemini":
+        # Gemini (Charon / Autonoe) faqat o'zining ichki modellar hovuzi va pullik kalitlari orqali qayta urinadi.
+        # Azure yoki Edge ga o'tib ketilmaydi — ovoz bitta videoda boshidan oxirigacha 100% bir xil saqlanadi.
+        pass
     else:
         if has_azure:
             fallback_chain.append("azure")
-        if primary.name != "gemini":
-            fallback_chain.append("gemini")
         if primary.name != "edge":
             fallback_chain.append("edge")
 
@@ -238,19 +234,6 @@ def _synthesize_text(
                 return fallback.name
         except PermanentTTSError as exc:
             logger.error(f"{fb_candidate} fallback doimiy xatolik: {exc}")
-    # 4. Agar barcha oddiy provayderlar va bepul zaxiralar yiqilsa, foydalanuvchiga xatolik ko'rsatmaslik uchun
-    # oxirgi ishonchli xavfsizlik to'ri sifatida pullik Gemini kaliti orqali sintez qilib beramiz:
-    try:
-        gemini_paid_prov = get_provider("gemini")
-        paid_key = getattr(settings, "GEMINI_PAID_API_KEY", None) or os.environ.get("GEMINI_PAID_API_KEY")
-        if paid_key:
-            fb_voice = "Autonoe" if voice_name in ("uz-UZ-MadinaNeural", "Madina", "Autonoe") else "Charon"
-            if gemini_paid_prov.synthesize(text, output_path, voice_name=fb_voice, is_paid=True):
-                log_tts_usage(gemini_paid_prov, text, output_path, video_id=video_id, user_id=user_id)
-                logger.info(f"Favqulodda xavfsizlik to'ri: pullik Gemini orqali segment muvaffaqiyatli sintez qilindi (voice={fb_voice}).")
-                return "gemini"
-    except Exception as exc:
-        logger.warning(f"Favqulodda pullik Gemini zaxirasi ham ishlamadi: {exc}")
 
     raise RuntimeError(f"Barcha TTS providerlari muvaffaqiyatsiz: '{text[:50]}...'")
 

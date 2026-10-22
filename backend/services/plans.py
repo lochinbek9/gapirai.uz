@@ -208,13 +208,46 @@ def get_max_resolution_for_job(db, job) -> str:
     return PLANS[sub.plan.value].max_resolution
 
 
+LEGACY_TTS_CUTOFF = datetime(2026, 10, 22, 14, 0, 0)  # 2026-10-22 gacha paket/tarif olgan eski mijozlar
+
+
+def is_legacy_paid_customer(db, user_id) -> bool:
+    """2026-10-22 14:00 gacha paket yoki tarif xarid qilgan mavjud mijozlar.
+    Ular uchun Variant A (Edge TTS -> Azure zaxira) saqlanadi.
+    """
+    if not user_id:
+        return False
+    try:
+        from backend.models.payment import Payment, PaymentStatus
+        has_old_payment = db.query(Payment.id).filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.APPROVED,
+            Payment.created_at < LEGACY_TTS_CUTOFF
+        ).first() is not None
+        if has_old_payment:
+            return True
+
+        sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+        if sub and getattr(sub, "created_at", None) and sub.created_at < LEGACY_TTS_CUTOFF:
+            if sub.purchased_minutes > 0 or sub.plan in (PlanTier.STANDARD, PlanTier.PRO):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def get_tts_provider_for_job(db, job) -> str:
-    """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi.
-    Default tanlov barcha foydalanuvchilar uchun — gemini.
+    """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi:
+    1. Agar job.tts_provider qo'lda (admin yoki API orqali) ko'rsatilgan bo'lsa — o'sha ishlatiladi.
+    2. Agar foydalanuvchi 2026-10-22 gacha xarid qilgan eski mijoz bo'lsa — 'edge' (Variant A: Edge -> Azure).
+    3. Qolgan barcha holatlar (yangi xaridlar, yangi ro'yxatdan o'tganlar, preview bepul foydalanuvchilar) — 'gemini' (Pullik Gemini TTS).
     """
     tts = getattr(job, "tts_provider", None)
     if isinstance(tts, str) and tts.strip():
         return tts.lower().strip()
+
+    if getattr(job, "user_id", None) and is_legacy_paid_customer(db, job.user_id):
+        return "edge"
 
     return "gemini"
 

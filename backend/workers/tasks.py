@@ -1062,13 +1062,18 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.SYNTHESIZING, 60.0,
                         f"O'zbek ovozi yaratilmoqda ({'ayol' if gender == 'female' else 'erkak'} ovozi)...")
             tts_dir = str(output_dir / "audio" / "tts_segments")
+            # Yangi qoida: Agar tts_provider == 'gemini' bo'lsa, hatto yangi bepul (preview)
+            # foydalanuvchilar uchun ham pullik Gemini kalitlaridan foydalaniladi (is_paid=True),
+            # shunda ovoz yuqori sifatli, tabiiy, va tezkor sintez bo'ladi (rate limitga uchramaydi).
+            tts_is_paid = True if tts_provider == "gemini" else is_paid_job
+
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
                 existing_qa=job.segment_qa,
                 progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
                 provider_name=tts_provider,
-                is_paid=is_paid_job,
+                is_paid=tts_is_paid,
             )
             job.dubbed_audio_path = dubbed_audio_path
             if tts_provider == "gemini":
