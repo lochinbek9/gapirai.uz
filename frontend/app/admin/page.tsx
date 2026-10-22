@@ -720,11 +720,15 @@ export default function AdminPage() {
             {/* Quick Recent Jobs with 1-Click Retry */}
             <section className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
-                    So‘nggi dublyaj ishlari (Jonli navbat & holat)
-                  </h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Oxirgi 50 ta video (Xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                      Bugungi dublyaj ishlari (Jonli navbat & holat)
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                      {stats.recent_jobs.length} ta bugun
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Faqat bugungi videolar (Maksimal 50 ta, xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
                 </div>
                 <button
                   onClick={() => handleTabChange('jobs')}
@@ -747,7 +751,14 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recent_jobs.slice(0, 15).map((j) => {
+                    {stats.recent_jobs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                          Bugun hali yangi dublyaj ishlari yaratilmagan.
+                        </td>
+                      </tr>
+                    ) : (
+                      stats.recent_jobs.slice(0, 50).map((j) => {
                       const isNoSpeech = j.error_code === 'NO_SPEECH_FOUND'
                       const isSuccess = j.status === 'COMPLETED'
                       const isFailed = j.status === 'FAILED'

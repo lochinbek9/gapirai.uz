@@ -125,10 +125,17 @@ def admin_stats(
             for u in recent_u_q.order_by(User.created_at.desc()).limit(10).all()
         ]
 
-        # ── So'nggi joblar ──
+        # ── Toshkent vaqti bo'yicha Bugun va Kecha (UTC+5) ──
+        TASHKENT_OFFSET = timedelta(hours=5)
+        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
+        tashkent_today_date = tashkent_now.date()
+        today_start_utc = datetime(tashkent_today_date.year, tashkent_today_date.month, tashkent_today_date.day) - TASHKENT_OFFSET
+
+        # ── So'nggi joblar (Faqat bugungi kun, Toshkent vaqti bo'yicha, max 50 ta) ──
         recent_jobs_query = (
             db.query(DubbingJob, User.email)
             .outerjoin(User, DubbingJob.user_id == User.id)
+            .filter(DubbingJob.created_at >= today_start_utc)
         )
         if recent_jobs_user_filter is not None:
             recent_jobs_query = recent_jobs_query.filter(recent_jobs_user_filter)
@@ -151,11 +158,6 @@ def admin_stats(
             }
             for job, email in recent_jobs_rows
         ]
-
-        # ── Toshkent vaqti bo'yicha Bugun va Kecha (UTC+5) ──
-        TASHKENT_OFFSET = timedelta(hours=5)
-        tashkent_now = datetime.utcnow() + TASHKENT_OFFSET
-        tashkent_today_date = tashkent_now.date()
 
         # Trendlar (faqat real mijozlar)
         trend_since = now - timedelta(days=TREND_DAYS)
