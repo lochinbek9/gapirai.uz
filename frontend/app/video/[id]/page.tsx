@@ -1738,17 +1738,27 @@ export default function VideoPage() {
       )}
 
       {/* Modern Cancel Confirmation Modal */}
-      <ConfirmModal
-        isOpen={confirmCancelOpen}
-        onClose={() => setConfirmCancelOpen(false)}
-        onConfirm={handleExecuteCancel}
-        loading={cancelLoading}
-        title="Dublyaj jarayonini bekor qilish"
-        message="Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz?"
-        confirmText="Ha, bekor qilinsin"
-        cancelText="Ortga"
-        danger
-      />
+      {(() => {
+        const currentElapsedSec = getElapsedSeconds(job, currentTime, sessionStartRef.current);
+        const isCancelPastOneMinute = currentElapsedSec > 60;
+        return (
+          <ConfirmModal
+            isOpen={confirmCancelOpen}
+            onClose={() => setConfirmCancelOpen(false)}
+            onConfirm={handleExecuteCancel}
+            loading={cancelLoading}
+            title="Dublyaj jarayonini bekor qilish"
+            message={
+              isCancelPastOneMinute
+                ? "⚠️ Diqqat: Jarayon boshlanganiga 1 daqiqadan oshdi! Server va AI resurslari (STT, tarjima va ovoz yozish) sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
+                : "Haqiqatan ham ushbu videoni qayta ishlashni to'xtatmoqchimisiz? Dastlabki 1 daqiqa ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi."
+            }
+            confirmText={isCancelPastOneMinute ? "Ha, limit qaytarilmasligiga roziman" : "Ha, bekor qilinsin"}
+            cancelText="Ortga (davom ettirish)"
+            danger
+          />
+        );
+      })()}
 
       {/* 24-Hour 10% Welcome Discount Modal for First Video */}
       {job?.discount_offer && (

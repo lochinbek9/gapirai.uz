@@ -235,12 +235,16 @@ export default function Home() {
 
   const handleCancel = async () => {
     if (!jobId) return;
-    if (!confirm("Rostdan ham jarayonni bekor qilmoqchimisiz?")) return;
+    const isPastOneMin = (elapsed || 0) > 60;
+    const confirmMsg = isPastOneMin
+      ? "⚠️ Diqqat: Jarayon boshlanganiga 1 daqiqadan oshdi! Server va AI resurslari (STT, tarjima va ovoz yaratish) sarflangani sababli, bekor qilsangiz sarflangan daqiqalar (limit) hisobingizga QAYTARILMAYDI!\n\nJarayonni bekor qilishni tasdiqlaysizmi?"
+      : "Haqiqatan ham jarayonni bekor qilmoqchimisiz? Dastlabki 1 daqiqa ichida bo'lgani sababli sarflangan daqiqalaringiz hisobingizga to'liq qaytariladi.";
+    if (!confirm(confirmMsg)) return;
     setCancelLoading(true);
     try {
       const res = await cancelJob(jobId);
       if (res.success) {
-        alert("Jarayon muvaffaqiyatli bekor qilindi.");
+        alert(res.message || "Jarayon muvaffaqiyatli bekor qilindi.");
         clearJobId();
         setJobId(null);
       } else {

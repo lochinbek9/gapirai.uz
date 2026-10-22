@@ -1620,20 +1620,36 @@ def cancel_job(
     except Exception:
         pass
     
-    job.status = JobStatus.FAILED
-    job.status_message = "Foydalanuvchi tomonidan bekor qilindi."
-    job.error_code = "USER_CANCELLED"
-    job.error_message = "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
-    job.updated_at = datetime.utcnow()
+    now_utc = datetime.utcnow()
+    created_at = job.created_at or now_utc
+    elapsed_seconds = (now_utc - created_at).total_seconds()
+    limit_refunded = False
 
-    # Agar kvota sarflangan bo'lsa, foydalanuvchiga qaytarish (preview bundan mustasno)
-    if getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False):
-        try:
-            from backend.services.plans import refund_quota
-            refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)
-            job.quota_consumed = False
-        except Exception:
-            pass
+    # 2026-10-22: Sekundomer 1 daqiqadan (60 soniyadan) o'tgach bekor qilish kvotani/limitni qaytarmaydi.
+    # Server va AI resurslari (STT, tarjima, ovoz yaratish) allaqachon sarflangan bo'ladi.
+    if elapsed_seconds <= 60.0:
+        if getattr(job, "quota_consumed", False) and not getattr(job, "is_preview", False):
+            try:
+                from backend.services.plans import refund_quota
+                refund_quota(db, job.user_id, (job.video_duration or 0.0) / 60.0)
+                job.quota_consumed = False
+                limit_refunded = True
+            except Exception:
+                pass
+        msg = "Dublyaj bekor qilindi. Sarflangan daqiqalar hisobingizga qaytarildi."
+        status_msg = "Foydalanuvchi tomonidan bekor qilindi (daqiqalar qaytarildi)."
+    else:
+        logger.info(
+            f"Job {job_id} bekor qilindi, lekin ishga tushganiga {elapsed_seconds:.1f}s (>60s) bo'lgani sababli kvota qaytarilmadi."
+        )
+        msg = "Dublyaj bekor qilindi. Jarayon boshlanganiga 1 daqiqadan oshgani sababli sarflangan daqiqalar qaytarilmadi."
+        status_msg = "Foydalanuvchi tomonidan bekor qilindi (1 daqiqadan oshgani sababli limit qaytarilmadi)."
+
+    job.status = JobStatus.FAILED
+    job.status_message = status_msg
+    job.error_code = "USER_CANCELLED"
+    job.error_message = msg
+    job.updated_at = now_utc
 
     db.commit()
 
@@ -1647,7 +1663,7 @@ def cancel_job(
             except Exception:
                 pass
 
-    return {"success": True, "message": "Dublyaj bekor qilindi."}
+    return {"success": True, "message": msg, "refunded": limit_refunded}
 
 
 class PlatformFeedbackRequest(BaseModel):
