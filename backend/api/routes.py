@@ -780,10 +780,13 @@ def delete_job(
     except Exception as e:
         logger.warning(f"Celery taskini bekor qilishda xatolik ({job.id}): {e}")
 
-    # 2. Checkpointlarni tozalash (Redis/disk)
+    # 2. S3 checkpointlarini tozalash -- delete_checkpoint fayl nomini ham talab
+    # qiladi (ilgari faqat job_id bilan chaqirilib, har safar TypeError bilan
+    # jim o'tib ketardi va checkpointlar S3'da qolib ketardi).
     try:
         from backend.services.job_checkpoint import delete_checkpoint
-        delete_checkpoint(str(job.id))
+        for checkpoint_name in ("video.mp4", "audio.wav", "dubbed_audio.wav", "dubbed_final.mp4"):
+            delete_checkpoint(str(job.id), checkpoint_name)
     except Exception as e:
         logger.warning(f"Checkpointni tozalashda xatolik ({job.id}): {e}")
 

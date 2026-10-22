@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 import uuid
 from backend.api.routes import delete_job
 from backend.models.database import DubbingJob, ResolutionVariant, User
@@ -27,7 +27,10 @@ class TestDeleteJob(unittest.TestCase):
             res = delete_job(job_id=job_id, db=db, current_user=owner)
             self.assertEqual(res.status_code, 204)
             mock_revoke.assert_called_once_with(str(job_id), terminate=True)
-            mock_checkpoint.assert_called_once_with(str(job_id))
+            mock_checkpoint.assert_has_calls(
+                [call(str(job_id), name) for name in ("video.mp4", "audio.wav", "dubbed_audio.wav", "dubbed_final.mp4")],
+                any_order=True,
+            )
             db.delete.assert_called_once_with(job)
             db.commit.assert_called_once()
 
