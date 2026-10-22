@@ -97,6 +97,7 @@ function AdminUsersManagerInner() {
   // Minute Top-up / Deduct modal state
   const [minuteModalUser, setMinuteModalUser] = useState<AdminUserItem | null>(null)
   const [actionType, setActionType] = useState<'add' | 'deduct'>('add')
+  const [balanceType, setBalanceType] = useState<'kuymas' | 'tarif'>('kuymas')
   const [amountUzs, setAmountUzs] = useState<string>('')
   const [minutes, setMinutes] = useState<string>('')
   const [ratePerMinute, setRatePerMinute] = useState<number>(500)
@@ -210,12 +211,14 @@ function AdminUsersManagerInner() {
         amount_uzs: !isNaN(numAmount) && numAmount > 0 ? numAmount : undefined,
         rate_per_minute: ratePerMinute,
         action: actionType,
+        target: balanceType,
       })
       setSuccessMsg(res.message || (actionType === 'deduct' ? "Daqiqalar muvaffaqiyatli ayirildi!" : "Daqiqalar muvaffaqiyatli qo'shildi!"))
       setMinuteModalUser(null)
       setAmountUzs('')
       setMinutes('')
       setActionType('add')
+      setBalanceType('kuymas')
       fetchUsers(search, page)
       setTimeout(() => setSuccessMsg(null), 4000)
     } catch (err: any) {
@@ -611,6 +614,7 @@ function AdminUsersManagerInner() {
                             setMinuteModalUser(u)
                             setAmountUzs('')
                             setMinutes('')
+                            setBalanceType('kuymas')
                             setError(null)
                           }}
                           className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex items-center gap-1 transition"
@@ -715,11 +719,73 @@ function AdminUsersManagerInner() {
               </button>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs flex justify-between items-center">
-              <span className="text-gray-400">Joriy balans:</span>
-              <span className="text-emerald-400 font-bold">
-                {minuteModalUser.balance?.total_available ?? 0} daqiqa (kuymas: {minuteModalUser.balance?.purchased ?? 0} daq)
-              </span>
+            {/* Balans turi tanlash (Kuymas vs Tarif) */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Daqiqa / Balans turi:</span>
+                <span className="text-gray-500 font-normal lowercase">qaysi balansga ta'sir qilsin?</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBalanceType('kuymas')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    balanceType === 'kuymas'
+                      ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Kuymas daqiqa
+                    </span>
+                    {balanceType === 'kuymas' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  </div>
+                  <div className="text-[10px] text-gray-400 leading-tight">
+                    Paket (muddatsiz, oydan-oyga o'tadi)
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBalanceType('tarif')}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                    balanceType === 'tarif'
+                      ? 'bg-blue-500/15 border-blue-500/50 text-white shadow-sm'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Tarif / Oylik
+                    </span>
+                    {balanceType === 'tarif' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                  </div>
+                  <div className="text-[10px] text-gray-400 leading-tight">
+                    Oylik reja kvotasi (oy oxirida yangilanadi)
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Joriy balans ko'rsatkichi */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs flex flex-col gap-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Jami mavjud balans:</span>
+                <span className="text-white font-extrabold text-sm">
+                  {minuteModalUser.balance?.total_available ?? 0} daqiqa
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-white/5">
+                <span className="text-blue-300 font-medium">
+                  Oylik tarif: {minuteModalUser.balance?.monthly_remaining ?? 0}/{minuteModalUser.balance?.monthly_cap ?? 5} daq
+                </span>
+                <span className="text-emerald-400 font-semibold">
+                  Kuymas paket: {minuteModalUser.balance?.purchased ?? 0} daq
+                </span>
+              </div>
             </div>
 
             {/* Quick presets */}
@@ -802,9 +868,17 @@ function AdminUsersManagerInner() {
 
               <p className="text-[11px] text-gray-400 leading-relaxed">
                 {actionType === 'deduct' ? (
-                  <>⚠️ Belgilangan daqiqa foydalanuvchining <span className="text-rose-400 font-semibold">balansidan yechib olinadi</span>.</>
+                  balanceType === 'tarif' ? (
+                    <>⚠️ Belgilangan daqiqa foydalanuvchining <span className="text-rose-400 font-semibold">oylik tarif kvotasidan</span> yechib olinadi.</>
+                  ) : (
+                    <>⚠️ Belgilangan daqiqa foydalanuvchining <span className="text-rose-400 font-semibold">kuymaydigan (paket) balansidan</span> yechib olinadi.</>
+                  )
                 ) : (
-                  <>ℹ️ Qo'shilgan daqiqalar foydalanuvchining <span className="text-emerald-400 font-semibold">kuymaydigan balansi</span>ga yoziladi va oylik obuna tugasa ham saqlanib qoladi.</>
+                  balanceType === 'tarif' ? (
+                    <>ℹ️ Daqiqalar foydalanuvchining <span className="text-blue-400 font-semibold">oylik tarif kvotasi</span>ga qo'shiladi (oylik sarf miqdorini kamaytiradi).</>
+                  ) : (
+                    <>ℹ️ Qo'shilgan daqiqalar foydalanuvchining <span className="text-emerald-400 font-semibold">kuymaydigan balansi</span>ga yoziladi va oylik obuna tugasa ham saqlanib qoladi.</>
+                  )
                 )}
               </p>
 
@@ -832,7 +906,9 @@ function AdminUsersManagerInner() {
                   ) : (
                     <Plus className="w-4 h-4" />
                   )}
-                  {actionType === 'deduct' ? "Balansdan ayirish" : "Balansga qo'shish"}
+                  {actionType === 'deduct'
+                    ? (balanceType === 'tarif' ? "Tarifdan ayirish" : "Kuymasdan ayirish")
+                    : (balanceType === 'tarif' ? "Tarifga qo'shish" : "Kuymasga qo'shish")}
                 </button>
               </div>
             </form>

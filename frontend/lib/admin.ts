@@ -158,7 +158,15 @@ export async function apiAdminListUsers(
 export async function apiAdminAddMinutes(
   token: string,
   userId: string,
-  payload: { minutes?: number; amount_uzs?: number; rate_per_minute?: number; action?: 'add' | 'deduct'; reason?: string }
+  payload: {
+    minutes?: number
+    amount_uzs?: number
+    rate_per_minute?: number
+    action?: 'add' | 'deduct'
+    target?: 'purchased' | 'monthly' | 'kuymas' | 'tarif'
+    balance_type?: 'purchased' | 'monthly' | 'kuymas' | 'tarif'
+    reason?: string
+  }
 ) {
   const res = await axios.post(`${API_URL}/admin/users/${userId}/add-minutes`, payload, {
     headers: { Authorization: `Bearer ${token}` },

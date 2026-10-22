@@ -404,6 +404,8 @@ class AddMinutesRequest(BaseModel):
     amount_uzs: float | None = None
     rate_per_minute: float = 500.0
     action: str = "add"  # "add" | "deduct"
+    target: str = "purchased"  # "purchased" (kuymas) | "monthly" (tarif)
+    balance_type: str | None = None  # alias: "kuymas" | "purchased" | "monthly" | "tarif"
     reason: str | None = None
 
 
@@ -608,6 +610,8 @@ def admin_add_minutes(
         raise HTTPException(status_code=400, detail="Daqiqa yoki summa 0 dan katta bo'lishi kerak")
 
     is_deduct = str(req.action or "").lower() in ["deduct", "subtract", "minus", "ayirish"]
+    target_type = str(req.balance_type or req.target or "purchased").lower().strip()
+    is_monthly = target_type in ["monthly", "tarif", "tariff", "oylik"]
 
     db = SessionLocal()
     try:
@@ -619,40 +623,51 @@ def admin_add_minutes(
         from backend.services.plans import PLANS
         plan = PLANS[sub.plan.value]
 
-        if is_deduct:
-            # 1. Avval kuymaydigan (purchased_minutes) dan ayiramiz
-            purchased = float(sub.purchased_minutes or 0.0)
-            if purchased >= mins:
-                sub.purchased_minutes = round(purchased - mins, 1)
+        if is_monthly:
+            current_used = float(sub.monthly_minutes_used or 0.0)
+            if is_deduct:
+                # Oylik sarflangan daqiqalarni oshiramiz (mavjud qoldiq kamayadi)
+                sub.monthly_minutes_used = round(min(float(plan.monthly_minutes), current_used + mins), 1)
+                action_text = f"{mins} daqiqa oylik tarif kvotasidan muvaffaqiyatli ayirildi"
             else:
-                leftover = mins - purchased
-                sub.purchased_minutes = 0.0
-                # Qolganini joriy oylik kvotadan ayiramiz (monthly_minutes_used ni oshirish orqali)
-                current_used = float(sub.monthly_minutes_used or 0.0)
-                sub.monthly_minutes_used = round(min(float(plan.monthly_minutes), current_used + leftover), 1)
+                # Oylik sarflangan daqiqalarni kamaytiramiz (mavjud qoldiq oshadi)
+                sub.monthly_minutes_used = round(current_used - mins, 1)
+                action_text = f"{mins} daqiqa oylik tarif kvotasiga muvaffaqiyatli qo'shildi"
 
             db.commit()
             db.refresh(sub)
-
             bal = get_minute_balance(db, user.id)
             return {
                 "success": True,
-                "message": f"{mins} daqiqa muvaffaqiyatli ayirildi",
-                "deducted_minutes": mins,
+                "message": action_text,
+                "target": "monthly",
+                "action": "deduct" if is_deduct else "add",
+                "minutes": mins,
+                "monthly_minutes_used": sub.monthly_minutes_used,
                 "purchased_minutes": sub.purchased_minutes,
                 "balance": bal,
             }
         else:
-            sub.purchased_minutes = round(float(sub.purchased_minutes or 0.0) + float(mins), 1)
+            # Kuymas daqiqalar (purchased_minutes)
+            purchased = float(sub.purchased_minutes or 0.0)
+            if is_deduct:
+                sub.purchased_minutes = round(max(0.0, purchased - mins), 1)
+                action_text = f"{mins} daqiqa kuymas balansdan muvaffaqiyatli ayirildi"
+            else:
+                sub.purchased_minutes = round(purchased + float(mins), 1)
+                action_text = f"{mins} daqiqa kuymas balansga muvaffaqiyatli qo'shildi"
+
             db.commit()
             db.refresh(sub)
-
             bal = get_minute_balance(db, user.id)
             return {
                 "success": True,
-                "message": f"{mins} daqiqa muvaffaqiyatli qo'shildi",
-                "added_minutes": mins,
+                "message": action_text,
+                "target": "purchased",
+                "action": "deduct" if is_deduct else "add",
+                "minutes": mins,
                 "purchased_minutes": sub.purchased_minutes,
+                "monthly_minutes_used": sub.monthly_minutes_used,
                 "balance": bal,
             }
     finally:
