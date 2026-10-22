@@ -312,6 +312,107 @@ def _get_gemini_stt_model_name() -> str:
     return getattr(settings, "GEMINI_STT_MODEL", None) or settings.GEMINI_MODEL or "gemini-3.8-flash"
 
 
+def _gemini_time_to_seconds(value) -> float:
+    """Gemini segment vaqtini soniyaga aylantiradi: son (75.4) yoki matn
+    ("1:15.4", "01:15", "0:01:15") ko'rinishida kelishi mumkin."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", ".")
+    if ":" in text:
+        total = 0.0
+        for part in text.split(":"):
+            total = total * 60 + float(part)
+        return total
+    return float(text)
+
+
+def _mmss_digits_to_seconds(value: float) -> float:
+    """101.5 -> 61.5: "1:01.5" raqamlari soniya deb yozilgan holatni tiklaydi."""
+    minutes = int(value // 100)
+    return minutes * 60 + (value - minutes * 100)
+
+
+def _has_contiguous_minute_crossing(segments: list[dict]) -> bool:
+    """MM:SS raqamlarida nutq daqiqa chegarasidan uzilmasdan o'tadi: "0:58" ->
+    "1:01" (58 -> 101). Soniyaga aylantirilganda chegaradagi qadam kichik
+    (<= 8s) bo'ladi. Haqiqiy soniyalarda 60..99 bo'sh qolgan bo'lsa (masalan
+    55..105s musiqa), aylantirilgan qadam katta qoladi -- bu belgi yo'q."""
+    points = []
+    for s in sorted(segments, key=lambda x: x["start"]):
+        points.extend((s["start"], s["end"]))
+    for a, b in zip(points, points[1:]):
+        blocks = int(b // 100) - int(a // 100)
+        if blocks >= 1 and 0 <= (b - a) - 40 * blocks <= 8.0:
+            return True
+    return False
+
+
+def _fix_gemini_mmss_timestamps(segments: list[dict], clip_duration: float | None) -> list[dict]:
+    """Gemini audio vaqtini ichida MM:SS bilan hisoblaydi va soniya so'ralsa ham
+    ba'zan "1:01"ni 101 deb qaytaradi (2026-10 productionda: har daqiqadan keyin
+    +40s siljish, 3 daqiqalik nutq ~5 daqiqaga cho'zilib, videodan oshgan qismi
+    -- videoning OXIRI -- dublyajsiz qolardi). segments -- shu bo'lakka nisbatan
+    (offset qo'shilmagan) vaqtlar.
+
+    MM:SS raqamlari belgisi: 60..99 oralig'ida birorta qiymat bo'lmaydi (bunday
+    "soniya" MM:SS'da yo'q), haqiqiy soniyalarda esa nutq 100s dan oshsa bu
+    oraliq doim to'ladi. Yoki vaqtlar bo'lak uzunligidan oshib ketadi."""
+    if not segments:
+        return segments
+    values = [v for s in segments for v in (s["start"], s["end"])]
+    max_end = max(s["end"] for s in segments)
+    tolerance = 2.0
+    exceeds_clip = bool(clip_duration) and max_end > clip_duration + tolerance
+    looks_mmss = (
+        max_end >= 100
+        and not any(60 <= v < 100 for v in values)
+        and all((v - int(v // 100) * 100) < 60 for v in values)
+        and _has_contiguous_minute_crossing(segments)
+    )
+
+    if looks_mmss or exceeds_clip:
+        if all((v - int(v // 100) * 100) < 60 for v in values):
+            converted = [
+                {**s, "start": round(_mmss_digits_to_seconds(s["start"]), 3),
+                 "end": round(_mmss_digits_to_seconds(s["end"]), 3)}
+                for s in segments
+            ]
+            new_max = max(s["end"] for s in converted)
+            if not clip_duration or new_max <= clip_duration + tolerance:
+                logger.warning(
+                    f"Gemini STT vaqtlari MM:SS raqamlari ko'rinishida keldi (max {max_end:.1f}s -> "
+                    f"{new_max:.1f}s, bo'lak {clip_duration or 0:.1f}s) -- soniyaga aylantirildi."
+                )
+                return converted
+
+    if exceeds_clip:
+        # Aylantirib ham tushuntirib bo'lmadi -- bo'lakdan tashqaridagi
+        # segmentlarni kesamiz (aks holda keyingi bo'lak bilan ustma-ust tushadi).
+        kept = [
+            {**s, "end": min(s["end"], clip_duration)}
+            for s in segments if s["start"] < clip_duration
+        ]
+        logger.warning(
+            f"Gemini STT vaqtlari bo'lak uzunligidan oshdi (max {max_end:.1f}s > {clip_duration:.1f}s) -- "
+            f"{len(segments) - len(kept)} ta segment tashlandi, qolganlari kesildi."
+        )
+        return kept
+
+    return segments
+
+
+def _probe_audio_duration(path: Path) -> float | None:
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        return float(out.stdout.strip())
+    except Exception:
+        return None
+
+
 def _build_transcribe_prompt(language: str | None) -> str:
     if language == "uz":
         lang_instruction = (
@@ -334,6 +435,8 @@ def _build_transcribe_prompt(language: str | None) -> str:
         "Instructions:\n"
         "1. Split the transcription into short natural subtitle-style segments (roughly one sentence or clause each, around 2-6 seconds each).\n"
         "2. For each segment, give its exact start and end time in seconds, measured from the start of THIS audio clip (0.0 = clip start).\n"
+        "   Write times as plain decimal seconds: 1 minute 15.4 seconds is 75.4, 2 minutes 3 seconds is 123.0. "
+        "NEVER write minutes and seconds as digits (do NOT write 115.4 for 1:15.4) and never use the MM:SS format.\n"
         "3. Exclude non-speech background music or noise. If the audio is silent or music-only, return an empty segments list.\n\n"
         'Respond with ONLY valid JSON in this exact shape, no other text:\n'
         '{"language": "uz", "segments": [{"start": 0.0, "end": 2.4, "text": "transcribed text..."}, ...]}'
@@ -357,6 +460,7 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
     )
 
     audio_bytes = chunk_path.read_bytes()
+    clip_duration = _probe_audio_duration(chunk_path)
     config = types.GenerateContentConfig(
         temperature=0.0,
         response_mime_type="application/json",
@@ -409,20 +513,29 @@ def _transcribe_chunk_gemini(chunk_path: Path, offset_seconds: float, language: 
                     else:
                         raw_segments = []
 
-                    segments = []
-                    text_parts = []
+                    rel_segments = []
                     for seg in raw_segments or []:
                         text = (seg.get("text") or "").strip()
                         start = seg.get("start")
                         end = seg.get("end")
                         if not text or start is None or end is None:
                             continue
-                        text_parts.append(text)
-                        segments.append({
-                            "start": round(float(start) + offset_seconds, 3),
-                            "end": round(float(end) + offset_seconds, 3),
+                        rel_segments.append({
+                            "start": _gemini_time_to_seconds(start),
+                            "end": _gemini_time_to_seconds(end),
                             "text": text,
                         })
+                    rel_segments = _fix_gemini_mmss_timestamps(rel_segments, clip_duration)
+
+                    text_parts = [s["text"] for s in rel_segments]
+                    segments = [
+                        {
+                            "start": round(s["start"] + offset_seconds, 3),
+                            "end": round(s["end"] + offset_seconds, 3),
+                            "text": s["text"],
+                        }
+                        for s in rel_segments
+                    ]
 
                     tier = "paid" if is_paid_gemini_key(api_key) else "free"
                     masked_k = mask_key(api_key) if api_key else "none"
