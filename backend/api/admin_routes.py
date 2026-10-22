@@ -2846,10 +2846,8 @@ def admin_jobs_cost(
                     chars = int(dur_min * 1000)
                     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4)
 
-            # TTS Cost estimation:
-            # Foydalanuvchi talabi: "tts da gemini pullik narxini doim chiqaraver!"
-            # Bepul Edge, bepul Gemini yoki Azure bo'lishidan qat'i nazar,
-            # TTS xarajati sifatida Gemini pullik stavkasi ($0.017 / 1,000 belgi) doim hisoblanadi va qo'shiladi!
+            # TTS Cost estimation: Edge bepul ($0.0), Azure ($0.016 / 1k), Gemini ($0.017 / 1k)
+            tts_provider_clean = (job.tts_provider or ("edge" if "edge" in (job.tts_model or "").lower() else ("azure" if "azure" in (job.tts_model or "").lower() else "gemini"))).lower()
             tts_usd = round(tts_info.get("cost_usd", 0.0), 4)
             tts_uzs = round(tts_info.get("cost_uzs", 0.0))
 
@@ -2864,10 +2862,16 @@ def admin_jobs_cost(
             else:
                 est_chars = int(dur_min * 1200)
 
-            if (dur_sec > 0 or est_chars > 0) and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
-                # Gemini TTS stavkasi: 1,000 belgiga $0.017 USD
-                calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
-                tts_usd = max(tts_usd, calculated_gemini_tts)
+            if tts_provider_clean == "edge":
+                tts_usd = 0.0
+                tts_uzs = 0
+            elif (dur_sec > 0 or est_chars > 0) and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
+                if tts_provider_clean == "azure":
+                    calculated_azure_tts = round((est_chars / 1000.0) * 0.016, 4)
+                    tts_usd = max(tts_usd, calculated_azure_tts)
+                else:  # gemini
+                    calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
+                    tts_usd = max(tts_usd, calculated_gemini_tts)
                 tts_uzs = int(round(tts_usd * USD_TO_UZS))
 
             total_usd = round(tts_usd + stt_cost_usd + llm_cost_usd, 4)

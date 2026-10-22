@@ -945,7 +945,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                           {/* Breakdown pills */}
                           <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] text-gray-400 font-mono">
-                            <span title="TTS xarajati">TTS: ${job.costs?.tts_cost_usd ?? 0}</span>
+                            <span title="TTS xarajati" className={(job.costs?.tts_cost_usd ?? 0) === 0 ? "text-emerald-400 font-medium" : ""}>
+                              TTS: {(job.costs?.tts_cost_usd ?? 0) === 0 ? "$0 (Bepul)" : `$${job.costs?.tts_cost_usd ?? 0}`}
+                            </span>
                             <span>•</span>
                             <span title="STT xarajati" className={(job.costs?.stt_cost_usd ?? 0) === 0 ? "text-emerald-400 font-medium" : ""}>
                               STT: {(job.costs?.stt_cost_usd ?? 0) === 0 ? "$0 (Bepul)" : `$${job.costs?.stt_cost_usd}`}

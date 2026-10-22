@@ -207,9 +207,15 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     chars = len(job.translated_text) if getattr(job, "translated_text", None) else int(dur_min * 1200)
     llm_cost_usd = round((chars / 1000.0) * 0.0005, 4) if (dur_sec > 0 or chars > 0) else 0.0
 
-    # Foydalanuvchi talabi: TTS da Gemini pullik narxini ($0.017 / 1,000 belgi) doim chiqaraver
+    # Real TTS tannarxi provayderga qarab (Edge: bepul $0.00, Azure: $0.016, Gemini: $0.017)
+    tts_prov = (job.tts_provider or ("edge" if "edge" in (job.tts_model or "").lower() else ("azure" if "azure" in (job.tts_model or "").lower() else "gemini"))).lower()
     est_chars = chars if chars > 0 else int(dur_min * 1200)
-    tts_cost_usd = round((est_chars / 1000.0) * 0.017, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
+    if tts_prov == "edge":
+        tts_cost_usd = 0.0
+    elif tts_prov == "azure":
+        tts_cost_usd = round((est_chars / 1000.0) * 0.016, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
+    else:
+        tts_cost_usd = round((est_chars / 1000.0) * 0.017, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
 
     total_cost_usd = round(stt_cost_usd + llm_cost_usd + tts_cost_usd, 4)
     total_cost_uzs = int(round(total_cost_usd * 12850))
@@ -922,7 +928,20 @@ def retry_job(
             job.speaker_gender = payload.speaker_gender
         if payload.tts_provider:
             job.tts_provider = payload.tts_provider
-        if payload.voice_name:
+            gender = job.speaker_gender or "male"
+            if payload.tts_provider in ("azure", "edge"):
+                if payload.voice_name and "neural" in payload.voice_name.lower():
+                    job.voice_name = payload.voice_name
+                else:
+                    job.voice_name = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                job.tts_model = f"{payload.tts_provider}-tts ({job.voice_name})"
+            elif payload.tts_provider == "gemini":
+                if payload.voice_name and "neural" not in payload.voice_name.lower():
+                    job.voice_name = payload.voice_name
+                else:
+                    job.voice_name = "Autonoe" if gender == "female" else "Charon"
+                job.tts_model = f"gemini-3.8-flash-tts ({job.voice_name})"
+        elif payload.voice_name:
             job.voice_name = payload.voice_name
         if payload.gemini_key_tier:
             job.gemini_key_tier = payload.gemini_key_tier
@@ -1120,6 +1139,7 @@ def retry_job(
     job.recovery_attempt_count = 0
     job.processing_claim_token = None
     job.processing_lease_expires_at = None
+    job.created_at = datetime.utcnow()
     job.completed_at = None
     db.commit()
 

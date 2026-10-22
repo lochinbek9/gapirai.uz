@@ -1323,16 +1323,17 @@ export default function VideoPage() {
                       const chars = job.translated_text ? job.translated_text.length : Math.round(durMin * 1000)
                       const sttUsd = job.costs?.stt_cost_usd ?? 0.0
                       const llmUsd = job.costs?.llm_cost_usd ?? (durSec > 0 ? Number(((chars / 1000) * 0.0005).toFixed(4)) : 0)
-                      const ttsProv = (job.tts_provider || 'gemini').toLowerCase()
-                      const ttsUsd = job.costs?.tts_cost_usd ?? (
+                      const ttsProv = (job.tts_provider || (job.tts_model?.toLowerCase().includes('edge') ? 'edge' : job.tts_model?.toLowerCase().includes('azure') ? 'azure' : 'gemini')).toLowerCase()
+                      const isEdge = ttsProv === 'edge' || Boolean(job.tts_model?.toLowerCase().includes('edge'))
+                      const ttsUsd = isEdge ? 0.0 : (job.costs?.tts_cost_usd ?? (
                         ttsProv === 'gemini'
                           ? Number(((chars / 1000) * 0.017).toFixed(4))
                           : ttsProv === 'azure'
                           ? Number(((chars / 1000) * 0.016).toFixed(4))
                           : 0.0
-                      )
+                      ))
                       const totalUsd = job.costs?.total_cost_usd ?? Number((sttUsd + llmUsd + ttsUsd).toFixed(4))
-                      const totalUzs = job.costs?.total_cost_uzs ?? Math.round(totalUsd * 12850)
+                      const totalUzs = isEdge ? Math.round(Number((sttUsd + llmUsd).toFixed(4)) * 12850) : (job.costs?.total_cost_uzs ?? Math.round(totalUsd * 12850))
                       const perMinUzs = durMin > 0 ? Math.round(totalUzs / durMin) : 0
 
                       return (

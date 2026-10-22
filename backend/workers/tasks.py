@@ -1037,12 +1037,17 @@ def process_video(self: Task, job_id: str) -> dict:
 
             user_chose_gender = getattr(job, "voice_gender_setting", None) in ("male", "female")
             if user_chose_gender and getattr(job, "voice_name", None):
-                # Foydalanuvchi jins va ovozni yangi videoda qo'lda tanlagan
-                voice = job.voice_name
+                candidate_voice = job.voice_name
+                if tts_provider in ("azure", "edge"):
+                    voice = candidate_voice if "neural" in candidate_voice.lower() else default_voice
+                elif tts_provider == "gemini":
+                    voice = candidate_voice if "neural" not in candidate_voice.lower() else default_voice
+                else:
+                    voice = candidate_voice
             else:
-                # Avtomatik jins aniqlash: ovoz aniqlangan jinsga (female/male) mos bo'lishi shart!
                 voice = default_voice
-                job.voice_name = voice
+
+            job.voice_name = voice
 
             if not getattr(job, "voice_style", None):
                 job.voice_style = "neutral"
