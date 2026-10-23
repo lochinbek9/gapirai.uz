@@ -9,6 +9,7 @@ const lastModified = new Date('2026-08-05')
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: baseUrl, lastModified, changeFrequency: 'weekly', priority: 1.0 },
+    { url: `${baseUrl}/videos`, lastModified: new Date('2026-10-23'), changeFrequency: 'daily', priority: 0.9 },
     { url: `${baseUrl}/about`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/faq`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/terms`, lastModified, changeFrequency: 'yearly', priority: 0.3 },

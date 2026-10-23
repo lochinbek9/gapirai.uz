@@ -126,6 +126,11 @@ class JobResponse(BaseModel):
     cancel_refund_seconds_left: Optional[float] = None
     initial_stage: Optional[str] = None
     current_stage: Optional[str] = None
+    # "Ommaviy videolar" (/videos) ro'yxatida turibdimi; so'rovchi shu job
+    # egasimi -- frontend egasi bo'lmagan tomoshabinga "Qayta yaratish" /
+    # baholash kabi egasiga xos tugmalarni ko'rsatmaydi.
+    is_public: bool = False
+    viewer_is_owner: bool = False
 
 
 def _normalize_audio_mix_mode(mode: str | None) -> str:
@@ -295,6 +300,7 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         content_flagged=getattr(job, "content_flagged", False),
         linked_analysis_id=str(job.linked_analysis_id) if getattr(job, "linked_analysis_id", None) else None,
         subtitle_only=bool(getattr(job, "subtitle_only", False)),
+        is_public=bool(getattr(job, "is_public", False)),
         source_language=getattr(job, "source_language", None),
         tts_provider=getattr(job, "tts_provider", None),
         voice_name=getattr(job, "voice_name", None),
@@ -620,6 +626,41 @@ def get_jobs_stats(
     }
 
 
+@router.get("/public-videos", dependencies=[Depends(rate_limit("public_videos", 120, 60))])
+def list_public_videos(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=24, ge=1, le=48),
+    db: Session = Depends(get_db),
+):
+    """"Ommaviy videolar" (/videos): admin chiqargan tayyor dublyajlar, eng
+    yangisi birinchi. Auth talab qilinmaydi; dublaj qilgan foydalanuvchi
+    haqida hech narsa qaytarilmaydi."""
+    q = (
+        db.query(
+            DubbingJob.id, DubbingJob.video_title, DubbingJob.video_thumbnail,
+            DubbingJob.video_duration, DubbingJob.published_at,
+        )
+        .filter(DubbingJob.is_public.is_(True), DubbingJob.status == JobStatus.COMPLETED)
+        .order_by(DubbingJob.published_at.desc().nullslast(), DubbingJob.id.desc())
+    )
+    rows = q.offset((page - 1) * page_size).limit(page_size + 1).all()
+    has_more = len(rows) > page_size
+    return {
+        "videos": [
+            {
+                "id": str(r.id),
+                "video_title": r.video_title,
+                "video_thumbnail": r.video_thumbnail,
+                "video_duration": r.video_duration,
+                "published_at": to_tashkent_iso(r.published_at) if r.published_at else None,
+            }
+            for r in rows[:page_size]
+        ],
+        "page": page,
+        "has_more": has_more,
+    }
+
+
 @router.get("/jobs/{job_id}")
 def get_job(
     job_id: uuid.UUID,
@@ -643,7 +684,9 @@ def get_job(
     from backend.services.plans import is_user_admin
     is_admin = is_user_admin(db, current_user_id)
     is_owner = current_user_id is not None and job.user_id == current_user_id
-    if current_user_id is not None and not is_owner and not is_admin:
+    # Ommaviy video har kimga (tizimga kirgan boshqa foydalanuvchiga ham)
+    # ochiq -- pastda redact=True bilan qaytadi.
+    if current_user_id is not None and not is_owner and not is_admin and not job.is_public:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
     # On-demand video recovery tekshiruvi:
@@ -675,6 +718,7 @@ def get_job(
         return _job_to_response(job, redact=True)
 
     response = _job_to_response(job)
+    response.viewer_is_owner = is_owner
     if job.status == JobStatus.PENDING and job.created_at:
         # Navbat worker o'rinlaridan qisqa bo'lsa job zum bir necha soniyada
         # boshlanadi -- "1-o'rin" kabi shovqin ko'rsatmaymiz. Uzun bo'lganda

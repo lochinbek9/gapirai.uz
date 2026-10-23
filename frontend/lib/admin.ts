@@ -666,6 +666,9 @@ export interface AdminJobCostItem {
   completed_at: string | null
   processing_seconds: number | null
   subtitle_only: boolean
+  is_preview?: boolean
+  is_public?: boolean
+  published_at?: string | null
   source_language: string | null
   models: {
     tts_provider: string
@@ -708,6 +711,7 @@ export interface AdminJobCostItem {
     email: string | null
     phone: string | null
     is_internal: boolean
+    is_active?: boolean
     plan?: string
     balance_minutes?: number
   }
@@ -745,7 +749,8 @@ export async function apiAdminJobsCost(
   startDate?: string,
   endDate?: string,
   plan?: string,
-  errorCode?: string
+  errorCode?: string,
+  publicOnly: boolean = false
 ): Promise<AdminJobsCostResponse> {
   const res = await axios.get(`${API_URL}/admin/jobs-cost`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -758,6 +763,7 @@ export async function apiAdminJobsCost(
       plan: plan && plan !== 'ALL' ? plan : undefined,
       error_code: errorCode && errorCode !== 'ALL' ? errorCode : undefined,
       include_internal: includeInternal,
+      public_only: publicOnly || undefined,
       sort_by: sortBy,
       date_range: dateRange,
       start_date: startDate || undefined,
@@ -958,6 +964,19 @@ export async function apiAdminRetryJob(
     headers: { Authorization: `Bearer ${token}` },
   })
   return res.data
+}
+
+export async function apiAdminSetJobVisibility(token: string, jobId: string, isPublic: boolean): Promise<{ is_public: boolean; published_at: string | null }> {
+  const res = await axios.post(`${API_URL}/admin/jobs/${jobId}/visibility`, { is_public: isPublic }, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
+export async function apiAdminDeleteJob(token: string, jobId: string): Promise<void> {
+  await axios.delete(`${API_URL}/admin/jobs/${jobId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
 }
 
 export async function apiAdminCancelJob(token: string, jobId: string): Promise<{ status: string; message: string }> {

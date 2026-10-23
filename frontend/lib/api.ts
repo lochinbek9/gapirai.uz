@@ -58,6 +58,10 @@ export interface Job {
   // 2026-09-16: "Subtitr" rejimi -- true bo'lsa dublyaj audiosi/videosi
   // yaratilmagan, faqat transkripsiya+tarjima+subtitr (output_video_url yo'q).
   subtitle_only?: boolean
+  // 2026-10-23: "Ommaviy videolar" ro'yxatida turibdimi; so'rovchi shu job
+  // egasimi (egasi bo'lmagan tomoshabinga egasiga xos tugmalar ko'rsatilmaydi).
+  is_public?: boolean
+  viewer_is_owner?: boolean
   // 2026-09-19: navbat worker o'rinlaridan uzun bo'lganda kutayotgan job
   // uchun to'ldiriladi (backend/services/queue_load.py). Matn allaqachon
   // status_message'ga yozilgan -- bular boshqa UI (masalan mobil) uchun.
@@ -192,6 +196,19 @@ export async function learnVideo(youtube_url: string, voice_gender: string = 'au
   amount: number | null
 }> {
   const res = await apiClient.post('/api/learn', { youtube_url, voice_gender })
+  return res.data
+}
+
+export interface PublicVideo {
+  id: string
+  video_title: string | null
+  video_thumbnail: string | null
+  video_duration: number | null
+  published_at: string | null
+}
+
+export async function listPublicVideos(page: number, pageSize = 24): Promise<{ videos: PublicVideo[]; page: number; has_more: boolean }> {
+  const res = await apiClient.get('/api/public-videos', { params: { page, page_size: pageSize } })
   return res.data
 }
 

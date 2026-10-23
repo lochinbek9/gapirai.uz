@@ -150,6 +150,11 @@ class DubbingJob(Base):
     # topilgan) bergan bo'lsa true -- frontend foydalanuvchiga "video tayyor,
     # lekin ommaviy kutubxonaga chiqarilmaydi" xabarini shu orqali ko'rsatadi.
     content_flagged = Column(Boolean, default=False, nullable=False)
+    # 2026-10-23: "Ommaviy videolar" (/videos) -- admin panelda admin qo'lda
+    # chiqargan tayyor dublyajlar. Ustun migratsiya bilan (2026_10_23_public_videos.sql)
+    # kod deploy qilinishidan OLDIN qo'shiladi.
+    is_public = Column(Boolean, default=False, nullable=False, server_default="false")
+    published_at = Column(DateTime, nullable=True)
     rating = Column(Integer, nullable=True)
     feedback_comment = Column(Text, nullable=True)
     feedback_created_at = Column(DateTime, nullable=True)

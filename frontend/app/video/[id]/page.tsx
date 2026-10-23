@@ -276,6 +276,8 @@ export default function VideoPage() {
   }
 
   const job = polledJob
+  // Egasi bo'lmagan tomoshabin (ommaviy video yoki ulashilgan havola) -- qayta yaratish/baholash ko'rinmaydi
+  const canManage = Boolean(job?.viewer_is_owner) || isAdmin
 
   useEffect(() => {
     if (job?.tts_provider) {
@@ -1143,6 +1145,7 @@ export default function VideoPage() {
                       <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
                     </div>
 
+                    {canManage && (
                     <div className="pt-2 sm:pt-0 sm:border-l sm:border-gray-200/60 dark:sm:border-white/10 sm:pl-5 flex flex-col justify-center">
                       <button
                         onClick={() => setShowRegenerateModal(true)}
@@ -1154,14 +1157,17 @@ export default function VideoPage() {
                         <span>Qayta yaratish (Regenerate)</span>
                       </button>
                     </div>
+                    )}
                   </div>
 
                   {/* Feedback rating component */}
-                  <FeedbackSection
-                    jobId={id}
-                    initialRating={job.rating}
-                    initialComment={job.feedback_comment}
-                  />
+                  {canManage && (
+                    <FeedbackSection
+                      jobId={id}
+                      initialRating={job.rating}
+                      initialComment={job.feedback_comment}
+                    />
+                  )}
                 </div>
               )}
 

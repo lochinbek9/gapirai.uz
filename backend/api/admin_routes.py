@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
@@ -12,6 +13,7 @@ from backend.services.timezone_utils import to_tashkent_iso
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 TREND_DAYS = 30
 TREND_MONTHS = 12
@@ -1143,6 +1145,78 @@ def admin_cancel_job(
         job.processing_lease_expires_at = None
         db.commit()
         return {"status": "success", "message": f"Job {job_id} bekor qilindi"}
+    finally:
+        db.close()
+
+
+class JobVisibilityRequest(BaseModel):
+    is_public: bool
+
+
+@router.post("/jobs/{job_id}/visibility")
+def admin_set_job_visibility(
+    job_id: uuid.UUID,
+    req: JobVisibilityRequest,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Tayyor dublyajni "Ommaviy videolar" (/videos) ro'yxatiga chiqarish yoki olib tashlash."""
+    from pathlib import Path
+    from backend.scripts.disk_cleanup import PUBLIC_MARKER
+    db = SessionLocal()
+    try:
+        job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job topilmadi")
+        if req.is_public:
+            if job.status != JobStatus.COMPLETED:
+                raise HTTPException(status_code=400, detail="Faqat tayyor videoni ommaviy qilish mumkin.")
+            if job.subtitle_only or job.is_preview:
+                raise HTTPException(status_code=400, detail="Subtitr yoki sinov (preview) jobini ommaviy qilib bo'lmaydi.")
+            if not job.is_public:
+                job.published_at = datetime.utcnow()
+            job.is_public = True
+        else:
+            job.is_public = False
+            job.published_at = None
+        storage_id = job.storage_id
+        db.commit()
+
+        # disk_cleanup ommaviy video fayllarini o'chirmasligi uchun marker
+        try:
+            marker = Path(settings.OUTPUT_DIR) / storage_id / PUBLIC_MARKER
+            if req.is_public:
+                if marker.parent.is_dir():
+                    marker.touch(exist_ok=True)
+            else:
+                still_public = db.query(DubbingJob.id).filter(
+                    DubbingJob.is_public.is_(True),
+                    or_(DubbingJob.id == storage_id, DubbingJob.source_job_id == storage_id),
+                ).first()
+                if not still_public:
+                    marker.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"Public marker ({job_id}): {e}")
+
+        return {
+            "success": True,
+            "is_public": job.is_public,
+            "published_at": to_tashkent_iso(job.published_at),
+        }
+    finally:
+        db.close()
+
+
+@router.delete("/jobs/{job_id}", status_code=204)
+def admin_delete_job(
+    job_id: uuid.UUID,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Admin panel: istalgan foydalanuvchining videosini butunlay o'chirish
+    (foydalanuvchining o'zi bosadigan DELETE /jobs/{id} bilan bir xil tozalash)."""
+    from backend.api.routes import delete_job
+    db = SessionLocal()
+    try:
+        return delete_job(job_id=job_id, db=db, current_user=current_user)
     finally:
         db.close()
 
@@ -2982,6 +3056,7 @@ def admin_jobs_cost(
     plan: str | None = Query(default=None),
     error_code: str | None = Query(default=None),
     include_internal: bool = Query(default=False),
+    public_only: bool = Query(default=False),
     sort_by: str = Query(default="newest"),
     date_range: str = Query(default="today"),
     start_date: str | None = Query(default=None),
@@ -3008,6 +3083,9 @@ def admin_jobs_cost(
             base_query = base_query.filter(
                 or_(DubbingJob.user_id.is_(None), DubbingJob.user_id.notin_(internal_ids_select))
             )
+
+        if public_only:
+            base_query = base_query.filter(DubbingJob.is_public.is_(True))
 
         # Provider filter
         if tts_provider and tts_provider.strip().lower() not in ("all", ""):
@@ -3385,6 +3463,9 @@ def admin_jobs_cost(
                 "completed_at": to_tashkent_iso(job.completed_at),
                 "processing_seconds": proc_sec,
                 "subtitle_only": bool(job.subtitle_only),
+                "is_preview": bool(job.is_preview),
+                "is_public": bool(job.is_public),
+                "published_at": to_tashkent_iso(job.published_at),
                 "source_language": job.source_language,
                 "models": {
                     "tts_provider": job.tts_provider or (list(tts_info["providers"])[0] if tts_info["providers"] else "gemini"),
@@ -3427,6 +3508,7 @@ def admin_jobs_cost(
                     "email": user.email if user else None,
                     "phone": user.phone if user else None,
                     "is_internal": bool(getattr(user, "is_internal", False)) if user else False,
+                    "is_active": bool(user.is_active) if user else True,
                     "plan": plan_name,
                     "balance_minutes": bal_minutes,
                 },
