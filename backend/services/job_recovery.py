@@ -112,7 +112,17 @@ def can_recover_job(job: DubbingJob) -> bool:
 def trigger_ondemand_recovery(db: Session, job: DubbingJob) -> bool:
     """Video fayli diskda yo'q bo'lsa va qayta tiklash mumkin bo'lsa,
     Celery taskni navbatga qo'yadi va job holatini DOWNLOADING ga o'tkazadi.
-    Faqat bir marta Redis lock orqali ishga tushadi."""
+    Faqat bir marta Redis lock orqali ishga tushadi.
+
+    Faqat hozir COMPLETED holatidagi job tiklanadi. Ilgari GET /api/jobs/{id}
+    "completed_at bor"ning o'zini yetarli deb hisoblardi -- keyin bekor
+    qilingan / FAILED bo'lgan eski joblar (masalan 2026-09'dagi USER_CANCELLED)
+    sahifasi ochilganda to'liq pipeline qayta ishga tushib, ikkala worker
+    o'rnini band qilgan va haqiqiy navbatni to'xtatib qo'ygan (2026-10-23).
+    Tiklash yarim yo'lda yiqilib FAILED bo'lsa ham shu sabab cheksiz qayta
+    urinilmaydi."""
+    if job.status != JobStatus.COMPLETED:
+        return False
     if not can_recover_job(job):
         return False
 
