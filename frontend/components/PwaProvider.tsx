@@ -65,10 +65,10 @@ export default function PwaProvider() {
           <p className="text-[11px] text-gray-500 dark:text-slate-400">Bosh ekrandan bir bosishда oching</p>
         </div>
         <button onClick={install} className="shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 text-white">
-          <Download className="w-3.5 h-3.5" /> O&apos;rnatish
+          <Download aria-hidden="true" className="w-3.5 h-3.5" /> O&apos;rnatish
         </button>
         <button onClick={dismiss} aria-label="Yopish" className="shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-slate-200">
-          <X className="w-4 h-4" />
+          <X aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
     </div>

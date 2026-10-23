@@ -50,13 +50,13 @@ export default function PreviewOfferModal({
             className="absolute top-4 right-4 sm:top-5 sm:right-5 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 transition text-gray-500 dark:text-gray-400 z-10"
             aria-label="Yopish"
           >
-            <X size={15} />
+            <X aria-hidden="true" size={15} />
           </button>
 
           <div className="overflow-y-auto pr-0.5 space-y-3">
             {/* Badge */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-500/10 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border border-violet-500/20">
-              <Sparkles size={12} className="text-violet-500 animate-pulse" />
+              <Sparkles aria-hidden="true" size={12} className="text-violet-500 animate-pulse" />
               Maxsus Sinov Taklifi
             </div>
 
@@ -86,7 +86,7 @@ export default function PreviewOfferModal({
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400 font-medium">
                     <span className="flex items-center gap-0.5">
-                      <Clock size={10} />
+                      <Clock aria-hidden="true" size={10} />
                       {Math.round(videoMinutes)} daqiqa
                     </span>
                     <span>•</span>
@@ -99,7 +99,7 @@ export default function PreviewOfferModal({
             {/* Free 2-Minute Preview Highlight Box */}
             <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-blue-500/10 border border-violet-500/30 space-y-1">
               <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300 font-extrabold text-xs sm:text-sm">
-                <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0" />
+                <CheckCircle2 aria-hidden="true" size={15} className="text-emerald-500 flex-shrink-0" />
                 Dastlabki 2 daqiqasini MUTLAQO BEPUL dublyaj qilib beramiz!
               </div>
               <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed pl-5">
@@ -115,7 +115,7 @@ export default function PreviewOfferModal({
                 onClick={onStartPreview}
                 className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl btn-premium text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-violet-500/25 transition disabled:opacity-50 cursor-pointer"
               >
-                <Play size={14} className="fill-current" />
+                <Play aria-hidden="true" size={14} className="fill-current" />
                 {loading ? "Jarayon boshlanmoqda..." : "✨ Dastlabki 2 daqiqasini bepul dublyaj qilish"}
               </button>
 
@@ -124,7 +124,7 @@ export default function PreviewOfferModal({
                 onClick={onGoToPricing}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] hover:bg-black/[0.07] dark:hover:bg-white/[0.08] text-slate-800 dark:text-slate-200 font-bold text-xs border border-black/5 dark:border-white/10 transition cursor-pointer"
               >
-                <CreditCard size={14} className="text-violet-500" />
+                <CreditCard aria-hidden="true" size={14} className="text-violet-500" />
                 Butun videoni to'liq dublyaj qilish (Tariflar)
               </button>
 

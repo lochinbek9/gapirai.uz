@@ -25,7 +25,7 @@ export default function FaqPreviewSection() {
                 className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
               >
                 <span className="text-sm font-bold text-gray-900 dark:text-white">{item.q}</span>
-                <ChevronDown
+                <ChevronDown aria-hidden="true"
                   className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
                 />
               </button>
@@ -41,7 +41,7 @@ export default function FaqPreviewSection() {
           href="/faq"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
         >
-          Barcha savollarni ko'rish <ArrowRight className="w-3.5 h-3.5" />
+          Barcha savollarni ko'rish <ArrowRight aria-hidden="true" className="w-3.5 h-3.5" />
         </Link>
       </div>
     </section>

@@ -83,7 +83,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                       animate={{ scale: 1, rotate: 0 }}
                       exit={{ scale: 0 }}
                     >
-                      <Check className="w-5 h-5 text-white" strokeWidth={3} />
+                      <Check aria-hidden="true" className="w-5 h-5 text-white" strokeWidth={3} />
                     </motion.div>
                   ) : isActive ? (
                     <motion.div
@@ -127,7 +127,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <div className="flex justify-between items-end">
            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                 <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                 <Sparkles aria-hidden="true" className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
                  <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
             disabled={cancelLoading}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-violet-500 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-xl transition duration-200 disabled:opacity-50"
           >
-            {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {cancelLoading ? <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin" /> : null}
             Jarayonni bekor qilish
           </button>
         </div>

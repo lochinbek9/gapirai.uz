@@ -76,7 +76,7 @@ export default function VideosClient() {
               href="/"
               className="flex items-center gap-2 h-9 sm:h-10 px-3.5 sm:px-4 bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-900 dark:text-white text-xs font-bold rounded-2xl shadow-sm transition"
             >
-              <ArrowLeft className="w-4 h-4 text-violet-500" />
+              <ArrowLeft aria-hidden="true" className="w-4 h-4 text-violet-500" />
               Bosh sahifa
             </Link>
             <ThemeToggle />
@@ -124,7 +124,7 @@ export default function VideosClient() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-400">
-                          <Play className="w-8 h-8" />
+                          <Play aria-hidden="true" className="w-8 h-8" />
                         </div>
                       )}
                       {duration && (
@@ -150,7 +150,7 @@ export default function VideosClient() {
         <div className="pt-8 text-center text-sm text-slate-500 dark:text-slate-400" aria-live="polite">
           {loading && (
             <span className="inline-flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+              <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-violet-500" />
               Yuklanmoqda...
             </span>
           )}
