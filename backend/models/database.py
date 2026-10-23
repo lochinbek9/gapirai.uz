@@ -538,32 +538,42 @@ def create_tables():
     # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
 
-    # 2026-10-22: dubbing_jobs.linked_analysis_id FK bo'yicha ON DELETE SET NULL ta'minlash
+    # 2026-10-22: dubbing_jobs.linked_analysis_id FK -> ON DELETE SET NULL.
+    # 2026-10-23: ilgari har ishga tushishda cheklovni DROP + ADD qilardi (ACCESS
+    # EXCLUSIVE qulf + butun jadvalni qayta tekshirish). Worker'ning ochiq
+    # ("idle in transaction") sessiyasi bo'lsa backend startup cheksiz kutib qolib,
+    # API 502 berdi. Endi: faqat qoidasi SET NULL bo'lmagan FK bo'lsagina o'zgartiradi
+    # (odatda hech qanday qulf olmaydi), va lock_timeout bilan 3s dan ortiq kutmaydi.
     if engine.dialect.name == "postgresql":
         try:
             from sqlalchemy import text
             with engine.begin() as conn:
+                conn.execute(text("SET LOCAL lock_timeout = '3s'"))
                 conn.execute(text("""
                     DO $$
+                    DECLARE c record;
                     BEGIN
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.table_constraints 
-                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'dubbing_jobs_linked_analysis_id_fkey'
-                        ) THEN
-                            ALTER TABLE dubbing_jobs DROP CONSTRAINT dubbing_jobs_linked_analysis_id_fkey;
-                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
-                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
-                        ELSIF EXISTS (
-                            SELECT 1 FROM information_schema.table_constraints 
-                            WHERE table_name = 'dubbing_jobs' AND constraint_name = 'fk_dubbing_jobs_linked_analysis_id'
-                        ) THEN
-                            ALTER TABLE dubbing_jobs DROP CONSTRAINT fk_dubbing_jobs_linked_analysis_id;
-                            ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
-                                FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
-                        END IF;
+                        FOR c IN
+                            SELECT conname FROM pg_constraint
+                            WHERE conrelid = 'dubbing_jobs'::regclass AND contype = 'f'
+                              AND confrelid = 'video_analyses'::regclass AND confdeltype <> 'n'
+                        LOOP
+                            EXECUTE format('ALTER TABLE dubbing_jobs DROP CONSTRAINT %I', c.conname);
+                            IF NOT EXISTS (
+                                SELECT 1 FROM pg_constraint
+                                WHERE conrelid = 'dubbing_jobs'::regclass AND conname = 'fk_dubbing_jobs_linked_analysis_id'
+                            ) THEN
+                                ALTER TABLE dubbing_jobs ADD CONSTRAINT fk_dubbing_jobs_linked_analysis_id
+                                    FOREIGN KEY (linked_analysis_id) REFERENCES video_analyses(id) ON DELETE SET NULL;
+                            END IF;
+                        END LOOP;
                     END $$;
                 """))
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"linked_analysis_id FK ON DELETE SET NULL tekshiruvi o'tkazib yuborildi "
+                f"(keyingi ishga tushishda qayta urinadi): {e}"
+            )
 
 
