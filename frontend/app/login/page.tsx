@@ -156,11 +156,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-6 transition-colors duration-300">
+    <main className="min-h-screen relative flex items-center justify-center px-6 pb-6 pt-16 sm:p-6 transition-colors duration-300">
       <MeshBackground />
 
       {/* Orqaga */}
-      <Link href="/" className="absolute top-6 left-6 flex items-center gap-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 font-bold transition text-xs uppercase tracking-widest">
+      <Link href="/" className="absolute top-3 left-6 py-3 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold transition text-xs uppercase tracking-widest">
         <ArrowLeft className="w-4 h-4" />
         Bosh sahifa
       </Link>
@@ -173,12 +173,12 @@ export default function LoginPage() {
               <img src="/logo.webp" alt="GapirAI.uz Logo" width={160} height={80} className="h-20 w-auto object-contain dark:hidden" />
               <img src="/logodark.webp" alt="GapirAI.uz Logo" width={160} height={80} className="h-20 w-auto object-contain hidden dark:block" />
             </div>
-            <p className="text-xs text-blue-600/80 dark:text-blue-400/80 font-bold uppercase tracking-widest mt-2">Hisobingizga kiring</p>
+            <h1 className="text-xs text-blue-600/80 dark:text-blue-400/80 font-bold uppercase tracking-widest mt-2">Hisobingizga kiring</h1>
           </div>
         </div>
 
         {/* Card */}
-        <div className="glass-card rounded-[32px] p-8 sm:p-10">
+        <div className="glass-card rounded-[32px] p-6 sm:p-10">
           {step === 'form' && (
             <div className="space-y-6 mb-6">
               <GoogleSignInButton onCredential={handleGoogleCredential} text="signin_with" />
@@ -193,9 +193,11 @@ export default function LoginPage() {
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Email</label>
+                <label htmlFor="login-email" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Email</label>
                 <input
+                  id="login-email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="email@example.com"
@@ -206,13 +208,15 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1 mr-1">
-                  <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Parol</label>
-                  <Link href="/forgot-password" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                  <label htmlFor="login-password" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Parol</label>
+                  <Link href="/forgot-password" className="inline-block py-3 -my-3 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition">
                     Parolni unutdingizmi?
                   </Link>
                 </div>
                 <div className="relative">
                   <input
+                    id="login-password"
+                    autoComplete="current-password"
                     type={showPass ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -223,7 +227,9 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPass(!showPass)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                    aria-label={showPass ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                    aria-pressed={showPass}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
                   >
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -248,7 +254,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setStep('phone-form'); setError('') }}
-                className="w-full flex items-center justify-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                className="w-full flex items-center justify-center gap-2 py-3 -my-3 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
               >
                 <Phone className="w-3.5 h-3.5" />
                 Telefon orqali kirish
@@ -266,8 +272,10 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Tasdiqlash kodi</label>
+                <label htmlFor="login-code" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Tasdiqlash kodi</label>
                 <input
+                  id="login-code"
+                  autoComplete="one-time-code"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
@@ -304,7 +312,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setStep('form')}
-                  className="text-gray-500 dark:text-gray-400 font-bold hover:text-blue-600 dark:hover:text-blue-400 transition"
+                  className="py-3 -my-3 text-gray-500 dark:text-gray-400 font-bold hover:text-blue-600 dark:hover:text-blue-400 transition"
                 >
                   Orqaga
                 </button>
@@ -312,7 +320,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleResend}
                   disabled={resendLoading}
-                  className="text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
+                  className="py-3 -my-3 text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
                 >
                   {resendLoading ? 'Yuborilmoqda...' : "Kodni qayta yuborish"}
                 </button>
@@ -323,9 +331,11 @@ export default function LoginPage() {
           {step === 'phone-form' && (
             <form onSubmit={handlePhoneRequestCode} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Telefon raqami</label>
+                <label htmlFor="login-phone" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Telefon raqami</label>
                 <input
+                  id="login-phone"
                   type="tel"
+                  autoComplete="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+998901234567"
@@ -353,7 +363,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setStep('form'); setError('') }}
-                className="w-full text-center text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                className="w-full py-3 -my-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
               >
                 Orqaga
               </button>
@@ -370,8 +380,10 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Tasdiqlash kodi</label>
+                <label htmlFor="login-phone-code" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Tasdiqlash kodi</label>
                 <input
+                  id="login-phone-code"
+                  autoComplete="one-time-code"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
@@ -408,7 +420,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setStep('phone-form')}
-                  className="text-gray-500 dark:text-gray-400 font-bold hover:text-blue-600 dark:hover:text-blue-400 transition"
+                  className="py-3 -my-3 text-gray-500 dark:text-gray-400 font-bold hover:text-blue-600 dark:hover:text-blue-400 transition"
                 >
                   Orqaga
                 </button>
@@ -416,7 +428,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handlePhoneResend}
                   disabled={resendLoading}
-                  className="text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
+                  className="py-3 -my-3 text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
                 >
                   {resendLoading ? 'Yuborilmoqda...' : "Kodni qayta yuborish"}
                 </button>
@@ -429,7 +441,7 @@ export default function LoginPage() {
               Hisobingiz yo'qmi?{' '}
               <Link
                 href={returnUrl ? `/register?returnUrl=${encodeURIComponent(returnUrl)}` : '/register'}
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="inline-block py-3 -my-3 text-blue-600 dark:text-blue-400 hover:underline"
               >
                 Ro'yxatdan o'ting
               </Link>
@@ -437,6 +449,6 @@ export default function LoginPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   )
 }
