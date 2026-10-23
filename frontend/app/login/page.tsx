@@ -4,9 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
-import { Eye, EyeOff, Loader2, Youtube, ArrowLeft, Phone } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Youtube, ArrowLeft } from 'lucide-react'
 
-const PHONE_RE = /^\+998\d{9}$/
 
 function MeshBackground() {
   return (
@@ -24,14 +23,12 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'form' | 'code' | 'phone-form' | 'phone-code'>('form')
+  const [step, setStep] = useState<'form' | 'code'>('form')
   const [code, setCode] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
-  const [phone, setPhone] = useState('+998')
-  const [phoneCode, setPhoneCode] = useState('')
   const [returnUrl, setReturnUrl] = useState('')
-  const { login, verifyCode, resendCode, googleAuth, requestPhoneCode, verifyPhoneCode } = useAuth()
+  const { login, verifyCode, resendCode, googleAuth } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -109,54 +106,8 @@ export default function LoginPage() {
     }
   }
 
-  async function handlePhoneRequestCode(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    if (!PHONE_RE.test(phone)) {
-      setError("Telefon raqami +998XXXXXXXXX formatida bo'lishi kerak.")
-      return
-    }
-    setLoading(true)
-    try {
-      await requestPhoneCode(phone)
-      setStep('phone-code')
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Xatolik yuz berdi.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handlePhoneVerify(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      await verifyPhoneCode(phone, phoneCode)
-      router.push(getDestination())
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Kod noto\'g\'ri yoki muddati tugagan')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handlePhoneResend() {
-    setError('')
-    setResendMessage('')
-    setResendLoading(true)
-    try {
-      await requestPhoneCode(phone)
-      setResendMessage('Yangi kod yuborildi.')
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Kodni qayta yuborishda xatolik')
-    } finally {
-      setResendLoading(false)
-    }
-  }
-
   return (
-    <main className="min-h-screen relative flex items-center justify-center px-6 pb-6 pt-16 sm:p-6 transition-colors duration-300">
+    <main className="min-h-screen relative flex items-center justify-center px-4 pb-6 pt-16 sm:p-6 transition-colors duration-300">
       <MeshBackground />
 
       {/* Orqaga */}
@@ -178,10 +129,10 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="glass-card rounded-[32px] p-6 sm:p-10">
+        <div className="glass-card rounded-[32px] p-5 sm:p-10">
           {step === 'form' && (
             <div className="space-y-6 mb-6">
-              <GoogleSignInButton onCredential={handleGoogleCredential} text="signin_with" />
+              <GoogleSignInButton onCredential={handleGoogleCredential} text="continue_with" />
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">yoki</span>
@@ -251,14 +202,6 @@ export default function LoginPage() {
                 {loading ? 'Kirilmoqda...' : 'Kirish'}
               </button>
 
-              <button
-                type="button"
-                onClick={() => { setStep('phone-form'); setError('') }}
-                className="w-full flex items-center justify-center gap-2 py-3 -my-3 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
-              >
-                <Phone className="w-3.5 h-3.5" />
-                Telefon orqali kirish
-              </button>
             </form>
           )}
 
@@ -319,114 +262,6 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resendLoading}
-                  className="py-3 -my-3 text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
-                >
-                  {resendLoading ? 'Yuborilmoqda...' : "Kodni qayta yuborish"}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {step === 'phone-form' && (
-            <form onSubmit={handlePhoneRequestCode} className="space-y-6">
-              <div className="space-y-2">
-                <label htmlFor="login-phone" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Telefon raqami</label>
-                <input
-                  id="login-phone"
-                  type="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+998901234567"
-                  required
-                  autoFocus
-                  className="w-full bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/10 rounded-2xl px-5 py-3.5 text-sm text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
-                />
-              </div>
-
-              {error && (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl px-5 py-4 text-blue-600 dark:text-blue-400 text-xs font-semibold leading-relaxed">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50 cursor-pointer"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {loading ? 'Yuborilmoqda...' : 'Kod yuborish'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setStep('form'); setError('') }}
-                className="w-full py-3 -my-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
-              >
-                Orqaga
-              </button>
-            </form>
-          )}
-
-          {step === 'phone-code' && (
-            <form onSubmit={handlePhoneVerify} className="space-y-6">
-              <div className="text-center space-y-1">
-                <p className="text-sm font-bold text-black dark:text-white">Tasdiqlash kodi yuborildi</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">{phone}</span> raqamiga 6 xonali kod yubordik.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="login-phone-code" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Tasdiqlash kodi</label>
-                <input
-                  id="login-phone-code"
-                  autoComplete="one-time-code"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={phoneCode}
-                  onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  required
-                  autoFocus
-                  className="w-full bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/10 rounded-2xl px-5 py-3.5 text-center text-2xl tracking-[0.5em] text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-bold"
-                />
-              </div>
-
-              {error && (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl px-5 py-4 text-blue-600 dark:text-blue-400 text-xs font-semibold leading-relaxed">
-                  {error}
-                </div>
-              )}
-              {resendMessage && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-5 py-4 text-emerald-600 dark:text-emerald-400 text-xs font-semibold leading-relaxed">
-                  {resendMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading || phoneCode.length !== 6}
-                className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50 cursor-pointer"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {loading ? 'Tekshirilmoqda...' : 'Tasdiqlash'}
-              </button>
-
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={() => setStep('phone-form')}
-                  className="py-3 -my-3 text-gray-500 dark:text-gray-400 font-bold hover:text-blue-600 dark:hover:text-blue-400 transition"
-                >
-                  Orqaga
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePhoneResend}
                   disabled={resendLoading}
                   className="py-3 -my-3 text-blue-600 dark:text-blue-400 font-bold hover:underline disabled:opacity-50"
                 >
