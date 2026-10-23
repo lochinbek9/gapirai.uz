@@ -1,14 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Play, Sparkles } from "lucide-react";
+import { Brain, Check, Globe, Play, Rocket, Sparkles, Zap, type LucideIcon } from "lucide-react";
+
+// Emoji o'rniga bitta chiziq qalinligidagi ikonka tizimi (lucide).
+const CATEGORY_ICONS = { brain: Brain, rocket: Rocket, globe: Globe, zap: Zap } satisfies Record<string, LucideIcon>;
 
 export interface SampleVideo {
   id: string;
   url: string;
   title: string;
   category: string;
-  categoryIcon: string;
+  categoryIcon: keyof typeof CATEGORY_ICONS;
   durationText: string;
   thumbnail: string;
   recommendedVoice: "Charon" | "Autonoe";
@@ -21,7 +24,7 @@ export const SAMPLE_VIDEOS: SampleVideo[] = [
     url: "https://youtu.be/UwMS0J2eTXE",
     title: "Qo'rquvni qanday yengish mumkin?",
     category: "Psixologiya",
-    categoryIcon: "🧠",
+    categoryIcon: "brain",
     durationText: "0:58",
     thumbnail: "https://i.ytimg.com/vi/UwMS0J2eTXE/hqdefault.jpg",
     recommendedVoice: "Charon",
@@ -32,7 +35,7 @@ export const SAMPLE_VIDEOS: SampleVideo[] = [
     url: "https://youtu.be/2ePf9rue1Ao",
     title: "Sun'iy intellekt kelajagi va insoniyat",
     category: "Texnologiya",
-    categoryIcon: "🚀",
+    categoryIcon: "rocket",
     durationText: "0:45",
     thumbnail: "https://i.ytimg.com/vi/2ePf9rue1Ao/hqdefault.jpg",
     recommendedVoice: "Autonoe",
@@ -43,7 +46,7 @@ export const SAMPLE_VIDEOS: SampleVideo[] = [
     url: "https://youtu.be/pDmg2DyOp7o",
     title: "Koinot mo'jizalari va qora tuynuklar",
     category: "Fan & Olam",
-    categoryIcon: "🌍",
+    categoryIcon: "globe",
     durationText: "0:22",
     thumbnail: "https://i.ytimg.com/vi/pDmg2DyOp7o/hqdefault.jpg",
     recommendedVoice: "Charon",
@@ -54,7 +57,7 @@ export const SAMPLE_VIDEOS: SampleVideo[] = [
     url: "https://youtu.be/kqQLQZ7vTcI",
     title: "2 daqiqalik qoida: Dangasalikni yengish",
     category: "Samaradorlik",
-    categoryIcon: "⚡",
+    categoryIcon: "zap",
     durationText: "0:22",
     thumbnail: "https://i.ytimg.com/vi/kqQLQZ7vTcI/hqdefault.jpg",
     recommendedVoice: "Charon",
@@ -115,7 +118,7 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
 
                 {/* Category Pill */}
                 <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-[9px] font-medium text-white/90 flex items-center gap-1">
-                  <span>{sample.categoryIcon}</span>
+                  {(() => { const Icon = CATEGORY_ICONS[sample.categoryIcon]; return <Icon aria-hidden className="w-2.5 h-2.5" />; })()}
                   <span className="truncate max-w-[70px]">{sample.category}</span>
                 </div>
 
@@ -137,10 +140,10 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
                   <span className={`font-semibold flex items-center gap-1 ${
                     isSelected ? "text-violet-600 dark:text-violet-400 font-bold" : "text-gray-500 dark:text-gray-400"
                   }`}>
-                    {isSelected ? "Tanlangan ✓" : "⚡ Sinash"}
+                    {isSelected ? <><Check aria-hidden className="w-3 h-3" />Tanlangan</> : <><Play aria-hidden className="w-3 h-3" />Sinash</>}
                   </span>
                   <span className="text-[9px] text-gray-400 dark:text-gray-500 font-mono">
-                    {sample.gender === "male" ? "👨 Erkak" : "👩 Ayol"}
+                    {sample.gender === "male" ? "Erkak" : "Ayol"}
                   </span>
                 </div>
               </div>

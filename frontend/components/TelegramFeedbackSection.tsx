@@ -157,8 +157,8 @@ export default function TelegramFeedbackSection() {
 
               {/* Yuborish tugmasi */}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-slate-400 dark:text-gray-500">
-                  Fikringiz biz uchun juda qadrli ✨
+                <span className="text-[11px] text-slate-500 dark:text-gray-400">
+                  Fikringiz biz uchun juda qadrli
                 </span>
 
                 <button
