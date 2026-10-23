@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
+import { AudioLines, ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { VideoInfo, formatDuration } from "@/lib/api";
 import SampleVideosSection, { SampleVideo } from "@/components/SampleVideosSection";
@@ -77,9 +77,9 @@ export default function UrlInput({
   const currentFemaleVoice = femaleVoices.find((v) => v.id === voiceName) || femaleVoices[0];
 
   const genderOptions = [
-    { value: "auto",   label: "Avtomatik", icon: "🤖", desc: "AI aniqlaydi" },
-    { value: "male",   label: "Erkak",     icon: "👨", desc: `${currentMaleVoice.label} ovozi` },
-    { value: "female", label: "Ayol",      icon: "👩", desc: `${currentFemaleVoice.label} ovozi` },
+    { value: "auto",   label: "Avtomatik", icon: Sparkles,   desc: "AI aniqlaydi" },
+    { value: "male",   label: "Erkak",     icon: AudioLines, desc: `${currentMaleVoice.label} ovozi` },
+    { value: "female", label: "Ayol",      icon: AudioLines, desc: `${currentFemaleVoice.label} ovozi` },
   ];
 
   const handleGenderSelect = (val: string) => {
@@ -181,11 +181,11 @@ export default function UrlInput({
                 {isSelected && (
                   <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-violet-500 to-pink-500" />
                 )}
-                <span className="text-xl sm:text-2xl filter drop-shadow-md">{opt.icon}</span>
+                <opt.icon aria-hidden className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
                 <span className={`text-[11px] sm:text-xs font-bold transition-colors duration-200 ${isSelected ? "text-blue-600 dark:text-blue-400 font-extrabold" : "text-gray-700 dark:text-gray-300"}`}>
                   {opt.label}
                 </span>
-                <span className="text-[8px] sm:text-[9px] text-gray-400 dark:text-gray-500 font-medium">{opt.desc}</span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{opt.desc}</span>
               </button>
             );
           })}

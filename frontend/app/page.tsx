@@ -18,7 +18,8 @@ import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import PreviewOfferModal from "@/components/PreviewOfferModal";
 import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
-import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle, Zap, AudioLines, Gift, Clapperboard, Cloud } from "lucide-react";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -62,43 +63,39 @@ function MeshBackground() {
   );
 }
 
-/* ── Logo ─────────────────────────────────────────── */
+/* ── Hero ─────────────────────────────────────────── */
+// h1 -- taklifning o'zi (brend nomi tepadagi logoda bor). Ustidagi kichik
+// "eyebrow" yorliq va emoji-ikonkalar olib tashlangan (Impeccable craft-floor).
 function Logo() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-2 sm:gap-3 text-center mb-5 sm:mb-8 px-2"
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-center gap-3 sm:gap-5 text-center mb-7 sm:mb-12 px-2"
     >
-      <div className="inline-flex items-center gap-2 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full bg-violet-500/10 dark:bg-violet-500/15 border border-violet-500/20 backdrop-blur-md shadow-sm">
-        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-violet-500 animate-pulse" />
-        <span className="text-[10px] sm:text-[11px] font-black text-violet-600 dark:text-violet-400 tracking-wider uppercase">
-          ✨ AI Studio 2.0 • Avtomatik Dublyaj
-        </span>
-      </div>
-
-      <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white transition-colors duration-300">
-        GapirAI<span className="text-violet-600 dark:text-violet-500">.uz</span>
+      <h1 className="text-[2.15rem] leading-[1.06] sm:text-6xl md:text-7xl font-black tracking-[-0.03em] text-slate-900 dark:text-white max-w-4xl [text-wrap:balance]">
+        Dunyodagi bilimlarni <span className="text-violet-600 dark:text-violet-400">o&apos;zbek tilida</span>
       </h1>
-      <p className="text-sm sm:text-xl font-bold text-slate-900 dark:text-white max-w-md leading-snug">
-        Dunyodagi bilimlarni o'zbek tilida.
-      </p>
-      <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 font-medium max-w-md leading-relaxed">
-        YouTube havolasi yoki video faylingizni o'zbek tiliga sun'iy intellekt orqali avtomatik dublyaj qiling.
+      <p className="text-sm sm:text-lg text-slate-600 dark:text-slate-300 font-medium max-w-xl leading-relaxed [text-wrap:pretty]">
+        <strong className="font-bold text-slate-900 dark:text-white">GapirAI.uz</strong> — YouTube havolasi yoki video faylingizni
+        sun&apos;iy intellekt orqali o&apos;zbek tiliga avtomatik dublyaj qiladi.
       </p>
 
-      {/* Feature chips */}
-      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1">
-          ⚡ 100% Avtomatik
-        </span>
-        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1">
-          🎙️ Tiniq AI ovozlari
-        </span>
-        <span className="px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center gap-1 text-violet-600 dark:text-violet-400">
-          🎁 Har oy 5 daqiqa bepul
-        </span>
-      </div>
+      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">
+        <li className="flex items-center gap-1.5">
+          <Zap aria-hidden className="w-4 h-4 text-violet-500" />
+          100% avtomatik
+        </li>
+        <li className="flex items-center gap-1.5">
+          <AudioLines aria-hidden className="w-4 h-4 text-violet-500" />
+          Tiniq AI ovozlari
+        </li>
+        <li className="flex items-center gap-1.5 text-violet-700 dark:text-violet-300">
+          <Gift aria-hidden className="w-4 h-4" />
+          Har oy 5 daqiqa bepul
+        </li>
+      </ul>
 
       <h2 className="sr-only">
         Dunyodagi bilimlarni o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
@@ -579,8 +576,11 @@ export default function Home() {
       {/* Main Content Body */}
       <div className="w-full flex-1 flex flex-col items-center justify-start pt-24 sm:pt-28 pb-12 px-3 sm:px-6">
 
-      <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl"}`}>
+      <div className="w-full max-w-5xl z-10">
         <Logo />
+      </div>
+
+      <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl lg:max-w-2xl"}`}>
 
         <motion.div
           layout
@@ -757,34 +757,41 @@ export default function Home() {
         </motion.div>
       </div>
 
-      {/* ── Foydalanuvchilar Fikr va Takliflari (Telegram Kanalga avtomatik boradi) ── */}
-      <TelegramFeedbackSection />
+      {/* ── Qanday ishlaydi: havola -> AI -> tayyor video ── */}
+      <HowItWorksSection />
 
       {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
-      <section className="w-full max-w-4xl mt-16 px-4 space-y-6 z-10">
-        <div className="glass-card rounded-[32px] p-8 sm:p-10 border border-black/5 dark:border-white/10 text-left">
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mb-4">
-            GapirAI.uz (Gapir AI) — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Programmasi
-          </h2>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-normal mb-4">
-            <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj programmasi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">🎯 Professional Dublyaj Imkoniyatlari</h3>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
+      <section className="w-full max-w-3xl mt-20 sm:mt-28 px-4 z-10 text-left">
+        <h2 className="text-xl sm:text-3xl font-black tracking-[-0.02em] text-slate-900 dark:text-white mb-4 [text-wrap:balance]">
+          GapirAI.uz (Gapir AI) — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Programmasi
+        </h2>
+        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-[70ch]">
+          <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj programmasi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
+        </p>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mt-8 pt-8 border-t border-black/10 dark:border-white/10">
+          <div className="flex gap-3">
+            <Clapperboard aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+            <div>
+              <dt className="text-sm font-bold text-slate-900 dark:text-white mb-1">Professional dublyaj imkoniyatlari</dt>
+              <dd className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Istalgan YouTube havolasini kiriting va sun'iy intellekt yordamida professional o'zbekcha dublyaj, sinxron audio hamda tayyor MP4 video faylni yuklab oling.
-              </p>
-            </div>
-            <div className="bg-black/5 dark:bg-white/[0.03] p-4 rounded-2xl border border-black/5 dark:border-white/5">
-              <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">⚡ Tezkor Onlayn Xizmat</h3>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
-                Qurilmangizga hech qanday qo'shimcha ilova yoki dastur yuklash talab qilinmaydi. Dublyaj jarayoni to'liq bulutli serverlarimizda amalga oshiriladi.
-              </p>
+              </dd>
             </div>
           </div>
-        </div>
+          <div className="flex gap-3">
+            <Cloud aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+            <div>
+              <dt className="text-sm font-bold text-slate-900 dark:text-white mb-1">Tezkor onlayn xizmat</dt>
+              <dd className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Qurilmangizga hech qanday qo'shimcha ilova yoki dastur yuklash talab qilinmaydi. Dublyaj jarayoni to'liq bulutli serverlarimizda amalga oshiriladi.
+              </dd>
+            </div>
+          </div>
+        </dl>
       </section>
+
+      {/* ── Foydalanuvchilar Fikr va Takliflari (Telegram Kanalga avtomatik boradi) ── */}
+      <TelegramFeedbackSection />
 
         <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-4">
           <DonateCTA />
