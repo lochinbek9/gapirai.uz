@@ -63,7 +63,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [errorCodeFilter, setErrorCodeFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<string>('newest')
   const [includeInternal, setIncludeInternal] = useState(false)
-  const [dateRange, setDateRange] = useState<DateRangeValue>('today')
+  const [dateRange, setDateRange] = useState<DateRangeValue>('all')
   const [customStartDate, setCustomStartDate] = useState<string>('')
   const [customEndDate, setCustomEndDate] = useState<string>('')
 
