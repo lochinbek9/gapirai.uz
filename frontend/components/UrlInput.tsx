@@ -1,6 +1,8 @@
 "use client";
 
-import { AudioLines, ClipboardPaste, Loader2, Sparkles, Youtube } from "lucide-react";
+import { useRef, useState, type KeyboardEvent } from "react";
+import Link from "next/link";
+import { AudioLines, ClipboardPaste, Info, Loader2, Sparkles, Youtube } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { VideoInfo, formatDuration } from "@/lib/api";
 import SampleVideosSection, { SampleVideo } from "@/components/SampleVideosSection";
@@ -32,20 +34,20 @@ function VideoPreview({ info }: { info: VideoInfo }) {
         <div className="relative flex-shrink-0">
           <img
             src={info.thumbnail}
-            alt={info.title}
+            alt=""
             className="w-24 h-14 object-cover rounded-xl shadow-lg ring-1 ring-black/5 dark:ring-white/10"
           />
           <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/20 to-transparent" />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <h4 className="text-sm font-bold leading-tight text-gray-900 dark:text-white line-clamp-2 transition-colors">
+        <p className="text-sm font-bold leading-tight text-gray-900 dark:text-white line-clamp-2 transition-colors">
           {info.title}
-        </h4>
+        </p>
         <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">{info.uploader}</span>
+          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{info.uploader}</span>
           <span className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
-          <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">{formatDuration(info.duration)}</span>
+          <span className="text-xs font-semibold tabular-nums text-blue-700 dark:text-blue-300">{formatDuration(info.duration)}</span>
         </div>
       </div>
     </motion.div>
@@ -76,11 +78,27 @@ export default function UrlInput({
   const currentMaleVoice = maleVoices.find((v) => v.id === voiceName) || maleVoices[0];
   const currentFemaleVoice = femaleVoices.find((v) => v.id === voiceName) || femaleVoices[0];
 
+  // Foydalanuvchiga ichki TTS model nomi (Charon, Autonoe) emas, ovoz tavsifi ko'rsatiladi
   const genderOptions = [
-    { value: "auto",   label: "Avtomatik", icon: Sparkles,   desc: "AI aniqlaydi" },
-    { value: "male",   label: "Erkak",     icon: AudioLines, desc: `${currentMaleVoice.label} ovozi` },
-    { value: "female", label: "Ayol",      icon: AudioLines, desc: `${currentFemaleVoice.label} ovozi` },
+    { value: "auto",   label: "Avtomatik", icon: Sparkles,   desc: "Spikerga qarab" },
+    { value: "male",   label: "Erkak",     icon: AudioLines, desc: currentMaleVoice.id === "Charon" ? "Chuqur, ishonchli" : currentMaleVoice.desc },
+    { value: "female", label: "Ayol",      icon: AudioLines, desc: currentFemaleVoice.id === "Autonoe" ? "Yumshoq, aniq" : currentFemaleVoice.desc },
   ];
+  const genderRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pasteError, setPasteError] = useState(false);
+
+  // Ovoz jinsi -- radiogroup: ←/→ tanlovni o'zgartiradi
+  const onGenderKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = genderOptions.length - 1;
+    const next =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? (index === last ? 0 : index + 1)
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (index === 0 ? last : index - 1)
+      : null;
+    if (next === null) return;
+    e.preventDefault();
+    handleGenderSelect(genderOptions[next].value);
+    genderRefs.current[next]?.focus();
+  };
 
   const handleGenderSelect = (val: string) => {
     onGenderChange(val);
@@ -96,8 +114,12 @@ export default function UrlInput({
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
+      setPasteError(false);
       if (text) onChange(text);
-    } catch {}
+    } catch {
+      // Brauzer bufer ruxsatini bermadi -- foydalanuvchiga qo'lda joylashtirishni aytamiz
+      setPasteError(true);
+    }
   };
 
   const handleSampleSelect = (sample: SampleVideo) => {
@@ -109,34 +131,49 @@ export default function UrlInput({
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={onSubmit} noValidate className="space-y-6">
       {/* URL input */}
       <div className="space-y-2">
-        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
-          YouTube Havolasi
+        <label htmlFor="youtube-url" className="block text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1">
+          YouTube havolasi
         </label>
-        <div className="glass-input flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl relative overflow-hidden group transition-all duration-300">
+        <div className="glass-input flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl relative overflow-hidden group transition-all duration-300 focus-within:ring-2 focus-within:ring-violet-500/70">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-violet-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <Youtube className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 flex-shrink-0" />
+          <Youtube aria-hidden="true" className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 flex-shrink-0" />
           <input
-            type="text"
+            id="youtube-url"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
             value={url}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => { setPasteError(false); onChange(e.target.value); }}
             placeholder="Video havolasini joylashtiring..."
-            className="flex-1 min-w-0 bg-transparent text-black dark:text-white placeholder-slate-400 dark:placeholder-gray-600 text-xs sm:text-sm focus:outline-none font-medium"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={`youtube-url-rules${error ? " youtube-url-error" : ""}${pasteError ? " youtube-url-paste" : ""}`}
+            className="flex-1 min-w-0 bg-transparent text-black dark:text-white placeholder-slate-500 dark:placeholder-gray-400 text-sm focus:outline-none font-medium"
           />
           <button
             type="button"
             onClick={handlePaste}
-            className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 transition-all flex-shrink-0"
+            className="flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-300 hover:text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-3 sm:px-4 py-2 transition-all flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
           >
-            <ClipboardPaste size={13} />
-            <span className="hidden xs:inline">Nusxani </span><span>qo'yish</span>
+            <ClipboardPaste aria-hidden="true" size={14} />
+            <span className="hidden sm:inline">Joylashtirish</span>
+            <span className="sm:hidden">Qo&apos;yish</span>
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-relaxed ml-1">
-          Diniy, 18+, zo'ravonlik yoki noqonuniy faoliyatga oid videolarni yubormang
-          (bolalarga oid jinsiy kontent esa umuman qabul qilinmaydi).
+        {pasteError && (
+          <p id="youtube-url-paste" role="status" className="text-xs text-slate-600 dark:text-slate-300 ml-1">
+            Brauzer buferdan o&apos;qishga ruxsat bermadi — havolani maydonga qo&apos;lda joylashtiring (Ctrl+V yoki uzoq bosib &quot;Qo&apos;yish&quot;).
+          </p>
+        )}
+        <p id="youtube-url-rules" className="flex items-start gap-1.5 text-xs text-slate-600 dark:text-slate-400 leading-relaxed ml-1">
+          <Info aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Diniy, 18+, zo&apos;ravonlik yoki noqonuniy faoliyatga oid videolarni yubormang
+            (bolalarga oid jinsiy kontent esa umuman qabul qilinmaydi).{" "}
+            <Link href="/terms" className="font-semibold text-blue-700 dark:text-blue-300 underline underline-offset-2">Foydalanish shartlari</Link>
+          </span>
         </p>
       </div>
 
@@ -158,21 +195,26 @@ export default function UrlInput({
       {/* 1-Click Sample Videos Carousel */}
       <SampleVideosSection onSelect={handleSampleSelect} activeUrl={url} />
 
-
       {/* Gender selector */}
-      <div className="space-y-2">
-        <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">
+      <fieldset className="space-y-2">
+        <legend id="voice-gender-label" className="block text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1 mb-2">
           Ovoz jinsi
-        </label>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {genderOptions.map((opt) => {
+        </legend>
+        <div role="radiogroup" aria-labelledby="voice-gender-label" className="grid grid-cols-3 gap-2 sm:gap-3">
+          {genderOptions.map((opt, index) => {
             const isSelected = voiceGender === opt.value;
+            const isFocusable = isSelected || (!genderOptions.some((o) => o.value === voiceGender) && index === 0);
             return (
               <button
                 key={opt.value}
+                ref={(el) => { genderRefs.current[index] = el; }}
                 type="button"
+                role="radio"
+                aria-checked={isSelected}
+                tabIndex={isFocusable ? 0 : -1}
+                onKeyDown={(e) => onGenderKeyDown(e, index)}
                 onClick={() => handleGenderSelect(opt.value)}
-                className={`flex flex-col items-center gap-1 sm:gap-1.5 py-3 sm:py-4 px-1.5 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all duration-300 relative overflow-hidden ${
+                className={`flex flex-col items-center gap-1 sm:gap-1.5 py-3 sm:py-4 px-1.5 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all duration-300 relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
                   isSelected
                     ? "border-blue-500 bg-gradient-to-b from-blue-500/10 to-blue-500/20 dark:from-blue-500/20 dark:to-blue-500/30 shadow-lg shadow-blue-500/10"
                     : "border-black/5 dark:border-white/5 hover:border-blue-400/40 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
@@ -181,24 +223,24 @@ export default function UrlInput({
                 {isSelected && (
                   <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-violet-500 to-pink-500" />
                 )}
-                <opt.icon aria-hidden className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
-                <span className={`text-[11px] sm:text-xs font-bold transition-colors duration-200 ${isSelected ? "text-blue-600 dark:text-blue-400 font-extrabold" : "text-gray-700 dark:text-gray-300"}`}>
+                <opt.icon aria-hidden className={`w-5 h-5 sm:w-6 sm:h-6 ${isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-500 dark:text-gray-400"}`} />
+                <span className={`text-xs sm:text-sm font-bold transition-colors duration-200 ${isSelected ? "text-blue-700 dark:text-blue-300 font-extrabold" : "text-slate-800 dark:text-gray-200"}`}>
                   {opt.label}
                 </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{opt.desc}</span>
+                <span className="text-xs leading-tight text-slate-600 dark:text-slate-300 font-medium">{opt.desc}</span>
               </button>
             );
           })}
         </div>
-      </div>
+      </fieldset>
 
       {/* Gemini ovoz tanlash (faqat Pro foydalanuvchi Gemini tanlaganda) */}
       {isProUser && isGemini && voiceGender !== "auto" && (
         <div className="space-y-1.5 pt-1">
-          <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
+          <span id="voice-variant-label" className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wide font-bold">
             Ovoz variantini tanlang:
           </span>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div role="group" aria-labelledby="voice-variant-label" className="grid grid-cols-3 gap-1.5">
             {(voiceGender === "male" ? maleVoices : femaleVoices).map((v) => {
               const active = (voiceName || (voiceGender === "male" ? "Charon" : "Autonoe")) === v.id;
               return (
@@ -206,14 +248,15 @@ export default function UrlInput({
                   key={v.id}
                   type="button"
                   onClick={() => onVoiceNameChange?.(v.id)}
-                  className={`py-1.5 px-2 rounded-xl text-center border transition-all ${
+                  aria-pressed={active}
+                  className={`py-1.5 px-2 rounded-xl text-center border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
                     active
                       ? "border-violet-500 bg-violet-500/15 text-violet-700 dark:text-violet-300 font-bold shadow-sm"
                       : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 text-gray-600 dark:text-gray-400"
                   }`}
                 >
-                  <div className="text-[11px] font-bold">{v.label}</div>
-                  <div className="text-[8px] text-gray-400 dark:text-gray-500 truncate">{v.desc}</div>
+                  <div className="text-xs font-bold">{v.label}</div>
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{v.desc}</div>
                 </button>
               );
             })}
@@ -224,12 +267,14 @@ export default function UrlInput({
       {/* Error */}
       {error && (
         <motion.div
+          id="youtube-url-error"
+          role="alert"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3 items-center"
+          className="bg-rose-500/10 border border-rose-500/25 rounded-2xl p-4 flex gap-3 items-center"
         >
-          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">{error}</p>
+          <div aria-hidden="true" className="w-2 h-2 shrink-0 rounded-full bg-rose-500" />
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{error}</p>
         </motion.div>
       )}
 
@@ -237,28 +282,35 @@ export default function UrlInput({
       <motion.button
         type="submit"
         disabled={loading || !url.trim()}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
+        aria-describedby={!url.trim() && !loading ? "submit-hint" : undefined}
+        whileHover={url.trim() ? { scale: 1.01 } : undefined}
+        whileTap={url.trim() ? { scale: 0.98 } : undefined}
         className="w-full flex items-center justify-center gap-3
-                   btn-premium disabled:from-gray-300 disabled:to-gray-200 dark:disabled:from-gray-800 dark:disabled:to-gray-800 disabled:opacity-50 disabled:pointer-events-none
+                   btn-premium
                    text-white font-extrabold py-4 sm:py-5 rounded-2xl sm:rounded-[24px]
-                   transition-all duration-300 text-xs sm:text-sm shadow-xl"
+                   transition-all duration-300 text-sm shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
       >
         {loading ? (
-          <><Loader2 size={18} className="animate-spin" /> Vazifa yaratilmoqda...</>
+          <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Vazifa yaratilmoqda...</>
         ) : (
-          <><Sparkles size={18} /> Video dublaj qilish</>
+          <><Sparkles aria-hidden="true" size={18} /> Video dublaj qilish</>
         )}
       </motion.button>
 
-      <div className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
-        {["100% Avtomat", "HD Sifat", "O'zbek tilida"].map((label, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-tighter">{label}</span>
-          </div>
+      {!url.trim() && !loading && (
+        <p id="submit-hint" className="-mt-3 text-center text-xs text-slate-600 dark:text-slate-400">
+          Avval video havolasini kiriting yoki namunaviy videoni tanlang
+        </p>
+      )}
+
+      <ul className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
+        {["100% avtomatik", "HD sifat", "O'zbek tilida"].map((label) => (
+          <li key={label} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+          </li>
         ))}
-      </div>
+      </ul>
     </form>
   );
 }
