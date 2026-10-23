@@ -1180,6 +1180,129 @@ def admin_cancel_analysis(
 
 
 
+_ACTIVE_USER_PERIODS = {"7d": 7, "30d": 30, "90d": 90}
+
+
+@router.get("/active-users")
+def admin_active_users(
+    period: str = Query("30d", description="7d | 30d | 90d | 12m"),
+    include_internal: bool = False,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Saytga kirgan (faol) foydalanuvchilar: bugun / kecha / shu oy / jami va
+    grafik uchun kunlik yoki oylik qator. Manba -- user_daily_visits (har bir
+    tizimga kirgan foydalanuvchi so'rovi, services/auth.py: record_user_activity).
+    Kunlar Toshkent vaqti (UTC+5) bo'yicha: visit_date UTC sanasi, shuning uchun
+    first_seen_at/last_seen_at +5 soat bilan qayta sanaladi (bitta UTC qator ikki
+    Toshkent kuniga tushishi mumkin -- DISTINCT bilan ikki marta sanalmaydi).
+    Faqat ro'yxatdan o'tgan va tizimga kirgan foydalanuvchilar hisoblanadi."""
+    if period not in _ACTIVE_USER_PERIODS and period != "12m":
+        raise HTTPException(status_code=400, detail="period: 7d | 30d | 90d | 12m")
+
+    offset = timedelta(hours=5)
+    today = (datetime.utcnow() + offset).date()
+    yesterday = today - timedelta(days=1)
+    month_start = today.replace(day=1)
+    prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+    # O'tgan oyning xuddi shu kunigacha bo'lgan qismi (adolatli solishtirish uchun).
+    prev_month_same_day = min(
+        prev_month_start + timedelta(days=today.day - 1),
+        month_start - timedelta(days=1),
+    )
+
+    internal_clause = "" if include_internal else "AND (u.is_internal IS NOT TRUE)"
+    visits_cte = f"""
+        WITH v AS (
+            SELECT dv.user_id, (COALESCE(dv.first_seen_at, dv.visit_date) + INTERVAL '5 hours')::date AS d
+            FROM user_daily_visits dv JOIN users u ON u.id = dv.user_id
+            WHERE TRUE {internal_clause}
+            UNION
+            SELECT dv.user_id, (COALESCE(dv.last_seen_at, dv.visit_date) + INTERVAL '5 hours')::date AS d
+            FROM user_daily_visits dv JOIN users u ON u.id = dv.user_id
+            WHERE TRUE {internal_clause}
+        )
+    """
+
+    db = SessionLocal()
+    try:
+        def count_between(start: date, end: date) -> int:
+            return db.execute(
+                text(visits_cte + "SELECT COUNT(DISTINCT user_id) FROM v WHERE d BETWEEN :s AND :e"),
+                {"s": start, "e": end},
+            ).scalar() or 0
+
+        summary = {
+            "today": count_between(today, today),
+            "yesterday": count_between(yesterday, yesterday),
+            "last_7d": count_between(today - timedelta(days=6), today),
+            "last_30d": count_between(today - timedelta(days=29), today),
+            "this_month": count_between(month_start, today),
+            "prev_month_same_period": count_between(prev_month_start, prev_month_same_day),
+            "prev_month": count_between(prev_month_start, month_start - timedelta(days=1)),
+            "total": db.execute(text(visits_cte + "SELECT COUNT(DISTINCT user_id) FROM v")).scalar() or 0,
+        }
+
+        new_users_cte = f"""
+            , n AS (
+                SELECT u.id AS user_id, (u.created_at + INTERVAL '5 hours')::date AS d
+                FROM users u WHERE u.created_at IS NOT NULL {internal_clause}
+            )
+        """
+        if period == "12m":
+            first = (month_start - timedelta(days=1))
+            for _ in range(10):
+                first = (first.replace(day=1) - timedelta(days=1))
+            series_start = first.replace(day=1)
+            rows = db.execute(
+                text(visits_cte + new_users_cte + """
+                    SELECT to_char(date_trunc('month', d), 'YYYY-MM') AS bucket,
+                           COUNT(DISTINCT user_id) AS active,
+                           COUNT(DISTINCT user_id) FILTER (
+                               WHERE user_id IN (SELECT user_id FROM n WHERE date_trunc('month', n.d) = date_trunc('month', v.d))
+                           ) AS new_active
+                    FROM v WHERE d >= :s GROUP BY 1
+                """),
+                {"s": series_start},
+            ).fetchall()
+            by_bucket = {r.bucket: (r.active, r.new_active) for r in rows}
+            buckets, cursor = [], series_start
+            while cursor <= today:
+                buckets.append(cursor.strftime("%Y-%m"))
+                cursor = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+        else:
+            days = _ACTIVE_USER_PERIODS[period]
+            series_start = today - timedelta(days=days - 1)
+            rows = db.execute(
+                text(visits_cte + new_users_cte + """
+                    SELECT to_char(v.d, 'YYYY-MM-DD') AS bucket,
+                           COUNT(DISTINCT v.user_id) AS active,
+                           COUNT(DISTINCT v.user_id) FILTER (
+                               WHERE v.user_id IN (SELECT user_id FROM n WHERE n.d = v.d)
+                           ) AS new_active
+                    FROM v WHERE v.d >= :s GROUP BY 1
+                """),
+                {"s": series_start},
+            ).fetchall()
+            by_bucket = {r.bucket: (r.active, r.new_active) for r in rows}
+            buckets = [(series_start + timedelta(days=i)).isoformat() for i in range(days)]
+
+        series = []
+        for b in buckets:
+            active, new_active = by_bucket.get(b, (0, 0))
+            series.append({"date": b, "active": active, "new": new_active, "returning": active - new_active})
+
+        return {
+            "period": period,
+            "timezone": "Asia/Tashkent",
+            "today": today.isoformat(),
+            "summary": summary,
+            "series": series,
+            "data_since": (db.execute(text("SELECT MIN(visit_date) FROM user_daily_visits")).scalar() or today).isoformat()[:10],
+        }
+    finally:
+        db.close()
+
+
 @router.get("/retention")
 def admin_retention_stats(
     days: int = Query(default=7, ge=0, le=365),

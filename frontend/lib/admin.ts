@@ -1102,3 +1102,36 @@ export async function apiAdminResetGeminiCooldown(token: string, key_masked: str
   return res.data
 }
 
+
+// ── Saytga kirgan (faol) foydalanuvchilar ──────────────────────────────
+export type ActiveUsersPeriod = '7d' | '30d' | '90d' | '12m'
+
+export interface ActiveUsersReport {
+  period: ActiveUsersPeriod
+  timezone: string
+  today: string
+  data_since: string
+  summary: {
+    today: number
+    yesterday: number
+    last_7d: number
+    last_30d: number
+    this_month: number
+    prev_month_same_period: number
+    prev_month: number
+    total: number
+  }
+  series: { date: string; active: number; new: number; returning: number }[]
+}
+
+export async function apiAdminActiveUsers(
+  token: string,
+  period: ActiveUsersPeriod = '30d',
+  includeInternal: boolean = false
+): Promise<ActiveUsersReport> {
+  const res = await axios.get(`${API_URL}/admin/active-users`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { period, include_internal: includeInternal },
+  })
+  return res.data
+}

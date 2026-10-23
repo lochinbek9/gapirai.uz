@@ -45,6 +45,7 @@ import {
 import { getToken, setToken, setStoredUser } from '@/lib/auth'
 import { useAuth } from '@/hooks/useAuth'
 import AdminUsersManager from '@/components/AdminUsersManager'
+import AdminActiveUsersPanel from '@/components/AdminActiveUsersPanel'
 import AdminUnactivatedUsersManager from '@/components/AdminUnactivatedUsersManager'
 import AdminJobsCostManager from '@/components/AdminJobsCostManager'
 import AdminGeminiKeysManager from '@/components/AdminGeminiKeysManager'
@@ -766,6 +767,9 @@ export default function AdminPage() {
                 </div>
               )}
             </section>
+
+            {/* Saytga kirgan (faol) foydalanuvchilar: bugun / kecha / shu oy / jami + grafik */}
+            <AdminActiveUsersPanel />
 
             {/* Total Metric Highlights */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
