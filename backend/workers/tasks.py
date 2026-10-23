@@ -140,6 +140,24 @@ def _cleanup_upload_dir(job_id: str) -> None:
             logger.warning(f"uploads/{job_id} tozalab bo'lmadi: {exc}")
 
 
+def _release_read_tx(db) -> None:
+    """Uzoq tashqi chaqiruvdan (yuklash, STT, LLM, TTS, ffmpeg) OLDIN ochiq
+    tranzaksiyani yopadi. Hech qanday o'zgarish bo'lmasa commit() faqat
+    tranzaksiyani tugatadi.
+
+    Nega: sessiya bitta pipeline davomida yashaydi va har SELECT (masalan
+    get_tts_provider_for_job, kesh/donor qidiruvi) yangi tranzaksiya ochadi.
+    U keyingi commit()gacha -- ya'ni daqiqalab davom etadigan TTS/STT
+    davomida -- "idle in transaction" bo'lib turardi va dubbing_jobs'dagi
+    har qanday ALTER TABLE'ni (migratsiya, backend startup DDL) to'sib
+    qo'yardi (2026-10-22 API 502, 2026-10-24 migratsiya qotishi)."""
+    try:
+        db.commit()
+    except Exception as e:
+        logger.warning(f"[DB] tranzaksiyani yopib bo'lmadi: {e}")
+        db.rollback()
+
+
 def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message: str):
     job.status = status
     job.progress = progress
@@ -509,7 +527,12 @@ def _verify_output_files_exist(final_output: str | None, dubbed_audio_path: str 
     time_limit=8000,       # 133 daqiqa — worker'ni majburan to'xtatadi (hard limit)
 )
 def process_video(self: Task, job_id: str) -> dict:
-    db = SessionLocal()
+    # expire_on_commit=False: har commit()dan keyin job atributlari "eskirgan"
+    # deb belgilanmaydi. Aks holda keyingi job.xxx o'qilishi yashirin SELECT
+    # bilan yangi tranzaksiya ochib, uni uzoq TTS/STT davomida ochiq qoldirardi
+    # (qarang: _release_read_tx). Job'ni pipeline davomida faqat shu worker
+    # yozadi; bekor qilish Celery revoke bilan ishlaydi, DB'dan o'qilmaydi.
+    db = SessionLocal(expire_on_commit=False)
     stage_timings: dict = {}
     pipeline_start = time.monotonic()
     current_stage = "INIT"
@@ -759,6 +782,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 )
             _update_job(db, job, JobStatus.DOWNLOADING, 5.0, "YouTube'dan yuklanmoqda...")
             max_sec = 120.0 if getattr(job, "is_preview", False) else None
+            _release_read_tx(db)
             download_result = downloader.download_video(job.youtube_url, job_id, max_duration_seconds=max_sec)
             job.video_title = download_result["title"]
             job.video_duration = download_result["duration"]
@@ -791,6 +815,7 @@ def process_video(self: Task, job_id: str) -> dict:
             stt_primary = "gemini" if (job.subtitle_only or uzbek_source or settings.STT_PROVIDER == "gemini") else "openai"
             stt_is_paid = True
             try:
+                _release_read_tx(db)
                 transcript = transcriber.transcribe_audio(
                     audio_path,
                     language="uz" if uzbek_source else None,
@@ -807,6 +832,7 @@ def process_video(self: Task, job_id: str) -> dict:
                     job.source_language = "auto"
                     db.commit()
                     _update_job(db, job, JobStatus.TRANSCRIBING, 25.0, "Chet tili aniqlandi, qayta matnga aylantirilmoqda...")
+                    _release_read_tx(db)
                     transcript = transcriber.transcribe_audio(
                         audio_path,
                         language=None,
@@ -866,6 +892,7 @@ def process_video(self: Task, job_id: str) -> dict:
         # lekin videoning haqiqiy nutqi siyosatga zid bo'lgan holatlarni shu
         # yerda ushlaydi -- tarjima/TTS (qimmat bosqichlar) boshlanishidan OLDIN.
         current_stage = "SAFETY_CHECK"
+        _release_read_tx(db)
         safety = check_safety(transcript_text)
         if not safety.allowed:
             # Faqat CSAM (sexual_minors) shu yerga yetib keladi -- yagona
@@ -950,6 +977,7 @@ def process_video(self: Task, job_id: str) -> dict:
             _record_stage(stage_timings, job_id, "GENDER", stage_t0, "skipped", f"Donor auto: {gender}")
         else:
             _update_job(db, job, JobStatus.TRANSLATING, 35.0, "Spikerning jinsi aniqlanmoqda...")
+            _release_read_tx(db)
             gender = _detect_gender(transcript_text, title=getattr(job, "video_title", "") or "")
             job.speaker_gender = gender
             db.commit()
@@ -975,6 +1003,7 @@ def process_video(self: Task, job_id: str) -> dict:
             else:
                 _update_job(db, job, JobStatus.TRANSLATING, 40.0, "O'zbek tiliga tarjima qilinmoqda...")
                 translate_is_paid = True
+                _release_read_tx(db)
                 translated_segments = translator.translate_segments(segments, is_paid=translate_is_paid)
 
             # Davomiylik tekshiruvi — original segment vaqtidan sezilarli
@@ -1063,6 +1092,7 @@ def process_video(self: Task, job_id: str) -> dict:
         else:
             _start_stage(job_id, "SPEECH_OPT")
             _update_job(db, job, JobStatus.SYNCING, 50.0, "Matn tabiiy talaffuzga moslashtirilmoqda...")
+            _release_read_tx(db)
             speech_segments = speech_optimizer.optimize_segments(translated_segments)
             speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             job.speech_segments = speech_segments
@@ -1129,6 +1159,7 @@ def process_video(self: Task, job_id: str) -> dict:
             tts_is_paid = True if tts_provider == "gemini" else is_paid_job
 
             speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
+            _release_read_tx(db)
             dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                 speech_segments, tts_dir, voice_name=voice,
                 video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
@@ -1175,6 +1206,7 @@ def process_video(self: Task, job_id: str) -> dict:
             final_output = str(final_output_dir / "dubbed_final.mp4")
 
             max_dur = 120.0 if getattr(job, "is_preview", False) else None
+            _release_read_tx(db)
             merger.merge_video_audio(
                 video_path=video_path,
                 dubbed_audio_path=dubbed_audio_path,
