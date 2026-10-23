@@ -28,6 +28,8 @@ import {
   TrendingUp,
   Percent,
   Calendar,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import {
   apiAdminJobsCost,
@@ -66,6 +68,19 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [dateRange, setDateRange] = useState<DateRangeValue>('all')
   const [customStartDate, setCustomStartDate] = useState<string>('')
   const [customEndDate, setCustomEndDate] = useState<string>('')
+
+  // Ko'rinish: jadval yoki YouTube uslubidagi kartochkalar (tanlov brauzerda eslab qolinadi)
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('admin_jobs_view')
+      if (saved === 'grid' || saved === 'table') setViewMode(saved)
+    } catch {}
+  }, [])
+  const changeViewMode = (mode: 'table' | 'grid') => {
+    setViewMode(mode)
+    try { localStorage.setItem('admin_jobs_view', mode) } catch {}
+  }
 
   // Detail Modal State
   const [selectedJob, setSelectedJob] = useState<AdminJobCostItem | null>(null)
@@ -607,6 +622,28 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               ]}
               className="min-w-[135px]"
             />
+
+            {/* Ko'rinish almashtirgichi */}
+            <div role="group" aria-label="Ko'rinish" className="flex items-center bg-black/30 border border-white/10 rounded-xl p-0.5">
+              {([
+                { id: 'table', label: 'Jadval', Icon: List },
+                { id: 'grid', label: 'Kartochka', Icon: LayoutGrid },
+              ] as const).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => changeViewMode(id)}
+                  aria-pressed={viewMode === id}
+                  title={label}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                    viewMode === id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -640,6 +677,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
       {/* Data Table */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+        {viewMode === 'table' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -1020,6 +1058,93 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
             </tbody>
           </table>
         </div>
+        ) : (
+          /* YouTube uslubidagi kartochkalar */
+          <div className="p-4">
+            {loading && jobs.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 text-xs">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-400" />
+                <span>Yuklanmoqda...</span>
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 text-xs">Hech qanday dublyaj jobi topilmadi.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+                {jobs.map((job) => {
+                  const statusInfo = getStatusBadge(job.status, job.error_code)
+                  const jobLink = job.subtitle_only ? `/subtitles/${job.id}` : `/video/${job.id}`
+                  const relative = getRelativeTime(job.created_at)
+                  return (
+                    <div key={job.id} className="group min-w-0">
+                      <a
+                        href={jobLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative block aspect-video rounded-xl overflow-hidden bg-black/50 border border-white/10"
+                        title="Dublaj qilingan videoni ochish"
+                      >
+                        {job.video_thumbnail ? (
+                          <img
+                            src={job.video_thumbnail}
+                            alt={job.video_title}
+                            loading="lazy"
+                            className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-600">
+                            <Play className="w-8 h-8" />
+                          </div>
+                        )}
+                        {/* To'q fon: badge rangi yarim shaffof, yorug' rasm ustida o'qilmay qolardi */}
+                        <span className="absolute top-2 left-2 rounded-full bg-black/80">
+                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
+                            <span>{statusInfo.label}</span>
+                          </span>
+                        </span>
+                        {job.subtitle_only && (
+                          <span className="absolute top-2 right-2 text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded">
+                            Subtitr
+                          </span>
+                        )}
+                        <span className="absolute bottom-1.5 right-1.5 text-[11px] bg-black/80 font-mono text-gray-100 px-1.5 py-0.5 rounded">
+                          {formatDurationBadge(job.video_duration)}
+                        </span>
+                      </a>
+
+                      <div className="mt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJob(job)}
+                          title={job.video_title}
+                          className="text-left text-sm font-semibold text-white leading-snug line-clamp-2 hover:text-blue-400 transition"
+                        >
+                          {job.video_title}
+                        </button>
+                        <p className="mt-1 text-xs text-gray-300 truncate">
+                          {job.user.name || 'Mehmon (Anonim)'}
+                          {job.user.plan && job.user.plan.toLowerCase() !== 'free' && (
+                            <span className="ml-1.5 text-[10px] font-bold uppercase text-purple-300">{job.user.plan}</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-gray-500 truncate">{job.user.email || job.user.phone || '—'}</p>
+                        <p className="mt-0.5 text-[11px] text-gray-400">
+                          {relative && `${relative} · `}
+                          {formatDateTime(job.created_at).date} {formatDateTime(job.created_at).time}
+                        </p>
+                        {job.error_code && (
+                          <p className="mt-0.5 text-[10px] font-mono text-rose-400 truncate" title={job.error_message || ''}>
+                            {job.error_code}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pagination footer */}
         {pagination && pagination.total_pages > 1 && (
