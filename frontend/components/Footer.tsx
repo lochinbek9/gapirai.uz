@@ -41,6 +41,9 @@ export default function Footer() {
                 <Link href="/about" className="hover:text-blue-600 dark:hover:text-blue-400 transition">Afzalliklarimiz</Link>
               </li>
               <li>
+                <Link href="/videos" className="hover:text-blue-600 dark:hover:text-blue-400 transition">Ommaviy videolar</Link>
+              </li>
+              <li>
                 <Link href="/donate" className="inline-flex items-center gap-1 font-semibold text-rose-500 hover:text-rose-600 transition">
                   <Heart className="w-3.5 h-3.5" fill="currentColor" /> Loyihani qo‘llab-quvvatlash
                 </Link>

@@ -66,6 +66,8 @@ for _noisy in ("httpx", "httpcore", "telegram.ext.Application"):
 
 logger = logging.getLogger("telegram_bot")
 
+BLOCKED_ACCOUNT_TEXT = "🚫 Hisobingiz administrator tomonidan bloklangan. Savollar bo'lsa, bizga murojaat qiling."
+
 
 async def _safe_edit_text(message, text: str) -> None:
     """Holat xabarini tahrirlaydi. Tahrir muvaffaqiyatsiz bo'lsa (masalan,
@@ -354,6 +356,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not user:
         await update.message.reply_text("Avval /start buyrug'ini yuborib, telefon raqamingizni ulashing.")
         return
+    if not user.is_active:
+        await update.message.reply_text(BLOCKED_ACCOUNT_TEXT)
+        return
 
     url = _looks_like_youtube_url(text)
     if not url:
@@ -414,6 +419,9 @@ async def _execute_dubbing_job_flow(
         user = db.query(User).filter(User.telegram_chat_id == chat_id_str).first()
         if not user:
             await target_message.reply_text("Avval /start buyrug'ini yuborib, profilingizni faollashtiring.")
+            return
+        if not user.is_active:
+            await target_message.reply_text(BLOCKED_ACCOUNT_TEXT)
             return
 
         result = await create_dubbing_job(
@@ -538,6 +546,9 @@ async def _process_video_file_job(
         if not user:
             await target_message.reply_text("Avval /start buyrug'ini yuborib, profilingizni faollashtiring.")
             return
+        if not user.is_active:
+            await target_message.reply_text(BLOCKED_ACCOUNT_TEXT)
+            return
 
         rejection = check_queue_capacity(db, user.id)
         if rejection:
@@ -635,6 +646,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if not user:
         await update.message.reply_text("Avval /start buyrug'ini yuborib, telefon raqamingizni ulashing.")
+        return
+    if not user.is_active:
+        await update.message.reply_text(BLOCKED_ACCOUNT_TEXT)
         return
 
     if not settings.TELEGRAM_LOCAL_API_URL:

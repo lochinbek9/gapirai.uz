@@ -18,7 +18,7 @@ import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import PreviewOfferModal from "@/components/PreviewOfferModal";
 import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
-import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle, Zap, AudioLines, Gift, Clapperboard, Cloud } from "lucide-react";
+import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle, Zap, AudioLines, Gift, Clapperboard, Cloud, PlaySquare } from "lucide-react";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 
 
@@ -512,6 +512,13 @@ export default function Home() {
           {/* Center Navigation Links: perfectly centered in max-w-7xl */}
           <nav className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
             <Link
+              href="/videos"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition whitespace-nowrap"
+            >
+              <PlaySquare className="w-3.5 h-3.5 text-violet-500" />
+              <span>Ommaviy videolar</span>
+            </Link>
+            <Link
               href="/pricing"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
             >
@@ -536,6 +543,14 @@ export default function Home() {
 
           {/* Right Controls */}
           <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link
+              href="/videos"
+              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
+              title="Ommaviy videolar"
+              aria-label="Ommaviy videolar"
+            >
+              <PlaySquare className="w-4 h-4 text-violet-500" />
+            </Link>
             <Link
               href="/pricing"
               className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"

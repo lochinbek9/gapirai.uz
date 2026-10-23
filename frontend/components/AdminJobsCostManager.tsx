@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Search,
   Filter,
@@ -30,11 +30,18 @@ import {
   Calendar,
   LayoutGrid,
   List,
+  Globe,
+  Trash2,
+  Ban,
+  UserCheck,
 } from 'lucide-react'
 import {
   apiAdminJobsCost,
   apiAdminRetryJob,
   apiAdminCancelJob,
+  apiAdminSetJobVisibility,
+  apiAdminDeleteJob,
+  apiAdminUpdateUserCredentials,
   apiAdminGeminiKeysOverview,
   AdminJobsCostResponse,
   AdminJobCostItem,
@@ -56,7 +63,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   // Filters state
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(25)
+  const [pageSize] = useState(24)
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -65,6 +72,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   const [errorCodeFilter, setErrorCodeFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<string>('newest')
   const [includeInternal, setIncludeInternal] = useState(false)
+  const [publicOnly, setPublicOnly] = useState(false)
   const [dateRange, setDateRange] = useState<DateRangeValue>('all')
   const [customStartDate, setCustomStartDate] = useState<string>('')
   const [customEndDate, setCustomEndDate] = useState<string>('')
@@ -79,8 +87,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   }, [])
   const changeViewMode = (mode: 'table' | 'grid') => {
     setViewMode(mode)
+    setPage(1)
     try { localStorage.setItem('admin_jobs_view', mode) } catch {}
   }
+
+  // Kartochka ko'rinishi YouTube kabi cheksiz: sahifalar ketma-ket qo'shilib boradi
+  const [gridJobs, setGridJobs] = useState<AdminJobCostItem[]>([])
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
 
   // Detail Modal State
   const [selectedJob, setSelectedJob] = useState<AdminJobCostItem | null>(null)
@@ -205,22 +219,100 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           customStartDate || undefined,
           customEndDate || undefined,
           planFilter === 'ALL' ? undefined : planFilter,
-          errorCodeFilter === 'ALL' ? undefined : errorCodeFilter
+          errorCodeFilter === 'ALL' ? undefined : errorCodeFilter,
+          publicOnly
         ),
         apiAdminGeminiKeysOverview(token).catch(() => null),
       ])
       setData(res)
+      if (viewMode === 'grid') {
+        setGridJobs((prev) => {
+          if (page === 1) return res.jobs
+          const seen = new Set(prev.map((j) => j.id))
+          return [...prev, ...res.jobs.filter((j) => !seen.has(j.id))]
+        })
+      }
       if (geminiRes) setGeminiOverview(geminiRes)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Maʼlumotlarni yuklab bo‘lmadi')
     } finally {
       setLoading(false)
     }
-  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, planFilter, errorCodeFilter, includeInternal, sortBy, dateRange, customStartDate, customEndDate])
+  }, [token, page, pageSize, statusFilter, debouncedSearch, ttsProviderFilter, planFilter, errorCodeFilter, includeInternal, publicOnly, sortBy, dateRange, customStartDate, customEndDate, viewMode])
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Kartochkalar oxiriga yaqinlashganda keyingi sahifani yuklash
+  const totalPages = data?.pagination?.total_pages ?? 1
+  useEffect(() => {
+    const el = loadMoreRef.current
+    if (viewMode !== 'grid' || !el || loading || page >= totalPages) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setPage((p) => p + 1)
+      },
+      { rootMargin: '600px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [viewMode, loading, page, totalPages])
+
+  // Amaldan keyin butun ro'yxatni qayta yuklamaymiz (cheksiz ro'yxatda pozitsiya yo'qoladi) -- joyida yangilaymiz
+  const patchJobs = (fn: (j: AdminJobCostItem) => AdminJobCostItem | null) => {
+    const apply = (list: AdminJobCostItem[]) =>
+      list.map(fn).filter((j): j is AdminJobCostItem => j !== null)
+    setGridJobs(apply)
+    setData((prev) => (prev ? { ...prev, jobs: apply(prev.jobs) } : prev))
+  }
+
+  const errorText = (err: any, fallback: string) => err?.response?.data?.detail || err?.message || fallback
+
+  const handleToggleVisibility = async (job: AdminJobCostItem) => {
+    try {
+      setBusyAction(`vis:${job.id}`)
+      const res = await apiAdminSetJobVisibility(token, job.id, !job.is_public)
+      patchJobs((j) => (j.id === job.id ? { ...j, is_public: res.is_public, published_at: res.published_at } : j))
+    } catch (err: any) {
+      alert(errorText(err, "Ommaviylik holatini o'zgartirib bo'lmadi"))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleDeleteJob = async (job: AdminJobCostItem) => {
+    if (!confirm(`"${job.video_title}" videosini butunlay o'chirasizmi?\n\nVideo fayllari ham o'chadi, bu amalni qaytarib bo'lmaydi.`)) return
+    try {
+      setBusyAction(`del:${job.id}`)
+      await apiAdminDeleteJob(token, job.id)
+      patchJobs((j) => (j.id === job.id ? null : j))
+    } catch (err: any) {
+      alert(errorText(err, "Videoni o'chirib bo'lmadi"))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleToggleBlockUser = async (job: AdminJobCostItem) => {
+    const userId = job.user.id
+    if (!userId) return
+    const block = job.user.is_active !== false
+    const who = job.user.email || job.user.name
+    const question = block
+      ? `${who} foydalanuvchisini bloklaysizmi?\n\nU saytga va Telegram botga kira olmaydi, yangi dublaj qila olmaydi.`
+      : `${who} foydalanuvchisini blokdan chiqarasizmi?`
+    if (!confirm(question)) return
+    try {
+      setBusyAction(`blk:${job.id}`)
+      await apiAdminUpdateUserCredentials(token, userId, { is_active: !block })
+      patchJobs((j) => (j.user.id === userId ? { ...j, user: { ...j.user, is_active: !block } } : j))
+    } catch (err: any) {
+      alert(errorText(err, "Foydalanuvchi holatini o'zgartirib bo'lmadi"))
+    } finally {
+      setBusyAction(null)
+    }
+  }
 
   const handleDateRangeChange = (newRange: DateRangeValue, start?: string, end?: string) => {
     setDateRange(newRange)
@@ -622,6 +714,20 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               ]}
               className="min-w-[135px]"
             />
+
+            <label className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-white/5 transition text-xs text-gray-300">
+              <input
+                type="checkbox"
+                checked={publicOnly}
+                onChange={(e) => {
+                  setPublicOnly(e.target.checked)
+                  setPage(1)
+                }}
+                className="rounded border-gray-600 bg-black/40 text-emerald-500 focus:ring-0"
+              />
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Faqat ommaviy</span>
+            </label>
 
             {/* Ko'rinish almashtirgichi */}
             <div role="group" aria-label="Ko'rinish" className="flex items-center bg-black/30 border border-white/10 rounded-xl p-0.5">
@@ -1061,17 +1167,19 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         ) : (
           /* YouTube uslubidagi kartochkalar */
           <div className="p-4">
-            {loading && jobs.length === 0 ? (
+            {loading && gridJobs.length === 0 ? (
               <div className="py-12 text-center text-gray-500 text-xs">
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-400" />
                 <span>Yuklanmoqda...</span>
               </div>
-            ) : jobs.length === 0 ? (
+            ) : gridJobs.length === 0 ? (
               <div className="py-12 text-center text-gray-500 text-xs">Hech qanday dublyaj jobi topilmadi.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
-                {jobs.map((job) => {
+                {gridJobs.map((job) => {
                   const statusInfo = getStatusBadge(job.status, job.error_code)
+                  const canPublish = job.status === 'COMPLETED' && !job.subtitle_only && !job.is_preview
+                  const isBlocked = job.user.is_active === false
                   const jobLink = job.subtitle_only ? `/subtitles/${job.id}` : `/video/${job.id}`
                   const relative = getRelativeTime(job.created_at)
                   return (
@@ -1102,11 +1210,19 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             <span>{statusInfo.label}</span>
                           </span>
                         </span>
-                        {job.subtitle_only && (
-                          <span className="absolute top-2 right-2 text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded">
-                            Subtitr
-                          </span>
-                        )}
+                        <span className="absolute top-2 right-2 flex gap-1">
+                          {job.is_public && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-600/90 text-white px-1.5 py-0.5 rounded">
+                              <Globe className="w-3 h-3" />
+                              Ommaviy
+                            </span>
+                          )}
+                          {job.subtitle_only && (
+                            <span className="text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded">
+                              Subtitr
+                            </span>
+                          )}
+                        </span>
                         <span className="absolute bottom-1.5 right-1.5 text-[11px] bg-black/80 font-mono text-gray-100 px-1.5 py-0.5 rounded">
                           {formatDurationBadge(job.video_duration)}
                         </span>
@@ -1122,6 +1238,9 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           {job.video_title}
                         </button>
                         <p className="mt-1 text-xs text-gray-300 truncate">
+                          {isBlocked && (
+                            <span className="mr-1.5 text-[10px] font-bold uppercase text-rose-400">Bloklangan</span>
+                          )}
                           {job.user.name || 'Mehmon (Anonim)'}
                           {job.user.plan && job.user.plan.toLowerCase() !== 'free' && (
                             <span className="ml-1.5 text-[10px] font-bold uppercase text-purple-300">{job.user.plan}</span>
@@ -1137,17 +1256,83 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             {job.error_code}
                           </p>
                         )}
+
+                        {/* Admin amallari */}
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {canPublish && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleVisibility(job)}
+                              disabled={busyAction !== null}
+                              title={job.is_public ? "Ommaviy videolardan olib tashlash" : "Saytdagi \"Ommaviy videolar\" bo'limiga chiqarish"}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition disabled:opacity-50 ${
+                                job.is_public
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25'
+                                  : 'bg-white/5 text-gray-300 border-white/10 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              <Globe className="w-3 h-3" />
+                              <span>{job.is_public ? 'Ommaviyda' : 'Ommaviy qilish'}</span>
+                            </button>
+                          )}
+                          {job.user.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleBlockUser(job)}
+                              disabled={busyAction !== null}
+                              title={isBlocked ? 'Foydalanuvchini blokdan chiqarish' : 'Foydalanuvchini bloklash'}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition disabled:opacity-50 ${
+                                isBlocked
+                                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                                  : 'bg-white/5 text-gray-300 border-white/10 hover:text-rose-300 hover:bg-rose-500/10'
+                              }`}
+                            >
+                              {isBlocked ? <UserCheck className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+                              <span>{isBlocked ? 'Blokdan chiqarish' : 'Bloklash'}</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteJob(job)}
+                            disabled={busyAction !== null}
+                            title="Videoni butunlay o'chirish"
+                            aria-label="Videoni o'chirish"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border bg-white/5 text-gray-300 border-white/10 hover:text-rose-300 hover:bg-rose-500/10 hover:border-rose-500/30 transition disabled:opacity-50"
+                          >
+                            <Trash2 className={`w-3 h-3 ${busyAction === `del:${job.id}` ? 'animate-pulse' : ''}`} />
+                            <span>O‘chirish</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
                 })}
               </div>
             )}
+
+            {/* Cheksiz yuklash: shu element ko'rinishga yaqinlashganda keyingi sahifa so'raladi */}
+            <div ref={loadMoreRef} aria-hidden className="h-px" />
+            {gridJobs.length > 0 && (
+              <div className="pt-6 pb-2 text-center text-xs text-gray-500">
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                    Yuklanmoqda...
+                  </span>
+                ) : page < totalPages ? (
+                  <button type="button" onClick={() => setPage((p) => p + 1)} className="text-blue-400 hover:text-blue-300">
+                    Yana ko‘rsatish
+                  </button>
+                ) : (
+                  <span>Hammasi ko‘rsatildi — jami {pagination?.total_items ?? gridJobs.length} ta video</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Pagination footer */}
-        {pagination && pagination.total_pages > 1 && (
+        {/* Pagination footer (faqat jadvalda; kartochkalar cheksiz aylantiriladi) */}
+        {viewMode === 'table' && pagination && pagination.total_pages > 1 && (
           <div className="p-4 border-t border-white/10 bg-white/[0.01] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-400">
             <div>
               Jami <span className="font-semibold text-white">{pagination.total_items}</span> ta job,{' '}

@@ -29,6 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.config import get_settings
 
+PUBLIC_MARKER = ".public"
+
 
 def _sweep(root: Path, max_age_seconds: float) -> tuple[int, int]:
     """root ichidagi har bir 1-daraja pastki papkani ko'rib chiqadi;
@@ -41,6 +43,12 @@ def _sweep(root: Path, max_age_seconds: float) -> tuple[int, int]:
     removed = kept = 0
     for child in sorted(root.iterdir()):
         if not child.is_dir():
+            continue
+        # Ommaviy videolar (admin chiqargan) muddatsiz saqlanadi -- marker
+        # faylni admin_routes.set_job_visibility() yozadi (bu skript DB'ga
+        # murojaat qilmaydi).
+        if (child / PUBLIC_MARKER).exists():
+            kept += 1
             continue
         try:
             if now - child.stat().st_mtime > max_age_seconds:
