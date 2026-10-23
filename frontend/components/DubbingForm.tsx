@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileVideo, Youtube } from "lucide-react";
+import TabList, { tabPanelProps } from "@/components/ui/TabList";
 import UrlInput from "@/components/UrlInput";
 import DubFileForm from "@/components/DubFileForm";
 import type { VideoInfo } from "@/lib/api";
@@ -39,29 +40,28 @@ export default function DubbingForm({
 }: Props) {
   const [source, setSource] = useState<"url" | "file">("url");
 
-  const tab = (id: "url" | "file", label: string, Icon: typeof Youtube) => (
-    <button
-      type="button"
-      onClick={() => setSource(id)}
-      aria-pressed={source === id}
-      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all ${
-        source === id
-          ? "bg-white dark:bg-white/10 text-blue-600 dark:text-blue-400 shadow-sm"
-          : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-      }`}
-    >
-      <Icon size={14} />
-      {label}
-    </button>
-  );
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5">
-        {tab("url", "YouTube havolasi", Youtube)}
-        {tab("file", "Video fayl yuklash", FileVideo)}
-      </div>
+      <TabList
+        idBase="dub-source"
+        label="Video manbasi"
+        value={source}
+        onChange={setSource}
+        items={[
+          { id: "url", label: "YouTube havolasi", icon: Youtube },
+          { id: "file", label: "Video fayl yuklash", icon: FileVideo },
+        ]}
+        className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5"
+        tabClassName={(active) =>
+          `flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+            active
+              ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
+              : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          }`}
+      />
 
+      <div {...tabPanelProps("dub-source", source)}>
       {source === "url" ? (
         <UrlInput
           url={url}
@@ -89,6 +89,7 @@ export default function DubbingForm({
           onTtsProviderChange={onTtsProviderChange}
         />
       )}
+      </div>
     </div>
   );
 }

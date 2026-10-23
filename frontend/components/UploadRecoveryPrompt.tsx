@@ -111,7 +111,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
       {state === "uploading" ? (
         <div className="glass-card rounded-2xl p-4 space-y-3 border border-gray-200/60 dark:border-white/10">
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-            <Loader2 className="w-4 h-4 animate-spin text-violet-500 shrink-0" />
+            <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-violet-500 shrink-0" />
             <span className="truncate flex-1 font-medium">{pendingFile?.name}</span>
             <span className="font-mono text-gray-500 dark:text-gray-400 font-bold">{progress}%</span>
           </div>
@@ -125,7 +125,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
             onClick={handleCancel}
             className="flex items-center gap-1.5 mx-auto text-xs font-semibold text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition"
           >
-            <X className="w-3.5 h-3.5" /> Bekor qilish
+            <X aria-hidden="true" className="w-3.5 h-3.5" /> Bekor qilish
           </button>
         </div>
       ) : (
@@ -149,7 +149,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
               dragActive ? "border-violet-500 bg-violet-500/10" : "border-gray-300 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 hover:bg-black/[0.04] dark:hover:bg-white/10"
             }`}
           >
-            <UploadCloud className="w-7 h-7 text-violet-600 dark:text-violet-400" />
+            <UploadCloud aria-hidden="true" className="w-7 h-7 text-violet-600 dark:text-violet-400" />
             <p className="text-sm font-bold text-gray-900 dark:text-white">📁 Videoni yuklash</p>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center">
               MP4, MOV, MKV yoki WebM &middot; {formatMaxSize(UPLOAD_MAX_SIZE_BYTES)} gacha
@@ -165,7 +165,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
 
           {state === "error" && error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5 flex items-start gap-2.5">
-              <FileVideo className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <FileVideo aria-hidden="true" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <div className="flex-1 space-y-2">
                 <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>
                 {pendingFile && (
@@ -173,7 +173,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
                     onClick={handleRetry}
                     className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-300 hover:underline transition"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" /> Qayta urinish
+                    <RotateCcw aria-hidden="true" className="w-3.5 h-3.5" /> Qayta urinish
                   </button>
                 )}
               </div>

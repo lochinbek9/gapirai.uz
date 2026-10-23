@@ -198,6 +198,16 @@ body {
 }
 
 /* ── Premium Buttons ─────────────────────────────── */
+/* Klaviatura fokusi doim ko'rinsin: o'z fokus uslubi bo'lmagan barcha
+   interaktiv elementlar uchun umumiy halqa (utilities qatlamidagi
+   focus-visible:ring-* bundan ustun turadi). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid #7c3aed;
+    outline-offset: 2px;
+  }
+}
+
 .btn-premium {
   position: relative;
   overflow: hidden;
@@ -210,6 +220,23 @@ body {
 .btn-premium:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 28px -2px rgba(99, 102, 241, 0.5);
+}
+
+/* O'chirilgan holat: ilgari opacity:.5 bilan oq matn och gradientda (~1.3:1)
+   deyarli ko'rinmasdi. Endi neytral fon + o'qiladigan matn (~6:1). */
+.btn-premium:disabled {
+  background: #e2e8f0;
+  color: #475569;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+.dark .btn-premium:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+.btn-premium:disabled::after {
+  display: none;
 }
 
 .btn-premium::after {

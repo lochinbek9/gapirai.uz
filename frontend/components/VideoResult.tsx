@@ -124,7 +124,7 @@ export default function VideoResult({ job, onReset }: Props) {
         className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl px-6 py-4 transition-colors"
       >
         <div className="relative">
-           <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-500 transition-colors" strokeWidth={2.5} />
+           <CheckCircle2 aria-hidden="true" className="w-8 h-8 text-emerald-600 dark:text-emerald-500 transition-colors" strokeWidth={2.5} />
            <motion.div 
              className="absolute inset-0 bg-emerald-500 rounded-full blur-lg opacity-20"
              animate={{ scale: [1, 1.5, 1] }}
@@ -143,7 +143,7 @@ export default function VideoResult({ job, onReset }: Props) {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-3xl px-6 py-4 transition-colors"
         >
-          <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <ShieldAlert aria-hidden="true" className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
             Video tayyor va shaxsiy foydalanish uchun mavjud. Ammo kontent siyosatimizga ko&apos;ra
             (diniy, 18+, zo&apos;ravonlik yoki shunga o&apos;xshash kategoriya) bunday videolarni
@@ -196,11 +196,11 @@ export default function VideoResult({ job, onReset }: Props) {
             >
               {copied ? (
                 <>
-                  <Check size={18} className="text-emerald-500 transition-colors" />
+                  <Check aria-hidden="true" size={18} className="text-emerald-500 transition-colors" />
                   <span className="text-xs font-bold text-emerald-500">Nusxalandi!</span>
                 </>
               ) : (
-                <Share2 size={18} className="text-gray-500 dark:text-gray-400 transition-colors" />
+                <Share2 aria-hidden="true" size={18} className="text-gray-500 dark:text-gray-400 transition-colors" />
               )}
             </motion.button>
           </div>
@@ -215,7 +215,7 @@ export default function VideoResult({ job, onReset }: Props) {
                      py-5 rounded-[24px]
                      transition-all duration-300 text-sm shadow-xl font-extrabold"
         >
-          <Download size={18} />
+          <Download aria-hidden="true" size={18} />
           Videoni yuklab olish
         </motion.a>
 
@@ -241,14 +241,14 @@ export default function VideoResult({ job, onReset }: Props) {
               rel="noopener noreferrer"
               className="flex-1 py-3 px-4 bg-[#229ED9] hover:bg-[#1E8BC0] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md shadow-sky-500/20"
             >
-              <Send size={14} />
+              <Send aria-hidden="true" size={14} />
               Telegramda ulashish
             </a>
             <button
               onClick={handleShare}
               className="py-3 px-4 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-gray-700 dark:text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
             >
-              {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
+              {copied ? <Check aria-hidden="true" size={14} className="text-emerald-500" /> : <Share2 aria-hidden="true" size={14} />}
               <span>{copied ? "Nusxalandi" : "Havola"}</span>
             </button>
           </div>
@@ -274,7 +274,7 @@ export default function VideoResult({ job, onReset }: Props) {
           <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shadow-inner">
-                <Sparkles size={15} className="text-blue-500" />
+                <Sparkles aria-hidden="true" size={15} className="text-blue-500" />
               </div>
               <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">
                 AI Xulosa & Asosiy Tezislar
@@ -284,7 +284,7 @@ export default function VideoResult({ job, onReset }: Props) {
               onClick={handleCopySummary}
               className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition flex items-center gap-1.5"
             >
-              {summaryCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+              {summaryCopied ? <Check aria-hidden="true" size={12} className="text-emerald-500" /> : <Copy aria-hidden="true" size={12} />}
               <span>{summaryCopied ? "Nusxalandi" : "Xulosani nusxalash"}</span>
             </button>
           </div>
@@ -338,7 +338,7 @@ export default function VideoResult({ job, onReset }: Props) {
                    text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.02]
                    transition-all duration-300 text-[11px] font-bold uppercase tracking-widest"
       >
-        <RotateCcw size={14} />
+        <RotateCcw aria-hidden="true" size={14} />
         Yangi video dublyaj qilish
       </motion.button>
     </div>

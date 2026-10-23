@@ -20,7 +20,7 @@ export default function FinalCtaSection() {
           onClick={scrollToStart}
           className="btn-premium inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm"
         >
-          <ArrowUp className="w-4 h-4" /> Boshlash
+          <ArrowUp aria-hidden="true" className="w-4 h-4" /> Boshlash
         </button>
       </div>
     </section>

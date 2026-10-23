@@ -50,11 +50,11 @@ export default function DonateModal() {
           className="absolute top-5 right-5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
           aria-label="Yopish"
         >
-          <X className="h-5 w-5" />
+          <X aria-hidden="true" className="h-5 w-5" />
         </button>
 
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 shadow-inner">
-          <Heart className="h-8 w-8" fill="currentColor" />
+          <Heart aria-hidden="true" className="h-8 w-8" fill="currentColor" />
         </div>
 
         <div className="space-y-2">
