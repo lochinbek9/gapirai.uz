@@ -20,6 +20,8 @@ import PreviewOfferModal from "@/components/PreviewOfferModal";
 import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
 import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle, Zap, AudioLines, Gift, Clapperboard, Cloud, PlaySquare } from "lucide-react";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import TabList, { tabPanelProps } from "@/components/ui/TabList";
+import MobileNavMenu from "@/components/MobileNavMenu";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -75,7 +77,7 @@ function Logo() {
       className="flex flex-col items-center gap-3 sm:gap-5 text-center mb-7 sm:mb-12 px-2"
     >
       <h1 className="text-[2.15rem] leading-[1.06] sm:text-6xl md:text-7xl font-black tracking-[-0.03em] text-slate-900 dark:text-white max-w-4xl [text-wrap:balance]">
-        Dunyodagi bilimlarni <span className="text-violet-600 dark:text-violet-400">o&apos;zbek tilida</span>
+        Dunyodagi bilimlarni <span className="text-violet-600 dark:text-violet-400">oʻzbek tilida</span>
       </h1>
       <p className="text-sm sm:text-lg text-slate-600 dark:text-slate-300 font-medium max-w-xl leading-relaxed [text-wrap:pretty]">
         <strong className="font-bold text-slate-900 dark:text-white">GapirAI.uz</strong> — YouTube havolasi yoki video faylingizni
@@ -128,7 +130,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
             className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition text-gray-500 dark:text-gray-400"
             aria-label="Yopish"
           >
-            <X className="w-4 h-4" />
+            <X aria-hidden="true" className="w-4 h-4" />
           </button>
 
           {/* Icon */}
@@ -152,7 +154,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
               onClick={onClose}
               className="w-full flex items-center justify-center gap-2 btn-premium py-3.5 rounded-2xl font-extrabold text-sm"
             >
-              <UserPlus className="w-4 h-4" />
+              <UserPlus aria-hidden="true" className="w-4 h-4" />
               Bepul ro'yxatdan o'tish
             </Link>
 
@@ -161,7 +163,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
               onClick={onClose}
               className="w-full flex items-center justify-center gap-2 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 font-semibold py-3.5 rounded-2xl transition text-sm"
             >
-              <LogIn className="w-4 h-4" />
+              <LogIn aria-hidden="true" className="w-4 h-4" />
               Hisobim bor — kirish
             </Link>
 
@@ -483,7 +485,7 @@ export default function Home() {
     : "processing";
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-between overflow-x-hidden transition-colors duration-300">
+    <main id="main" tabIndex={-1} className="relative min-h-screen flex flex-col justify-between overflow-x-hidden transition-colors duration-300 focus:outline-none">
       <MeshBackground />
 
       {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
@@ -503,83 +505,62 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex items-center justify-between relative gap-4">
           {/* Left Logo */}
           <div className="pointer-events-auto flex items-center shrink-0">
-            <Link href="/" className="flex items-center transition duration-300 hover:scale-105">
-              <img src="/logo.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain dark:hidden drop-shadow-md" />
-              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain hidden dark:block drop-shadow-md" />
+            <Link href="/" aria-label="GapirAI.uz — bosh sahifa" className="flex items-center transition duration-300 hover:scale-105">
+              <img src="/logo.webp" alt="" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain dark:hidden drop-shadow-md" />
+              <img src="/logodark.webp" alt="" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain hidden dark:block drop-shadow-md" />
             </Link>
           </div>
 
           {/* Center Navigation Links: perfectly centered in max-w-7xl */}
-          <nav className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
+          <nav aria-label="Asosiy menyu" className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
             <Link
               href="/videos"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition whitespace-nowrap"
             >
-              <PlaySquare className="w-3.5 h-3.5 text-violet-500" />
+              <PlaySquare aria-hidden="true" className="w-3.5 h-3.5 text-violet-500" />
               <span>Ommaviy videolar</span>
             </Link>
             <Link
               href="/pricing"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
             >
-              <CreditCard className="w-3.5 h-3.5 text-violet-500" />
+              <CreditCard aria-hidden="true" className="w-3.5 h-3.5 text-violet-500" />
               <span>Tariflar</span>
             </Link>
             <Link
               href="/donate"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
             >
-              <Heart className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
+              <Heart aria-hidden="true" className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
               <span>Donat</span>
             </Link>
             <Link
               href="/about"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
             >
-              <Info className="w-3.5 h-3.5 text-blue-500" />
+              <Info aria-hidden="true" className="w-3.5 h-3.5 text-blue-500" />
               <span>Haqida</span>
             </Link>
           </nav>
 
           {/* Right Controls */}
           <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <Link
-              href="/videos"
-              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
-              title="Ommaviy videolar"
-              aria-label="Ommaviy videolar"
-            >
-              <PlaySquare className="w-4 h-4 text-violet-500" />
-            </Link>
-            <Link
-              href="/pricing"
-              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
-              title="Tariflar"
-            >
-              <CreditCard className="w-4 h-4 text-violet-500" />
-            </Link>
-            <Link
-              href="/donate"
-              className="md:hidden flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl shadow-sm transition backdrop-blur-md"
-              title="Donat"
-            >
-              <Heart className="w-4 h-4 text-rose-500" fill="currentColor" />
-            </Link>
+            <MobileNavMenu />
             {isLoggedIn ? (
               <Link
                 href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
+                className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
               >
-                <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+                <LayoutDashboard aria-hidden="true" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
                 <span className="hidden sm:inline">Mening videolarim</span>
                 <span className="sm:hidden">Videolar</span>
               </Link>
             ) : (
               <Link
                 href="/login"
-                className="flex items-center gap-1 sm:gap-2 h-8 sm:h-10 px-2.5 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap"
+                className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
               >
-                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
+                <LogIn aria-hidden="true" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
                 <span>Kirish</span>
               </Link>
             )}
@@ -607,45 +588,27 @@ export default function Home() {
           <AnimatePresence mode="wait">
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <div className="flex gap-1 sm:gap-2 p-1 mb-5 sm:mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setMode("dub")}
-                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
-                      mode === "dub"
-                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    }`}
-                  >
-                    <span className="hidden sm:inline">Video dublaj qilish</span>
-                    <span className="sm:hidden">Dublyaj</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("subtitle")}
-                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
-                      mode === "subtitle"
-                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    }`}
-                  >
-                    <span className="hidden sm:inline">Subtitr yaratish</span>
-                    <span className="sm:hidden">Subtitr</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("analyze")}
-                    className={`flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
-                      mode === "analyze"
-                        ? "bg-white dark:bg-white/10 shadow text-blue-600 dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                    }`}
-                  >
-                    <span className="hidden sm:inline">Video tahlil qilish</span>
-                    <span className="sm:hidden">Tahlil</span>
-                  </button>
-                </div>
+                <TabList
+                  idBase="mode"
+                  label="Xizmat turi"
+                  value={mode}
+                  onChange={setMode}
+                  items={[
+                    { id: "dub", label: <><span className="hidden sm:inline">Video dublaj qilish</span><span className="sm:hidden">Dublyaj</span></> },
+                    { id: "subtitle", label: <><span className="hidden sm:inline">Subtitr yaratish</span><span className="sm:hidden">Subtitr</span></> },
+                    { id: "analyze", label: <><span className="hidden sm:inline">Video tahlil qilish</span><span className="sm:hidden">Tahlil</span></> },
+                  ]}
+                  className="flex gap-1 sm:gap-2 p-1 mb-5 sm:mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5"
+                  tabClassName={(active) =>
+                    `flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+                      active
+                        ? "bg-white dark:bg-white/10 shadow text-blue-700 dark:text-blue-300"
+                        : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    }`
+                  }
+                />
 
+                <div {...tabPanelProps("mode", mode)}>
                 {mode === "dub" ? (
                   <DubbingForm
                     url={url}
@@ -667,13 +630,14 @@ export default function Home() {
                 ) : (
                   <AnalysisUrlForm />
                 )}
+                </div>
               </motion.div>
             )}
 
             {phase === "loading" && (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-violet-500/15 border border-blue-500/20 text-blue-500 flex items-center justify-center shadow-inner">
-                  <Sparkles className="w-6 h-6 text-blue-500" />
+                  <Sparkles aria-hidden="true" className="w-6 h-6 text-blue-500" />
                 </div>
                 <p className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-wide">Video ma&apos;lumotlari tekshirilmoqda...</p>
               </motion.div>
@@ -715,7 +679,7 @@ export default function Home() {
                       <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-6 sm:p-7 space-y-4 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                            <AlertTriangle className="w-5 h-5" />
+                            <AlertTriangle aria-hidden="true" className="w-5 h-5" />
                           </div>
                           <div>
                             <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
@@ -776,40 +740,40 @@ export default function Home() {
       <HowItWorksSection />
 
       {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
-      <section className="w-full max-w-3xl mt-20 sm:mt-28 px-4 z-10 text-left">
-        <h2 className="text-xl sm:text-3xl font-black tracking-[-0.02em] text-slate-900 dark:text-white mb-4 [text-wrap:balance]">
-          GapirAI.uz (Gapir AI) — Sun'iy Intellekt Asosidagi Avtomatik Dublyaj Programmasi
+      <section aria-labelledby="about-platform-title" className="w-full max-w-3xl mt-20 sm:mt-28 px-4 z-10 text-left">
+        <h2 id="about-platform-title" className="text-xl sm:text-3xl font-black tracking-[-0.02em] text-slate-900 dark:text-white mb-4 [text-wrap:balance]">
+          GapirAI.uz (Gapir AI) — sun&apos;iy intellekt asosidagi avtomatik dublyaj dasturi
         </h2>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-[70ch]">
-          <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. OpenAI Whisper (nutqni aniqlash), ilg'or neyron tarjimonlar hamda Microsoft Azure Speech AI (tabiiy o'zbekcha nutq sintezi) texnologiyalaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj programmasi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
+          <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. nutqni aniqlash, neyron tarjima va tabiiy o'zbekcha nutq sintezi (TTS) uchun ilg'or sun'iy intellekt modellaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj dasturi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
         </p>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mt-8 pt-8 border-t border-black/10 dark:border-white/10">
-          <div className="flex gap-3">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mt-8 pt-8 border-t border-black/10 dark:border-white/10">
+          <li className="flex gap-3">
             <Clapperboard aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
             <div>
-              <dt className="text-sm font-bold text-slate-900 dark:text-white mb-1">Professional dublyaj imkoniyatlari</dt>
-              <dd className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Professional dublyaj imkoniyatlari</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Istalgan YouTube havolasini kiriting va sun'iy intellekt yordamida professional o'zbekcha dublyaj, sinxron audio hamda tayyor MP4 video faylni yuklab oling.
-              </dd>
+              </p>
             </div>
-          </div>
-          <div className="flex gap-3">
+          </li>
+          <li className="flex gap-3">
             <Cloud aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
             <div>
-              <dt className="text-sm font-bold text-slate-900 dark:text-white mb-1">Tezkor onlayn xizmat</dt>
-              <dd className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Tezkor onlayn xizmat</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Qurilmangizga hech qanday qo'shimcha ilova yoki dastur yuklash talab qilinmaydi. Dublyaj jarayoni to'liq bulutli serverlarimizda amalga oshiriladi.
-              </dd>
+              </p>
             </div>
-          </div>
-        </dl>
+          </li>
+        </ul>
       </section>
 
       {/* ── Foydalanuvchilar Fikr va Takliflari (Telegram Kanalga avtomatik boradi) ── */}
       <TelegramFeedbackSection />
 
-        <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-4">
-          <DonateCTA />
+        <section aria-labelledby="donate-cta-title" className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+          <DonateCTA headingId="donate-cta-title" />
         </section>
       </div>
 

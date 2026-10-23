@@ -22,7 +22,7 @@ const STEPS = [
 
 export default function HowItWorksSection() {
   return (
-    <section aria-labelledby="how-it-works-title" className="w-full max-w-5xl mt-20 sm:mt-28 px-4 z-10">
+    <section id="qanday-ishlaydi" aria-labelledby="how-it-works-title" className="w-full max-w-5xl mt-20 sm:mt-28 px-4 z-10 scroll-mt-24">
       <h2
         id="how-it-works-title"
         className="text-2xl sm:text-4xl font-black tracking-[-0.025em] text-slate-900 dark:text-white text-center mb-10 sm:mb-14 [text-wrap:balance]"

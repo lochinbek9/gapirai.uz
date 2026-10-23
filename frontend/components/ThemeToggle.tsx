@@ -6,15 +6,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
 export default function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return null;
 
+  // "system" rejimida ham haqiqiy ko'rinishga qarab almashtiramiz
+  const isDark = resolvedTheme === "dark";
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
+    setTheme(isDark ? "light" : "dark");
   };
 
   return (
@@ -22,11 +24,11 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white shadow-sm transition-all duration-300 backdrop-blur-md cursor-pointer"
-      aria-label="Mavzuni o'zgartirish"
+      className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white shadow-sm transition-all duration-300 backdrop-blur-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+      aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
     >
       <AnimatePresence mode="wait">
-        {theme === "dark" ? (
+        {isDark ? (
           <motion.div
             key="moon"
             initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
@@ -34,7 +36,7 @@ export default function ThemeToggle() {
             exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
             transition={{ duration: 0.2 }}
           >
-            <Moon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+            <Moon aria-hidden="true" className="w-4 h-4 text-blue-500 dark:text-blue-400" />
           </motion.div>
         ) : (
           <motion.div
@@ -44,7 +46,7 @@ export default function ThemeToggle() {
             exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
             transition={{ duration: 0.2 }}
           >
-            <Sun className="w-5 h-5 text-amber-500" />
+            <Sun aria-hidden="true" className="w-5 h-5 text-amber-500" />
           </motion.div>
         )}
       </AnimatePresence>

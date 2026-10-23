@@ -165,6 +165,12 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200] focus:rounded-xl focus:bg-violet-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:shadow-lg"
+        >
+          Asosiy kontentga o&apos;tish
+        </a>
         <Providers>{children}</Providers>
         <PwaProvider />
         <PlatformFeedbackWidget />
@@ -184,6 +190,9 @@ export default function RootLayout({
           <div>
             <img src="https://mc.yandex.ru/watch/111361158" style={{ position: "absolute", left: "-9999px" }} alt="" />
           </div>
+          <p style={{ padding: "12px 16px", textAlign: "center", background: "#fef3c7", color: "#78350f", fontSize: "14px" }}>
+            Sayt to&apos;liq ishlashi uchun brauzeringizda JavaScript&apos;ni yoqing.
+          </p>
         </noscript>
       </body>
     </html>
