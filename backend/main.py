@@ -231,29 +231,51 @@ def recover_stuck_analyses(redis_conn=None):
 
 def cleanup_stale_unverified_users():
     """24 soatdan ortiq vaqt davomida tasdiqlanmagan va hech qanday
-    aktivligi (job) bo'lmagan chala registratsiyalarni tozalaydi."""
-    from backend.models.database import SessionLocal, User
+    aktivligi bo'lmagan chala registratsiyalarni tozalaydi.
+
+    Har bir foydalanuvchiga avtomatik bepul Subscription yaratiladi, shuning
+    uchun ilgari to'g'ridan-to'g'ri `db.delete(user)` subscriptions_user_id_fkey
+    bilan yiqilib, HECH BIR hisob o'chmasdi (har startup'da [CLEANUP ERROR],
+    2026-10-24 da 116 ta yig'ilgan). Endi faqat haqiqatan bo'sh hisob o'chadi:
+    job / tahlil / to'lov / karta / qoidabuzarlik yozuvi yo'q va obunasi bepul,
+    sotib olingan daqiqasiz. Avval shu bepul obuna va push yozuvlari, keyin
+    foydalanuvchi o'chiriladi (user_daily_visits DB'da CASCADE)."""
     from datetime import timedelta
+    from sqlalchemy import and_, exists, func, or_
+    from backend.models.database import (
+        SessionLocal, User, DubbingJob, VideoAnalysis, ContentViolation,
+        Subscription, PushSubscription, PlanTier,
+    )
+    from backend.models.payment import Payment, PaymentCard
     db = SessionLocal()
     try:
         cutoff = datetime.utcnow() - timedelta(hours=24)
-        stale_users = db.query(User).filter(
+        has_value_sub = exists().where(and_(
+            Subscription.user_id == User.id,
+            or_(Subscription.plan != PlanTier.FREE, func.coalesce(Subscription.purchased_minutes, 0) > 0),
+        ))
+        stale_ids = [row.id for row in db.query(User.id).filter(
             User.is_verified.is_(False),
             User.created_at < cutoff,
-        ).all()
-        count = 0
-        for u in stale_users:
-            if u.jobs.count() == 0:
-                db.delete(u)
-                count += 1
-        if count > 0:
-            db.commit()
-            print(f"[CLEANUP] {count} ta tasdiqlanmagan eski akkaunt tozalandi.")
+            ~exists().where(DubbingJob.user_id == User.id),
+            ~exists().where(VideoAnalysis.user_id == User.id),
+            ~exists().where(ContentViolation.user_id == User.id),
+            ~exists().where(Payment.user_id == User.id),
+            ~exists().where(PaymentCard.user_id == User.id),
+            ~has_value_sub,
+        ).limit(500).all()]
+        if not stale_ids:
+            return
+        db.query(PushSubscription).filter(PushSubscription.user_id.in_(stale_ids)).delete(synchronize_session=False)
+        db.query(Subscription).filter(Subscription.user_id.in_(stale_ids)).delete(synchronize_session=False)
+        count = db.query(User).filter(User.id.in_(stale_ids)).delete(synchronize_session=False)
+        db.commit()
+        print(f"[CLEANUP] {count} ta tasdiqlanmagan eski akkaunt tozalandi.")
     except Exception as e:
+        db.rollback()
         print(f"[CLEANUP ERROR] Eski tasdiqlanmagan akkauntlarni tozalashda xatolik: {e}")
     finally:
         db.close()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
