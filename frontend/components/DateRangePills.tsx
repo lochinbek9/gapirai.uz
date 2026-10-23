@@ -66,9 +66,9 @@ export default function DateRangePills({
   }
 
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      {/* Pill group container */}
-      <div className="bg-black/40 border border-white/10 rounded-2xl p-1 flex items-center gap-0.5 backdrop-blur-md shadow-inner">
+    <div className={`flex items-center gap-1.5 min-w-0 max-w-full ${className}`}>
+      {/* Pill group container: telefonda sig'masa ikkinchi qatorga o'tadi (ilgari ekrandan chiqib ketardi) */}
+      <div className="relative min-w-0 bg-black/40 border border-white/10 rounded-2xl p-1 flex flex-wrap items-center gap-0.5 backdrop-blur-md shadow-inner">
         {RANGES.map((r) => {
           const isActive = value === r.id
           return (
@@ -76,7 +76,7 @@ export default function DateRangePills({
               key={r.id}
               type="button"
               onClick={() => onChange(r.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
                 isActive
                   ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 font-bold scale-[1.02]'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -87,8 +87,8 @@ export default function DateRangePills({
           )
         })}
 
-        {/* Custom date range trigger */}
-        <div className="relative" ref={popoverRef}>
+        {/* Custom date range trigger (popover guruhga nisbatan joylashadi -- telefonda ekran chetidan chiqmasligi uchun) */}
+        <div ref={popoverRef}>
           <button
             type="button"
             onClick={() => setShowCustomModal((prev) => !prev)}
@@ -98,6 +98,7 @@ export default function DateRangePills({
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
             title="Istalgan oraliqni tanlash"
+            aria-label="Istalgan oraliqni tanlash"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">
@@ -108,7 +109,7 @@ export default function DateRangePills({
           {/* Custom Date Modal / Popover */}
           {showCustomModal && (
             <div
-              className="absolute right-0 top-full mt-2 w-72 bg-[#0c1222] border border-white/15 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95"
+              className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-[#0c1222] border border-white/15 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95"
               style={{ colorScheme: 'dark' }}
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
@@ -172,8 +173,9 @@ export default function DateRangePills({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="p-2 rounded-2xl bg-black/40 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition shadow-sm disabled:opacity-50"
+          className="shrink-0 p-2 rounded-2xl bg-black/40 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition shadow-sm disabled:opacity-50"
           title="Ma'lumotlarni yangilash"
+          aria-label="Ma'lumotlarni yangilash"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-violet-400' : ''}`} />
         </button>
