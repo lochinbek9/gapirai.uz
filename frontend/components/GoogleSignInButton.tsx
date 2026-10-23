@@ -18,6 +18,12 @@ declare global {
   }
 }
 
+// Google tugmasi faqat piksel kenglik qabul qiladi (200..400). Ilgari qat'iy 360px
+// edi -- telefonda (375px ekran, karta ichi ~290px) tugma kartadan chiqib ketardi.
+function buttonWidth(el: HTMLElement): number {
+  return Math.max(200, Math.min(400, Math.floor(el.clientWidth || 360)))
+}
+
 interface GoogleSignInButtonProps {
   onCredential: (credential: string) => void
   text?: 'signin_with' | 'signup_with' | 'continue_with'
@@ -40,7 +46,7 @@ export default function GoogleSignInButton({ onCredential, text = 'continue_with
         window.google.accounts.id.renderButton(containerRef.current, {
           theme: isDark ? 'filled_black' : 'outline',
           size: 'large',
-          width: 360,
+          width: buttonWidth(containerRef.current),
           text: text,
           locale: 'uz',
           shape: 'pill',
@@ -81,7 +87,7 @@ export default function GoogleSignInButton({ onCredential, text = 'continue_with
               window.google.accounts.id.renderButton(containerRef.current, {
                 theme: isDark ? 'filled_black' : 'outline',
                 size: 'large',
-                width: 360,
+                width: buttonWidth(containerRef.current),
                 text: text,
                 locale: 'uz',
                 shape: 'pill',
