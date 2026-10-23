@@ -658,7 +658,8 @@ def get_job(
             job.status_message = "Dublyaj tayyor!"
             db.commit()
     else:
-        if can_recover_job(job) and (job.completed_at is not None or job.status == JobStatus.COMPLETED):
+        # Faqat tayyor job -- bekor qilingan/xato bo'lgan eski joblar qayta dublyaj qilinmaydi
+        if job.status == JobStatus.COMPLETED and can_recover_job(job):
             trigger_ondemand_recovery(db, job)
 
     is_recovering = (
