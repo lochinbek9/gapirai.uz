@@ -973,6 +973,20 @@ export async function apiAdminSetJobVisibility(token: string, jobId: string, isP
   return res.data
 }
 
+export interface AdminJobDeleteImpact {
+  is_copy: boolean
+  copies: number
+  is_public: boolean
+}
+
+/** O'chirishdan oldin: kesh nusxasimi va unga boshqa foydalanuvchilarning nechta nusxasi ishora qiladi. */
+export async function apiAdminJobDeleteImpact(token: string, jobId: string): Promise<AdminJobDeleteImpact> {
+  const res = await axios.get(`${API_URL}/admin/jobs/${jobId}/delete-impact`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.data
+}
+
 export async function apiAdminDeleteJob(token: string, jobId: string): Promise<void> {
   await axios.delete(`${API_URL}/admin/jobs/${jobId}`, {
     headers: { Authorization: `Bearer ${token}` },

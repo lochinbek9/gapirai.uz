@@ -963,6 +963,7 @@ def delete_job(
     current_user: User = Depends(get_current_user),
 ):
     from backend.services.plans import is_user_admin
+    from backend.services.job_deletion import JobDeletionError, delete_job as delete_job_everywhere
     is_admin = is_user_admin(db, current_user.id)
 
     query = db.query(DubbingJob).filter(DubbingJob.id == job_id)
@@ -972,65 +973,13 @@ def delete_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job topilmadi.")
 
-    # 1. Bekor qilish: agar job navbatda yoki jarayonda bo'lsa Celery taskni to'xtatish
+    # Kesh nusxalari bor bo'lsa fayllar eng birinchi nusxaga ko'chiriladi --
+    # boshqa foydalanuvchilarning videolari buzilmaydi (services/job_deletion.py)
     try:
-        from backend.workers.celery_app import celery_app
-        celery_app.control.revoke(str(job.id), terminate=True)
-    except Exception as e:
-        logger.warning(f"Celery taskini bekor qilishda xatolik ({job.id}): {e}")
-
-    # 2. S3 checkpointlarini tozalash -- delete_checkpoint fayl nomini ham talab
-    # qiladi (ilgari faqat job_id bilan chaqirilib, har safar TypeError bilan
-    # jim o'tib ketardi va checkpointlar S3'da qolib ketardi).
-    try:
-        from backend.services.job_checkpoint import delete_checkpoint
-        for checkpoint_name in ("video.mp4", "audio.wav", "dubbed_audio.wav", "dubbed_final.mp4"):
-            delete_checkpoint(str(job.id), checkpoint_name)
-    except Exception as e:
-        logger.warning(f"Checkpointni tozalashda xatolik ({job.id}): {e}")
-
-    # 3. Tashqi kalitlar (Foreign Keys) bog'liqliklarini uzish va tozalash
-    try:
-        # a) Ushbu job'dan kesh sifatida nusxa olgan boshqa joblarning source_job_id'sini null qilish
-        db.query(DubbingJob).filter(DubbingJob.source_job_id == job.id).update({DubbingJob.source_job_id: None})
-
-        # b) Rezolyutsiya variantlarini o'chirish (resolution_variants FK)
-        db.query(ResolutionVariant).filter(ResolutionVariant.job_id == job.id).delete()
-
-        # c) To'lov tranzaksiyalari bo'lsa job_id'ni null qilish (to'lov saqlanadi, job aloqasi uziladi)
-        try:
-            from backend.models.payment import Payment
-            db.query(Payment).filter(Payment.job_id == job.id).update({Payment.job_id: None})
-        except Exception:
-            pass
-
-        # 4. Job'ni o'chirish va commit qilish
-        db.delete(job)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.exception(f"Jobni bazadan o'chirishda xatolik ({job.id}): {e}")
+        delete_job_everywhere(db, job)
+    except JobDeletionError as e:
+        logger.exception(f"Jobni o'chirishda xatolik ({job_id}): {e}")
         raise HTTPException(status_code=500, detail="Jobni o'chirishda xatolik yuz berdi.")
-
-    # 5. Diskdagi lokal fayllarni tozalash (commit muvaffaqiyatli bo'lgandan so'ng)
-    try:
-        out_dir = Path(settings.OUTPUT_DIR) / str(job.id)
-        if out_dir.exists():
-            shutil.rmtree(out_dir, ignore_errors=True)
-        temp_dir = Path("/tmp/dubber") / str(job.id)
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir, ignore_errors=True)
-    except Exception as e:
-        logger.warning(f"Lokal fayllarni tozalashda xatolik ({job.id}): {e}")
-
-    # 6. S3 fayllarini tozalash (agar mavjud bo'lsa)
-    try:
-        from backend.services.storage import delete_file_from_s3
-        if job.output_video_url and not job.output_video_url.startswith("http") and not job.output_video_url.startswith("/outputs"):
-            delete_file_from_s3(job.output_video_url)
-    except Exception as e:
-        logger.warning(f"S3 faylini tozalashda xatolik ({job.id}): {e}")
-
     return Response(status_code=204)
 
 

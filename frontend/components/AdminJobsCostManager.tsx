@@ -41,6 +41,7 @@ import {
   apiAdminCancelJob,
   apiAdminSetJobVisibility,
   apiAdminDeleteJob,
+  apiAdminJobDeleteImpact,
   apiAdminUpdateUserCredentials,
   apiAdminGeminiKeysOverview,
   AdminJobsCostResponse,
@@ -282,9 +283,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   }
 
   const handleDeleteJob = async (job: AdminJobCostItem) => {
-    if (!confirm(`"${job.video_title}" videosini butunlay o'chirasizmi?\n\nVideo fayllari ham o'chadi, bu amalni qaytarib bo'lmaydi.`)) return
+    setBusyAction(`del:${job.id}`)
+    // Kesh nusxalari bo'lsa fayllar o'chirilmaydi, eng birinchi nusxaga ko'chadi -- admin buni oldindan bilsin
+    let detail = "Video fayllari serverdan ham o'chadi, bu amalni qaytarib bo'lmaydi."
     try {
-      setBusyAction(`del:${job.id}`)
+      const impact = await apiAdminJobDeleteImpact(token, job.id)
+      if (impact.is_copy) {
+        detail = "Bu boshqa videoning kesh nusxasi: faqat shu foydalanuvchidan o'chadi, asl fayllar va boshqa foydalanuvchilarning videolari saqlanib qoladi."
+      } else if (impact.copies > 0) {
+        detail = `Bu videoning yana ${impact.copies} ta nusxasi boshqa foydalanuvchilarda bor. Ular ishlashda davom etadi: fayllar eng birinchi nusxaga ko'chiriladi, faqat shu yozuv o'chadi.`
+      }
+      if (impact.is_public) detail += "\n\nVideo ommaviy videolar ro'yxatidan ham olib tashlanadi."
+    } catch {
+      // Ma'lumotni olib bo'lmasa ham o'chirish mumkin -- umumiy ogohlantirish ko'rsatiladi
+    }
+    if (!confirm(`"${job.video_title}" videosini o'chirasizmi?\n\n${detail}`)) {
+      setBusyAction(null)
+      return
+    }
+    try {
       await apiAdminDeleteJob(token, job.id)
       patchJobs((j) => (j.id === job.id ? null : j))
     } catch (err: any) {
