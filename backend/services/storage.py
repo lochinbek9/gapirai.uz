@@ -78,6 +78,42 @@ def delete_file_from_s3(object_name: str) -> bool:
         logger.error(f"S3 delete kutilmagan xatolik ({object_name}): {e}")
         return False
 
+def list_s3_keys(prefix: str) -> list[str] | None:
+    """Prefiks ostidagi barcha obyekt kalitlari. None -- S3 sozlanmagan yoki
+    ro'yxatlab bo'lmadi (chaqiruvchi buni "bo'sh" deb emas, "noma'lum" deb
+    tushunishi kerak)."""
+    s3_client, bucket = _get_s3_client()
+    if not s3_client:
+        return None
+    try:
+        keys: list[str] = []
+        for page in s3_client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+            keys.extend(obj["Key"] for obj in page.get("Contents", []))
+        return keys
+    except Exception as e:
+        logger.error(f"S3 ro'yxatlashda xatolik ({prefix}): {e}")
+        return None
+
+
+def copy_s3_object(src_key: str, dst_key: str) -> bool:
+    """Bucket ichida obyektni nusxalaydi (Content-Type saqlanadi)."""
+    s3_client, bucket = _get_s3_client()
+    if not s3_client:
+        return False
+    try:
+        s3_client.copy_object(Bucket=bucket, Key=dst_key, CopySource={"Bucket": bucket, "Key": src_key})
+        return True
+    except Exception as e:
+        logger.error(f"S3 nusxalashda xatolik ({src_key} -> {dst_key}): {e}")
+        return False
+
+
+def delete_s3_prefix(prefix: str) -> int:
+    """Prefiks ostidagi barcha obyektlarni o'chiradi; o'chirilganlar sonini qaytaradi."""
+    keys = list_s3_keys(prefix) or []
+    return sum(1 for key in keys if delete_file_from_s3(key))
+
+
 def download_file_from_s3(object_name: str, local_path: str) -> bool:
     """S3'dagi faylni lokal diskka yuklab oladi (masalan TTS keshdan qayta
     foydalanish uchun — backend/services/tts_cache.py)."""

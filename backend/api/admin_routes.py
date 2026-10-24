@@ -1206,6 +1206,24 @@ def admin_set_job_visibility(
         db.close()
 
 
+@router.get("/jobs/{job_id}/delete-impact")
+def admin_job_delete_impact(
+    job_id: uuid.UUID,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """O'chirishdan oldin: bu kesh nusxasimi, unga nechta nusxa ishora qiladi."""
+    from backend.services.job_deletion import delete_impact
+    db = SessionLocal()
+    try:
+        job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job topilmadi")
+        impact = delete_impact(db, job)
+        return {"is_copy": impact.is_copy, "copies": impact.copies, "is_public": impact.is_public}
+    finally:
+        db.close()
+
+
 @router.delete("/jobs/{job_id}", status_code=204)
 def admin_delete_job(
     job_id: uuid.UUID,
