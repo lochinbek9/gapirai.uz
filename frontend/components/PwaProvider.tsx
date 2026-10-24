@@ -62,7 +62,7 @@ export default function PwaProvider() {
         <img src="/icons/icon-192.png" alt="" className="w-9 h-9 rounded-lg shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-ui-ink">GapirAI ilovasini o&apos;rnating</p>
-          <p className="text-xs text-ui-muted">Bosh ekrandan bir bosishда oching</p>
+          <p className="text-xs text-ui-muted">Bosh ekrandan bir bosishda oching</p>
         </div>
         <button onClick={install} className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-blue-500 text-white">
           <Download aria-hidden="true" className="w-3.5 h-3.5" /> O&apos;rnatish
