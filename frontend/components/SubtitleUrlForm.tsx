@@ -53,12 +53,11 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
-        <label htmlFor="sub-url" className="block text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1">
+        <label htmlFor="sub-url" className="m-label block">
           YouTube havolasi
         </label>
-        <div className="glass-input flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-5 py-3 sm:py-4 rounded-2xl sm:rounded-3xl relative overflow-hidden group transition-all duration-300 focus-within:ring-2 focus-within:ring-violet-500/70">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-violet-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <Youtube aria-hidden="true" className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 flex-shrink-0" />
+        <div className="m-input flex min-h-14 items-center gap-2 px-3 sm:px-4">
+          <Youtube aria-hidden="true" className="h-5 w-5 shrink-0 text-metro-red" />
           <input
             id="sub-url"
             type="url"
@@ -67,25 +66,25 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="YouTube havolasini kiriting..."
-            className="flex-1 bg-transparent text-black dark:text-white placeholder-slate-500 dark:placeholder-gray-400 text-sm focus:outline-none font-medium"
+            className="min-w-0 flex-1 bg-transparent text-base font-medium text-metro-ink placeholder:text-metro-muted focus:outline-none"
           />
           <button
             type="button"
             onClick={handlePaste}
-            className="flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-300 hover:text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl px-3 sm:px-4 py-2 transition-all flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            className="flex shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 py-2 font-sign text-sm font-bold uppercase tracking-wide text-metro-muted transition hover:bg-metro-ground hover:text-metro-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue"
           >
             <ClipboardPaste aria-hidden="true" size={14} />
             <span className="hidden sm:inline">Joylashtirish</span>
             <span className="sm:hidden">Qo&apos;yish</span>
           </button>
         </div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+        <p className="text-sm text-metro-muted">
           O'zbekcha subtitr (.srt/.vtt) yaratiladi — dublyaj audiosi yo'q, tezroq va TTS xarajatisiz.
         </p>
       </div>
 
       {!isLoggedIn && (
-        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border-2 border-amber-600/40 rounded-[6px] px-4 py-3">
           Subtitr yaratish uchun{" "}
           <Link href="/login" className="underline hover:text-amber-900 dark:hover:text-amber-200">kiring</Link>
           {" "}yoki{" "}
@@ -98,22 +97,16 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
           role="alert"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-rose-500/10 border border-rose-500/25 rounded-2xl p-4 flex gap-3 items-center"
+          className="rounded-[6px] border-2 border-metro-red/50 bg-metro-red/5 px-4 py-3"
         >
-          <div aria-hidden="true" className="w-2 h-2 shrink-0 rounded-full bg-rose-500" />
-          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{error}</p>
+                    <p className="text-base font-semibold text-metro-red-ink">{error}</p>
         </motion.div>
       )}
 
       <motion.button
         type="submit"
         disabled={loading || !url.trim()}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full flex items-center justify-center gap-3
-                   btn-premium
-                   text-white font-extrabold py-4 sm:py-5 rounded-2xl sm:rounded-[24px]
-                   transition-all duration-300 text-sm shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
+                className="m-btn m-btn-blue min-h-14 w-full"
       >
         {loading ? (
           <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Subtitr yaratilmoqda...</>
@@ -125,8 +118,8 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
       <ul className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
         {["SRT", "VTT", "Vaqt kodlari", sourceLanguage === "uz" ? "O'zbekcha STT (tarjimasiz)" : "O'zbekcha tarjima"].map((label) => (
           <li key={label} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-metro-muted" />
+            <span className="m-label">{label}</span>
           </li>
         ))}
       </ul>

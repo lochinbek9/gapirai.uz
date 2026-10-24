@@ -12,16 +12,23 @@ import AnalysisUrlForm from "@/components/AnalysisUrlForm";
 import SubtitleForm from "@/components/SubtitleForm";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
-import ThemeToggle from "@/components/ThemeToggle";
 import Footer from "@/components/Footer";
 import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import PreviewOfferModal from "@/components/PreviewOfferModal";
 import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
-import { LayoutDashboard, LogIn, X, UserPlus, Sparkles, Heart, Info, CreditCard, AlertTriangle, Zap, AudioLines, Gift, Clapperboard, Cloud, PlaySquare } from "lucide-react";
-import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import { X, UserPlus, LogIn, Sparkles, AlertTriangle } from "lucide-react";
 import TabList, { tabPanelProps } from "@/components/ui/TabList";
-import MobileNavMenu from "@/components/MobileNavMenu";
+import SiteHeader from "@/components/metro/SiteHeader";
+import LineMap from "@/components/metro/LineMap";
+import { Spine } from "@/components/metro/Spine";
+import LinesSection from "@/components/metro/LinesSection";
+import RouteSection from "@/components/metro/RouteSection";
+import StationBoard from "@/components/metro/StationBoard";
+import PublicVideosStrip from "@/components/metro/PublicVideosStrip";
+import TelegramTransfer from "@/components/metro/TelegramTransfer";
+import SubtitleFrame from "@/components/metro/SubtitleFrame";
+import { LINES, stationForStatus, type LineId } from "@/components/metro/lines";
 
 
 /* ── LocalStorage helpers ─────────────────────────── */
@@ -54,129 +61,34 @@ function clearJobId() {
   localStorage.removeItem(JOB_KEY);
 }
 
-/* ── Mesh Background ──────────────────────────────── */
-function MeshBackground() {
-  return (
-    <div className="mesh-gradient">
-      <div className="mesh-gradient-blob blob-1" />
-      <div className="mesh-gradient-blob blob-2" />
-      <div className="mesh-gradient-blob blob-3" />
-    </div>
-  );
-}
-
-/* ── Hero ─────────────────────────────────────────── */
-// h1 -- taklifning o'zi (brend nomi tepadagi logoda bor). Ustidagi kichik
-// "eyebrow" yorliq va emoji-ikonkalar olib tashlangan (Impeccable craft-floor).
-function Logo() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col items-center gap-3 sm:gap-5 text-center mb-7 sm:mb-12 px-2"
-    >
-      <h1 className="text-[2.15rem] leading-[1.06] sm:text-6xl md:text-7xl font-black tracking-[-0.03em] text-slate-900 dark:text-white max-w-4xl [text-wrap:balance]">
-        Dunyo bilimlari <span className="text-violet-600 dark:text-violet-400">oʻzbek tilida</span>
-      </h1>
-      <p className="text-sm sm:text-lg text-slate-600 dark:text-slate-300 font-medium max-w-xl leading-relaxed [text-wrap:pretty]">
-        <strong className="font-bold text-slate-900 dark:text-white">GapirAI.uz</strong> — YouTube havolasi yoki video faylingizni
-        sun&apos;iy intellekt orqali o&apos;zbek tiliga avtomatik dublyaj qiladi.
-      </p>
-
-      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-1 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">
-        <li className="flex items-center gap-1.5">
-          <Zap aria-hidden className="w-4 h-4 text-violet-500" />
-          100% avtomatik
-        </li>
-        <li className="flex items-center gap-1.5">
-          <AudioLines aria-hidden className="w-4 h-4 text-violet-500" />
-          Tiniq AI ovozlari
-        </li>
-        <li className="flex items-center gap-1.5 text-violet-700 dark:text-violet-300">
-          <Gift aria-hidden className="w-4 h-4" />
-          Har oy 5 daqiqa bepul
-        </li>
-      </ul>
-
-      <h2 className="sr-only">
-        Dunyo bilimlari o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
-      </h2>
-    </motion.div>
-  );
-}
-
-
-/* ── Welcome Modal (birinchi tashrif) ─────────────── */
+/* ── Birinchi tashrif: ro'yxatdan o'tish taklifi ─────
+   Ilgari sahifani to'sadigan modal edi; endi birinchi ekranni bloklamaydigan,
+   yopiladigan qator (yopilganda dubber_welcome_seen saqlanadi). */
 function WelcomeModal({ onClose }: { onClose: () => void }) {
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ type: "spring", duration: 0.5 }}
-          className="relative w-full max-w-md bg-white dark:bg-[#070202] rounded-[32px] p-8 shadow-2xl border border-black/5 dark:border-white/10"
-        >
-          {/* Yopish */}
+    <aside aria-label="Ro'yxatdan o'tish taklifi" className="border-b-2 border-metro-rule bg-metro-surface">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-6 lg:px-8">
+        <p className="flex-1 text-base text-metro-ink">
+          <strong>Bepul hisob oching</strong> — videolaringiz saqlanadi va har 30 kunda 5 daqiqa bepul.
+        </p>
+        <div className="flex items-center gap-2">
+          <Link href="/register" onClick={onClose} className="m-btn min-h-11 flex-1 whitespace-nowrap sm:flex-none">
+            <UserPlus aria-hidden="true" className="h-4 w-4" /> Ro&apos;yxatdan o&apos;tish
+          </Link>
+          <Link href="/login" onClick={onClose} className="m-btn m-btn-ghost hidden min-h-11 sm:inline-flex">
+            <LogIn aria-hidden="true" className="h-4 w-4" /> Kirish
+          </Link>
           <button
+            type="button"
             onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition text-gray-500 dark:text-gray-400"
-            aria-label="Yopish"
+            aria-label="Taklifni yopish"
+            className="flex h-11 w-11 items-center justify-center rounded-[6px] text-metro-muted hover:bg-metro-ground hover:text-metro-ink"
           >
-            <X aria-hidden="true" className="w-4 h-4" />
+            <X aria-hidden="true" className="h-5 w-5" />
           </button>
-
-          {/* Icon */}
-          <div className="flex justify-center mb-6">
-            <div className="p-2 transition duration-300 hover:scale-105">
-              <img src="/logo.webp" alt="GapirAI.uz Logo" width={256} height={256} className="h-32 w-auto object-contain dark:hidden" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
-              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={256} height={256} className="h-32 w-auto object-contain hidden dark:block" style={{ maxWidth: "200px", maxHeight: "140px", height: "auto" }} />
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-black text-black dark:text-white text-center mb-2">
-            GapirAI.uz ga xush kelibsiz
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-8 leading-relaxed px-4">
-            YouTube videolarini o'zbek tiliga soniyalar ichida dublyaj qiling. Barcha videolaringizni saqlash uchun bepul hisob oching.
-          </p>
-
-          <div className="space-y-3">
-            <Link
-              href="/register"
-              onClick={onClose}
-              className="w-full flex items-center justify-center gap-2 btn-premium py-3.5 rounded-2xl font-extrabold text-sm"
-            >
-              <UserPlus aria-hidden="true" className="w-4 h-4" />
-              Bepul ro'yxatdan o'tish
-            </Link>
-
-            <Link
-              href="/login"
-              onClick={onClose}
-              className="w-full flex items-center justify-center gap-2 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 font-semibold py-3.5 rounded-2xl transition text-sm"
-            >
-              <LogIn aria-hidden="true" className="w-4 h-4" />
-              Hisobim bor — kirish
-            </Link>
-
-            <button
-              onClick={onClose}
-              className="w-full text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 py-2 transition font-medium"
-            >
-              Hisobsiz davom etish
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -484,300 +396,210 @@ export default function Home() {
     : job.status === "failed" ? "error"
     : "processing";
 
+  // Xizmat liniyasini tanlash: rejim almashadi va forma ko'rinadigan joyga o'tiladi
+  const pickLine = (line: LineId) => {
+    setMode(line);
+    if (jobId) return;
+    document.getElementById("boshlash")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Poyezd: jarayonda -- job'ning haqiqiy bosqichi; havola kiritilganda -- 1-bekat; aks holda bir marta oxirigacha yuradi
+  const trainStep =
+    phase === "processing" || phase === "done" ? stationForStatus(job?.status)
+    : url.trim() ? 0
+    : undefined;
+  const line = LINES[mode];
+
   return (
-    <main id="main" tabIndex={-1} className="relative min-h-screen flex flex-col justify-between overflow-x-hidden transition-colors duration-300 focus:outline-none">
-      <MeshBackground />
+    <>
+      <SiteHeader onLineSelect={pickLine} activeLine={mode} />
+      <main id="main" tabIndex={-1} className="relative min-h-screen overflow-x-hidden bg-metro-ground text-metro-ink focus:outline-none">
+        {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
+        <PreviewOfferModal
+          isOpen={previewOffer.isOpen}
+          videoInfo={videoInfo}
+          videoMinutes={previewOffer.videoMinutes}
+          minutesShort={previewOffer.minutesShort}
+          availableMinutes={previewOffer.availableMinutes}
+          loading={previewLoading}
+          onClose={() => setPreviewOffer((prev) => ({ ...prev, isOpen: false }))}
+          onStartPreview={handleStartPreview}
+          onGoToPricing={handleGoToPricingFromPreview}
+        />
 
-      {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
-      <PreviewOfferModal
-        isOpen={previewOffer.isOpen}
-        videoInfo={videoInfo}
-        videoMinutes={previewOffer.videoMinutes}
-        minutesShort={previewOffer.minutesShort}
-        availableMinutes={previewOffer.availableMinutes}
-        loading={previewLoading}
-        onClose={() => setPreviewOffer((prev) => ({ ...prev, isOpen: false }))}
-        onStartPreview={handleStartPreview}
-        onGoToPricing={handleGoToPricingFromPreview}
-      />
-      {/* Top Header Bar bounded in max-w-7xl container */}
-      <header className="absolute top-0 left-0 right-0 z-50 w-full pointer-events-none">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-5 flex items-center justify-between relative gap-4">
-          {/* Left Logo */}
-          <div className="pointer-events-auto flex items-center shrink-0">
-            <Link href="/" aria-label="GapirAI.uz — bosh sahifa" className="flex items-center transition duration-300 hover:scale-105">
-              <img src="/logo.webp" alt="" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain dark:hidden drop-shadow-md" />
-              <img src="/logodark.webp" alt="" width={140} height={36} className="h-8 sm:h-11 md:h-12 w-auto object-contain hidden dark:block drop-shadow-md" />
-            </Link>
+        {/* ── Birinchi ekran: bekat lavhasi + chipta avtomati (forma) ── */}
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-8 sm:px-6 sm:pt-12 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:pt-14">
+          <div className="lg:col-span-5">
+            <div className={`m-plaque border-b-[10px] px-5 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-7 ${line.borderBottom}`}>
+              <h1 className="font-sign text-[3.25rem] font-extrabold uppercase leading-[0.9] tracking-[-0.015em] text-white sm:text-6xl xl:text-[5.25rem] [text-wrap:balance]">
+                Dunyo bilimlari oʻzbek tilida
+              </h1>
+            </div>
+            <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-metro-muted sm:text-xl">
+              YouTube havolasini yoki videongizni yuboring — u o&apos;zbekcha ovoz, subtitr yoki qisqa konspekt bo&apos;lib qaytadi.
+              Har oy 5 daqiqa bepul.
+            </p>
+            <LineMap
+              line={mode}
+              step={trainStep}
+              className="mt-8 lg:mt-10"
+              label={phase === "processing" && job ? `Video hozir ${["Havola", "Nutq", "Tarjima", "Ovoz", "Tayyor"][stationForStatus(job.status)]} bekatida` : undefined}
+            />
+            {phase === "idle" && <SubtitleFrame className="mt-10 hidden lg:block" />}
           </div>
 
-          {/* Center Navigation Links: perfectly centered in max-w-7xl */}
-          <nav aria-label="Asosiy menyu" className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm">
-            <Link
-              href="/videos"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition whitespace-nowrap"
+          <section id="boshlash" aria-label="Video yuborish" className="scroll-mt-20 lg:col-span-7">
+            <motion.div
+              layout
+              className={`rounded-[6px] border-2 border-t-[8px] border-metro-rule bg-metro-surface p-4 sm:p-7 ${line.borderTop}`}
             >
-              <PlaySquare aria-hidden="true" className="w-3.5 h-3.5 text-violet-500" />
-              <span>Ommaviy videolar</span>
-            </Link>
-            <Link
-              href="/pricing"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition"
-            >
-              <CreditCard aria-hidden="true" className="w-3.5 h-3.5 text-violet-500" />
-              <span>Tariflar</span>
-            </Link>
-            <Link
-              href="/donate"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
-            >
-              <Heart aria-hidden="true" className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
-              <span>Donat</span>
-            </Link>
-            <Link
-              href="/about"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
-            >
-              <Info aria-hidden="true" className="w-3.5 h-3.5 text-blue-500" />
-              <span>Haqida</span>
-            </Link>
-          </nav>
-
-          {/* Right Controls */}
-          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <MobileNavMenu />
-            {isLoggedIn ? (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              >
-                <LayoutDashboard aria-hidden="true" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
-                <span className="hidden sm:inline">Mening videolarim</span>
-                <span className="sm:hidden">Videolar</span>
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="flex items-center gap-1.5 sm:gap-2 h-10 px-3 sm:px-4 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-sm hover:shadow transition backdrop-blur-md hover:scale-105 active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              >
-                <LogIn aria-hidden="true" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 shrink-0" />
-                <span>Kirish</span>
-              </Link>
-            )}
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Body */}
-      <div className="w-full flex-1 flex flex-col items-center justify-start pt-24 sm:pt-28 pb-12 px-3 sm:px-6">
-
-      <div className="w-full max-w-5xl z-10">
-        <Logo />
-      </div>
-
-      <div className={`w-full z-10 transition-all duration-500 ${phase === "done" ? "max-w-2xl" : "max-w-xl lg:max-w-2xl"}`}>
-
-        <motion.div
-          layout
-          className="glass-card rounded-[22px] sm:rounded-[32px] p-4 sm:p-8 md:p-10"
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-        >
-          <AnimatePresence mode="wait">
-            {phase === "idle" && (
-              <motion.div key="idle" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <TabList
-                  idBase="mode"
-                  label="Xizmat turi"
-                  value={mode}
-                  onChange={setMode}
-                  items={[
-                    { id: "dub", label: <><span className="hidden sm:inline">Video dublaj qilish</span><span className="sm:hidden">Dublyaj</span></> },
-                    { id: "subtitle", label: <><span className="hidden sm:inline">Subtitr yaratish</span><span className="sm:hidden">Subtitr</span></> },
-                    { id: "analyze", label: <><span className="hidden sm:inline">Video tahlil qilish</span><span className="sm:hidden">Tahlil</span></> },
-                  ]}
-                  className="flex gap-1 sm:gap-2 p-1 mb-5 sm:mb-6 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5"
-                  tabClassName={(active) =>
-                    `flex-1 py-2 sm:py-2.5 px-1 rounded-xl text-xs sm:text-sm font-bold transition-all text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
-                      active
-                        ? "bg-white dark:bg-white/10 shadow text-blue-700 dark:text-blue-300"
-                        : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                    }`
-                  }
-                />
-
-                <div {...tabPanelProps("mode", mode)}>
-                {mode === "dub" ? (
-                  <DubbingForm
-                    url={url}
-                    videoInfo={videoInfo}
-                    loading={loading}
-                    error={error}
-                    voiceGender={voiceGender}
-                    voiceName={voiceName}
-                    ttsProvider={ttsProvider}
-                    isProUser={isProUser}
-                    onChange={handleUrlChange}
-                    onGenderChange={setVoiceGender}
-                    onVoiceNameChange={setVoiceName}
-                    onTtsProviderChange={setTtsProvider}
-                    onSubmit={handleSubmit}
-                  />
-                ) : mode === "subtitle" ? (
-                  <SubtitleForm />
-                ) : (
-                  <AnalysisUrlForm />
-                )}
-                </div>
-              </motion.div>
-            )}
-
-            {phase === "loading" && (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-12 flex flex-col items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-violet-500/15 border border-blue-500/20 text-blue-500 flex items-center justify-center shadow-inner">
-                  <Sparkles aria-hidden="true" className="w-6 h-6 text-blue-500" />
-                </div>
-                <p className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-wide">Video ma&apos;lumotlari tekshirilmoqda...</p>
-              </motion.div>
-            )}
-
-            {phase === "processing" && job && (
-              <motion.div key="processing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                {job.video_title && (
-                  <div className="pb-4 border-b border-black/5 dark:border-white/5 transition-colors">
-                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest block mb-1">Hozirgi video</span>
-                    <h2 className="text-base font-bold text-gray-900 dark:text-white line-clamp-1 transition-colors">{job.video_title}</h2>
-                  </div>
-                )}
-                <StepProgress job={job} elapsed={elapsed} onCancel={handleCancel} cancelLoading={cancelLoading} />
-              </motion.div>
-            )}
-
-            {phase === "done" && job && (
-              <motion.div key="done" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                <VideoResult job={job} onReset={handleReset} />
-              </motion.div>
-            )}
-
-            {phase === "error" && job && (() => {
-              const isYouTubeRestricted =
-                job.error_code === 'AUTH_ERROR' ||
-                job.error_code === 'DOWNLOAD_FAILED' ||
-                job.error_code === 'HTTP_403' ||
-                job.error_code === 'PO_TOKEN_REQUIRED' ||
-                job.error_message?.toLowerCase().includes('bot') ||
-                job.error_message?.toLowerCase().includes('sign in') ||
-                job.error_message?.toLowerCase().includes('ruxsat') ||
-                job.error_message?.toLowerCase().includes('private');
-
-              return (
-                <motion.div key="error" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-center">
-                  {isYouTubeRestricted ? (
-                    <div className="space-y-4 text-left">
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-6 sm:p-7 space-y-4 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                            <AlertTriangle aria-hidden="true" className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                              YouTube Cheklovi Aniqlondi
-                            </span>
-                            <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                              Ushbu video YouTube himoyasi bilan cheklangan
-                            </h3>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                          YouTube bot yoki yosh/mintaqaviy cheklov sababli ushbu videoni avtomatik yuklashga ruxsat bermadi. 
-                          Lekin uni <strong>fayl sifatida yuklasangiz, dublyaj 100% muvaffaqiyatli ishlaydi!</strong>
-                        </p>
-
-                        <div className="bg-white/60 dark:bg-black/20 rounded-2xl p-4 border border-amber-500/20">
-                          <UploadRecoveryPrompt jobId={job.job_id} />
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleReset}
-                        className="w-full py-3.5 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
-                      >
-                        Boshqa video kiritish
-                      </button>
+              <AnimatePresence mode="wait">
+                {phase === "idle" && (
+                  <motion.div key="idle" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                    <TabList
+                      idBase="mode"
+                      label="Xizmat turi"
+                      value={mode}
+                      onChange={setMode}
+                      items={(Object.keys(LINES) as LineId[]).map((id) => ({
+                        id,
+                        label: (
+                          <>
+                            <span aria-hidden className={`h-3 w-3 shrink-0 rounded-full ${LINES[id].bg}`} />
+                            {LINES[id].name}
+                          </>
+                        ),
+                      }))}
+                      className="mb-6 grid grid-cols-3 border-b-2 border-metro-rule"
+                      tabClassName={(active) =>
+                        `-mb-[2px] flex min-h-12 items-center justify-center gap-2 border-b-[4px] px-1 font-sign text-base font-bold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue sm:text-lg ${
+                          active ? `${line.borderBottom} text-metro-ink` : "border-transparent text-metro-muted hover:text-metro-ink"
+                        }`
+                      }
+                    />
+                    <div {...tabPanelProps("mode", mode)}>
+                      {mode === "dub" ? (
+                        <DubbingForm
+                          url={url}
+                          videoInfo={videoInfo}
+                          loading={loading}
+                          error={error}
+                          voiceGender={voiceGender}
+                          voiceName={voiceName}
+                          ttsProvider={ttsProvider}
+                          isProUser={isProUser}
+                          onChange={handleUrlChange}
+                          onGenderChange={setVoiceGender}
+                          onVoiceNameChange={setVoiceName}
+                          onTtsProviderChange={setTtsProvider}
+                          onSubmit={handleSubmit}
+                        />
+                      ) : mode === "subtitle" ? (
+                        <SubtitleForm />
+                      ) : (
+                        <AnalysisUrlForm />
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-2">
-                        <div className="w-8 h-8 text-blue-500">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                          </svg>
-                        </div>
+                  </motion.div>
+                )}
+
+                {phase === "loading" && (
+                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-12" role="status">
+                    <Sparkles aria-hidden="true" className="h-6 w-6 text-metro-muted" />
+                    <p className="m-label">Video ma&apos;lumotlari tekshirilmoqda...</p>
+                  </motion.div>
+                )}
+
+                {phase === "processing" && job && (
+                  <motion.div key="processing" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-6">
+                    {job.video_title && (
+                      <div className="border-b-2 border-metro-rule pb-4">
+                        <p className="m-label">Hozirgi video</p>
+                        <h2 className="mt-1 line-clamp-2 text-lg font-bold text-metro-ink">{job.video_title}</h2>
                       </div>
-                      <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 transition-colors">
-                        <h3 className="text-blue-500 dark:text-blue-400 font-bold mb-2">Xatolik yuz berdi</h3>
-                        <p className="text-sm text-blue-500/60 dark:text-blue-400/60 leading-relaxed">{job.error_message}</p>
-                      </div>
-                      <button
-                        onClick={handleReset}
-                        className="w-full py-4 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-xs uppercase tracking-widest"
-                      >
-                        Qayta boshlash
-                      </button>
-                    </>
-                  )}
-                </motion.div>
-              );
-            })()}
-          </AnimatePresence>
-        </motion.div>
-      </div>
+                    )}
+                    <StepProgress job={job} elapsed={elapsed} onCancel={handleCancel} cancelLoading={cancelLoading} />
+                  </motion.div>
+                )}
 
-      {/* ── Qanday ishlaydi: havola -> AI -> tayyor video ── */}
-      <HowItWorksSection />
+                {phase === "done" && job && (
+                  <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <VideoResult job={job} onReset={handleReset} />
+                  </motion.div>
+                )}
 
-      {/* ── SEO Section: GapirAI.uz Tarjima va Dublyaj platformasi ── */}
-      <section aria-labelledby="about-platform-title" className="w-full max-w-3xl mt-20 sm:mt-28 px-4 z-10 text-left">
-        <h2 id="about-platform-title" className="text-xl sm:text-3xl font-black tracking-[-0.02em] text-slate-900 dark:text-white mb-4 [text-wrap:balance]">
-          GapirAI.uz (Gapir AI) — sun&apos;iy intellekt asosidagi avtomatik dublyaj dasturi
-        </h2>
-        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-[70ch]">
-          <strong>GapirAI.uz</strong> — bu ingliz tilidagi va boshqa xorijiy video kontentlarni o'zbek tiliga soniyalar ichida professional darajada tarjima va dublyaj (dublaj) qilib beruvchi onlayn dublyaj dasturi va platformadir. nutqni aniqlash, neyron tarjima va tabiiy o'zbekcha nutq sintezi (TTS) uchun ilg'or sun'iy intellekt modellaridan foydalangan holda, platforma videodagi har bir spikerning jinsini aniqlaydi va ularni o'zlariga mos bo'lgan jonli, insoniy ovozlarda ovozlashtiradi. YouTube dublaj dasturi izlayotgan bo'lsangiz, GapirAI (Gapir AI) — o'zbek tilidagi eng qulay bepul dublyaj dasturlaridan biridir.
-        </p>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mt-8 pt-8 border-t border-black/10 dark:border-white/10">
-          <li className="flex gap-3">
-            <Clapperboard aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Professional dublyaj imkoniyatlari</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Istalgan YouTube havolasini kiriting va sun'iy intellekt yordamida professional o'zbekcha dublyaj, sinxron audio hamda tayyor MP4 video faylni yuklab oling.
+                {phase === "error" && job && (() => {
+                  const isYouTubeRestricted =
+                    job.error_code === 'AUTH_ERROR' ||
+                    job.error_code === 'DOWNLOAD_FAILED' ||
+                    job.error_code === 'HTTP_403' ||
+                    job.error_code === 'PO_TOKEN_REQUIRED' ||
+                    job.error_message?.toLowerCase().includes('bot') ||
+                    job.error_message?.toLowerCase().includes('sign in') ||
+                    job.error_message?.toLowerCase().includes('ruxsat') ||
+                    job.error_message?.toLowerCase().includes('private');
+
+                  return (
+                    <motion.div key="error" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6" role="alert">
+                      {isYouTubeRestricted ? (
+                        <>
+                          <div className="space-y-4 rounded-[6px] border-2 border-amber-600/40 bg-amber-500/10 p-5 sm:p-6">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+                              <h2 className="text-lg font-bold text-metro-ink">YouTube bu videoni yuklashga ruxsat bermadi</h2>
+                            </div>
+                            <p className="text-base leading-relaxed text-metro-muted">
+                              Bot himoyasi yoki yosh/hudud cheklovi sababli video avtomatik yuklanmadi. Videoni fayl sifatida yuklasangiz, dublaj odatdagidek ishlaydi.
+                            </p>
+                            <div className="rounded-[6px] border border-metro-rule bg-metro-surface p-4">
+                              <UploadRecoveryPrompt jobId={job.job_id} />
+                            </div>
+                          </div>
+                          <button onClick={handleReset} className="m-btn m-btn-ghost w-full">Boshqa video kiritish</button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="rounded-[6px] border-2 border-metro-red/40 bg-metro-red/5 p-5 sm:p-6">
+                            <h2 className="text-lg font-bold text-metro-ink">Dublaj tugallanmadi</h2>
+                            <p className="mt-2 text-base leading-relaxed text-metro-muted">{job.error_message || "Kutilmagan xatolik yuz berdi."}</p>
+                          </div>
+                          <button onClick={handleReset} className="m-btn m-btn-ghost w-full">Qayta boshlash</button>
+                        </>
+                      )}
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
+            </motion.div>
+          </section>
+        </div>
+
+
+        <Spine>
+          <LinesSection onPick={pickLine} activeLine={mode} />
+          <RouteSection />
+          <StationBoard />
+          <PublicVideosStrip />
+          <TelegramTransfer />
+          <section id="haqida" aria-labelledby="haqida-title" className="relative scroll-mt-24 pl-14 sm:pl-16">
+            <span aria-hidden className="absolute left-0 top-1.5 h-[30px] w-[30px] rounded-full border-[6px] border-metro-red bg-metro-red" />
+            <h2 id="haqida-title" className="font-sign text-3xl font-extrabold uppercase leading-none text-metro-ink sm:text-5xl">GapirAI.uz haqida</h2>
+            <div className="mt-8 space-y-10">
+              <p className="max-w-[70ch] text-lg leading-relaxed text-metro-muted">
+                <strong className="text-metro-ink">GapirAI.uz</strong> (Gapir AI) — ingliz tilidagi va boshqa xorijiy videolarni o&apos;zbek tiliga dublyaj (dublaj) qiluvchi onlayn dastur.
+                Nutqni aniqlash, neyron tarjima va o&apos;zbekcha nutq sintezi (TTS) uchun sun&apos;iy intellekt modellaridan foydalanadi, videodagi spikerning jinsini aniqlab, unga mos ovoz tanlaydi.
+                Qurilmangizga hech narsa o&apos;rnatish shart emas: hammasi brauzerda yoki Telegram&apos;da ishlaydi.
               </p>
+              <div className="max-w-2xl space-y-6">
+                <TelegramFeedbackSection />
+                <DonateCTA variant="line" className="justify-start" />
+              </div>
             </div>
-          </li>
-          <li className="flex gap-3">
-            <Cloud aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Tezkor onlayn xizmat</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Qurilmangizga hech qanday qo'shimcha ilova yoki dastur yuklash talab qilinmaydi. Dublyaj jarayoni to'liq bulutli serverlarimizda amalga oshiriladi.
-              </p>
-            </div>
-          </li>
-        </ul>
-      </section>
+          </section>
+        </Spine>
 
-      {/* ── Foydalanuvchilar Fikr va Takliflari (Telegram Kanalga avtomatik boradi) ── */}
-      <TelegramFeedbackSection />
-
-        <section aria-labelledby="donate-cta-title" className="w-full max-w-3xl mx-auto px-4 sm:px-6 pt-6">
-          <DonateCTA headingId="donate-cta-title" />
-        </section>
-      </div>
-
-      <Footer />
-    </main>
+        <Footer />
+      </main>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Brain, Check, Globe, Mic, Play, Rocket, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { Brain, Check, Globe, Mic, Rocket, Zap, type LucideIcon } from "lucide-react";
 
 // Emoji o'rniga bitta chiziq qalinligidagi ikonka tizimi (lucide).
 const CATEGORY_ICONS = { brain: Brain, rocket: Rocket, globe: Globe, zap: Zap } satisfies Record<string, LucideIcon>;
@@ -72,84 +71,51 @@ interface Props {
 
 export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
   return (
-    <div className="pt-2 pb-1 space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-1 ml-1">
-        <div className="flex items-center gap-1.5">
-          <Sparkles aria-hidden="true" className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-          <span id="samples-label" className="text-xs font-extrabold uppercase tracking-wide text-slate-700 dark:text-slate-300">
-            Tayyor namunaviy videolar
-          </span>
-        </div>
-        <span className="text-xs text-slate-600 dark:text-slate-400 font-medium hidden sm:inline">
-          Havola izlamasdan 1 klikda sinab ko&apos;ring
-        </span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span id="samples-label" className="m-label">Namunalar</span>
+        <span className="text-sm text-metro-muted">Havola izlamasdan bittasini tanlang</span>
       </div>
 
-      <div role="group" aria-labelledby="samples-label" className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+      <div role="group" aria-labelledby="samples-label" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {SAMPLE_VIDEOS.map((sample) => {
           const isSelected = activeUrl === sample.url;
+          const Icon = CATEGORY_ICONS[sample.categoryIcon];
           return (
-            <motion.button
+            <button
               key={sample.id}
               type="button"
               onClick={() => onSelect(sample)}
               aria-pressed={isSelected}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`group text-left p-2 rounded-2xl border transition-all duration-300 relative flex flex-col justify-between overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
-                isSelected
-                  ? "bg-violet-500/10 dark:bg-violet-500/15 border-violet-500 shadow-md ring-2 ring-violet-500/20"
-                  : "bg-black/[0.02] dark:bg-white/[0.03] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] border-black/5 dark:border-white/10 hover:border-violet-400/40"
+              className={`group flex flex-col overflow-hidden rounded-[6px] border-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue ${
+                isSelected ? "border-metro-ink" : "border-metro-rule hover:border-metro-muted"
               }`}
             >
-              {/* Thumbnail Container */}
-              <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-900 mb-2">
-                <img
-                  src={sample.thumbnail}
-                  alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-                {/* Duration Badge */}
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-sm text-[11px] font-bold tabular-nums text-white shadow-sm">
+              <span className="relative block aspect-video w-full overflow-hidden bg-metro-plaque">
+                <img src={sample.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
+                <span className="absolute bottom-1 right-1 rounded-[3px] bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white m-num">
                   {sample.durationText}
-                </div>
-
-                {/* Category Pill */}
-                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-sm text-[11px] font-medium text-white flex items-center gap-1">
-                  {(() => { const Icon = CATEGORY_ICONS[sample.categoryIcon]; return <Icon aria-hidden className="w-3 h-3" />; })()}
-                  <span className="truncate max-w-[80px]">{sample.category}</span>
-                </div>
-
-                {/* Play Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="w-7 h-7 rounded-full bg-violet-600/90 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-                    <Play aria-hidden="true" className="w-3.5 h-3.5 fill-current ml-0.5" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Title & Action */}
-              <div className="space-y-1.5 flex-1 flex flex-col justify-between">
-                {/* Tugma ichida sarlavha (h*) bo'lishi mumkin emas -- oddiy matn */}
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2">
-                  {sample.title}
                 </span>
-                <span className="flex items-center justify-between gap-1 pt-0.5 text-xs">
-                  <span className={`font-semibold flex items-center gap-1 ${
-                    isSelected ? "text-violet-700 dark:text-violet-300 font-bold" : "text-slate-600 dark:text-slate-300"
-                  }`}>
-                    {isSelected ? <><Check aria-hidden className="w-3 h-3" />Tanlangan</> : <><Play aria-hidden className="w-3 h-3" />Sinash</>}
+                {isSelected && (
+                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-[3px] bg-metro-ink px-1.5 py-0.5 text-[11px] font-bold text-metro-ground">
+                    <Check aria-hidden="true" className="h-3 w-3" /> Tanlangan
                   </span>
-                  <span className="flex items-center gap-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                    <Mic aria-hidden="true" className="w-3 h-3" />
+                )}
+              </span>
+              <span className="flex flex-1 flex-col gap-1.5 p-2.5">
+                <span className="line-clamp-2 text-sm font-bold leading-snug text-metro-ink">{sample.title}</span>
+                <span className="mt-auto flex items-center justify-between gap-1 text-xs text-metro-muted">
+                  <span className="inline-flex items-center gap-1">
+                    <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                    {sample.category}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <Mic aria-hidden="true" className="h-3 w-3" />
                     {sample.gender === "male" ? "Erkak" : "Ayol"}
                   </span>
                 </span>
-              </div>
-            </motion.button>
+              </span>
+            </button>
           );
         })}
       </div>

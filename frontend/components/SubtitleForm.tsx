@@ -23,20 +23,20 @@ export default function SubtitleForm() {
         value={source}
         onChange={setSource}
         items={[
-          { id: "url", label: "YouTube havolasi", icon: Youtube },
-          { id: "file", label: "Video fayl", icon: FileVideo },
+          { id: "url", label: <><span className="sm:hidden">Havola</span><span className="hidden sm:inline">YouTube havolasi</span></>, icon: Youtube },
+          { id: "file", label: <><span className="sm:hidden">Fayl</span><span className="hidden sm:inline">Video fayl</span></>, icon: FileVideo },
         ]}
-        className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5"
+        className="inline-flex w-full gap-1 rounded-[6px] bg-metro-ground p-1 sm:w-auto"
         tabClassName={(active) =>
-          `flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+          `flex flex-1 items-center justify-center gap-2 rounded-[4px] px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue sm:flex-none ${
             active
-              ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
-              : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              ? "bg-metro-surface text-metro-ink shadow-[0_1px_3px_rgb(0_0_0/0.12)]"
+              : "text-metro-muted hover:text-metro-ink"
           }`}
       />
       <div className="space-y-1.5">
-        <span id="sub-lang-label" className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1">Video tili</span>
-        <div className="flex flex-col sm:flex-row gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5" role="group" aria-labelledby="sub-lang-label">
+        <span id="sub-lang-label" className="m-label block">Video tili</span>
+        <div className="grid gap-2 sm:grid-cols-2" role="group" aria-labelledby="sub-lang-label">
           {([
             ["auto", "Boshqa til (Ingliz, Rus, Turk...) → O'zbekcha tarjima"],
             ["uz", "Video o'zbek tilida (faqat matnga aylantirish)"],
@@ -46,17 +46,17 @@ export default function SubtitleForm() {
               type="button"
               onClick={() => setLang(id)}
               aria-pressed={lang === id}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold text-center leading-snug transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+              className={`rounded-[6px] border-2 px-3 py-2.5 text-left text-sm font-semibold leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue ${
                 lang === id
-                  ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
-                  : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  ? "border-metro-ink bg-metro-ink text-metro-ground"
+                  : "border-metro-rule text-metro-ink hover:border-metro-muted"
               }`}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+        <p className="text-sm text-metro-muted">
           {lang === "uz"
             ? "Videodagi o'zbekcha nutq to'g'ridan-to'g'ri o'zbekcha subtitrga aylantiriladi (tarjimasiz)."
             : "Chet tildagi (ingliz, rus, turk va b.) nutq avtomatik aniqlanib, o'zbekchaga tarjima qilinadi."}

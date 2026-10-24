@@ -74,7 +74,7 @@ export default function PlatformFeedbackWidget() {
         aria-hidden={inlineFormVisible || undefined}
         tabIndex={inlineFormVisible ? -1 : undefined}
         style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))', pointerEvents: inlineFormVisible ? 'none' : undefined }}
-        className="fixed right-4 sm:right-5 z-40 flex items-center justify-center gap-2 h-11 min-w-11 px-3 sm:px-4 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-full shadow-lg shadow-violet-600/30 hover:scale-105 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
+        className="fixed right-4 sm:right-5 z-40 flex items-center justify-center gap-2 h-11 min-w-11 px-3 sm:px-4 bg-metro-plaque text-metro-plaque-ink font-sign text-base font-bold uppercase tracking-wide rounded-[6px] shadow-[0_6px_16px_rgb(0_0_0/0.25)] hover:bg-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-metro-blue"
         aria-label="Fikr bildirish"
         aria-haspopup="dialog"
       >
@@ -100,11 +100,11 @@ export default function PlatformFeedbackWidget() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="platform-feedback-title"
-              className="relative w-full sm:max-w-md bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl p-6 sm:p-7 shadow-2xl"
+              className="relative w-full sm:max-w-md bg-metro-plaque text-metro-plaque-ink border-t-[8px] border-metro-red rounded-t-[6px] sm:rounded-[6px] p-6 sm:p-7 shadow-2xl"
             >
               <button
                 onClick={handleClose}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400"
+                className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-[6px] text-metro-plaque-ink/80 hover:bg-white/10 hover:text-white transition"
                 aria-label="Yopish"
               >
                 <X aria-hidden="true" className="w-4 h-4" />
@@ -112,14 +112,14 @@ export default function PlatformFeedbackWidget() {
 
               {submitted ? (
                 <div className="text-center py-6 space-y-3">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-metro-ink text-metro-ground">
                     <CheckCircle2 aria-hidden="true" className="w-7 h-7" />
                   </div>
                   <h2 id="platform-feedback-title" className="text-white font-bold text-base">Rahmat!</h2>
-                  <p className="text-xs text-gray-400">Fikringiz qabul qilindi va jamoamizga yuborildi.</p>
+                  <p className="text-base text-metro-plaque-ink/80">Fikringiz qabul qilindi va jamoamizga yuborildi.</p>
                   <button
                     onClick={handleClose}
-                    className="mt-2 text-xs font-bold text-violet-400 hover:text-violet-300 transition"
+                    className="mt-2 text-sm font-bold text-metro-plaque-ink underline underline-offset-4"
                   >
                     Yopish
                   </button>
@@ -128,12 +128,12 @@ export default function PlatformFeedbackWidget() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <h2 id="platform-feedback-title" className="text-white font-bold text-base mb-1">Platforma haqida fikringizni bildiring</h2>
-                    <p className="text-sm text-gray-300">Takliflaringiz GapirAI.uz&apos;ni yaxshilashga yordam beradi.</p>
+                    <p className="text-base text-metro-plaque-ink/80">Takliflaringiz GapirAI.uz&apos;ni yaxshilashga yordam beradi.</p>
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <StarRating value={rating} onChange={setRating} allowClear label="Platformaga baho (ixtiyoriy)" starClassName="w-6 h-6" emptyClassName="text-slate-500" />
-                    <span className="text-xs text-gray-400 ml-1">(ixtiyoriy)</span>
+                    <div className="[&_svg.fill-current]:text-white"><StarRating value={rating} onChange={setRating} allowClear label="Platformaga baho (ixtiyoriy)" starClassName="w-6 h-6" emptyClassName="text-metro-plaque-ink/50" /></div>
+                    <span className="ml-1 text-sm text-metro-plaque-ink/70">(ixtiyoriy)</span>
                   </div>
 
                   <label htmlFor="platform-feedback-message" className="sr-only">Fikringiz</label>
@@ -144,7 +144,7 @@ export default function PlatformFeedbackWidget() {
                     placeholder="Fikringiz, taklifingiz yoki muammoingizni yozing..."
                     rows={4}
                     maxLength={2000}
-                    className="w-full bg-white/5 border border-white/15 rounded-2xl px-4 py-3 text-sm text-white placeholder:text-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 resize-none"
+                    className="w-full bg-white/5 border-2 border-white/20 rounded-[6px] px-4 py-3 text-base text-white placeholder:text-metro-plaque-ink/60 focus:outline-none focus:border-metro-plaque-ink resize-none"
                   />
 
                   {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
@@ -152,7 +152,7 @@ export default function PlatformFeedbackWidget() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold py-3 rounded-2xl transition text-sm"
+                    className="m-btn m-btn-red w-full"
                   >
                     {submitting ? <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> : <Send aria-hidden="true" className="w-4 h-4" />}
                     Yuborish

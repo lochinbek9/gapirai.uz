@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquarePlus, Send, CheckCircle2 } from "lucide-react";
+import { Send, CheckCircle2 } from "lucide-react";
 import StarRating from "@/components/ui/StarRating";
 import { sendTelegramFeedback } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,18 +45,15 @@ export default function TelegramFeedbackSection() {
   };
 
   return (
-    <section id="fikr" data-feedback-section aria-labelledby="feedback-title" className="w-full max-w-xl mx-auto mt-10 mb-8 px-3">
-      <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-b from-white/10 via-white/5 to-transparent dark:from-white/[0.07] dark:via-white/[0.03] dark:to-transparent border border-black/5 dark:border-white/10 p-5 sm:p-7 backdrop-blur-xl shadow-xl">
+    <section id="fikr" data-feedback-section aria-labelledby="feedback-title" className="w-full">
+      <div className="rounded-[6px] border-2 border-metro-rule bg-metro-surface p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-violet-600/15 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
-              <MessageSquarePlus aria-hidden="true" className="w-4 h-4" />
-            </div>
             <div>
-              <h2 id="feedback-title" className="text-base font-black text-slate-900 dark:text-white">
+              <h2 id="feedback-title" className="font-sign text-2xl font-extrabold uppercase text-metro-ink">
                 Fikr va takliflaringiz bormi?
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-400">
+              <p className="text-base text-metro-muted">
                 GapirAI.uz ni yanada yaxshilashimiz uchun fikringizni bildiring!
               </p>
             </div>
@@ -71,20 +68,20 @@ export default function TelegramFeedbackSection() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="py-6 text-center space-y-3"
             >
-              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-metro-ink text-metro-ground">
                 <CheckCircle2 aria-hidden="true" className="w-6 h-6" />
               </div>
-              <p role="status" className="text-base font-bold text-slate-900 dark:text-white">
+              <p role="status" className="text-lg font-bold text-metro-ink">
                 Katta rahmat! Fikringiz qabul qilindi.
               </p>
-              <p className="text-xs text-slate-600 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+              <p className="mx-auto max-w-sm text-base leading-relaxed text-metro-muted">
                 Taklifingiz muvaffaqiyatli qabul qilindi va platformani yanada rivojlantirishda albatta inobatga olinadi.
               </p>
               <div className="pt-2 flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => setSuccess(false)}
-                  className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
+                  className="m-btn m-btn-ghost"
                 >
                   Yana fikr bildirish
                 </button>
@@ -94,7 +91,7 @@ export default function TelegramFeedbackSection() {
             <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
               {/* Reyting (Yulduzchalar) */}
               <div className="flex flex-wrap items-center justify-between gap-2 py-1 px-1">
-                <span id="feedback-rating-label" className="text-sm font-semibold text-slate-700 dark:text-gray-300">
+                <span id="feedback-rating-label" className="text-base font-semibold text-metro-ink">
                   Platforma qanchalik ma&apos;qul keldi?
                 </span>
                 <StarRating value={rating} onChange={setRating} label="Platformaga baho" />
@@ -102,7 +99,7 @@ export default function TelegramFeedbackSection() {
 
               {/* Fikr / Izoh matni */}
               <div>
-                <label htmlFor="feedback-comment" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1 px-1">Fikringiz</label>
+                <label htmlFor="feedback-comment" className="m-label mb-1.5 block">Fikringiz</label>
                 <textarea
                   id="feedback-comment"
                   value={comment}
@@ -111,7 +108,7 @@ export default function TelegramFeedbackSection() {
                   rows={3}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? "feedback-error" : undefined}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-300 dark:border-white/15 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 transition resize-none"
+                  className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none resize-none"
                   required
                 />
               </div>
@@ -119,18 +116,18 @@ export default function TelegramFeedbackSection() {
               {/* Ism va Aloqa ma'lumotlari (ixtiyoriy) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="feedback-name" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1 px-1">Ismingiz <span className="font-normal text-slate-600 dark:text-gray-400">(ixtiyoriy)</span></label>
+                  <label htmlFor="feedback-name" className="m-label mb-1.5 block">Ismingiz <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
                   <input
                     id="feedback-name"
                     type="text"
                     autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-300 dark:border-white/15 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 transition"
+                    className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="feedback-contact" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1 px-1">Telegram yoki telefon <span className="font-normal text-slate-600 dark:text-gray-400">(ixtiyoriy)</span></label>
+                  <label htmlFor="feedback-contact" className="m-label mb-1.5 block">Telegram yoki telefon <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
                   <input
                     id="feedback-contact"
                     type="text"
@@ -138,27 +135,27 @@ export default function TelegramFeedbackSection() {
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
                     placeholder="@username yoki telefon"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-300 dark:border-white/15 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 transition"
+                    className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none"
                   />
                 </div>
               </div>
 
               {error && (
-                <p id="feedback-error" role="alert" className="text-sm text-red-700 dark:text-red-400 font-medium px-1">
+                <p id="feedback-error" role="alert" className="text-base font-semibold text-metro-red-ink">
                   {error}
                 </p>
               )}
 
               {/* Yuborish tugmasi */}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-600 dark:text-gray-400">
+                <span className="text-sm text-metro-muted">
                   Fikringiz biz uchun juda qadrli
                 </span>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition shadow-md shadow-violet-600/20 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
+                  className="m-btn"
                 >
                   {loading ? (
                     <span aria-hidden="true" className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
