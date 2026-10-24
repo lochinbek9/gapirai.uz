@@ -1,4 +1,4 @@
-// Bekat taxtasidagi raqamlar -- production bazadan olingan sanali snapshot
+// Bosh sahifadagi raqamlar -- production bazadan olingan sanali snapshot
 // (ichki/test hisoblar chiqarilgan). Yangilash: dubbing_jobs (COMPLETED,
 // subtitle_only=false) soni, ularning video_duration yig'indisi (kesh-hit
 // nusxalarsiz) va tasdiqlangan foydalanuvchilar soni. Taxmin yozilmaydi.

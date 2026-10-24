@@ -87,35 +87,35 @@ export default function QuizTab({
     return (
       <div className="space-y-5">
         <div className="text-center space-y-2 py-4">
-          <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Natija</p>
-          <p className="text-3xl font-black text-white">{score}/{total}</p>
+          <p className="text-xs font-semibold text-ui-accent-ink ">Natija</p>
+          <p className="text-3xl font-semibold text-ui-ink">{score}/{total}</p>
         </div>
         {missed.length > 0 ? (
           <div className="space-y-3">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Qayta ko'rib chiqish kerak</p>
+            <p className="text-xs font-semibold text-ui-muted ">Qayta ko'rib chiqish kerak</p>
             <div className="space-y-1.5">
               {missed.map(({ q, qi }) => (
                 <button
                   key={qi}
                   onClick={() => onSeek(q.timestamp)}
-                  className="w-full text-left flex gap-3 items-start bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 rounded-xl p-3 transition"
+                  className="w-full text-left flex gap-3 items-start bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                 >
-                  <span className="text-[11px] font-mono text-blue-400 bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
+                  <span className="text-xs font-mono text-ui-accent-ink bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
                     {formatTs(q.timestamp)}
                   </span>
-                  <span className="text-sm text-gray-300">{q.question}</span>
+                  <span className="text-sm text-ui-muted">{q.question}</span>
                 </button>
               ))}
             </div>
             <button
               onClick={() => { setReviewingMistakes(true); setIndex(missed[0].qi); }}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-xs font-semibold text-ui-ink transition"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Xatolarni qayta ko'rish
             </button>
           </div>
         ) : (
-          <p className="text-center text-sm text-emerald-400 font-semibold">Barcha savollarga to'g'ri javob berdingiz!</p>
+          <p className="text-center text-sm text-ui-green-ink font-semibold">Barcha savollarga to'g'ri javob berdingiz!</p>
         )}
       </div>
     );
@@ -148,7 +148,7 @@ export default function QuizTab({
     <div ref={cardRef} className="space-y-4">
       {/* Quiz Progress Header */}
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">
+        <p className="text-xs font-semibold text-ui-accent-ink ">
           {reviewingMistakes ? "Xato javoblarni qayta ko'rish" : `Savol ${posInSequence + 1} / ${sequence.length}`}
         </p>
         {!reviewingMistakes && (
@@ -163,7 +163,7 @@ export default function QuizTab({
                       : "bg-red-400"
                     : i === index
                     ? "bg-blue-400 scale-125"
-                    : "bg-white/10"
+                    : "bg-ui-ground"
                 }`}
               />
             ))}
@@ -171,8 +171,8 @@ export default function QuizTab({
         )}
       </div>
 
-      <div className="border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3.5 bg-white/[0.02] backdrop-blur-sm shadow-sm">
-        <p className="text-sm sm:text-base font-bold text-white leading-snug">{q.question}</p>
+      <div className="border border-ui-rule rounded-2xl p-4 sm:p-5 space-y-3.5 bg-ui-ground shadow-sm">
+        <p className="text-sm sm:text-base font-semibold text-ui-ink leading-snug">{q.question}</p>
 
         {/* Options */}
         <div className="space-y-1.5" role="radiogroup" aria-label={q.question}>
@@ -188,26 +188,26 @@ export default function QuizTab({
                 aria-checked={isChosen}
                 className={`w-full text-left flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition border ${
                   showResult && isOptCorrect
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold shadow-sm"
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-ui-green-ink font-semibold shadow-sm"
                     : showResult && isChosen
-                    ? "bg-red-500/15 border-red-500/40 text-red-300 font-semibold"
-                    : "bg-white/[0.03] border-white/5 text-gray-300 hover:bg-white/[0.07] hover:border-white/15 active:scale-[0.99]"
+                    ? "bg-red-500/15 border-red-500/40 text-ui-red-ink font-semibold"
+                    : "bg-ui-ground border-ui-rule text-ui-muted hover:bg-ui-ground hover:border-ui-rule active:scale-[0.99]"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold ${
+                  <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-semibold ${
                     showResult && isOptCorrect
                       ? "bg-emerald-500 text-white"
                       : showResult && isChosen
                       ? "bg-red-500 text-white"
-                      : "bg-white/10 text-gray-300"
+                      : "bg-ui-ground text-ui-muted"
                   }`}>
                     {String.fromCharCode(65 + oi)}
                   </span>
                   <span>{opt}</span>
                 </div>
-                {showResult && isOptCorrect && <Check className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />}
-                {showResult && isChosen && !isOptCorrect && <X className="w-4 h-4 shrink-0 text-red-400" aria-hidden="true" />}
+                {showResult && isOptCorrect && <Check className="w-4 h-4 shrink-0 text-ui-green-ink" aria-hidden="true" />}
+                {showResult && isChosen && !isOptCorrect && <X className="w-4 h-4 shrink-0 text-ui-red-ink" aria-hidden="true" />}
               </button>
             );
           })}
@@ -216,14 +216,14 @@ export default function QuizTab({
         {/* Result & Explanation: Positioned immediately so no scrolling needed */}
         <div aria-live="polite">
           {showResult && (
-            <div className="pt-2 border-t border-white/10 space-y-2.5 animate-fadeIn">
+            <div className="pt-2 border-t border-ui-rule space-y-2.5 animate-fadeIn">
               {/* Primary Action & Status bar (Directly visible!) */}
               <div className="flex items-center justify-between gap-2">
                 <div
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
                     isCorrect
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                      : "bg-red-500/10 text-red-400 border-red-500/20"
+                      ? "bg-emerald-500/10 text-ui-green-ink border-emerald-500/20"
+                      : "bg-red-500/10 text-ui-red-ink border-red-500/20"
                   }`}
                 >
                   {isCorrect ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <X className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -233,7 +233,7 @@ export default function QuizTab({
                 <button
                   onClick={advance}
                   autoFocus
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-500/25 active:scale-95 transition"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md active:scale-95 transition"
                 >
                   <span>{isLastInSequence ? (reviewingMistakes ? "Natijaga qaytish" : "Yakunlash") : "Keyingisi"}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -241,19 +241,19 @@ export default function QuizTab({
               </div>
 
               {/* Explanation Callout */}
-              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5">
+              <div className="p-3 rounded-xl bg-ui-ground border border-ui-rule space-y-1.5">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => onSeek(q.timestamp)}
-                    className="text-[11px] font-mono text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2 py-0.5 rounded-md flex items-center gap-1 transition"
+                    className="text-xs font-mono text-ui-accent-ink hover:text-ui-accent-ink bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2 py-0.5 rounded-md flex items-center gap-1 transition"
                     title="Videodan ushbu daqiqani ko'rish"
                   >
                     <Clock className="w-3 h-3" />
                     <span>{formatTs(q.timestamp)}</span>
                   </button>
-                  <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Tushuntirish:</span>
+                  <span className="text-xs text-ui-muted font-semibold ">Tushuntirish:</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">{q.explanation}</p>
+                <p className="text-xs text-ui-muted leading-relaxed">{q.explanation}</p>
               </div>
             </div>
           )}

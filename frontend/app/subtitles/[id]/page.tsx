@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PageShell from '@/components/PageShell'
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import SubtitleResult from '@/components/SubtitleResult'
@@ -19,53 +20,43 @@ export default function SubtitlePage() {
   const { job, error, is404 } = useJobPolling(id)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white dark:from-[#15121f] dark:to-[#0f0f10]">
-      <div className="mx-auto max-w-lg px-4 py-10">
-        <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600 dark:text-gray-400">
-          <ArrowLeft className="h-4 w-4" /> Bosh sahifa
+    <PageShell>
+      <div className="mx-auto max-w-xl px-4 pb-24 pt-6 sm:px-6">
+        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-ui-muted transition hover:text-ui-ink">
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Mening videolarim
         </Link>
+        <h1 className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-ui-ink">Oʻzbekcha subtitr</h1>
+        {job?.video_title && <p className="mt-1.5 line-clamp-2 text-[15px] text-ui-muted">{job.video_title}</p>}
 
-        {is404 ? (
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-16">Job topilmadi.</p>
-        ) : !job ? (
-          <div className="flex flex-col items-center gap-3 py-16">
-            <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-500 flex items-center justify-center shadow-inner">
-              <Sparkles className="w-5 h-5 text-violet-500" />
+        <div className="mt-8">
+          {is404 ? (
+            <p className="py-16 text-center text-[15px] text-ui-muted">Bunday subtitr topilmadi.</p>
+          ) : !job ? (
+            <div className="flex items-center justify-center gap-3 py-16 text-[15px] text-ui-muted" role="status">
+              <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin" />
+              {error || 'Yuklanmoqda...'}
             </div>
-            <p className="text-xs text-gray-400">{error || 'Yuklanmoqda...'}</p>
-          </div>
-        ) : job.status === 'completed' ? (
-          <SubtitleResult job={job} onReset={() => router.push('/')} />
-        ) : job.status === 'failed' ? (
-          <div className="space-y-4 text-center">
-            <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-6">
-              <h3 className="font-bold text-red-600 dark:text-red-400 mb-2">Xatolik yuz berdi</h3>
-              <p className="text-sm text-red-500/80 dark:text-red-400/80">{job.error_message || 'Subtitr yaratib bo‘lmadi.'}</p>
+          ) : job.status === 'completed' ? (
+            <SubtitleResult job={job} onReset={() => router.push('/')} />
+          ) : job.status === 'failed' ? (
+            <div className="space-y-4" role="alert">
+              <div className="rounded-control border border-ui-red/30 bg-ui-red/[0.05] p-5">
+                <h2 className="font-semibold text-ui-ink">Subtitr tayyor boʻlmadi</h2>
+                <p className="mt-1.5 text-[15px] text-ui-muted">{job.error_message || 'Subtitr yaratib boʻlmadi.'}</p>
+              </div>
+              <button type="button" onClick={() => router.push('/')} className="ui-btn ui-btn-secondary w-full">
+                Qayta boshlash
+              </button>
             </div>
-            <button
-              onClick={() => router.push('/')}
-              className="w-full py-3.5 rounded-2xl border border-black/10 dark:border-white/10 text-sm font-bold text-gray-600 dark:text-gray-300"
-            >
-              Qayta boshlash
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-violet-500/10 to-indigo-500/15 border border-violet-500/20 text-violet-500 flex items-center justify-center shadow-inner">
-              <span className="text-2xl">📝</span>
+          ) : (
+            <div className="ui-card flex flex-col items-center gap-3 px-6 py-14 text-center" role="status">
+              <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-ui-muted" />
+              <p className="text-base font-medium text-ui-ink">{job.status_message || 'Subtitr tayyorlanmoqda...'}</p>
+              <p className="max-w-xs text-sm text-ui-muted">Tayyor boʻlgach sahifa avtomatik yangilanadi.</p>
             </div>
-            {job.video_title && (
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{job.video_title}</h2>
-            )}
-            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
-              {job.status_message || 'Subtitr tayyorlanmoqda...'}
-            </p>
-            <p className="text-[11px] text-gray-400 max-w-xs">
-              Bu odatda 30-60 soniya davom etadi. Tayyor bo&apos;lgach avtomatik ochiladi.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -4,6 +4,11 @@ import type { Config } from "tailwindcss";
 // rejimda bir xil nomlar, qiymatlar globals.css'da.
 const ui = (name: string) => `rgb(var(--ui-${name}) / <alpha-value>)`;
 
+const NEUTRAL = {
+  50: "#F6F7F9", 100: "#EEF0F3", 200: "#E5E7EB", 300: "#D1D5DB", 400: "#9CA3AF", 500: "#6B7280",
+  600: "#585E6A", 700: "#3F4450", 800: "#22252C", 900: "#141519", 950: "#0B0B0D",
+};
+
 const config: Config = {
   darkMode: "class",
   content: [
@@ -17,6 +22,16 @@ const config: Config = {
         xs: "420px",
       },
       colors: {
+        // Eski sahifalardagi blue-* / gray-* klasslari ham yangi tizimga mos:
+        // ko'k = logo aksenti (#2B5CF0 atrofida), kulranglar = neytral tokenlar.
+        blue: {
+          50: "#EEF3FF", 100: "#DFE8FF", 200: "#C4D3FF", 300: "#9CB4FF", 400: "#6F8DFA",
+          500: "#4A6EF5", 600: "#2B5CF0", 700: "#204CD6", 800: "#1E3FAD", 900: "#1E3787", 950: "#172352",
+        },
+        gray: NEUTRAL,
+        slate: NEUTRAL,
+        zinc: NEUTRAL,
+        neutral: NEUTRAL,
         ui: {
           ground: ui("ground"),
           surface: ui("surface"),

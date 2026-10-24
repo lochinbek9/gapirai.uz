@@ -68,7 +68,7 @@ export default function DateRangePills({
   return (
     <div className={`flex items-center gap-1.5 min-w-0 max-w-full ${className}`}>
       {/* Pill group container: telefonda sig'masa ikkinchi qatorga o'tadi (ilgari ekrandan chiqib ketardi) */}
-      <div className="relative min-w-0 bg-black/40 border border-white/10 rounded-2xl p-1 flex flex-wrap items-center gap-0.5 backdrop-blur-md shadow-inner">
+      <div className="relative min-w-0 bg-black/40 border border-white/10 rounded-2xl p-1 flex flex-wrap items-center gap-0.5 ">
         {RANGES.map((r) => {
           const isActive = value === r.id
           return (
@@ -78,8 +78,8 @@ export default function DateRangePills({
               onClick={() => onChange(r.id)}
               className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
                 isActive
-                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 font-bold scale-[1.02]'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-violet-600 text-white shadow-md font-semibold scale-[1.02]'
+                  : 'text-ui-muted hover:text-white hover:bg-white/5'
               }`}
             >
               {r.label}
@@ -94,8 +94,8 @@ export default function DateRangePills({
             onClick={() => setShowCustomModal((prev) => !prev)}
             className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all duration-200 ${
               value === 'custom'
-                ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 font-bold'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ? 'bg-violet-600 text-white shadow-md font-semibold'
+                : 'text-ui-muted hover:text-white hover:bg-white/5'
             }`}
             title="Istalgan oraliqni tanlash"
             aria-label="Istalgan oraliqni tanlash"
@@ -109,18 +109,18 @@ export default function DateRangePills({
           {/* Custom Date Modal / Popover */}
           {showCustomModal && (
             <div
-              className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-[#0c1222] border border-white/15 rounded-2xl p-4 shadow-2xl z-50 backdrop-blur-xl animate-in fade-in zoom-in-95"
+              className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-[#0c1222] border border-white/15 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95"
               style={{ colorScheme: 'dark' }}
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-violet-400" />
                   Oraliq sana tanlang
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowCustomModal(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-ui-muted hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -128,7 +128,7 @@ export default function DateRangePills({
 
               <form onSubmit={handleApplyCustom} className="space-y-3">
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1">Boshlanish sanasi</label>
+                  <label className="block text-xs text-ui-muted mb-1">Boshlanish sanasi</label>
                   <input
                     type="date"
                     required
@@ -138,7 +138,7 @@ export default function DateRangePills({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1">Tugash sanasi</label>
+                  <label className="block text-xs text-ui-muted mb-1">Tugash sanasi</label>
                   <input
                     type="date"
                     value={customEnd}
@@ -150,13 +150,13 @@ export default function DateRangePills({
                   <button
                     type="button"
                     onClick={() => setShowCustomModal(false)}
-                    className="flex-1 py-1.5 rounded-xl text-xs font-medium text-gray-400 hover:text-white bg-white/5 transition"
+                    className="flex-1 py-1.5 rounded-xl text-xs font-medium text-ui-muted hover:text-white bg-white/5 transition"
                   >
                     Bekor qilish
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-1.5 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 shadow-md shadow-violet-500/20 transition flex items-center justify-center gap-1"
+                    className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow-md transition flex items-center justify-center gap-1"
                   >
                     <Check className="w-3 h-3" /> Qo'llash
                   </button>

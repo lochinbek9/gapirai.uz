@@ -97,13 +97,13 @@ export default function AdminRetentionManager({ token }: { token: string }) {
             <Repeat className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
               Foydalanuvchilar Qaytishi va Faolligi (Retention)
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                 Toshkent vaqti
               </span>
             </h2>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-ui-muted">
               Haqiqiy mijozlar qayta kiryaptimi, streak qanday va necha kundan keyin qaytmoqda?
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                 className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold transition ${
                   selectedDays === item.days
                     ? 'bg-purple-600 text-white shadow'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-ui-muted hover:text-white'
                 }`}
               >
                 {item.label}
@@ -156,38 +156,38 @@ export default function AdminRetentionManager({ token }: { token: string }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Jami Qaytganlar */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-1">
-            <div className="flex items-center justify-between text-gray-400 text-xs">
+            <div className="flex items-center justify-between text-ui-muted text-xs">
               <span>Umumiy Qaytish (Retention)</span>
               <Repeat className="w-4 h-4 text-purple-400" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white">
+              <span className="text-2xl font-semibold text-white">
                 {data.summary.overall_retention_pct}%
               </span>
-              <span className="text-xs text-gray-400 font-medium">
+              <span className="text-xs text-ui-muted font-medium">
                 ({data.summary.total_returning_all_time} ta qaytgan)
               </span>
             </div>
-            <p className="text-[11px] text-gray-500">
+            <p className="text-xs text-gray-500">
               Jami {data.summary.total_registered} ta ro&apos;yxatdan o&apos;tgandan
             </p>
           </div>
 
           {/* Card 2: Bugungi Kirishlar */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-1">
-            <div className="flex items-center justify-between text-gray-400 text-xs">
+            <div className="flex items-center justify-between text-ui-muted text-xs">
               <span>Bugungi Faollik</span>
               <Sparkles className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-emerald-400">
+              <span className="text-2xl font-semibold text-emerald-400">
                 {data.summary.today.total_active} ta
               </span>
               <span className="text-xs text-emerald-300/80 font-semibold">
                 {data.summary.today.returning_pct}% qaytgan
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-ui-muted">
               <span className="text-gray-300">Yangi: {data.summary.today.new_users}</span>
               <span>•</span>
               <span className="text-purple-300 font-medium">Qaytgan: {data.summary.today.returning_users}</span>
@@ -196,19 +196,19 @@ export default function AdminRetentionManager({ token }: { token: string }) {
 
           {/* Card 3: Kechagi Kirishlar */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-1">
-            <div className="flex items-center justify-between text-gray-400 text-xs">
+            <div className="flex items-center justify-between text-ui-muted text-xs">
               <span>Kechagi Faollik</span>
               <Calendar className="w-4 h-4 text-blue-400" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-blue-400">
+              <span className="text-2xl font-semibold text-blue-400">
                 {data.summary.yesterday.total_active} ta
               </span>
               <span className="text-xs text-blue-300/80 font-semibold">
                 {data.summary.yesterday.returning_pct}% qaytgan
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-ui-muted">
               <span>Yangi: {data.summary.yesterday.new_users}</span>
               <span>•</span>
               <span className="text-purple-300 font-medium">Qaytgan: {data.summary.yesterday.returning_users}</span>
@@ -217,12 +217,12 @@ export default function AdminRetentionManager({ token }: { token: string }) {
 
           {/* Card 4: Sodiq Foydalanuvchilar */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-1">
-            <div className="flex items-center justify-between text-gray-400 text-xs">
+            <div className="flex items-center justify-between text-ui-muted text-xs">
               <span>Sodiq Foydalanuvchilar</span>
               <Award className="w-4 h-4 text-amber-400" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-amber-400">
+              <span className="text-2xl font-semibold text-amber-400">
                 {(data.frequency.find((f) => f.label.includes('14'))?.count || 0) +
                   (data.frequency.find((f) => f.label.includes('30'))?.count || 0)} ta
               </span>
@@ -230,7 +230,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                 6+ kun kirgan
               </span>
             </div>
-            <p className="text-[11px] text-gray-500">
+            <p className="text-xs text-gray-500">
               Doimiy va qayta-qayta foydalanuvchilar
             </p>
           </div>
@@ -240,16 +240,16 @@ export default function AdminRetentionManager({ token }: { token: string }) {
       {/* Sodiqlik Taqsimoti (Frequency Buckets: 1, 3, 6, 14, 30, Barchasi) */}
       {data && (
         <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4 space-y-3">
-          <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-purple-400" />
             Foydalanuvchilarning Kirish Chastotasi (Sodiqlik taqsimoti)
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {data.frequency.map((item, idx) => (
               <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/5">
-                <span className="text-[11px] text-gray-400 block">{item.label}</span>
+                <span className="text-xs text-ui-muted block">{item.label}</span>
                 <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-base sm:text-lg font-bold text-white">{item.count} ta</span>
+                  <span className="text-base sm:text-lg font-semibold text-white">{item.count} ta</span>
                   <span className="text-xs font-semibold text-purple-400">{item.pct}%</span>
                 </div>
                 <div className="w-full bg-white/10 h-1.5 rounded-full mt-2 overflow-hidden">
@@ -274,10 +274,10 @@ export default function AdminRetentionManager({ token }: { token: string }) {
             <div className="flex items-center gap-2.5">
               <Calendar className="w-4 h-4 text-blue-400 shrink-0" />
               <div>
-                <span className="text-xs font-bold text-gray-200 uppercase tracking-wider block">
+                <span className="text-xs font-semibold text-gray-200 block">
                   Kunlik Faollik va Qaytish Ko&apos;rsatkichlari ({getDaysLabel(selectedDays)})
                 </span>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-xs text-ui-muted">
                   {data.daily_stats.length} kunlik tahlil • Qaytganlar: oldingi kunlarda ro&apos;yxatdan o&apos;tib yana kirganlar
                 </span>
               </div>
@@ -292,7 +292,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
           {isDailyTableOpen && (
             <div className="border-t border-white/10 overflow-x-auto">
               <table className="w-full text-left text-xs text-gray-300">
-                <thead className="bg-white/5 text-[11px] uppercase tracking-wider text-gray-400 border-b border-white/10">
+                <thead className="bg-white/5 text-xs text-ui-muted border-b border-white/10">
                   <tr>
                     <th className="py-2.5 px-4">Sana</th>
                     <th className="py-2.5 px-4 text-center">Jami Faol</th>
@@ -320,12 +320,12 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                         <td className="py-3 px-4 font-mono font-medium text-white whitespace-nowrap">
                           {row.date}
                           {idx === 0 && (
-                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-sans font-bold">
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-sans font-semibold">
                               Bugun
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-center font-bold text-white">
+                        <td className="py-3 px-4 text-center font-semibold text-white">
                           {row.total_active}
                         </td>
                         <td className="py-3 px-4 text-center text-gray-300">
@@ -336,7 +336,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${badgeColor}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${badgeColor}`}>
                               {pct}%
                             </span>
                             <div className="w-20 sm:w-24 bg-white/10 h-1.5 rounded-full overflow-hidden hidden sm:block">
@@ -376,10 +376,10 @@ export default function AdminRetentionManager({ token }: { token: string }) {
             <div className="flex items-center gap-2.5">
               <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
               <div>
-                <span className="text-xs font-bold text-gray-200 uppercase tracking-wider block">
+                <span className="text-xs font-semibold text-gray-200 block">
                   Oxirgi Faol Foydalanuvchilar, Streak va Tariflar (Barchasi {userLimit})
                 </span>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-xs text-ui-muted">
                   Har bir mijozning uzluksiz streak kunlari, faol kunlari, tarifi va buyurtmalari
                 </span>
               </div>
@@ -397,11 +397,11 @@ export default function AdminRetentionManager({ token }: { token: string }) {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* Faol kunlar bo'yicha filter */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] text-gray-400 font-medium mr-1">Faol kun:</span>
+                  <span className="text-xs text-ui-muted font-medium mr-1">Faol kun:</span>
                   <button
                     onClick={() => setStatusFilter('all')}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                      statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-gray-400 hover:text-white'
+                      statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-ui-muted hover:text-white'
                     }`}
                   >
                     Barchasi ({data.recent_users.length})
@@ -409,7 +409,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                   <button
                     onClick={() => setStatusFilter('1_day')}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                      statusFilter === '1_day' ? 'bg-gray-600 text-white' : 'bg-white/5 text-gray-400 hover:text-white'
+                      statusFilter === '1_day' ? 'bg-gray-600 text-white' : 'bg-white/5 text-ui-muted hover:text-white'
                     }`}
                   >
                     1 kun
@@ -452,7 +452,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                     <button
                       onClick={() => setPlanFilter('all')}
                       className={`px-2 py-1 rounded-md transition ${
-                        planFilter === 'all' ? 'bg-white/20 text-white font-bold' : 'text-gray-400 hover:text-white'
+                        planFilter === 'all' ? 'bg-white/20 text-white font-semibold' : 'text-ui-muted hover:text-white'
                       }`}
                     >
                       Barcha tarif
@@ -460,7 +460,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                     <button
                       onClick={() => setPlanFilter('paid')}
                       className={`px-2 py-1 rounded-md transition ${
-                        planFilter === 'paid' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-gray-400 hover:text-white'
+                        planFilter === 'paid' ? 'bg-amber-500/20 text-amber-300 font-semibold' : 'text-ui-muted hover:text-white'
                       }`}
                     >
                       Pullik (Obuna)
@@ -468,7 +468,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                     <button
                       onClick={() => setPlanFilter('free')}
                       className={`px-2 py-1 rounded-md transition ${
-                        planFilter === 'free' ? 'bg-white/20 text-white font-bold' : 'text-gray-400 hover:text-white'
+                        planFilter === 'free' ? 'bg-white/20 text-white font-semibold' : 'text-ui-muted hover:text-white'
                       }`}
                     >
                       Free
@@ -476,7 +476,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                   </div>
 
                   <div className="relative min-w-[200px]">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ui-muted" />
                     <input
                       type="text"
                       placeholder="Ism, email, tarif, streak..."
@@ -491,7 +491,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
               {/* Users Table */}
               <div className="overflow-x-auto rounded-xl border border-white/10">
                 <table className="w-full text-left text-xs text-gray-300">
-                  <thead className="bg-white/5 text-[11px] uppercase tracking-wider text-gray-400 border-b border-white/10">
+                  <thead className="bg-white/5 text-xs text-ui-muted border-b border-white/10">
                     <tr>
                       <th className="py-2.5 px-4">Foydalanuvchi</th>
                       <th className="py-2.5 px-4 text-center">Tarif</th>
@@ -512,7 +512,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                       </tr>
                     ) : (
                       filteredUsers.map((user) => {
-                        let badgeClass = 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                        let badgeClass = 'bg-gray-500/10 text-ui-muted border-gray-500/20'
                         if (user.loyalty_status === 'loyal') {
                           badgeClass = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
                         } else if (user.loyalty_status === 'returning') {
@@ -525,7 +525,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                           <tr key={user.id} className="hover:bg-white/[0.02] transition">
                             <td className="py-3 px-4">
                               <p className="font-semibold text-white">{user.name}</p>
-                              <p className="text-[11px] text-gray-400 font-mono">
+                              <p className="text-xs text-ui-muted font-mono">
                                 {user.email || user.phone || '—'}
                               </p>
                             </td>
@@ -533,7 +533,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                             {/* Tarif (Plan) */}
                             <td className="py-3 px-4 text-center">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                className={`inline-block px-2 py-0.5 rounded-md text-xs font-semibold ${
                                   isPaidPlan
                                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                                     : 'bg-white/10 text-gray-300'
@@ -546,10 +546,10 @@ export default function AdminRetentionManager({ token }: { token: string }) {
                             {/* Streak */}
                             <td className="py-3 px-4 text-center">
                               <span
-                                className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-[11px] ${
+                                className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-xs ${
                                   user.streak >= 2
                                     ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
-                                    : 'text-gray-400'
+                                    : 'text-ui-muted'
                                 }`}
                               >
                                 {user.streak >= 2 && <Flame className="w-3 h-3 text-orange-400 fill-orange-400" />}
@@ -559,22 +559,22 @@ export default function AdminRetentionManager({ token }: { token: string }) {
 
                             {/* Total Active Days */}
                             <td className="py-3 px-4 text-center">
-                              <span className="font-bold text-white px-2 py-0.5 rounded bg-white/10">
+                              <span className="font-semibold text-white px-2 py-0.5 rounded bg-white/10">
                                 {user.active_days} kun
                               </span>
                             </td>
 
-                            <td className="py-3 px-4 font-mono text-gray-400 text-[11px] whitespace-nowrap">
+                            <td className="py-3 px-4 font-mono text-ui-muted text-xs whitespace-nowrap">
                               {user.created_at || '—'}
                             </td>
 
-                            <td className="py-3 px-4 font-mono text-gray-300 text-[11px] whitespace-nowrap">
+                            <td className="py-3 px-4 font-mono text-gray-300 text-xs whitespace-nowrap">
                               {user.last_active_at || '—'}
                             </td>
 
                             <td className="py-3 px-4 text-center font-mono font-medium text-gray-300">
                               {user.jobs_count > 0 ? (
-                                <span className="text-blue-400 font-bold">{user.jobs_count} ta</span>
+                                <span className="text-blue-400 font-semibold">{user.jobs_count} ta</span>
                               ) : (
                                 <span className="text-gray-500">0</span>
                               )}
@@ -582,7 +582,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
 
                             <td className="py-3 px-4 text-right">
                               <span
-                                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClass}`}
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeClass}`}
                               >
                                 {user.loyalty_label}
                               </span>
@@ -596,7 +596,7 @@ export default function AdminRetentionManager({ token }: { token: string }) {
               </div>
 
               {/* Ko'proq yuklash (+20) tugmasi */}
-              <div className="flex items-center justify-between pt-2 text-xs text-gray-400">
+              <div className="flex items-center justify-between pt-2 text-xs text-ui-muted">
                 <span>Ko&apos;rsatilmoqda: {filteredUsers.length} ta foydalanuvchi</span>
                 <button
                   onClick={() => setUserLimit((prev) => prev + 20)}

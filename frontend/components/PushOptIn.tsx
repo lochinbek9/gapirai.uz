@@ -33,14 +33,14 @@ export default function PushOptIn() {
   const denied = state === 'denied'
 
   return (
-    <div className="glass-card rounded-2xl p-4 border border-black/5 dark:border-white/5 flex items-center justify-between gap-3 mb-6">
+    <div className="glass-card rounded-2xl p-4 border border-ui-rule flex items-center justify-between gap-3 mb-6">
       <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${subscribed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-violet-500/10 text-violet-500'}`}>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${subscribed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
           {subscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-gray-900 dark:text-white">Bildirishnomalar</p>
-          <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate">
+          <p className="text-sm font-semibold text-ui-ink">Bildirishnomalar</p>
+          <p className="text-xs text-ui-muted truncate">
             {denied
               ? "Brauzer sozlamalaridan ruxsat bering"
               : subscribed
@@ -53,10 +53,10 @@ export default function PushOptIn() {
         <button
           onClick={toggle}
           disabled={busy}
-          className={`shrink-0 text-xs font-bold px-3.5 py-2 rounded-xl transition disabled:opacity-50 ${
+          className={`shrink-0 text-xs font-semibold px-3.5 py-2 rounded-xl transition disabled:opacity-50 ${
             subscribed
-              ? 'bg-black/5 dark:bg-white/10 text-gray-600 dark:text-slate-300'
-              : 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white'
+              ? 'bg-ui-ground text-ui-muted'
+              : ' bg-blue-500 text-white'
           }`}
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : subscribed ? "O'chirish" : 'Yoqish'}

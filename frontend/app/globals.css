@@ -2,31 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Theme Variables ──────────────────────────────── */
-:root {
-  /* Light Mode - Fresh, Airy & Premium Palette */
-  --bg-color: #f8fafc;
-  --card-bg: rgba(255, 255, 255, 0.88);
-  --accent-color: #7c3aed;
-  --accent-glow: rgba(124, 58, 237, 0.15);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --glass-border: rgba(226, 232, 240, 0.9);
-  --blob-opacity: 0.18;
-  --primary-glow: radial-gradient(circle, rgba(124, 58, 237, 0.1) 0%, transparent 70%);
-}
-
-.dark {
-  /* Dark Mode - Deep Slate & Soft Violet Glow */
-  --bg-color: #090d16;
-  --card-bg: rgba(15, 23, 42, 0.75);
-  --accent-color: #8b5cf6;
-  --accent-glow: rgba(139, 92, 246, 0.25);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --blob-opacity: 0.28;
-  --primary-glow: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
+/* ── Eski o'zgaruvchilar: yangi tokenlarga bog'langan (eski sahifalar uchun) ── */
+:root, .dark {
+  --bg-color: rgb(var(--ui-surface));
+  --card-bg: rgb(var(--ui-surface));
+  --accent-color: rgb(var(--ui-accent));
+  --accent-glow: rgb(var(--ui-accent) / 0.15);
+  --text-primary: rgb(var(--ui-ink));
+  --text-secondary: rgb(var(--ui-muted));
+  --glass-border: rgb(var(--ui-rule));
+  --blob-opacity: 0;
+  --primary-glow: none;
 }
 
 /* ── Dizayn tizimi tokenlari (DESIGN.md) ──────────────────
@@ -89,65 +75,10 @@ body {
   position: relative;
   overflow-x: hidden;
   min-height: 100vh;
-  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Mesh Gradient Background ──────────────────────── */
-.mesh-gradient {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.mesh-gradient-blob {
-  position: absolute;
-  filter: blur(140px);
-  opacity: var(--blob-opacity);
-  border-radius: 50%;
-  animation: moveBlob 25s infinite alternate ease-in-out;
-  transition: opacity 0.5s ease;
-}
-
-.blob-1 {
-  width: 700px;
-  height: 700px;
-  background: radial-gradient(circle, #8b5cf6, transparent 70%);
-  top: -180px;
-  left: -150px;
-}
-
-.blob-2 {
-  width: 650px;
-  height: 650px;
-  background: radial-gradient(circle, #6366f1, transparent 70%);
-  bottom: -180px;
-  right: -150px;
-  animation-delay: -6s;
-}
-
-.blob-3 {
-  width: 550px;
-  height: 550px;
-  background: radial-gradient(circle, #38bdf8, transparent 70%);
-  top: 35%;
-  left: 45%;
-  transform: translate(-50%, -50%);
-  opacity: calc(var(--blob-opacity) * 0.6);
-  animation-duration: 30s;
-  animation-delay: -12s;
-}
-
-@keyframes moveBlob {
-  0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(50px, -60px) scale(1.1); }
-  66% { transform: translate(-30px, 30px) scale(0.95); }
-  100% { transform: translate(0, 0) scale(1); }
-}
+/* ── Eski bezak fonlari: yangi dizaynda ishlatilmaydi ── */
+.mesh-gradient, .mesh-gradient-blob { display: none; }
 
 /* ── Scrollbar (Aniq ko'rinadigan qulay yurgich) ─── */
 ::-webkit-scrollbar {
@@ -181,50 +112,30 @@ body {
   background: rgb(var(--ui-muted) / 0.85);
 }
 ::-webkit-scrollbar-thumb:horizontal:active {
-  background: linear-gradient(90deg, #a855f7 0%, #c084fc 100%);
+  background: rgb(var(--ui-ink));
 }
 ::-webkit-scrollbar-corner {
-  background: rgba(15, 23, 42, 0.85);
+  background: transparent;
 }
 
-/* ── Glassmorphism ────────────────────────────────── */
+/* ── Eski klasslar (glass-card, glass-input, btn-premium) ──
+   Ko'p sahifada ishlatiladi; endi yangi tizimdagi karta / maydon / tugma bilan
+   bir xil ko'rinadi: shaffoflik, blur va gradient yo'q. */
 .glass-card {
-  background: var(--card-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.06), 0 0 1px 1px rgba(255, 255, 255, 0.7) inset;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgb(var(--ui-surface));
+  border: 1px solid rgb(var(--ui-rule));
+  box-shadow: none;
 }
-
-.dark .glass-card {
-  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(9, 13, 22, 0.6) 100%);
-}
-
 .glass-input {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) inset;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgb(var(--ui-surface));
+  border: 1px solid rgb(var(--ui-rule));
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-.dark .glass-input {
-  background: rgba(255, 255, 255, 0.03);
-}
-
 .glass-input:focus-within {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 25px var(--accent-glow), 0 0 0 3px rgba(124, 58, 237, 0.1);
-  background: #ffffff;
+  border-color: rgb(var(--ui-accent));
+  box-shadow: 0 0 0 3px rgb(var(--ui-accent) / 0.15);
 }
 
-.dark .glass-input:focus-within {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* ── Premium Buttons ─────────────────────────────── */
 /* Klaviatura fokusi doim ko'rinsin: o'z fokus uslubi bo'lmagan barcha
    interaktiv elementlar uchun umumiy halqa (utilities qatlamidagi
    focus-visible:ring-* bundan ustun turadi). */
@@ -236,77 +147,21 @@ body {
 }
 
 .btn-premium {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #0ea5e9 100%);
-  color: white;
-  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.35);
+  background: rgb(var(--ui-dark));
+  color: rgb(var(--ui-dark-ink));
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
-
-.btn-premium:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px -2px rgba(99, 102, 241, 0.5);
-}
-
-/* O'chirilgan holat: ilgari opacity:.5 bilan oq matn och gradientda (~1.3:1)
-   deyarli ko'rinmasdi. Endi neytral fon + o'qiladigan matn (~6:1). */
+.btn-premium:hover:not(:disabled) { opacity: 0.88; }
+.btn-premium:active:not(:disabled) { transform: translateY(1px); }
 .btn-premium:disabled {
-  background: #e2e8f0;
-  color: #475569;
-  box-shadow: none;
-  transform: none;
+  background: rgb(var(--ui-ground));
+  color: rgb(var(--ui-muted));
+  box-shadow: inset 0 0 0 1px rgb(var(--ui-rule));
   cursor: not-allowed;
 }
-.dark .btn-premium:disabled {
-  background: rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
-}
-.btn-premium:disabled::after {
-  display: none;
-}
 
-.btn-premium::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  transform: rotate(45deg);
-  transition: all 0.6s ease;
-  pointer-events: none;
-}
-
-.btn-premium:hover::after {
-  left: 100%;
-}
-
-/* Glow effects */
-.glow-accent {
-  position: relative;
-}
-.glow-accent::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(90deg, #8b5cf6, #6366f1, #0ea5e9);
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0.4;
-  filter: blur(8px);
-  transition: opacity 0.3s ease;
-}
-.glow-accent:hover::before {
-  opacity: 0.85;
-  filter: blur(12px);
-}
+/* Eski "glow" bezagi -- endi ta'sirsiz */
+.glow-accent { position: relative; }
 
 /* ── Custom Animations ────────────────────────────── */
 @keyframes shimmer {
@@ -329,7 +184,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.08),
+    rgb(var(--ui-muted) / 0.08),
     transparent
   );
   animation: shimmer 2s infinite;
@@ -397,4 +252,14 @@ body {
     border: 1px solid rgb(var(--ui-rule));
     border-radius: 16px;
   }
+  /* Uzun matnli sahifalar (shartlar, maxfiylik) */
+  .ui-prose { color: rgb(var(--ui-muted)); font-size: 0.9375rem; line-height: 1.7; }
+  .ui-prose > * + * { margin-top: 2rem; }
+  .ui-prose h2 { color: rgb(var(--ui-ink)); font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; }
+  .ui-prose section > * + * { margin-top: 0.625rem; }
+  .ui-prose strong { color: rgb(var(--ui-ink)); font-weight: 500; }
+  .ui-prose a { color: rgb(var(--ui-accent-ink)); text-decoration: underline; text-underline-offset: 3px; }
+  .ui-prose ul { list-style: disc; padding-left: 1.25rem; }
+  .ui-prose ol { list-style: decimal; padding-left: 1.25rem; }
+  .ui-prose li + li { margin-top: 0.375rem; }
 }

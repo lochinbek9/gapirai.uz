@@ -130,14 +130,14 @@ export default function BillingCard() {
   const canRenew = ov.current_plan_paid || prefs.auto_renew_plan != null
 
   return (
-    <div className="glass-card rounded-2xl p-5 sm:p-6 border border-black/5 dark:border-white/5 shadow-inner mb-6 space-y-5">
+    <div className="glass-card rounded-2xl p-5 sm:p-6 border border-ui-rule mb-6 space-y-5">
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
           <CreditCard className="w-5 h-5" />
         </div>
         <div>
-          <h3 className="font-black text-gray-900 dark:text-white">Avtomatik to'lov</h3>
-          <p className="text-[11px] text-gray-500 dark:text-slate-400">Bog'langan karta bilan obunani va daqiqani avtomatik to'ldirish</p>
+          <h3 className="font-semibold text-ui-ink">Avtomatik to'lov</h3>
+          <p className="text-xs text-ui-muted">Bog'langan karta bilan obunani va daqiqani avtomatik to'ldirish</p>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ export default function BillingCard() {
       )}
 
       {err && (
-        <div className="flex items-center justify-between gap-2 text-xs bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl px-3 py-2">
+        <div className="flex items-center justify-between gap-2 text-xs bg-red-500/10 border border-red-500/20 text-ui-red-ink rounded-xl px-3 py-2">
           <span>{err}</span>
           <button onClick={() => setErr('')}><X className="w-3.5 h-3.5" /></button>
         </div>
@@ -158,26 +158,26 @@ export default function BillingCard() {
       {/* Saqlangan kartalar */}
       <div className="space-y-2">
         {ov.cards.length === 0 && (
-          <p className="text-xs text-gray-400 dark:text-slate-500">Hali karta bog'lanmagan.</p>
+          <p className="text-xs text-ui-muted">Hali karta bog'lanmagan.</p>
         )}
         {ov.cards.map((c) => (
-          <div key={c.id} className="flex items-center gap-3 rounded-xl border border-black/5 dark:border-white/10 bg-white/50 dark:bg-white/[0.03] px-3 py-2.5">
-            <CreditCard className="w-4 h-4 text-gray-400 shrink-0" />
+          <div key={c.id} className="flex items-center gap-3 rounded-xl border border-ui-rule bg-ui-surface px-3 py-2.5">
+            <CreditCard className="w-4 h-4 text-ui-muted shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-gray-800 dark:text-slate-200 truncate">
+              <p className="text-xs font-semibold text-ui-ink truncate">
                 {cardBrand(c)} · {c.card_mask || '••••'}
                 {!c.is_active && <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">tasdiqlanmagan</span>}
               </p>
-              {c.expire && <p className="text-[10px] text-gray-400">{c.expire}</p>}
+              {c.expire && <p className="text-xs text-ui-muted">{c.expire}</p>}
             </div>
             {c.is_default && c.is_active && (
-              <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full shrink-0">asosiy</span>
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full shrink-0">asosiy</span>
             )}
             {c.is_active && !c.is_default && (
               <button onClick={() => makeDefault(c.id)} disabled={busy}
-                className="text-[10px] font-semibold text-gray-500 hover:text-violet-600 shrink-0">asosiy qilish</button>
+                className="text-xs font-semibold text-gray-500 hover:text-blue-600 shrink-0">asosiy qilish</button>
             )}
-            <button onClick={() => remove(c.id)} disabled={busy} className="text-gray-400 hover:text-red-500 shrink-0">
+            <button onClick={() => remove(c.id)} disabled={busy} className="text-ui-muted hover:text-red-500 shrink-0">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -187,19 +187,19 @@ export default function BillingCard() {
       {/* Karta qo'shish */}
       {!adding && !pendingCard && (
         <button onClick={() => setAdding(true)}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 dark:text-violet-400 hover:opacity-80">
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:opacity-80">
           <Plus className="w-4 h-4" /> Karta bog'lash
         </button>
       )}
 
       {adding && !pendingCard && (
-        <div className="rounded-xl border border-black/5 dark:border-white/10 p-4 space-y-3 bg-black/[0.015] dark:bg-white/[0.02]">
+        <div className="rounded-xl border border-ui-rule p-4 space-y-3 bg-ui-ground">
           {ov.providers.click && ov.providers.payme && (
             <div className="flex gap-2">
               {(['click', 'payme'] as const).map((p) => (
                 <button key={p} onClick={() => setProvider(p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition ${
-                    provider === p ? 'bg-violet-500 text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-500'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition ${
+                    provider === p ? 'bg-blue-500 text-white' : 'bg-ui-ground text-gray-500'}`}>
                   {p}
                 </button>
               ))}
@@ -208,14 +208,14 @@ export default function BillingCard() {
           <input
             inputMode="numeric" autoComplete="cc-number" placeholder="Karta raqami"
             value={number} onChange={(e) => setNumber(e.target.value.replace(/[^\d ]/g, ''))}
-            className="w-full px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-900 text-sm outline-none focus:border-violet-500"
+            className="w-full px-3 py-2.5 rounded-lg border border-ui-rule bg-ui-surface text-sm outline-none focus:border-blue-500"
           />
           <input
             inputMode="numeric" autoComplete="cc-exp" placeholder="Amal muddati (MM/YY)"
             value={expire} onChange={(e) => setExpire(e.target.value.replace(/[^\d/]/g, '').slice(0, 5))}
-            className="w-full px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-900 text-sm outline-none focus:border-violet-500"
+            className="w-full px-3 py-2.5 rounded-lg border border-ui-rule bg-ui-surface text-sm outline-none focus:border-blue-500"
           />
-          <label className="flex items-start gap-2 text-[11px] text-gray-500 dark:text-slate-400 cursor-pointer">
+          <label className="flex items-start gap-2 text-xs text-ui-muted cursor-pointer">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
             <span>
               Kartani bog'lashga va obunam/daqiqam tugaganda undan avtomatik to'lov yechilishiga rozilik beraman.
@@ -225,41 +225,41 @@ export default function BillingCard() {
           </label>
           <div className="flex gap-2">
             <button onClick={doBind} disabled={busy || !number || !expire}
-              className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5">
+              className="flex-1 py-2.5 rounded-lg bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
               SMS kod olish
             </button>
-            <button onClick={resetForm} className="px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-white/5 text-xs font-bold text-gray-500">Bekor</button>
+            <button onClick={resetForm} className="px-4 py-2.5 rounded-lg bg-ui-ground text-xs font-semibold text-gray-500">Bekor</button>
           </div>
         </div>
       )}
 
       {pendingCard && (
-        <div className="rounded-xl border border-black/5 dark:border-white/10 p-4 space-y-3 bg-black/[0.015] dark:bg-white/[0.02]">
-          <p className="text-xs text-gray-600 dark:text-slate-300">
+        <div className="rounded-xl border border-ui-rule p-4 space-y-3 bg-ui-ground">
+          <p className="text-xs text-ui-muted">
             {phoneHint ? <><strong>{phoneHint}</strong> raqamiga</> : 'Telefoningizga'} yuborilgan SMS kodni kiriting.
           </p>
           <input
             inputMode="numeric" placeholder="SMS kod" value={code}
             onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, '').slice(0, 8))}
-            className="w-full px-3 py-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-900 text-sm outline-none focus:border-violet-500 tracking-widest text-center"
+            className="w-full px-3 py-2.5 rounded-lg border border-ui-rule bg-ui-surface text-sm outline-none focus:border-blue-500 tracking-widest text-center"
           />
           <div className="flex gap-2">
             <button onClick={doVerify} disabled={busy || code.length < 3}
-              className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5">
+              className="flex-1 py-2.5 rounded-lg bg-blue-500 text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Tasdiqlash
             </button>
             <button onClick={() => pendingCard && resendCardCode(pendingCard.id).then((r) => setPhoneHint(r.phone_hint)).catch(() => {})}
-              disabled={busy} className="px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-white/5 text-xs font-bold text-gray-500">Qayta</button>
-            <button onClick={resetForm} className="px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-white/5 text-xs font-bold text-gray-500">Bekor</button>
+              disabled={busy} className="px-3 py-2.5 rounded-lg bg-ui-ground text-xs font-semibold text-gray-500">Qayta</button>
+            <button onClick={resetForm} className="px-3 py-2.5 rounded-lg bg-ui-ground text-xs font-semibold text-gray-500">Bekor</button>
           </div>
         </div>
       )}
 
       {/* Sozlamalar */}
       {activeCards.length > 0 && (
-        <div className="space-y-3 pt-1 border-t border-black/5 dark:border-white/10">
+        <div className="space-y-3 pt-1 border-t border-ui-rule">
           <Toggle
             label="Obunani avtomatik uzaytirish"
             hint={canRenew ? "Tarif muddati tugaganda kartadan avtomatik to'lanadi" : "Faol pullik obuna kerak"}
@@ -272,13 +272,13 @@ export default function BillingCard() {
           />
           {prefs.auto_topup_enabled && (
             <div className="flex flex-wrap gap-1.5 pl-1">
-              <span className="text-[11px] text-gray-400 self-center mr-1">Paket:</span>
+              <span className="text-xs text-ui-muted self-center mr-1">Paket:</span>
               {[null, 30, 60, 120, 300].map((p) => (
                 <button key={p ?? 'auto'} onClick={() => pickPack(p)} disabled={busy}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                     (prefs.auto_topup_pack ?? null) === p
-                      ? 'bg-violet-500 text-white'
-                      : 'bg-gray-100 dark:bg-white/5 text-gray-500'}`}>
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-ui-ground text-gray-500'}`}>
                   {p === null ? 'Avto' : PACK_LABELS[p]}
                 </button>
               ))}
@@ -296,12 +296,12 @@ function Toggle({ label, hint, on, disabled, onToggle }: {
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-bold text-gray-800 dark:text-slate-200">{label}</p>
-        <p className="text-[11px] text-gray-400 dark:text-slate-500">{hint}</p>
+        <p className="text-xs font-semibold text-ui-ink">{label}</p>
+        <p className="text-xs text-ui-muted">{hint}</p>
       </div>
       <button
         onClick={onToggle} disabled={disabled} aria-pressed={on}
-        className={`relative w-11 h-6 rounded-full shrink-0 transition ${on ? 'bg-violet-500' : 'bg-gray-300 dark:bg-white/15'} disabled:opacity-40`}>
+        className={`relative w-11 h-6 rounded-full shrink-0 transition ${on ? 'bg-blue-500' : 'bg-gray-300 dark:bg-white/15'} disabled:opacity-40`}>
         <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${on ? 'translate-x-5' : ''}`} />
       </button>
     </div>

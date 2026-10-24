@@ -25,7 +25,7 @@ export default function HowItWorksSection() {
     <section id="qanday-ishlaydi" aria-labelledby="how-it-works-title" className="w-full max-w-5xl mt-20 sm:mt-28 px-4 z-10 scroll-mt-24">
       <h2
         id="how-it-works-title"
-        className="text-2xl sm:text-4xl font-black tracking-[-0.025em] text-slate-900 dark:text-white text-center mb-10 sm:mb-14 [text-wrap:balance]"
+        className="text-2xl sm:text-4xl font-semibold tracking-[-0.025em] text-ui-ink text-center mb-10 sm:mb-14 [text-wrap:balance]"
       >
         Havoladan tayyor videogacha — uch qadam
       </h2>
@@ -34,18 +34,18 @@ export default function HowItWorksSection() {
         {/* Qadamlarni bog'lovchi chiziq: telefonda vertikal, kompyuterda gorizontal */}
         <div
           aria-hidden
-          className="absolute left-6 top-6 bottom-6 w-px sm:left-[16.66%] sm:right-[16.66%] sm:top-6 sm:bottom-auto sm:w-auto sm:h-px bg-gradient-to-b sm:bg-gradient-to-r from-blue-500/50 via-violet-500/50 to-blue-500/50"
+          className="absolute left-6 top-6 bottom-6 w-px sm:left-[16.66%] sm:right-[16.66%] sm:top-6 sm:bottom-auto sm:w-auto sm:h-px bg-blue-500/50 "
         />
         {STEPS.map((step, i) => (
           <li key={step.title} className="relative flex items-start gap-4 sm:flex-col sm:items-center sm:gap-0 sm:text-center">
-            <div className="relative z-[1] w-12 h-12 shrink-0 rounded-full bg-white dark:bg-slate-950 border border-violet-500/40 flex items-center justify-center shadow-[0_8px_24px_-10px_rgba(124,58,237,0.55)] sm:mb-5">
-              <step.icon aria-hidden className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+            <div className="relative z-[1] w-12 h-12 shrink-0 rounded-full bg-ui-surface border border-blue-500/40 flex items-center justify-center shadow-[0_8px_24px_-10px_rgba(124,58,237,0.55)] sm:mb-5">
+              <step.icon aria-hidden className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="pt-1 sm:pt-0">
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-1.5">
-                <span className="text-violet-600 dark:text-violet-400 tabular-nums">{i + 1}.</span> {step.title}
+              <h3 className="text-base sm:text-lg font-semibold text-ui-ink mb-1.5">
+                <span className="text-blue-600 dark:text-blue-400 tabular-nums">{i + 1}.</span> {step.title}
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-[36ch] sm:mx-auto">{step.desc}</p>
+              <p className="text-sm text-ui-muted leading-relaxed max-w-[36ch] sm:mx-auto">{step.desc}</p>
             </div>
           </li>
         ))}

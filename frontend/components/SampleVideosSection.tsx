@@ -93,11 +93,11 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
             >
               <span className="relative block aspect-video w-full overflow-hidden bg-ui-ground">
                 <img src={sample.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                <span className="absolute bottom-1 right-1 rounded-md bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
+                <span className="absolute bottom-1 right-1 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white tabular-nums">
                   {sample.durationText}
                 </span>
                 {isSelected && (
-                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-md bg-ui-accent px-1.5 py-0.5 text-[11px] font-medium text-white">
+                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-md bg-ui-accent px-1.5 py-0.5 text-xs font-medium text-white">
                     <Check aria-hidden="true" className="h-3 w-3" /> Tanlangan
                   </span>
                 )}

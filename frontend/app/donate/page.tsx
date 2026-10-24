@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import axios from 'axios'
-import { Heart, Loader2, ArrowLeft } from 'lucide-react'
+import { Heart, Loader2 } from 'lucide-react'
+import PageShell, { PageTitle } from '@/components/PageShell'
 import { getDonateOptions, createDonation, DonateOptions } from '@/lib/api'
 import UzumAccountCard from '@/components/UzumAccountCard'
 import PaynetOrderCard from '@/components/PaynetOrderCard'
@@ -14,8 +14,9 @@ const PROVIDER_LABEL: Record<Provider, string> = { click: 'Click', payme: 'Payme
 
 const FALLBACK: DonateOptions = { presets: [10000, 25000, 50000, 100000], min: 1000, max: 10000000 }
 
+// toLocaleString server va brauzerda turli probel beradi (hydration xatosi) -- qo'lda guruhlaymiz
 function formatSom(n: number): string {
-  return n.toLocaleString('ru-RU').replace(/,/g, ' ')
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')
 }
 
 export default function DonatePage() {
@@ -74,132 +75,103 @@ export default function DonatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white dark:from-[#15121f] dark:to-[#0f0f10]">
-      <div className="mx-auto max-w-lg px-4 py-10">
-        <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600 dark:text-gray-400">
-          <ArrowLeft className="h-4 w-4" /> Bosh sahifa
-        </Link>
+    <PageShell>
+      <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-24 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1fr_1.1fr]">
+        <PageTitle
+          title="Loyihani qoʻllab-quvvatlang"
+          lead="GapirAI.uz — mustaqil loyiha. Har bir hissa server va sunʼiy intellekt xarajatlarini qoplab, videolarni koʻproq odamga yetkazishga yordam beradi."
+        />
 
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
-            <Heart className="h-6 w-6" fill="currentColor" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-gray-900 dark:text-white">Loyihani qo‘llab-quvvatlang</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              GapirAI.uz — mustaqil loyiha. Har bir hissa videolarni ko‘proq odamga yetkazishga yordam beradi.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-          {/* Presets */}
-          <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">Summa</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {opts.presets.map((p) => {
-              const active = custom === 0 && amount === p
-              return (
-                <button
-                  key={p}
-                  onClick={() => { setAmount(p); setCustomRaw('') }}
-                  className={`rounded-xl border px-2 py-2.5 text-sm font-bold transition ${
-                    active
-                      ? 'border-violet-500 bg-violet-500 text-white'
-                      : 'border-gray-200 text-gray-700 hover:border-violet-300 dark:border-white/15 dark:text-gray-200'
-                  }`}
-                >
-                  {formatSom(p)}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-3">
-            <div className="relative">
+        <div className="ui-card p-5 sm:p-7">
+          <fieldset>
+            <legend className="ui-label mb-2.5">Summa</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {opts.presets.map((p) => {
+                const active = custom === 0 && amount === p
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => { setAmount(p); setCustomRaw('') }}
+                    className={`min-h-11 rounded-control border px-2 text-sm font-medium tabular-nums transition ${active ? 'border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]' : 'border-ui-rule text-ui-muted hover:text-ui-ink'}`}
+                  >
+                    {formatSom(p)}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="relative mt-2">
+              <label htmlFor="donate-custom" className="sr-only">Boshqa summa (soʻm)</label>
               <input
+                id="donate-custom"
                 value={customRaw}
                 onChange={(e) => setCustomRaw(e.target.value)}
                 inputMode="numeric"
                 placeholder="Boshqa summa"
-                className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none dark:bg-white/5 ${
-                  custom > 0 ? 'border-violet-500' : 'border-gray-300 dark:border-white/15'
-                }`}
+                className="ui-input min-h-11 w-full px-3 text-base placeholder:text-ui-muted focus:outline-none"
               />
               {custom > 0 && (
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                  {formatSom(custom)} so‘m
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ui-muted tabular-nums">
+                  {formatSom(custom)} soʻm
                 </span>
               )}
             </div>
-          </div>
+          </fieldset>
 
-          {/* Provider */}
-          <label className="mb-2 mt-5 block text-xs font-bold uppercase tracking-wide text-gray-500">To‘lov turi</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {PROVIDERS.map((pv) => (
-              <button
-                key={pv}
-                onClick={() => { setProvider(pv); setUzumAccount(null); setPaynetOrder(null) }}
-                className={`rounded-xl border py-2.5 text-sm font-bold transition ${
-                  provider === pv
-                    ? 'border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-300'
-                    : 'border-gray-200 text-gray-600 dark:border-white/15 dark:text-gray-300'
-                }`}
-              >
-                {PROVIDER_LABEL[pv]}
-              </button>
-            ))}
-          </div>
+          <fieldset className="mt-6">
+            <legend className="ui-label mb-2.5">Toʻlov turi</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PROVIDERS.map((pv) => (
+                <button
+                  key={pv}
+                  type="button"
+                  aria-pressed={provider === pv}
+                  onClick={() => { setProvider(pv); setUzumAccount(null); setPaynetOrder(null) }}
+                  className={`min-h-11 rounded-control border text-sm font-medium transition ${provider === pv ? 'border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]' : 'border-ui-rule text-ui-muted hover:text-ui-ink'}`}
+                >
+                  {PROVIDER_LABEL[pv]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
           {uzumAccount && <div className="mt-4"><UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} /></div>}
           {paynetOrder && <div className="mt-4"><PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} /></div>}
 
-          {/* Optional identity */}
-          <div className="mt-5 space-y-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ismingiz (ixtiyoriy)"
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500 dark:border-white/15 dark:bg-white/5"
-            />
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder="Email (rahmat xabari uchun, ixtiyoriy)"
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500 dark:border-white/15 dark:bg-white/5"
-            />
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={2}
-              placeholder="Xabar (ixtiyoriy)"
-              className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500 dark:border-white/15 dark:bg-white/5"
-            />
+          <div className="mt-6 space-y-3">
+            <div>
+              <label htmlFor="donate-name" className="ui-label mb-1.5">Ismingiz <span className="font-normal text-ui-muted">(ixtiyoriy)</span></label>
+              <input id="donate-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="ui-input min-h-11 w-full px-3 text-base focus:outline-none" />
+            </div>
+            <div>
+              <label htmlFor="donate-email" className="ui-label mb-1.5">Email <span className="font-normal text-ui-muted">(rahmat xabari uchun, ixtiyoriy)</span></label>
+              <input id="donate-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className="ui-input min-h-11 w-full px-3 text-base focus:outline-none" />
+            </div>
+            <div>
+              <label htmlFor="donate-message" className="ui-label mb-1.5">Xabar <span className="font-normal text-ui-muted">(ixtiyoriy)</span></label>
+              <textarea id="donate-message" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="ui-input w-full resize-none px-3 py-2.5 text-base focus:outline-none" />
+            </div>
           </div>
 
-          {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm font-medium text-ui-red-ink">{error}</p>}
 
-          <button
-            onClick={submit}
-            disabled={submitting || !valid}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-violet-600 py-3.5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" fill="currentColor" />}
+          <button type="button" onClick={submit} disabled={submitting || !valid} className="ui-btn ui-btn-primary mt-5 w-full">
+            {submitting ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Heart aria-hidden="true" className="h-4 w-4" />}
             {valid
               ? provider === 'uzum'
-                ? `${formatSom(effectiveAmount)} so‘m — Uzum hisob raqamini olish`
+                ? `${formatSom(effectiveAmount)} soʻm — Uzum hisob raqamini olish`
                 : provider === 'paynet'
-                  ? `${formatSom(effectiveAmount)} so‘m — Paynet buyurtma raqamini olish`
-                  : `${formatSom(effectiveAmount)} so‘m qo‘llab-quvvatlash`
+                  ? `${formatSom(effectiveAmount)} soʻm — Paynet buyurtma raqamini olish`
+                  : `${formatSom(effectiveAmount)} soʻm qoʻllab-quvvatlash`
               : 'Summani tanlang'}
           </button>
 
-          <p className="mt-3 text-center text-[11px] text-gray-400">
-            To‘lov {PROVIDER_LABEL[provider]} orqali xavfsiz amalga oshiriladi. Karta ma’lumotlari saytda saqlanmaydi.
+          <p className="mt-3 text-center text-[13px] text-ui-muted">
+            Toʻlov {PROVIDER_LABEL[provider]} orqali xavfsiz amalga oshiriladi. Karta maʼlumotlari saytda saqlanmaydi.
           </p>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

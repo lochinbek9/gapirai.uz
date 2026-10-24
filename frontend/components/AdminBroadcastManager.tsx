@@ -191,11 +191,11 @@ export default function AdminBroadcastManager({ token }: Props) {
     <section className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Send className="w-4 h-4 text-violet-400" />
             Ommaviy Xabarnoma (Broadcast)
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-ui-muted mt-0.5">
             Barcha yoki tanlangan foydalanuvchilarga Email va Telegram bot orqali xabar yuborish
           </p>
         </div>
@@ -206,7 +206,7 @@ export default function AdminBroadcastManager({ token }: Props) {
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
               activeTab === 'create'
                 ? 'bg-violet-600 text-white shadow-sm'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                : 'text-ui-muted hover:text-white hover:bg-white/5'
             }`}
           >
             Yangi xabar
@@ -216,7 +216,7 @@ export default function AdminBroadcastManager({ token }: Props) {
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
               activeTab === 'history'
                 ? 'bg-violet-600 text-white shadow-sm'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                : 'text-ui-muted hover:text-white hover:bg-white/5'
             }`}
           >
             Yuborilganlar tarixi
@@ -247,7 +247,7 @@ export default function AdminBroadcastManager({ token }: Props) {
           <div className="lg:col-span-8 bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
             {/* 1. Kanal tanlash */}
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-ui-muted mb-2">
                 1. Yuborish usuli (Kanal)
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -260,11 +260,11 @@ export default function AdminBroadcastManager({ token }: Props) {
                       : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
                   }`}
                 >
-                  <div className="flex items-center gap-2 text-violet-400 font-bold text-xs">
+                  <div className="flex items-center gap-2 text-violet-400 font-semibold text-xs">
                     <Globe className="w-4 h-4" />
                     <span>Ikkalasi</span>
                   </div>
-                  <span className="text-[11px] text-gray-400 leading-tight">Email + Telegram Bot</span>
+                  <span className="text-xs text-ui-muted leading-tight">Email + Telegram Bot</span>
                 </button>
 
                 <button
@@ -276,11 +276,11 @@ export default function AdminBroadcastManager({ token }: Props) {
                       : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
                   }`}
                 >
-                  <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                  <div className="flex items-center gap-2 text-blue-400 font-semibold text-xs">
                     <Mail className="w-4 h-4" />
                     <span>Faqat Email</span>
                   </div>
-                  <span className="text-[11px] text-gray-400 leading-tight">Resend orqali pochtaga</span>
+                  <span className="text-xs text-ui-muted leading-tight">Resend orqali pochtaga</span>
                 </button>
 
                 <button
@@ -292,18 +292,18 @@ export default function AdminBroadcastManager({ token }: Props) {
                       : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
                   }`}
                 >
-                  <div className="flex items-center gap-2 text-sky-400 font-bold text-xs">
+                  <div className="flex items-center gap-2 text-sky-400 font-semibold text-xs">
                     <MessageSquare className="w-4 h-4" />
                     <span>Faqat Bot</span>
                   </div>
-                  <span className="text-[11px] text-gray-400 leading-tight">Telegram bot chatiga</span>
+                  <span className="text-xs text-ui-muted leading-tight">Telegram bot chatiga</span>
                 </button>
               </div>
             </div>
 
             {/* 2. Auditoriya filtri */}
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-ui-muted mb-2">
                 2. Qabul qiluvchilar (Auditoriya)
               </label>
               <select
@@ -323,7 +323,7 @@ export default function AdminBroadcastManager({ token }: Props) {
             {/* 3. Xabar mavzusi va matni */}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-ui-muted mb-1.5">
                   3. Xabar mavzusi / Sarlavhasi
                 </label>
                 <input
@@ -337,10 +337,10 @@ export default function AdminBroadcastManager({ token }: Props) {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-ui-muted ">
                     Xabar matni
                   </label>
-                  <span className="text-[11px] text-gray-500">{message.length} belgi</span>
+                  <span className="text-xs text-gray-500">{message.length} belgi</span>
                 </div>
                 <textarea
                   rows={6}
@@ -367,7 +367,7 @@ export default function AdminBroadcastManager({ token }: Props) {
               {showButton && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-black/30 border border-white/10 rounded-xl">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">Tugma matni</label>
+                    <label className="block text-xs font-semibold text-ui-muted mb-1">Tugma matni</label>
                     <input
                       type="text"
                       placeholder="Saytga o'tish"
@@ -377,7 +377,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">Tugma havolasi (URL)</label>
+                    <label className="block text-xs font-semibold text-ui-muted mb-1">Tugma havolasi (URL)</label>
                     <input
                       type="url"
                       placeholder="https://gapirai.uz"
@@ -414,7 +414,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                 type="button"
                 onClick={handleTestSend}
                 disabled={testing || !title.trim() || !message.trim()}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-bold transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-semibold transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-400" />}
                 O'zimga sinov xabari yuborish (Test)
@@ -424,7 +424,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                 type="button"
                 onClick={() => setConfirmModal(true)}
                 disabled={sending || !title.trim() || !message.trim()}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-violet-600/25 transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Hamma foydalanuvchilarga yuborish
@@ -437,7 +437,7 @@ export default function AdminBroadcastManager({ token }: Props) {
             {/* Audience Card */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-ui-muted flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-blue-400" />
                   Qamrov (Auditoriya)
                 </span>
@@ -445,7 +445,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                   type="button"
                   onClick={fetchAudience}
                   disabled={loadingAudience}
-                  className="text-gray-400 hover:text-white transition"
+                  className="text-ui-muted hover:text-white transition"
                   title="Yangilash"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingAudience ? 'animate-spin' : ''}`} />
@@ -453,7 +453,7 @@ export default function AdminBroadcastManager({ token }: Props) {
               </div>
 
               {loadingAudience ? (
-                <div className="flex items-center gap-2 text-xs text-gray-400 py-3">
+                <div className="flex items-center gap-2 text-xs text-ui-muted py-3">
                   <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
                   <span>Hisoblanmoqda...</span>
                 </div>
@@ -461,7 +461,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-white/5">
                     <span className="text-xs text-gray-300">Mos kelganlar:</span>
-                    <span className="text-sm font-extrabold text-white">{audience.total_matched.toLocaleString()} ta</span>
+                    <span className="text-sm font-semibold text-white">{audience.total_matched.toLocaleString()} ta</span>
                   </div>
 
                   {channel !== 'telegram' && (
@@ -470,7 +470,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                         <Mail className="w-3.5 h-3.5" />
                         Email qabul qiluvchilar:
                       </span>
-                      <span className="text-sm font-extrabold text-blue-200">
+                      <span className="text-sm font-semibold text-blue-200">
                         {audience.email_recipients.toLocaleString()} ta
                       </span>
                     </div>
@@ -482,13 +482,13 @@ export default function AdminBroadcastManager({ token }: Props) {
                         <MessageSquare className="w-3.5 h-3.5" />
                         Telegram qabul qiluvchilar:
                       </span>
-                      <span className="text-sm font-extrabold text-sky-200">
+                      <span className="text-sm font-semibold text-sky-200">
                         {audience.telegram_recipients.toLocaleString()} ta
                       </span>
                     </div>
                   )}
 
-                  <p className="text-[11px] text-gray-400 pt-1 leading-normal">
+                  <p className="text-xs text-ui-muted pt-1 leading-normal">
                     Xabarlar oraliq tanaffus bilan fon rejimida navbat asosida xavfsiz yetkaziladi.
                   </p>
                 </div>
@@ -497,18 +497,18 @@ export default function AdminBroadcastManager({ token }: Props) {
 
             {/* Live Preview Card */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-ui-muted flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-violet-400" />
                 Jonli Ko'rinish (Preview)
               </span>
 
               <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-extrabold text-violet-300">
+                  <span className="text-xs font-semibold text-violet-300">
                     GapirAI<span className="text-white">.uz</span>
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-white leading-snug">
+                <h4 className="text-sm font-semibold text-white leading-snug">
                   {title.trim() || 'Xabar sarlavhasi'}
                 </h4>
                 <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
@@ -516,7 +516,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                 </p>
                 {showButton && buttonText.trim() && (
                   <div className="pt-2">
-                    <span className="inline-block px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold shadow">
+                    <span className="inline-block px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold shadow">
                       {buttonText}
                     </span>
                   </div>
@@ -529,7 +529,7 @@ export default function AdminBroadcastManager({ token }: Props) {
         /* History Tab */
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-ui-muted ">
               Oxirgi yuborilgan kampaniyalar ro'yxati
             </span>
             <button
@@ -543,7 +543,7 @@ export default function AdminBroadcastManager({ token }: Props) {
           </div>
 
           {loadingHistory && campaigns.length === 0 ? (
-            <div className="py-12 flex justify-center items-center text-gray-400 gap-2">
+            <div className="py-12 flex justify-center items-center text-ui-muted gap-2">
               <Loader2 className="w-5 h-5 animate-spin text-violet-500" />
               <span className="text-xs">Tarix yuklanmoqda...</span>
             </div>
@@ -562,24 +562,24 @@ export default function AdminBroadcastManager({ token }: Props) {
                   >
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-white truncate max-w-md">{camp.title}</span>
+                        <span className="text-sm font-semibold text-white truncate max-w-md">{camp.title}</span>
                         {camp.status === 'completed' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                             Yetkazildi
                           </span>
                         )}
                         {isRunning && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                             <Loader2 className="w-2.5 h-2.5 animate-spin" />
                             Yuborilmoqda...
                           </span>
                         )}
                         {camp.status === 'failed' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
                             Xatolik
                           </span>
                         )}
-                        <span className="text-[11px] text-gray-500 uppercase px-2 py-0.5 rounded bg-white/5">
+                        <span className="text-xs text-gray-500 px-2 py-0.5 rounded bg-white/5">
                           {camp.channel === 'both' ? 'Email + Bot' : camp.channel === 'email' ? 'Faqat Email' : 'Faqat Bot'}
                         </span>
                       </div>
@@ -588,7 +588,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                         {camp.message}
                       </p>
 
-                      <div className="flex items-center gap-4 text-[11px] text-gray-500 pt-1 flex-wrap">
+                      <div className="flex items-center gap-4 text-xs text-gray-500 pt-1 flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {camp.created_at ? formatTashkentDateTime(camp.created_at) : ''}
@@ -611,15 +611,15 @@ export default function AdminBroadcastManager({ token }: Props) {
                     {/* Stats pill on right */}
                     <div className="flex items-center gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
                       <div className="text-right">
-                        <div className="text-xs text-gray-400">Jami qabul qiluvchi:</div>
-                        <div className="text-sm font-extrabold text-white">{camp.total_recipients} ta</div>
+                        <div className="text-xs text-ui-muted">Jami qabul qiluvchi:</div>
+                        <div className="text-sm font-semibold text-white">{camp.total_recipients} ta</div>
                       </div>
 
                       <div className="h-8 w-px bg-white/10 hidden md:block" />
 
                       <div className="text-right">
                         <div className="text-xs text-emerald-400">Muvaffaqiyatli:</div>
-                        <div className="text-sm font-extrabold text-emerald-400">
+                        <div className="text-sm font-semibold text-emerald-400">
                           {camp.email_sent + camp.telegram_sent} ta
                         </div>
                       </div>
@@ -627,7 +627,7 @@ export default function AdminBroadcastManager({ token }: Props) {
                       {(camp.email_failed > 0 || camp.telegram_failed > 0) && (
                         <div className="text-right">
                           <div className="text-xs text-rose-400">Yetib bormadi:</div>
-                          <div className="text-sm font-extrabold text-rose-400">
+                          <div className="text-sm font-semibold text-rose-400">
                             {camp.email_failed + camp.telegram_failed} ta
                           </div>
                         </div>
@@ -643,14 +643,14 @@ export default function AdminBroadcastManager({ token }: Props) {
 
       {/* Confirmation Modal */}
       {confirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-violet-500/20 text-violet-400 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-white">Xabarnomani barchaga yuborishni tasdiqlaysizmi?</h3>
+              <h3 className="text-base font-semibold text-white">Xabarnomani barchaga yuborishni tasdiqlaysizmi?</h3>
               <p className="text-xs text-gray-300 mt-1 leading-relaxed">
                 Ushbu xabar tanlangan kanal bo'yicha{' '}
                 <strong className="text-white">
@@ -661,8 +661,8 @@ export default function AdminBroadcastManager({ token }: Props) {
             </div>
 
             <div className="p-3 rounded-xl bg-black/40 border border-white/10 space-y-1">
-              <div className="text-xs font-bold text-white truncate">{title}</div>
-              <div className="text-[11px] text-gray-400 line-clamp-2">{message}</div>
+              <div className="text-xs font-semibold text-white truncate">{title}</div>
+              <div className="text-xs text-ui-muted line-clamp-2">{message}</div>
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -676,7 +676,7 @@ export default function AdminBroadcastManager({ token }: Props) {
               <button
                 type="button"
                 onClick={handleStartBroadcast}
-                className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-xs font-bold text-white shadow-lg shadow-violet-600/30 transition flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-xs font-semibold text-white shadow-lg transition flex items-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
                 Ha, yuborishni boshlash

@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import SiteHeader from '@/components/home/SiteHeader'
+import Footer from '@/components/Footer'
 import {
   ArrowLeft, Loader2, CreditCard, AlertTriangle, Copy, Check, Clock, CircleSlash, RotateCw,
 } from 'lucide-react'
@@ -37,23 +39,23 @@ function calculateClientPrice(durationMinutes: number): number {
 // qo'shimcha, frontend-only emoji/label qatlami -- "5-daqiqalik dars"
 // hissi uchun (backend maydoniga tegilmaydi).
 const PROCESSING_LABELS: Partial<Record<string, string>> = {
-  pending: "🎬 Videoni tayyorlayapmiz",
-  downloading: "🎬 Videoni tayyorlayapmiz",
-  transcribing: "📝 Nutqni aniqlayapmiz",
-  translating: "🇺🇿 O'zbekchaga tarjima qilinmoqda",
-  syncing: "🎙️ O'zbekcha ovoz tayyorlanmoqda",
-  synthesizing: "🎙️ O'zbekcha ovoz tayyorlanmoqda",
-  merging: "✨ Darsingiz tayyorlanmoqda",
+  pending: "Videoni tayyorlayapmiz",
+  downloading: "Videoni tayyorlayapmiz",
+  transcribing: "Nutqni aniqlayapmiz",
+  translating: "O'zbekchaga tarjima qilinmoqda",
+  syncing: "O'zbekcha ovoz tayyorlanmoqda",
+  synthesizing: "O'zbekcha ovoz tayyorlanmoqda",
+  merging: "Darsingiz tayyorlanmoqda",
 }
 
 type Tab = 'video' | 'notes' | 'five' | 'quiz' | 'qa'
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'video', label: '🎬 Video' },
-  { key: 'notes', label: '📝 Konspekt' },
-  { key: 'five', label: '⚡ 5 daqiqada' },
-  { key: 'quiz', label: '🧠 Test' },
-  { key: 'qa', label: '💬 AI Ustoz' },
+  { key: 'video', label: 'Video' },
+  { key: 'notes', label: 'Konspekt' },
+  { key: 'five', label: '5 daqiqada' },
+  { key: 'quiz', label: 'Test' },
+  { key: 'qa', label: 'AI Ustoz' },
 ]
 
 /* ── Page ────────────────────────────────────────── */
@@ -265,8 +267,9 @@ export default function LearnPage() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      <div className="flex min-h-screen items-center justify-center bg-ui-surface" role="status">
+        <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
+        <span className="sr-only">Yuklanmoqda</span>
       </div>
     )
   }
@@ -277,36 +280,26 @@ export default function LearnPage() {
   const analysisReady = analysis?.status === 'completed'
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
-            aria-label="Orqaga qaytish"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-            <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
-            <span className="text-lg font-black tracking-tight text-white">
-              GapirAI<span className="text-violet-500">.uz</span>
-            </span>
-          </Link>
-        </div>
-      </header>
+    <>
+    <SiteHeader />
+    <main id="main" tabIndex={-1} className="min-h-screen bg-ui-surface text-ui-ink focus:outline-none">
+      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+        <button type="button" onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-1.5 text-sm text-ui-muted transition hover:text-ui-ink">
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Mening videolarim
+        </button>
+      </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-white mb-1">{job.video_title || "Noma'lum video"}</h1>
+          <h1 className="text-xl font-semibold text-ui-ink mb-1">{job.video_title || "Noma'lum video"}</h1>
           {job.video_duration && (
-            <span className="flex items-center gap-1 text-sm text-slate-400">
+            <span className="flex items-center gap-1 text-sm text-ui-muted">
               <Clock className="w-4 h-4" /> {formatDuration(job.video_duration)}
             </span>
           )}
         </div>
 
-        <div role="tablist" aria-label="O'quv bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">
+        <div role="tablist" aria-label="O'quv bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-ui-ground border border-ui-rule overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -315,8 +308,8 @@ export default function LearnPage() {
               aria-controls={`panel-${t.key}`}
               id={`tab-${t.key}`}
               onClick={() => handleTabChange(t.key)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-                tab === t.key ? 'bg-white/10 text-blue-400 shadow' : 'text-gray-400 hover:text-gray-200'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
+                tab === t.key ? 'bg-ui-ground text-ui-accent-ink shadow' : 'text-ui-muted hover:text-ui-ink'
               }`}
             >
               {t.label}
@@ -339,65 +332,63 @@ export default function LearnPage() {
                 className="rounded-2xl"
               />
             ) : job.status === 'awaiting_payment' ? (
-              <div className="min-h-[28rem] bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 border border-white/5 shadow-2xl relative overflow-visible">
-                <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+              <div className="min-h-[28rem] bg-ui-ground rounded-2xl flex flex-col items-center justify-center p-8 border border-ui-rule shadow-2xl relative overflow-visible">
 
                 <div className="max-w-md w-full text-center space-y-6 z-10">
                   <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-500/10 mb-2">
-                    <CreditCard className="w-7 h-7 text-blue-400 animate-pulse" />
+                    <CreditCard className="w-7 h-7 text-ui-accent-ink animate-pulse" />
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-xl font-extrabold text-white">Tarif reja kerak</h2>
-                    <p className="text-sm text-slate-400 leading-relaxed">
+                    <h2 className="text-xl font-semibold text-ui-ink">Tarif reja kerak</h2>
+                    <p className="text-sm text-ui-muted leading-relaxed">
                       Ushbu video 45 daqiqadan uzun ({job.video_duration ? formatDuration(job.video_duration) : ''}).
                       45 daqiqadan uzun videolarni dublyaj qilish uchun tarif rejalaridan biriga obuna bo'lishingiz kerak.
                     </p>
                   </div>
 
                   {paymentError && (
-                    <div className="text-xs font-semibold text-blue-400 bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 text-left">
+                    <div className="text-xs font-semibold text-ui-accent-ink bg-blue-400/10 border border-blue-400/20 rounded-xl p-3 text-left">
                       {paymentError}
                     </div>
                   )}
 
                   <Link
                     href="/pricing"
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition duration-300 shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl transition duration-300 shadow-lg"
                   >
                     Tarif rejalarini ko'rish
                   </Link>
 
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs text-ui-muted">
                     Obuna bo'lgandan so'ng, shunga o'xshash videolarni qo'shimcha to'lovsiz dublyaj qila olasiz.
                   </p>
 
                   {uzumAccount ? (
-                    <div className="bg-white/5 border border-violet-500/20 rounded-xl p-4 text-left space-y-3">
-                      <p className="text-xs font-semibold text-slate-300">
+                    <div className="bg-ui-ground border border-blue-500/20 rounded-xl p-4 text-left space-y-3">
+                      <p className="text-xs font-semibold text-ui-muted">
                         Uzum ilovasida to'lovlar bo'limidan quyidagi hisob raqamini kiriting va {uzumAccount.amount.toLocaleString('uz-UZ')} so'm to'lang:
                       </p>
                       <div className="flex items-center gap-2">
-                        <span className="flex-1 font-mono text-lg font-bold text-white bg-black/30 rounded-lg px-3 py-2 text-center tracking-wider">
+                        <span className="flex-1 font-mono text-lg font-semibold text-ui-ink bg-ui-ground rounded-lg px-3 py-2 text-center tracking-wider">
                           {uzumAccount.account}
                         </span>
                         <button
                           onClick={handleCopyUzumAccount}
-                          className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex-shrink-0"
+                          className="flex items-center justify-center w-10 h-10 rounded-lg bg-ui-ground hover:bg-white/20 text-ui-ink transition flex-shrink-0"
                           title="Nusxalash"
                           aria-label="Hisob raqamini nusxalash"
                         >
-                          {uzumCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                          {uzumCopied ? <Check className="w-4 h-4 text-ui-green-ink" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-xs text-ui-muted">
                         To'lov tasdiqlangach, bu sahifa avtomatik yangilanadi.
                       </p>
                     </div>
                   ) : (
-                    <div className="border-t border-white/10 pt-4 space-y-3">
-                      <p className="text-xs text-slate-500">
+                    <div className="border-t border-ui-rule pt-4 space-y-3">
+                      <p className="text-xs text-ui-muted">
                         Yoki ushbu video uchun bir martalik to'lov qiling{job.video_duration ? ` (${calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ')} so'm)` : ''}:
                       </p>
                       <div className="flex items-center justify-center gap-2">
@@ -442,14 +433,13 @@ export default function LearnPage() {
 
               if (isCancelled) {
                 return (
-                  <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-white/10 shadow-2xl">
-                    <div className="absolute -bottom-24 -right-24 w-56 h-56 rounded-full bg-slate-500/10 blur-3xl pointer-events-none" />
+                  <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-slate-900/95 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-white/10 shadow-2xl">
                     <div className="text-center space-y-4 max-w-md z-10 px-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 text-slate-300 mb-1 shadow-lg shadow-black/40">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/10 text-slate-300 mb-1 shadow-lg ">
                         <CircleSlash className="w-7 h-7 text-slate-400" />
                       </div>
                       <div className="space-y-2">
-                        <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayoni bekor qilindi</h3>
+                        <h3 className="text-white font-semibold text-xl tracking-tight">Dublyaj jarayoni bekor qilindi</h3>
                         <p className="text-sm text-slate-400 leading-relaxed">
                           Ushbu video uchun dublyaj jarayoni to'xtatildi. Istalgan vaqtda jarayonni qaytadan boshlashingiz mumkin.
                         </p>
@@ -464,14 +454,13 @@ export default function LearnPage() {
               }
 
               return (
-                <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-gradient-to-b from-slate-900/95 via-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
-                  <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+                <div className="min-h-[18rem] sm:min-h-0 sm:aspect-video bg-slate-900/95 rounded-2xl flex items-center justify-center p-6 relative overflow-hidden border border-rose-500/20 shadow-2xl">
                   <div className="text-center space-y-4 max-w-md z-10 px-4">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg shadow-rose-500/10">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mb-1 shadow-lg ">
                       <AlertTriangle className="w-7 h-7" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-white font-extrabold text-xl tracking-tight">Dublyaj jarayonida kutilmagan xatolik yuz berdi</h3>
+                      <h3 className="text-white font-semibold text-xl tracking-tight">Dublyaj jarayonida kutilmagan xatolik yuz berdi</h3>
                       <p className="text-sm text-slate-300 leading-relaxed">
                         {job.error_message?.toLowerCase().includes('user cancelled')
                           ? "Dublyaj jarayoni foydalanuvchi tomonidan bekor qilindi."
@@ -507,12 +496,12 @@ export default function LearnPage() {
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-[width] duration-700 ease-out"
+                        className="h-full rounded-full bg-blue-500 transition-[width] duration-700 ease-out"
                         style={{ width: `${Math.max(3, Math.min(100, job.progress || 0))}%` }}
                       />
                     </div>
                     {job.expected_end_time && (
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-xs text-ui-muted">
                         Taxminan tugash vaqti:{' '}
                         {formatTashkentTime(job.expected_end_time, false)}
                       </p>
@@ -521,7 +510,7 @@ export default function LearnPage() {
                   <button
                     onClick={handleCancel}
                     disabled={cancelLoading}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-white transition disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-ui-accent-ink hover:text-ui-ink transition disabled:opacity-50"
                   >
                     {cancelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Jarayonni bekor qilish
@@ -533,19 +522,19 @@ export default function LearnPage() {
         )}
 
         {tab === 'notes' && (
-          <div role="tabpanel" id="panel-notes" aria-labelledby="tab-notes" className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div role="tabpanel" id="panel-notes" aria-labelledby="tab-notes" className="bg-ui-ground border border-ui-rule rounded-2xl p-6">
             <NotesTab notes={notes} loading={notesLoading} onGenerate={handleGenerateNotes} />
           </div>
         )}
 
         {tab === 'five' && (
-          <div role="tabpanel" id="panel-five" aria-labelledby="tab-five" className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div role="tabpanel" id="panel-five" aria-labelledby="tab-five" className="bg-ui-ground border border-ui-rule rounded-2xl p-6">
             <FiveMinuteTab summary={analysis?.five_minute_summary ?? null} loading={!analysisReady} />
           </div>
         )}
 
         {tab === 'quiz' && (
-          <div role="tabpanel" id="panel-quiz" aria-labelledby="tab-quiz" className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div role="tabpanel" id="panel-quiz" aria-labelledby="tab-quiz" className="bg-ui-ground border border-ui-rule rounded-2xl p-6">
             <QuizTab
               quiz={quiz}
               loading={quizLoading}
@@ -560,7 +549,7 @@ export default function LearnPage() {
         )}
 
         {tab === 'qa' && (
-          <div role="tabpanel" id="panel-qa" aria-labelledby="tab-qa" className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div role="tabpanel" id="panel-qa" aria-labelledby="tab-qa" className="bg-ui-ground border border-ui-rule rounded-2xl p-6">
             <QATab
               history={qaHistory}
               question={question}
@@ -574,6 +563,8 @@ export default function LearnPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
+    <Footer />
+    </>
   )
 }

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import SiteHeader from "@/components/home/SiteHeader";
+import Footer from "@/components/Footer";
 import {
   ArrowLeft, Loader2, AlertTriangle, Search, RotateCw, LogIn, Sparkles, ArrowRight, CreditCard,
   CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X, ChevronDown, ChevronUp, Copy, Check, XCircle,
@@ -267,16 +269,16 @@ export default function VideoAnalysisPage() {
 
   if (is404) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-white/10 rounded-2xl p-6 text-center space-y-4">
-          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
-          <h2 className="text-xl font-bold text-white">Tahlil topilmadi</h2>
-          <p className="text-sm text-gray-400">
+      <div className="min-h-screen bg-ui-surface flex items-center justify-center p-4">
+        <div className="ui-card w-full max-w-md space-y-4 p-6 text-center">
+          <AlertTriangle className="w-12 h-12 text-amber-700 dark:text-amber-300 mx-auto" />
+          <h2 className="text-xl font-semibold text-ui-ink">Tahlil topilmadi</h2>
+          <p className="text-sm text-ui-muted">
             Ushbu video tahlili mavjud emas yoki o'chirilgan bo'lishi mumkin.
           </p>
           <Link
             href="/"
-            className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition"
+            className="ui-btn ui-btn-primary"
           >
             Bosh sahifaga qaytish
           </Link>
@@ -287,25 +289,25 @@ export default function VideoAnalysisPage() {
 
   if (error === "auth_required") {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-white/10 rounded-2xl p-6 text-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+      <div className="min-h-screen bg-ui-surface flex items-center justify-center p-4">
+        <div className="ui-card w-full max-w-md space-y-4 p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-ui-accent-ink flex items-center justify-center mx-auto">
             <LogIn className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-bold text-white">Tizimga kirish talab qilinadi</h2>
-          <p className="text-sm text-gray-400">
+          <h2 className="text-xl font-semibold text-ui-ink">Tizimga kirish talab qilinadi</h2>
+          <p className="text-sm text-ui-muted">
             Ushbu tahlilni ko'rish yoki uning jarayonini kuzatish uchun profilingizga kiring.
           </p>
           <div className="flex gap-3 justify-center pt-2">
             <Link
               href={`/login?returnUrl=/video-analysis/${id}`}
-              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition"
+              className="ui-btn ui-btn-primary"
             >
               Kirish
             </Link>
             <Link
               href="/"
-              className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-sm transition"
+              className="ui-btn ui-btn-secondary"
             >
               Bosh sahifa
             </Link>
@@ -317,16 +319,16 @@ export default function VideoAnalysisPage() {
 
   if (error === "forbidden") {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-800/80 border border-white/10 rounded-2xl p-6 text-center space-y-4">
-          <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto" />
-          <h2 className="text-xl font-bold text-white">Kirish cheklangan</h2>
-          <p className="text-sm text-gray-400">
+      <div className="min-h-screen bg-ui-surface flex items-center justify-center p-4">
+        <div className="ui-card w-full max-w-md space-y-4 p-6 text-center">
+          <AlertTriangle className="w-12 h-12 text-ui-red-ink mx-auto" />
+          <h2 className="text-xl font-semibold text-ui-ink">Kirish cheklangan</h2>
+          <p className="text-sm text-ui-muted">
             Ushbu tahlil shaxsiy bo'lib, faqat uning egasi ko'rishi mumkin.
           </p>
           <Link
             href="/"
-            className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition"
+            className="ui-btn ui-btn-primary"
           >
             Bosh sahifaga qaytish
           </Link>
@@ -337,9 +339,9 @@ export default function VideoAnalysisPage() {
 
   if (!analysis) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-        <span className="text-xs text-gray-400 font-medium">Yuklanmoqda...</span>
+      <div className="min-h-screen bg-ui-surface flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-ui-accent-ink animate-spin" />
+        <span className="text-xs text-ui-muted font-medium">Yuklanmoqda...</span>
       </div>
     );
   }
@@ -349,60 +351,41 @@ export default function VideoAnalysisPage() {
   const isFailed = analysis.status === "failed";
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => { clearAnalysisId(); router.push("/"); }}
-              className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white transition active:scale-95 shadow-sm"
-              aria-label="Orqaga qaytish"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <Link href="/" className="flex items-center gap-2 transition duration-300 hover:scale-105">
-              <img src="/logodark.webp" alt="GapirAI.uz Logo" width={120} height={32} className="h-8 w-auto object-contain" />
-              <span className="text-lg font-black tracking-tight text-white">
-                GapirAI<span className="text-violet-500">.uz</span>
-              </span>
-            </Link>
-          </div>
+    <>
+    <SiteHeader />
+    <main id="main" tabIndex={-1} className="min-h-screen bg-ui-surface text-ui-ink focus:outline-none">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-6 sm:px-6">
+        <button type="button" onClick={() => { clearAnalysisId(); router.push("/dashboard"); }} className="inline-flex items-center gap-1.5 text-sm text-ui-muted transition hover:text-ui-ink">
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Mening videolarim
+        </button>
+        {analysis.linked_job_id && (
+          <Link href={`/video/${analysis.linked_job_id}`} className="ui-btn ui-btn-secondary min-h-9 px-3.5 text-sm">
+            Dublyaj sahifasi <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        )}
+      </div>
 
-          {analysis.linked_job_id && (
-            <Link
-              href={`/video/${analysis.linked_job_id}`}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/25 transition active:scale-95"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden sm:inline">Dublyaj sahifasiga o'tish</span>
-              <span className="sm:hidden">Dublyaj</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          )}
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Modern Toast Notification */}
         {toast && (
           <div
             className={`p-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 transition-all duration-300 ${
               toast.type === "error"
-                ? "bg-red-950/80 border-red-500/40 text-red-200"
-                : "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+                ? "bg-red-950/80 border-red-500/40 text-ui-red-ink"
+                : "bg-emerald-950/80 border-emerald-500/40 text-ui-green-ink"
             }`}
           >
             <div className="flex items-center gap-2.5">
               {toast.type === "error" ? (
-                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-ui-red-ink shrink-0" />
               ) : (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-ui-green-ink shrink-0" />
               )}
               <p className="text-xs sm:text-sm font-semibold">{toast.message}</p>
             </div>
             <button
               onClick={() => setToast(null)}
-              className="p-1 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition"
+              className="p-1 hover:bg-ui-ground rounded-lg text-ui-muted hover:text-ui-ink transition"
             >
               <X className="w-4 h-4" />
             </button>
@@ -410,12 +393,12 @@ export default function VideoAnalysisPage() {
         )}
 
         {!isDone && !isFailed && (
-          <div className="bg-slate-800/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+          <div className="bg-ui-ground border border-ui-rule rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
             {/* Top row: Video Thumbnail & Info + Elapsed Time */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-white/10">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-ui-rule">
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 {analysis.video_thumbnail ? (
-                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-ui-ground border border-ui-rule flex-shrink-0">
                     <img
                       src={analysis.video_thumbnail}
                       alt={analysis.video_title || "Video"}
@@ -423,19 +406,19 @@ export default function VideoAnalysisPage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    <VideoIcon className="w-7 h-7 text-blue-400" />
+                  <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-ui-rule flex items-center justify-center flex-shrink-0">
+                    <VideoIcon className="w-7 h-7 text-ui-accent-ink" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-bold text-white line-clamp-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-ui-ink line-clamp-2">
                     {analysis.video_title || "Video tahlili tayyorlanmoqda..."}
                   </h3>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                  <div className="flex items-center gap-3 text-xs text-ui-muted mt-1">
                     {analysis.video_duration ? (
                       <span>Davomiyligi: {formatHumanDuration(analysis.video_duration)}</span>
                     ) : null}
-                    <span className="flex items-center gap-1 text-blue-400 font-medium">
+                    <span className="flex items-center gap-1 text-ui-accent-ink font-medium">
                       <Clock className="w-3.5 h-3.5" /> {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
                     </span>
                   </div>
@@ -444,10 +427,10 @@ export default function VideoAnalysisPage() {
 
               <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
                 <div className="flex items-center sm:flex-col sm:items-end gap-2 sm:gap-0.5">
-                  <span className="text-2xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                  <span className="text-2xl font-semibold text-ui-ink">
                     {Math.round(analysis.progress)}%
                   </span>
-                  <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-ui-green-ink flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
                     Jarayonda
                   </span>
@@ -455,7 +438,7 @@ export default function VideoAnalysisPage() {
                 <button
                   onClick={handleCancel}
                   disabled={cancelling}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-rose-300 hover:text-rose-200 transition active:scale-95 disabled:opacity-50 shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-ui-red-ink hover:text-ui-red-ink transition active:scale-95 disabled:opacity-50 shadow-sm"
                   title="Tahlilni to'xtatish va bekor qilish"
                 >
                   {cancelling ? (
@@ -470,13 +453,13 @@ export default function VideoAnalysisPage() {
 
             {/* Glowing Progress Bar */}
             <div className="space-y-2">
-              <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden p-0.5 border border-white/10">
+              <div className="w-full h-2.5 rounded-full bg-ui-ground overflow-hidden p-0.5 border border-ui-rule">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(139,92,246,0.5)]"
+                  className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(139,92,246,0.5)]"
                   style={{ width: `${Math.max(5, analysis.progress)}%` }}
                 />
               </div>
-              <div className="flex justify-between items-center text-xs text-gray-400">
+              <div className="flex justify-between items-center text-xs text-ui-muted">
                 <span>{analysis.status_message || ANALYSIS_STATUS_LABELS[analysis.status]}</span>
                 <span>Taxminan: 30-60 soniya</span>
               </div>
@@ -520,35 +503,35 @@ export default function VideoAnalysisPage() {
                     key={stage.idx}
                     className={`relative p-3.5 rounded-2xl border transition-all duration-300 ${
                       isCurrent
-                        ? "bg-gradient-to-b from-blue-500/15 to-violet-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/30"
+                        ? " bg-blue-500/15 border-blue-500/40 shadow-lg ring-1 ring-blue-500/30"
                         : isPassed
-                        ? "bg-emerald-500/5 border-emerald-500/30 text-gray-300"
-                        : "bg-white/[0.02] border-white/5 opacity-60 text-gray-500"
+                        ? "bg-emerald-500/5 border-emerald-500/30 text-ui-muted"
+                        : "bg-ui-ground border-ui-rule opacity-60 text-ui-muted"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 mb-1.5">
                       <div
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
                           isCurrent
-                            ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 animate-pulse"
+                            ? "bg-blue-500 text-white shadow-md animate-pulse"
                             : isPassed
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                            : "bg-white/10 text-gray-400"
+                            ? "bg-ui-green/10 text-ui-green-ink border border-emerald-500/40"
+                            : "bg-ui-ground text-ui-muted"
                         }`}
                       >
                         {isPassed ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <CheckCircle2 className="w-4 h-4 text-ui-green-ink" />
                         ) : isCurrent ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <Loader2 className="w-4 h-4 animate-spin text-ui-ink" />
                         ) : (
                           <StageIcon className="w-3.5 h-3.5" />
                         )}
                       </div>
-                      <span className={`text-xs font-bold leading-tight ${isCurrent ? "text-white" : isPassed ? "text-gray-200" : "text-gray-400"}`}>
+                      <span className={`text-xs font-semibold leading-tight ${isCurrent ? "text-ui-ink" : isPassed ? "text-ui-ink" : "text-ui-muted"}`}>
                         {stage.title}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 leading-tight pl-9">
+                    <p className="text-xs text-ui-muted leading-tight pl-9">
                       {stage.desc}
                     </p>
                   </div>
@@ -557,19 +540,19 @@ export default function VideoAnalysisPage() {
             </div>
 
             {/* Rotating Tips Box & Cancel */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-ui-ground border border-ui-rule">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <Sparkles className="w-4 h-4 text-amber-700 dark:text-amber-300" />
                 </div>
-                <p className="text-xs text-gray-300 transition-all duration-500">
+                <p className="text-xs text-ui-muted transition-all duration-500">
                   {ANALYSIS_TIPS[tipIndex]}
                 </p>
               </div>
               <button
                 onClick={handleCancel}
                 disabled={cancelling}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-xs font-semibold text-gray-400 hover:text-rose-300 transition shrink-0 active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-ui-ground hover:bg-rose-500/10 border border-ui-rule hover:border-rose-500/30 text-xs font-semibold text-ui-muted hover:text-ui-red-ink transition shrink-0 active:scale-95 disabled:opacity-50"
                 title="Tahlilni to'xtatish"
               >
                 {cancelling ? (
@@ -584,16 +567,14 @@ export default function VideoAnalysisPage() {
         )}
 
         {isFailed && (
-          <div className="relative overflow-hidden rounded-3xl border border-rose-500/20 bg-gradient-to-b from-rose-950/20 via-slate-900/90 to-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl space-y-8">
+          <div className="relative overflow-hidden rounded-2xl border border-rose-500/20 bg-rose-950/20 p-6 sm:p-10 shadow-2xl space-y-8">
             {/* Ambient Background Glow */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Top Video Header Card */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10 relative z-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-ui-rule relative z-10">
               <div className="flex items-center gap-4 min-w-0">
                 {analysis.video_thumbnail ? (
-                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 shadow-md">
+                  <div className="relative w-24 sm:w-28 aspect-video rounded-xl overflow-hidden bg-ui-ground border border-ui-rule flex-shrink-0 shadow-md">
                     <img
                       src={analysis.video_thumbnail}
                       alt={analysis.video_title || "Video"}
@@ -603,28 +584,28 @@ export default function VideoAnalysisPage() {
                   </div>
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
-                    <VideoIcon className="w-6 h-6 text-rose-400" />
+                    <VideoIcon className="w-6 h-6 text-ui-red-ink" />
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-lg">
+                  <h3 className="text-sm sm:text-base font-semibold text-ui-ink truncate max-w-lg">
                     {analysis.video_title || "YouTube Video"}
                   </h3>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 font-mono">
+                  <div className="flex items-center gap-2 mt-1 text-xs text-ui-muted font-mono">
                     {analysis.video_duration && analysis.video_duration > 0 && (
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-gray-500" />
+                        <Clock className="w-3.5 h-3.5 text-ui-muted" />
                         {formatHumanDuration(analysis.video_duration)}
                       </span>
                     )}
                     <span>•</span>
-                    <span className="truncate max-w-[200px] text-gray-500">{analysis.youtube_url}</span>
+                    <span className="truncate max-w-[200px] text-ui-muted">{analysis.youtube_url}</span>
                   </div>
                 </div>
               </div>
 
               {/* Status Badge */}
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold shrink-0">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-ui-red-ink text-xs font-semibold shrink-0">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                 <span>Tahlil to'xtatildi</span>
               </div>
@@ -632,13 +613,13 @@ export default function VideoAnalysisPage() {
 
             {/* Error Message & Friendly Diagnosis */}
             <div className="text-center max-w-xl mx-auto space-y-3 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/5">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-ui-red-ink flex items-center justify-center mx-auto shadow-lg ">
                 <AlertTriangle className="w-7 h-7" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-semibold text-ui-ink tracking-tight">
                 Tahlil jarayonida to'xtalish yuz berdi
               </h2>
-              <p className="text-sm text-gray-300 leading-relaxed">
+              <p className="text-sm text-ui-muted leading-relaxed">
                 Video hajmi katta bo'lgani yoki sun'iy intellekt serverlarida vaqtinchalik yuklama yuqori bo'lgani sababli jarayon to'xtab qoldi.
                 Balansingizdagi daqiqalar saqlab qolingan.
               </p>
@@ -649,7 +630,7 @@ export default function VideoAnalysisPage() {
               <button
                 onClick={handleRetry}
                 disabled={retrying}
-                className="inline-flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 active:scale-95 transition-all duration-300 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-xl active:scale-95 transition-all duration-300 disabled:opacity-50"
               >
                 {retrying ? (
                   <>
@@ -667,16 +648,16 @@ export default function VideoAnalysisPage() {
               <button
                 onClick={handleCancel}
                 disabled={cancelling}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 text-gray-300 hover:text-rose-200 font-semibold text-sm transition active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-ui-ground hover:bg-rose-500/15 border border-ui-rule hover:border-rose-500/40 text-ui-muted hover:text-ui-red-ink font-semibold text-sm transition active:scale-95 disabled:opacity-50"
               >
                 {cancelling ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                    <Loader2 className="w-4 h-4 animate-spin text-ui-red-ink" />
                     <span>Bekor qilinmoqda...</span>
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-4 h-4 text-rose-400" />
+                    <XCircle className="w-4 h-4 text-ui-red-ink" />
                     <span>Tahlilni bekor qilish</span>
                   </>
                 )}
@@ -684,7 +665,7 @@ export default function VideoAnalysisPage() {
 
               <button
                 onClick={() => { clearAnalysisId(); router.push("/"); }}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white font-semibold text-sm transition active:scale-95"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-ui-muted hover:text-ui-ink font-semibold text-sm transition active:scale-95"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Boshqa video tahlil qilish</span>
@@ -692,33 +673,33 @@ export default function VideoAnalysisPage() {
             </div>
 
             {/* Collapsible Technical Details */}
-            <div className="pt-2 border-t border-white/5 relative z-10">
+            <div className="pt-2 border-t border-ui-rule relative z-10">
               <button
                 onClick={() => setShowTechDetails((prev) => !prev)}
-                className="flex items-center justify-center gap-2 mx-auto text-xs text-gray-400 hover:text-gray-200 font-medium py-1 transition"
+                className="flex items-center justify-center gap-2 mx-auto text-xs text-ui-muted hover:text-ui-ink font-medium py-1 transition"
               >
                 <span>Texnik xatolik tafsilotlari</span>
                 {showTechDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
 
               {showTechDetails && (
-                <div className="mt-3 p-4 rounded-2xl bg-black/40 border border-white/10 text-left space-y-2 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono pb-2 border-b border-white/5">
+                <div className="mt-3 p-4 rounded-2xl bg-ui-ground border border-ui-rule text-left space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs text-ui-muted font-mono pb-2 border-b border-ui-rule">
                     <span>ID: {analysis.id}</span>
                     <button
                       onClick={() => handleCopyError(`${analysis.error_message || ''}\nCode: ${analysis.error_code || ''}\nID: ${analysis.id}`)}
-                      className="flex items-center gap-1 text-gray-400 hover:text-white transition"
+                      className="flex items-center gap-1 text-ui-muted hover:text-ui-ink transition"
                     >
-                      {copiedError ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedError ? <Check className="w-3.5 h-3.5 text-ui-green-ink" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copiedError ? "Nusxalandi" : "Nusxa olish"}</span>
                     </button>
                   </div>
                   {analysis.error_code && (
-                    <p className="text-xs font-mono text-rose-300">
-                      Kod: <span className="text-white font-bold">{analysis.error_code}</span>
+                    <p className="text-xs font-mono text-ui-red-ink">
+                      Kod: <span className="text-ui-ink font-semibold">{analysis.error_code}</span>
                     </p>
                   )}
-                  <p className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                  <p className="text-xs font-mono text-ui-muted whitespace-pre-wrap break-words leading-relaxed">
                     {analysis.error_message || "Noma'lum xatolik yuz berdi."}
                   </p>
                 </div>
@@ -726,12 +707,12 @@ export default function VideoAnalysisPage() {
             </div>
 
             {/* Helpful Advice Banner */}
-            <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-start sm:items-center gap-3 text-xs text-gray-300 relative z-10">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400">
+            <div className="p-3.5 rounded-2xl bg-ui-ground border border-ui-rule flex items-start sm:items-center gap-3 text-xs text-ui-muted relative z-10">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-ui-accent-ink">
                 <Sparkles className="w-4 h-4" />
               </div>
               <p className="leading-relaxed">
-                <span className="font-semibold text-white">Foydali tavsiya:</span> Katta hajmdagi videolarda (1 soatdan ortiq) AI tahlili bo'lib-bo'lib amalga oshiriladi. <strong>«Qaytadan urinish»</strong> tugmasini bosganingizda tizim avtomatik ravishda optimal modelni ishga tushiradi.
+                <span className="font-semibold text-ui-ink">Foydali tavsiya:</span> Katta hajmdagi videolarda (1 soatdan ortiq) AI tahlili bo'lib-bo'lib amalga oshiriladi. <strong>«Qaytadan urinish»</strong> tugmasini bosganingizda tizim avtomatik ravishda optimal modelni ishga tushiradi.
               </p>
             </div>
           </div>
@@ -746,22 +727,22 @@ export default function VideoAnalysisPage() {
                 ref={htmlVideoRef}
                 src={analysis.video_url}
                 controls
-                className="w-full aspect-video rounded-2xl bg-black object-contain shadow-2xl border border-white/10"
+                className="w-full aspect-video rounded-2xl bg-black object-contain shadow-2xl border border-ui-rule"
               />
             ) : (
-              <div className="aspect-video bg-black rounded-2xl flex items-center justify-center text-gray-500 text-sm">
+              <div className="aspect-video bg-black rounded-2xl flex items-center justify-center text-ui-muted text-sm">
                 Video ko'rsatib bo'lmadi
               </div>
             )}
 
-            <h1 className="text-xl font-bold text-white">{analysis.video_title}</h1>
-            <div className="flex flex-wrap gap-2 text-[11px] font-bold text-gray-400">
+            <h1 className="text-xl font-semibold text-ui-ink">{analysis.video_title}</h1>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold text-ui-muted">
               {analysis.video_language && (
-                <span className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
+                <span className="bg-ui-ground border border-ui-rule rounded-lg px-2.5 py-1">
                   Original: {displayLanguage(analysis.video_language)}
                 </span>
               )}
-              <span className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
+              <span className="bg-ui-ground border border-ui-rule rounded-lg px-2.5 py-1">
                 Tahlil: {displayLanguage(analysis.language)}
               </span>
             </div>
@@ -792,27 +773,27 @@ export default function VideoAnalysisPage() {
 
               if (neededMinutes <= 0) {
                 return (
-                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-600/20 via-teal-600/20 to-blue-600/20 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-emerald-500/10">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg ">
                     <div className="space-y-1 text-center sm:text-left">
                       <div className="flex items-center justify-center sm:justify-start gap-2">
-                        <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                        <span className="text-xs font-semibold text-ui-green-ink bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
                           🎙️ Ovozli Dublyaj
                         </span>
-                        <span className="text-[11px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <span className="text-xs text-ui-green-ink font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full">
                           Balansingiz yetarli ({availableMinutes} daqiqa)
                         </span>
                       </div>
-                      <h3 className="text-sm sm:text-base font-extrabold text-white">
+                      <h3 className="text-sm sm:text-base font-semibold text-ui-ink">
                         Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
                       </h3>
-                      <p className="text-xs text-gray-300">
-                        Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa). Balansingizdagi daqiqalar yetarli — videoni to&apos;liq dublyaj qilishingiz mumkin.
+                      <p className="text-xs text-ui-muted">
+                        Video davomiyligi: <strong className="text-ui-ink">{formattedDur}</strong> ({videoMinutes} daqiqa). Balansingizdagi daqiqalar yetarli — videoni to&apos;liq dublyaj qilishingiz mumkin.
                       </p>
                     </div>
 
                     <Link
                       href={analysis.linked_job_id ? `/video/${analysis.linked_job_id}` : `/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
-                      className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+                      className="btn-premium px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shrink-0"
                     >
                       <Sparkles size={16} />
                       <span>{analysis.linked_job_id ? "Tayyor dublyajni ochish" : "O'zbekcha dublyaj qilish"}</span>
@@ -823,38 +804,38 @@ export default function VideoAnalysisPage() {
               }
 
               return (
-                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+                <div className="p-4 sm:p-5 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg ">
                   <div className="space-y-2 text-center md:text-left max-w-2xl">
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2.5 py-0.5 rounded-full">
+                      <span className="text-xs font-semibold text-ui-accent-ink bg-blue-500/20 px-2.5 py-0.5 rounded-full">
                         🎙️ Ovozli Dublyaj
                       </span>
                       {recPack && (
-                        <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <span className="text-xs text-ui-green-ink font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full">
                           Tavsiya paket: +{recPack.minutes} daqiqa ({recPack.price.toLocaleString("uz-UZ")} so&apos;m)
                         </span>
                       )}
                       {recPlan && (
-                        <span className="text-[11px] text-violet-300 font-bold bg-violet-500/10 px-2 py-0.5 rounded-full">
+                        <span className="text-xs text-ui-accent-ink font-semibold bg-blue-500/10 px-2 py-0.5 rounded-full">
                           yoki {recPlan.name} tarifi ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy)
                         </span>
                       )}
                     </div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-white">
+                    <h3 className="text-sm sm:text-base font-semibold text-ui-ink">
                       Ushbu videoni to&apos;liq o&apos;zbekcha ovozda eshitishni xohlaysizmi?
                     </h3>
-                    <p className="text-xs text-gray-300 leading-relaxed">
-                      Video davomiyligi: <strong className="text-white">{formattedDur}</strong> ({videoMinutes} daqiqa).{" "}
+                    <p className="text-xs text-ui-muted leading-relaxed">
+                      Video davomiyligi: <strong className="text-ui-ink">{formattedDur}</strong> ({videoMinutes} daqiqa).{" "}
                       Balansingizda {availableMinutes} daqiqa mavjud — to&apos;liq dublyaj qilish uchun{" "}
-                      <strong className="text-amber-300">{neededMinutes} daqiqa</strong> yetishmayapti.{" "}
+                      <strong className="text-amber-700 dark:text-amber-300">{neededMinutes} daqiqa</strong> yetishmayapti.{" "}
                       Ushbu videoni dublyaj qilish uchun{" "}
                       {recPack && (
                         <>
-                          <strong className="text-emerald-300">+{recPack.minutes} daqiqalik paketni</strong> ({recPack.price.toLocaleString("uz-UZ")} so&apos;m) olishni{" "}
+                          <strong className="text-ui-green-ink">+{recPack.minutes} daqiqalik paketni</strong> ({recPack.price.toLocaleString("uz-UZ")} so&apos;m) olishni{" "}
                         </>
                       )}
                       yoki{" "}
-                      <strong className="text-violet-300">{recPlan.name} tarifiga</strong> ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy) o&apos;tishni tavsiya qilamiz!
+                      <strong className="text-ui-accent-ink">{recPlan.name} tarifiga</strong> ({recPlan.price.toLocaleString("uz-UZ")} so&apos;m/oy) o&apos;tishni tavsiya qilamiz!
                     </p>
                   </div>
 
@@ -862,7 +843,7 @@ export default function VideoAnalysisPage() {
                     {analysis.linked_job_id ? (
                       <Link
                         href={`/video/${analysis.linked_job_id}`}
-                        className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                        className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all"
                       >
                         <Sparkles size={15} />
                         <span>Dublyaj sahifasiga o'tish</span>
@@ -872,16 +853,16 @@ export default function VideoAnalysisPage() {
                       <>
                         <Link
                           href={`/pricing?reason=insufficient_minutes&short=${encodeURIComponent(neededMinutes)}&duration=${encodeURIComponent(videoMinutes)}`}
-                          className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95 transition-all"
+                          className="btn-premium w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all"
                         >
                           <CreditCard size={15} />
                           <span>Paket yoki tarif olish</span>
                         </Link>
                         <Link
                           href={`/?url=${encodeURIComponent(analysis.youtube_url)}&mode=dub`}
-                          className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-bold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-white/10"
+                          className="w-full sm:w-auto px-4 py-3 rounded-xl bg-ui-ground hover:bg-white/15 text-ui-ink text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-1.5 transition-all border border-ui-rule"
                         >
-                          <Sparkles size={14} className="text-amber-400" />
+                          <Sparkles size={14} className="text-amber-700 dark:text-amber-300" />
                           <span>2 daqiqa bepul sinash</span>
                           <ArrowRight size={13} />
                         </Link>
@@ -892,7 +873,7 @@ export default function VideoAnalysisPage() {
               );
             })()}
 
-            <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 overflow-x-auto">
+            <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-ui-ground border border-ui-rule overflow-x-auto">
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -901,8 +882,8 @@ export default function VideoAnalysisPage() {
                   aria-controls={`panel-${t.key}`}
                   id={`tab-${t.key}`}
                   onClick={() => setTab(t.key)}
-                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-                    tab === t.key ? "bg-white/10 text-blue-400 shadow" : "text-gray-400 hover:text-gray-200"
+                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
+                    tab === t.key ? "bg-ui-ground text-ui-accent-ink shadow" : "text-ui-muted hover:text-ui-ink"
                   }`}
                 >
                   {t.label}
@@ -910,37 +891,37 @@ export default function VideoAnalysisPage() {
               ))}
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-ui-ground border border-ui-rule rounded-2xl p-6">
               {tab === "summary" && analysis.summary && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Qisqa</h3>
-                    <p className="text-gray-200 text-sm leading-relaxed">{analysis.summary.short}</p>
+                    <h3 className="text-xs font-semibold text-ui-accent-ink mb-2">Qisqa</h3>
+                    <p className="text-ui-ink text-sm leading-relaxed">{analysis.summary.short}</p>
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">O'rtacha</h3>
-                    <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{analysis.summary.medium}</p>
+                    <h3 className="text-xs font-semibold text-ui-accent-ink mb-2">O'rtacha</h3>
+                    <p className="text-ui-ink text-sm leading-relaxed whitespace-pre-line">{analysis.summary.medium}</p>
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Batafsil</h3>
-                    <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">{analysis.summary.detailed}</p>
+                    <h3 className="text-xs font-semibold text-ui-accent-ink mb-2">Batafsil</h3>
+                    <p className="text-ui-ink text-sm leading-relaxed whitespace-pre-line">{analysis.summary.detailed}</p>
                   </div>
                   {analysis.key_points && analysis.key_points.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">Asosiy fikrlar</h3>
+                      <h3 className="text-xs font-semibold text-ui-accent-ink mb-3">Asosiy fikrlar</h3>
                       <div className="space-y-2">
                         {analysis.key_points.map((kp, i) => (
                           <button
                             key={i}
                             onClick={() => seek(kp.timestamp)}
-                            className="w-full text-left flex gap-3 items-start bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 rounded-xl p-3 transition"
+                            className="w-full text-left flex gap-3 items-start bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                           >
-                            <span className="text-[11px] font-mono text-blue-400 bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
+                            <span className="text-xs font-mono text-ui-accent-ink bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
                               {formatTs(kp.timestamp)}
                             </span>
                             <div>
-                              <p className="text-sm font-bold text-white">{kp.title}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">{kp.description}</p>
+                              <p className="text-sm font-semibold text-ui-ink">{kp.title}</p>
+                              <p className="text-xs text-ui-muted mt-0.5">{kp.description}</p>
                             </div>
                           </button>
                         ))}
@@ -956,14 +937,14 @@ export default function VideoAnalysisPage() {
                     <button
                       key={i}
                       onClick={() => seek(c.start)}
-                      className="w-full text-left flex justify-between items-center bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 rounded-xl p-3 transition"
+                      className="w-full text-left flex justify-between items-center bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                     >
-                      <span className="text-sm font-bold text-white">{c.title}</span>
-                      <span className="text-[11px] font-mono text-blue-400">{formatTs(c.start)}</span>
+                      <span className="text-sm font-semibold text-ui-ink">{c.title}</span>
+                      <span className="text-xs font-mono text-ui-accent-ink">{formatTs(c.start)}</span>
                     </button>
                   ))}
                   {(!analysis.chapters || analysis.chapters.length === 0) && (
-                    <p className="text-sm text-gray-500">Boblar topilmadi.</p>
+                    <p className="text-sm text-ui-muted">Boblar topilmadi.</p>
                   )}
                 </div>
               )}
@@ -971,16 +952,16 @@ export default function VideoAnalysisPage() {
               {tab === "transcript" && (
                 <div className="space-y-4">
                   {analysis.video_language && analysis.video_language !== analysis.language && (
-                    <div className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
+                    <div className="flex gap-1 p-1 rounded-xl bg-ui-ground border border-ui-rule w-fit">
                       <button
                         onClick={() => setTranscriptView("normal")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${transcriptView === "normal" ? "bg-white/10 text-blue-400" : "text-gray-400 hover:text-gray-200"}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${transcriptView === "normal" ? "bg-ui-ground text-ui-accent-ink" : "text-ui-muted hover:text-ui-ink"}`}
                       >
                         Oddiy
                       </button>
                       <button
                         onClick={handleToggleBilingual}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${transcriptView === "bilingual" ? "bg-white/10 text-blue-400" : "text-gray-400 hover:text-gray-200"}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${transcriptView === "bilingual" ? "bg-ui-ground text-ui-accent-ink" : "text-ui-muted hover:text-ui-ink"}`}
                       >
                         Bilingual
                       </button>
@@ -990,16 +971,16 @@ export default function VideoAnalysisPage() {
                   {transcriptView === "normal" ? (
                     <>
                       <form onSubmit={handleSearch} className="flex gap-2">
-                        <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-                          <Search className="w-4 h-4 text-gray-500" />
+                        <div className="flex-1 flex items-center gap-2 bg-ui-ground border border-ui-rule rounded-xl px-3 py-2">
+                          <Search className="w-4 h-4 text-ui-muted" />
                           <input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Transkript ichidan qidirish..."
-                            className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+                            className="flex-1 bg-transparent text-sm text-ui-ink placeholder:text-ui-muted focus:outline-none"
                           />
                         </div>
-                        <button type="submit" className="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition">
+                        <button type="submit" className="px-4 py-2 rounded-xl bg-blue-500/20 text-ui-accent-ink text-sm font-semibold hover:bg-blue-500/30 transition">
                           Qidirish
                         </button>
                       </form>
@@ -1008,19 +989,19 @@ export default function VideoAnalysisPage() {
                           <button
                             key={i}
                             onClick={() => seek(seg.start)}
-                            className="w-full text-left flex gap-3 items-start hover:bg-white/[0.04] rounded-lg p-2 transition"
+                            className="w-full text-left flex gap-3 items-start hover:bg-ui-ground rounded-lg p-2 transition"
                           >
-                            <span className="text-[11px] font-mono text-blue-400 shrink-0 mt-0.5">{formatTs(seg.start)}</span>
-                            <span className="text-sm text-gray-300">{seg.text}</span>
+                            <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                            <span className="text-sm text-ui-muted">{seg.text}</span>
                           </button>
                         ))}
                         {searchResults?.length === 0 && (
-                          <p className="text-sm text-gray-500">Hech narsa topilmadi.</p>
+                          <p className="text-sm text-ui-muted">Hech narsa topilmadi.</p>
                         )}
                       </div>
                     </>
                   ) : bilingualLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-400 py-6">
+                    <div className="flex items-center gap-2 text-sm text-ui-muted py-6">
                       <Loader2 className="w-4 h-4 animate-spin" /> Bilingual ko'rinish tayyorlanmoqda...
                     </div>
                   ) : (
@@ -1029,12 +1010,12 @@ export default function VideoAnalysisPage() {
                         <button
                           key={i}
                           onClick={() => seek(seg.start)}
-                          className="w-full text-left flex gap-3 items-start hover:bg-white/[0.04] rounded-lg p-2.5 transition border border-white/5"
+                          className="w-full text-left flex gap-3 items-start hover:bg-ui-ground rounded-lg p-2.5 transition border border-ui-rule"
                         >
-                          <span className="text-[11px] font-mono text-blue-400 shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                          <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{formatTs(seg.start)}</span>
                           <div className="space-y-1">
-                            <p className="text-sm text-white">{seg.original}</p>
-                            <p className="text-sm text-gray-400">{seg.translated}</p>
+                            <p className="text-sm text-ui-ink">{seg.original}</p>
+                            <p className="text-sm text-ui-muted">{seg.translated}</p>
                           </div>
                         </button>
                       ))}
@@ -1094,6 +1075,8 @@ export default function VideoAnalysisPage() {
         cancelText="Ortga"
         danger
       />
-    </div>
+    </main>
+    <Footer />
+    </>
   );
 }

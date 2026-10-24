@@ -26,7 +26,7 @@ export default function ThemeToggle({ tone = "default" }: { tone?: "default" | "
       whileTap={{ scale: 0.95 }}
       className={tone === "plain"
         ? "w-9 h-9 flex items-center justify-center rounded-lg text-ui-muted hover:bg-ui-ground hover:text-ui-ink transition cursor-pointer"
-        : "w-10 h-10 flex items-center justify-center rounded-2xl bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-gray-900 dark:text-white shadow-sm transition-all duration-300 backdrop-blur-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"}
+        : "w-10 h-10 flex items-center justify-center rounded-2xl bg-ui-surface hover:bg-white dark:hover:bg-white/20 border border-blue-500/20 dark:border-white/15 text-ui-ink shadow-sm transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"}
       aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
     >
       <AnimatePresence mode="wait">
@@ -38,7 +38,7 @@ export default function ThemeToggle({ tone = "default" }: { tone?: "default" | "
             exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
             transition={{ duration: 0.2 }}
           >
-            <Moon aria-hidden="true" className={tone === "plain" ? "w-4 h-4" : "w-4 h-4 text-blue-500 dark:text-blue-400"} />
+            <Moon aria-hidden="true" className={tone === "plain" ? "w-4 h-4" : "w-4 h-4 text-ui-accent-ink"} />
           </motion.div>
         ) : (
           <motion.div

@@ -49,7 +49,7 @@ export default function MobileNavMenu({ tone = 'default' }: { tone?: 'default' |
         aria-label={open ? 'Menyuni yopish' : 'Menyu'}
         className={tone === 'plain'
           ? 'flex items-center justify-center w-9 h-9 rounded-lg text-ui-muted hover:bg-ui-ground hover:text-ui-ink transition'
-          : 'flex items-center justify-center w-10 h-10 bg-white/90 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white rounded-xl shadow-sm transition backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500'}
+          : 'flex items-center justify-center w-10 h-10 bg-ui-surface hover:bg-white dark:hover:bg-white/20 border border-ui-rule text-ui-ink rounded-xl shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'}
       >
         {open ? <X aria-hidden="true" className="w-5 h-5" /> : <Menu aria-hidden="true" className="w-5 h-5" />}
       </button>

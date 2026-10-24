@@ -27,21 +27,21 @@ export default function ProgressBar({ job }: Props) {
           return (
             <div key={step.key} className="flex flex-col items-center gap-1">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                   isFailed && isActive
                     ? "bg-blue-500 text-white"
                     : isDone
                     ? "bg-green-500 text-white"
                     : isActive
                     ? "bg-blue-500 text-white animate-pulse"
-                    : "bg-gray-200 text-gray-400"
+                    : "bg-gray-200 text-ui-muted"
                 }`}
               >
                 {isDone ? "✓" : i + 1}
               </div>
               <span
                 className={`text-xs ${
-                  isActive ? "text-blue-600 font-semibold" : "text-gray-400"
+                  isActive ? "text-blue-600 font-semibold" : "text-ui-muted"
                 }`}
               >
                 {step.label}

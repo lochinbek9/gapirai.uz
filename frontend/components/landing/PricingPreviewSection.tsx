@@ -17,24 +17,24 @@ export default function PricingPreviewSection() {
 
   return (
     <section className="w-full max-w-4xl mt-14 px-4 z-10">
-      <h2 className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white text-center mb-2">
+      <h2 className="text-lg sm:text-2xl font-semibold text-ui-ink text-center mb-2">
         Tarif rejalari
       </h2>
-      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 text-center mb-6 sm:mb-8">
+      <p className="text-xs sm:text-sm text-ui-muted text-center mb-6 sm:mb-8">
         Bepul tarifda oyiga 5 daqiqa dublyaj.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {plans.map((plan) => (
           <div
             key={plan.id}
-            className="glass-card rounded-[20px] p-5 border border-black/5 dark:border-white/10 text-left"
+            className="glass-card rounded-2xl p-5 border border-ui-rule text-left"
           >
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">{plan.name}</h3>
-            <p className="text-xl font-black text-gray-900 dark:text-white mb-3">
+            <h3 className="text-sm font-semibold text-ui-ink mb-1">{plan.name}</h3>
+            <p className="text-xl font-semibold text-ui-ink mb-3">
               {plan.price === 0 ? "Bepul" : `${plan.price.toLocaleString("uz-UZ")} so'm`}
-              {plan.price > 0 && <span className="text-xs font-medium text-gray-400">/oy</span>}
+              {plan.price > 0 && <span className="text-xs font-medium text-ui-muted">/oy</span>}
             </p>
-            <ul className="space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <ul className="space-y-1.5 text-xs text-ui-muted">
               <li className="flex items-center gap-1.5">
                 <Check aria-hidden="true" className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Oyiga {plan.monthly_minutes} daqiqa dublyaj
               </li>
@@ -48,7 +48,7 @@ export default function PricingPreviewSection() {
       <div className="flex justify-center mt-6">
         <Link
           href="/pricing"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 font-bold text-xs transition"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-ui-ground hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-ui-rule text-ui-ink font-semibold text-xs transition"
         >
           Barcha tariflarni ko'rish
         </Link>

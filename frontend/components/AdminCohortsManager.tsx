@@ -96,12 +96,12 @@ export default function AdminCohortsManager({ token }: { token: string }) {
       return 'bg-purple-700/50 text-purple-100 border-purple-600/50 font-semibold'
     }
     if (pct < 30) {
-      return 'bg-purple-600/70 text-white border-purple-500/70 font-bold shadow-sm shadow-purple-900/40'
+      return 'bg-purple-600/70 text-white border-purple-500/70 font-semibold shadow-sm '
     }
     if (pct < 50) {
-      return 'bg-emerald-600/70 text-white border-emerald-500/70 font-bold shadow-sm shadow-emerald-900/40'
+      return 'bg-emerald-600/70 text-white border-emerald-500/70 font-semibold shadow-sm '
     }
-    return 'bg-emerald-500 text-white border-emerald-400 font-extrabold shadow-md shadow-emerald-900/60'
+    return 'bg-emerald-500 text-white border-emerald-400 font-semibold shadow-md '
   }
 
   const summary = data?.activation_summary
@@ -111,19 +111,19 @@ export default function AdminCohortsManager({ token }: { token: string }) {
       {/* Sarlavha va Asosiy Boshqaruv */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
             <Layers className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 Aktivatsiya va Retention Kohortalari
               </h2>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 Kohorta Tahlili
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-ui-muted mt-0.5">
               Foydalanuvchilar qachon ro&apos;yxatdan o&apos;tgan, birinchi qiymatni qanday olgan va haftalar davomida qanday qaytmoqda?
             </p>
           </div>
@@ -138,7 +138,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 granularity === 'weekly'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-gray-400 hover:text-white'
+                  : 'text-ui-muted hover:text-white'
               }`}
             >
               Haftalik
@@ -148,7 +148,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                 granularity === 'monthly'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-gray-400 hover:text-white'
+                  : 'text-ui-muted hover:text-white'
               }`}
             >
               Oylik
@@ -174,7 +174,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
               onChange={(e) => setIncludeInternal(e.target.checked)}
               className="rounded bg-black/40 border-white/20 text-indigo-600 focus:ring-0 w-3.5 h-3.5"
             />
-            <span className="text-[11px]">Ichki xodimlar</span>
+            <span className="text-xs">Ichki xodimlar</span>
           </label>
 
           {/* Refresh */}
@@ -200,96 +200,96 @@ export default function AdminCohortsManager({ token }: { token: string }) {
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Card 1: D0 Fast Activation */}
-          <div className="bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border border-indigo-500/20 rounded-xl p-3.5 space-y-1">
-            <div className="flex items-center justify-between text-indigo-300 text-[11px] font-medium">
+          <div className=" bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3.5 space-y-1">
+            <div className="flex items-center justify-between text-indigo-300 text-xs font-medium">
               <span>D0 (24h) Aktivatsiya</span>
               <Zap className="w-4 h-4 text-indigo-400" />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-white">
+              <span className="text-xl sm:text-2xl font-semibold text-white">
                 {summary.overall_d0_activation_pct}%
               </span>
-              <span className="text-[10px] text-indigo-300/80 font-medium">
+              <span className="text-xs text-indigo-300/80 font-medium">
                 (birinchi 24s)
               </span>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-ui-muted">
               Ro&apos;yxatdan o&apos;tgan kunining o&apos;zida harakat
             </p>
           </div>
 
           {/* Card 2: Aha! Moment */}
-          <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 space-y-1">
-            <div className="flex items-center justify-between text-emerald-300 text-[11px] font-medium">
+          <div className=" bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 space-y-1">
+            <div className="flex items-center justify-between text-emerald-300 text-xs font-medium">
               <span>&ldquo;Aha! Moment&rdquo; Qiymat</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-emerald-400">
+              <span className="text-xl sm:text-2xl font-semibold text-emerald-400">
                 {summary.overall_aha_moment_pct}%
               </span>
-              <span className="text-[10px] text-emerald-300/80 font-medium">
+              <span className="text-xs text-emerald-300/80 font-medium">
                 tayyor video
               </span>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-ui-muted">
               Kamida 1 ta muvaffaqiyatli natija olgan
             </p>
           </div>
 
           {/* Card 3: Habit Formation (2+ video) */}
-          <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 rounded-xl p-3.5 space-y-1">
-            <div className="flex items-center justify-between text-purple-300 text-[11px] font-medium">
+          <div className=" bg-purple-500/10 border border-purple-500/20 rounded-xl p-3.5 space-y-1">
+            <div className="flex items-center justify-between text-purple-300 text-xs font-medium">
               <span>Odatlanish (Habit)</span>
               <Flame className="w-4 h-4 text-purple-400" />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-purple-300">
+              <span className="text-xl sm:text-2xl font-semibold text-purple-300">
                 {summary.overall_habit_pct}%
               </span>
-              <span className="text-[10px] text-purple-300/80 font-medium">
+              <span className="text-xs text-purple-300/80 font-medium">
                 2+ video
               </span>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-ui-muted">
               Platformadan ko&apos;p martalik foydalanish
             </p>
           </div>
 
           {/* Card 4: Median Time-to-Action */}
-          <div className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-xl p-3.5 space-y-1">
-            <div className="flex items-center justify-between text-amber-300 text-[11px] font-medium">
+          <div className=" bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 space-y-1">
+            <div className="flex items-center justify-between text-amber-300 text-xs font-medium">
               <span>Median Harakat Vaqti</span>
               <Clock className="w-4 h-4 text-amber-400" />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-amber-300">
+              <span className="text-xl sm:text-2xl font-semibold text-amber-300">
                 {summary.median_time_to_first_action_min}
               </span>
-              <span className="text-xs text-amber-400 font-bold">
+              <span className="text-xs text-amber-400 font-semibold">
                 daqiqa
               </span>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-ui-muted">
               Ro&apos;yxatdan o&apos;tgandan 1-videogacha
             </p>
           </div>
 
           {/* Card 5: W1 Retention Benchmark */}
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-xl p-3.5 space-y-1 col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between text-blue-300 text-[11px] font-medium">
+          <div className=" bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 space-y-1 col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between text-blue-300 text-xs font-medium">
               <span>{granularity === 'weekly' ? 'O\'rtacha W1 Qaytish' : 'O\'rtacha M1 Qaytish'}</span>
               <TrendingUp className="w-4 h-4 text-blue-400" />
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-blue-300">
+              <span className="text-xl sm:text-2xl font-semibold text-blue-300">
                 {summary.avg_w1_retention_pct !== null ? `${summary.avg_w1_retention_pct}%` : '-'}
               </span>
-              <span className="text-[10px] text-blue-300/80 font-medium">
+              <span className="text-xs text-blue-300/80 font-medium">
                 keyingi davrda
               </span>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-ui-muted">
               Yangi kohortaning keyingi haftadagi faolligi
             </p>
           </div>
@@ -300,10 +300,10 @@ export default function AdminCohortsManager({ token }: { token: string }) {
       <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('retention')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             activeTab === 'retention'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-indigo-600 text-white shadow-lg '
+              : 'text-ui-muted hover:text-white hover:bg-white/5'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -312,10 +312,10 @@ export default function AdminCohortsManager({ token }: { token: string }) {
 
         <button
           onClick={() => setActiveTab('activation')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             activeTab === 'activation'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-indigo-600 text-white shadow-lg '
+              : 'text-ui-muted hover:text-white hover:bg-white/5'
           }`}
         >
           <Zap className="w-4 h-4" />
@@ -324,16 +324,16 @@ export default function AdminCohortsManager({ token }: { token: string }) {
 
         <button
           onClick={() => setActiveTab('insights')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             activeTab === 'insights'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-indigo-600 text-white shadow-lg '
+              : 'text-ui-muted hover:text-white hover:bg-white/5'
           }`}
         >
           <Sparkles className="w-4 h-4" />
           Xulosalar va Tavsiyalar
           {data?.insights && data.insights.length > 0 && (
-            <span className="w-5 h-5 rounded-full bg-white/20 text-white text-[10px] flex items-center justify-center font-bold">
+            <span className="w-5 h-5 rounded-full bg-white/20 text-white text-xs flex items-center justify-center font-semibold">
               {data.insights.length}
             </span>
           )}
@@ -348,14 +348,14 @@ export default function AdminCohortsManager({ token }: { token: string }) {
           {/* Ko'rsatkich turi (Metric Selector) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/10 rounded-xl p-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 font-medium">Ko&apos;rsatkich turi:</span>
+              <span className="text-xs text-ui-muted font-medium">Ko&apos;rsatkich turi:</span>
               <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/10">
                 <button
                   onClick={() => setMetric('activity')}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition ${
                     metric === 'activity'
-                      ? 'bg-purple-600 text-white font-bold'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-purple-600 text-white font-semibold'
+                      : 'text-ui-muted hover:text-white'
                   }`}
                 >
                   ⚡ Umumiy Faollik (Kirish/Video)
@@ -364,8 +364,8 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                   onClick={() => setMetric('jobs')}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition ${
                     metric === 'jobs'
-                      ? 'bg-purple-600 text-white font-bold'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-purple-600 text-white font-semibold'
+                      : 'text-ui-muted hover:text-white'
                   }`}
                 >
                   🎬 Video/Tahlil Yaratish
@@ -374,8 +374,8 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                   onClick={() => setMetric('paying')}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition ${
                     metric === 'paying'
-                      ? 'bg-purple-600 text-white font-bold'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-purple-600 text-white font-semibold'
+                      : 'text-ui-muted hover:text-white'
                   }`}
                 >
                   💳 To&apos;lov Qaytishi (Paying)
@@ -384,7 +384,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
             </div>
 
             {/* Rang intensivligi afsonasi (Legend) */}
-            <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-ui-muted">
               <span>0%</span>
               <div className="flex gap-0.5">
                 <span className="w-3.5 h-3.5 rounded-sm bg-white/[0.03] border border-white/10" />
@@ -401,17 +401,17 @@ export default function AdminCohortsManager({ token }: { token: string }) {
           <div className="border border-white/10 rounded-xl overflow-x-auto bg-black/20">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-white/5 border-b border-white/10 text-[11px] uppercase tracking-wider text-gray-400">
-                  <th className="py-3 px-4 font-bold text-gray-300 sticky left-0 bg-slate-900/95 z-10 whitespace-nowrap min-w-[140px]">
+                <tr className="bg-white/5 border-b border-white/10 text-xs text-ui-muted">
+                  <th className="py-3 px-4 font-semibold text-gray-300 sticky left-0 bg-slate-900/95 z-10 whitespace-nowrap min-w-[140px]">
                     Kohorta ({granularity === 'weekly' ? 'Hafta' : 'Oy'})
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-gray-300 whitespace-nowrap min-w-[70px]">
+                  <th className="py-3 px-3 text-center font-semibold text-gray-300 whitespace-nowrap min-w-[70px]">
                     Hajmi (N)
                   </th>
                   {Array.from({ length: periodsCount }).map((_, idx) => (
                     <th
                       key={idx}
-                      className="py-3 px-2 text-center font-bold text-gray-300 min-w-[58px]"
+                      className="py-3 px-2 text-center font-semibold text-gray-300 min-w-[58px]"
                     >
                       {granularity === 'weekly' ? `W${idx}` : `M${idx}`}
                     </th>
@@ -426,7 +426,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-gray-200">{cohort.cohort_label}</span>
                         {rowIdx === 0 && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <span className="text-xs px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                             Joriy
                           </span>
                         )}
@@ -434,7 +434,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                     </td>
 
                     {/* Kohorta hajmi */}
-                    <td className="py-2.5 px-3 text-center font-bold text-gray-300 bg-white/[0.01] border-r border-white/5">
+                    <td className="py-2.5 px-3 text-center font-semibold text-gray-300 bg-white/[0.01] border-r border-white/5">
                       {cohort.cohort_size}
                     </td>
 
@@ -462,7 +462,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                           }}
                         >
                           <div
-                            className={`py-2 px-1 rounded-lg border text-[11px] transition duration-150 cursor-pointer ${colorClass} ${
+                            className={`py-2 px-1 rounded-lg border text-xs transition duration-150 cursor-pointer ${colorClass} ${
                               isHovered ? 'ring-2 ring-white scale-105 z-20' : ''
                             }`}
                             title={
@@ -486,8 +486,8 @@ export default function AdminCohortsManager({ token }: { token: string }) {
 
               {/* O'rtacha (Benchmark) Satri */}
               <tfoot>
-                <tr className="bg-indigo-950/40 border-t-2 border-indigo-500/30 text-[11px] font-bold">
-                  <td className="py-3 px-4 text-indigo-300 sticky left-0 bg-slate-900/95 z-10 border-r border-white/10 uppercase tracking-wider">
+                <tr className="bg-indigo-950/40 border-t-2 border-indigo-500/30 text-xs font-semibold">
+                  <td className="py-3 px-4 text-indigo-300 sticky left-0 bg-slate-900/95 z-10 border-r border-white/10 ">
                     O&apos;rtacha (Benchmark)
                   </td>
                   <td className="py-3 px-3 text-center text-indigo-200 border-r border-white/10">
@@ -498,7 +498,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                   </td>
                   {data.benchmarks.map((b) => (
                     <td key={b.period_index} className="p-1 text-center">
-                      <div className="py-2 px-1 rounded-lg bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-bold">
+                      <div className="py-2 px-1 rounded-lg bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-semibold">
                         {b.avg_retention_pct !== null ? `${b.avg_retention_pct}%` : '-'}
                       </div>
                     </td>
@@ -512,27 +512,27 @@ export default function AdminCohortsManager({ token }: { token: string }) {
           {selectedCell && (
             <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2 animate-in fade-in">
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-gray-400">Kohorta:</span>
-                <span className="font-bold text-white">{selectedCell.cohortLabel}</span>
+                <span className="text-ui-muted">Kohorta:</span>
+                <span className="font-semibold text-white">{selectedCell.cohortLabel}</span>
                 <span className="text-gray-500">•</span>
-                <span className="text-gray-400">Davr:</span>
-                <span className="font-bold text-indigo-300">{selectedCell.periodLabel}</span>
+                <span className="text-ui-muted">Davr:</span>
+                <span className="font-semibold text-indigo-300">{selectedCell.periodLabel}</span>
                 <span className="text-gray-500">•</span>
-                <span className="text-gray-400">Faollar:</span>
-                <span className="font-bold text-emerald-400">
+                <span className="text-ui-muted">Faollar:</span>
+                <span className="font-semibold text-emerald-400">
                   {selectedCell.activeCount} ta
                 </span>
-                <span className="text-gray-400">
+                <span className="text-ui-muted">
                   ({selectedCell.cohortSize} ta umumiy foydalanuvchidan)
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-white px-2.5 py-1 rounded-lg bg-indigo-600">
+                <span className="text-xs font-semibold text-white px-2.5 py-1 rounded-lg bg-indigo-600">
                   {selectedCell.retentionPct}% Retention
                 </span>
                 <button
                   onClick={() => setSelectedCell(null)}
-                  className="text-gray-400 hover:text-white text-xs px-2 py-1"
+                  className="text-ui-muted hover:text-white text-xs px-2 py-1"
                 >
                   ✕
                 </button>
@@ -550,32 +550,32 @@ export default function AdminCohortsManager({ token }: { token: string }) {
           <div className="border border-white/10 rounded-xl overflow-x-auto bg-black/20">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-white/5 border-b border-white/10 text-[11px] uppercase tracking-wider text-gray-400">
-                  <th className="py-3 px-4 font-bold text-gray-300 sticky left-0 bg-slate-900/95 z-10 whitespace-nowrap min-w-[140px]">
+                <tr className="bg-white/5 border-b border-white/10 text-xs text-ui-muted">
+                  <th className="py-3 px-4 font-semibold text-gray-300 sticky left-0 bg-slate-900/95 z-10 whitespace-nowrap min-w-[140px]">
                     Kohorta
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-gray-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-gray-300 whitespace-nowrap">
                     Ro&apos;yxatdan o&apos;tgan
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-gray-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-gray-300 whitespace-nowrap">
                     Tasdiqlangan
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-indigo-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-indigo-300 whitespace-nowrap">
                     D0 (24h) Faol
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-indigo-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-indigo-300 whitespace-nowrap">
                     D3 Faol
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-emerald-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-emerald-300 whitespace-nowrap">
                     &ldquo;Aha!&rdquo; (1-tayyor)
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-purple-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-purple-300 whitespace-nowrap">
                     Odat (2+ video)
                   </th>
-                  <th className="py-3 px-3 text-center font-bold text-amber-300 whitespace-nowrap">
+                  <th className="py-3 px-3 text-center font-semibold text-amber-300 whitespace-nowrap">
                     To&apos;lov (Paid)
                   </th>
-                  <th className="py-3 px-4 text-right font-bold text-gray-300 whitespace-nowrap">
+                  <th className="py-3 px-4 text-right font-semibold text-gray-300 whitespace-nowrap">
                     Median Vaqt (TTFA)
                   </th>
                 </tr>
@@ -588,7 +588,7 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-gray-200">{row.cohort_label}</span>
                         {idx === 0 && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <span className="text-xs px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                             Joriy
                           </span>
                         )}
@@ -596,20 +596,20 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                     </td>
 
                     {/* Hajmi */}
-                    <td className="py-3 px-3 text-center font-bold text-gray-200">
+                    <td className="py-3 px-3 text-center font-semibold text-gray-200">
                       {row.cohort_size} ta
                     </td>
 
                     {/* Tasdiqlangan */}
                     <td className="py-3 px-3 text-center">
                       <span className="font-semibold text-gray-300">{row.verified_count}</span>
-                      <span className="text-[10px] text-gray-500 block">({row.verified_pct}%)</span>
+                      <span className="text-xs text-gray-500 block">({row.verified_pct}%)</span>
                     </td>
 
                     {/* D0 Fast Activation */}
                     <td className="py-3 px-3 text-center bg-indigo-950/20">
-                      <span className="font-bold text-indigo-300">{row.d0_activated_count}</span>
-                      <span className="text-[10px] text-indigo-400 font-semibold block">
+                      <span className="font-semibold text-indigo-300">{row.d0_activated_count}</span>
+                      <span className="text-xs text-indigo-400 font-semibold block">
                         ({row.d0_activated_pct}%)
                       </span>
                     </td>
@@ -617,31 +617,31 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                     {/* D3 */}
                     <td className="py-3 px-3 text-center">
                       <span className="font-semibold text-gray-300">{row.d3_activated_count}</span>
-                      <span className="text-[10px] text-gray-500 block">({row.d3_activated_pct}%)</span>
+                      <span className="text-xs text-gray-500 block">({row.d3_activated_pct}%)</span>
                     </td>
 
                     {/* Aha! Moment */}
                     <td className="py-3 px-3 text-center bg-emerald-950/20">
-                      <span className="font-bold text-emerald-300">{row.completed_job_count}</span>
-                      <span className="text-[10px] text-emerald-400 font-semibold block">
+                      <span className="font-semibold text-emerald-300">{row.completed_job_count}</span>
+                      <span className="text-xs text-emerald-400 font-semibold block">
                         ({row.completed_job_pct}%)
                       </span>
                     </td>
 
                     {/* Habit (2+ video) */}
                     <td className="py-3 px-3 text-center bg-purple-950/20">
-                      <span className="font-bold text-purple-300">{row.habit_2plus_count}</span>
-                      <span className="text-[10px] text-purple-400 font-semibold block">
+                      <span className="font-semibold text-purple-300">{row.habit_2plus_count}</span>
+                      <span className="text-xs text-purple-400 font-semibold block">
                         ({row.habit_2plus_pct}%)
                       </span>
                     </td>
 
                     {/* Paid */}
                     <td className="py-3 px-3 text-center bg-amber-950/20">
-                      <span className={`font-bold ${row.paid_count > 0 ? 'text-amber-300' : 'text-gray-500'}`}>
+                      <span className={`font-semibold ${row.paid_count > 0 ? 'text-amber-300' : 'text-gray-500'}`}>
                         {row.paid_count}
                       </span>
-                      <span className="text-[10px] text-amber-400/80 font-medium block">
+                      <span className="text-xs text-amber-400/80 font-medium block">
                         ({row.paid_pct}%)
                       </span>
                     </td>
@@ -651,8 +651,8 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                       {row.median_min_to_action > 0 ? (
                         <div className="flex items-center justify-end gap-1.5 font-mono text-xs">
                           <Clock className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="font-bold text-white">{row.median_min_to_action}</span>
-                          <span className="text-[10px] text-gray-400">daq</span>
+                          <span className="font-semibold text-white">{row.median_min_to_action}</span>
+                          <span className="text-xs text-ui-muted">daq</span>
                         </div>
                       ) : (
                         <span className="text-gray-500">-</span>
@@ -692,11 +692,11 @@ export default function AdminCohortsManager({ token }: { token: string }) {
                   className={`border rounded-xl p-4 space-y-2 transition ${borderClass}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-white flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       {insight.title}
                     </span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badgeClass}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
                       {insight.type}
                     </span>
                   </div>
@@ -709,27 +709,27 @@ export default function AdminCohortsManager({ token }: { token: string }) {
           </div>
 
           {/* O'sish strategiyasi tavsiyalari (Product Growth Playbook) */}
-          <div className="bg-gradient-to-r from-indigo-900/20 via-purple-900/20 to-slate-900/40 border border-white/10 rounded-xl p-4 space-y-3">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <div className=" bg-indigo-900/20 border border-white/10 rounded-xl p-4 space-y-3">
+            <h3 className="text-xs font-semibold text-white flex items-center gap-2">
               <Award className="w-4 h-4 text-amber-400" />
               SaaS Aktivatsiya va Retention Qoidasi (Playbook)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-gray-300">
               <div className="bg-white/5 rounded-lg p-3 border border-white/5 space-y-1">
-                <span className="font-bold text-indigo-300 block">1. 15 daqiqalik qoida</span>
-                <p className="text-[11px] text-gray-400">
+                <span className="font-semibold text-indigo-300 block">1. 15 daqiqalik qoida</span>
+                <p className="text-xs text-ui-muted">
                   Ro&apos;yxatdan o&apos;tgandan so&apos;ng birinchi 15 daqiqa ichida video yuborgan mijozning keyingi haftada qaytish ehtimoli 4 barobar yuqori bo&apos;ladi.
                 </p>
               </div>
               <div className="bg-white/5 rounded-lg p-3 border border-white/5 space-y-1">
-                <span className="font-bold text-emerald-300 block">2. &ldquo;Aha! moment&rdquo;ni tezlashtirish</span>
-                <p className="text-[11px] text-gray-400">
+                <span className="font-semibold text-emerald-300 block">2. &ldquo;Aha! moment&rdquo;ni tezlashtirish</span>
+                <p className="text-xs text-ui-muted">
                   Mijoz birinchi videoni yuklaganda unga kuttirmasdan, qisqa (1-3 daqiqali) namunalarni sinab ko&apos;rishni tavsiya qilish tezkor natija beradi.
                 </p>
               </div>
               <div className="bg-white/5 rounded-lg p-3 border border-white/5 space-y-1">
-                <span className="font-bold text-purple-300 block">3. W1 Triggerni yoqish</span>
-                <p className="text-[11px] text-gray-400">
+                <span className="font-semibold text-purple-300 block">3. W1 Triggerni yoqish</span>
+                <p className="text-xs text-ui-muted">
                   Foydalanuvchi oxirgi marta kirganidan 3 kun o&apos;tgach Telegram-bot orqali &ldquo;Siz qiziqqan yangi AI videolar tayyor&rdquo; xabarini yuborish retentionni 20%+ ga oshiradi.
                 </p>
               </div>

@@ -6,11 +6,11 @@ import { formatTashkentTime, parseApiDate } from "@/lib/timestamp";
 
 const STEPS = [
   { key: "downloading",  icon: "⬇", label: "Yuklab olish" },
-  { key: "transcribing", icon: "🎙", label: "Transkripsiya" },
-  { key: "translating",  icon: "🌐", label: "Tarjima" },
-  { key: "syncing",      icon: "🗣", label: "Talaffuz" },
-  { key: "synthesizing", icon: "🔊", label: "Ovoz berish" },
-  { key: "merging",      icon: "🎬", label: "Birlashtirish" },
+  { key: "transcribing", icon: "", label: "Transkripsiya" },
+  { key: "translating",  icon: "", label: "Tarjima" },
+  { key: "syncing",      icon: "", label: "Talaffuz" },
+  { key: "synthesizing", icon: "", label: "Ovoz berish" },
+  { key: "merging",      icon: "", label: "Birlashtirish" },
 ] as const;
 
 function getCurrentStep(status: Job["status"]): number {
@@ -72,7 +72,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                 }}
                 className={`
                   w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500
-                  ${isCompleted ? "shadow-lg shadow-emerald-500/20 text-white" : isActive ? "shadow-xl shadow-blue-500/30 text-white" : "text-gray-500"}
+                  ${isCompleted ? "shadow-lg text-white" : isActive ? "shadow-xl text-white" : "text-gray-500"}
                 `}
               >
                 <AnimatePresence mode="wait">
@@ -96,14 +96,14 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                        <div className="absolute inset-0 rounded-2xl ring-2 ring-blue-500/40 bg-blue-500/10 transition-all duration-500"></div>
                     </motion.div>
                   ) : (
-                    <motion.span key="icon" className="text-gray-400 dark:text-gray-600 opacity-60 grayscale transition-colors">{step.icon}</motion.span>
+                    <motion.span key="icon" className="text-ui-muted opacity-60 grayscale transition-colors">{step.icon}</motion.span>
                   )}
                 </AnimatePresence>
               </motion.div>
               
               <div className="text-center">
-                 <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors duration-300
-                    ${isCompleted ? "text-emerald-500" : isActive ? "text-blue-500 font-extrabold" : "text-gray-400 dark:text-gray-700"}`}>
+                 <p className={`text-xs font-semibold transition-colors duration-300
+                    ${isCompleted ? "text-emerald-500" : isActive ? "text-ui-accent-ink font-semibold" : "text-ui-muted"}`}>
                    {step.label}
                  </p>
               </div>
@@ -112,7 +112,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         })}
 
         {/* Connector Line Background */}
-        <div className="absolute top-5 left-8 right-8 h-[2px] bg-black/5 dark:bg-white/[0.03] -z-0 transition-colors"></div>
+        <div className="absolute top-5 left-8 right-8 h-[2px] bg-ui-ground -z-0 transition-colors"></div>
         {/* Active Connector Line */}
         <motion.div 
           className="absolute top-5 left-8 h-[2px] bg-ui-accent -z-0"
@@ -127,26 +127,26 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <div className="flex justify-between items-end">
            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                 <Sparkles aria-hidden="true" className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-                 <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest transition-colors">{job.status_message}</p>
+                 <Sparkles aria-hidden="true" className="w-3.5 h-3.5 text-ui-accent-ink animate-pulse" />
+                 <p className="text-xs font-semibold text-ui-accent-ink transition-colors">{job.status_message}</p>
               </div>
               <div className="flex items-center gap-3">
                  {job.status === 'pending' || (job.progress || 0) <= 0 ? (
-                   <span className="text-base font-bold text-amber-500 animate-pulse">Navbatda...</span>
+                   <span className="text-base font-semibold text-amber-500 animate-pulse">Navbatda...</span>
                  ) : (
                    <p className="text-4xl font-semibold tracking-[-0.03em] text-ui-ink lining-nums tabular-nums transition-colors">
-                     {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
+                     {Math.round(job.progress)}<span className="text-ui-accent-ink text-lg ml-0.5">%</span>
                    </p>
                  )}
-                 <div className="py-1 px-3 rounded-full bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex items-center gap-2 transition-colors">
+                 <div className="py-1 px-3 rounded-full bg-ui-ground border border-ui-rule flex items-center gap-2 transition-colors">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse transition-colors"></div>
-                    <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 transition-colors">{formatElapsed(elapsed)}</span>
+                    <span className="text-xs font-mono text-ui-muted transition-colors">{formatElapsed(elapsed)}</span>
                  </div>
               </div>
            </div>
         </div>
 
-        <div className="relative h-3.5 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1.5px] transition-colors">
+        <div className="relative h-3.5 w-full bg-ui-ground rounded-full overflow-hidden border border-ui-rule p-[1.5px] transition-colors">
           <motion.div
             className="h-full bg-ui-accent rounded-full"
             initial={{ width: 0 }}
@@ -157,18 +157,18 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
             <div className="absolute inset-0 shimmer-anim"></div>
           </motion.div>
         </div>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center font-medium">
+        <p className="text-xs text-ui-muted text-center font-medium">
           Odatda 1–2 daqiqa davom etadi. Tayyor bo&apos;lgach video avtomatik ochiladi.
         </p>
       </div>
 
       {job.expected_end_time && !isFailed && job.status !== 'pending' && (job.progress || 0) > 0 && (
-        <div className="bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl p-4 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1 transition-colors">
-          <p className="font-bold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
-          <p className="text-gray-950 dark:text-white font-mono text-base font-semibold">
+        <div className="bg-ui-ground border border-ui-rule rounded-2xl p-4 text-center text-xs text-ui-muted space-y-1 transition-colors">
+          <p className="font-semibold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
+          <p className="text-ui-ink font-mono text-base font-semibold">
             {formatTashkentTime(job.expected_end_time)}
           </p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+          <p className="text-xs text-ui-muted font-medium">
             {Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000) <= 0
               ? "(tez orada yakunlanadi...)"
               : `(taxminan ${formatRemainingTime(Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000))} qoldi)`}
@@ -181,7 +181,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
           <button
             onClick={onCancel}
             disabled={cancelLoading}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-violet-500 hover:text-white bg-violet-500/10 hover:bg-violet-500 rounded-xl transition duration-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-500 hover:text-white bg-blue-500/10 hover:bg-blue-500 rounded-xl transition duration-200 disabled:opacity-50"
           >
             {cancelLoading ? <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin" /> : null}
             Jarayonni bekor qilish
@@ -195,7 +195,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
           animate={{ opacity: 1, scale: 1 }}
           className="p-5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-center"
         >
-          <p className="text-sm font-bold text-blue-600 dark:text-blue-500 mb-1 transition-colors">Xatolik yuz berdi</p>
+          <p className="text-sm font-semibold text-blue-600 dark:text-blue-500 mb-1 transition-colors">Xatolik yuz berdi</p>
           <p className="text-xs text-blue-600/60 dark:text-blue-400/60 leading-relaxed transition-colors">{job.error_message || "Tizimda kutilmagan xato."}</p>
         </motion.div>
       )}

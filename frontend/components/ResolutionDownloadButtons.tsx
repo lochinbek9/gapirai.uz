@@ -87,7 +87,7 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
 
   if (!resolutions) {
     return (
-      <div className="inline-flex items-center gap-2 text-slate-400 text-sm">
+      <div className="inline-flex items-center gap-2 text-ui-muted text-sm">
         <Loader2 className="w-4 h-4 animate-spin" />
         Sifat variantlari yuklanmoqda...
       </div>
@@ -107,7 +107,7 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
               <Link
                 key={opt.resolution}
                 href="/pricing"
-                className="inline-flex items-center gap-1.5 sm:gap-2 bg-white/5 hover:bg-white/10 text-slate-400 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold border border-white/10 transition"
+                className="inline-flex items-center gap-1.5 sm:gap-2 bg-ui-ground hover:bg-ui-ground text-ui-muted px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold border border-ui-rule transition"
                 title="Bu sifat yuqoriroq tarif rejasida mavjud"
               >
                 <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -121,7 +121,7 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
               key={opt.resolution}
               onClick={() => handleClick(opt)}
               disabled={isBusy}
-              className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-70 text-white px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/20 transition hover:scale-105 disabled:hover:scale-100"
+              className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-70 text-white px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold shadow-lg transition hover:scale-105 disabled:hover:scale-100"
             >
               {isBusy ? (
                 <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
@@ -132,10 +132,10 @@ export default function ResolutionDownloadButtons({ jobId, videoTitle }: Resolut
               )}
               {opt.resolution}
               {isBusy && !isReady && (
-                <span className="text-[10px] sm:text-xs font-normal text-blue-100">tayyorlanmoqda...</span>
+                <span className="text-xs sm:text-xs font-normal text-blue-100">tayyorlanmoqda...</span>
               )}
               {isFailed && !isBusy && (
-                <span className="text-[10px] sm:text-xs font-normal text-blue-100">qayta urinish</span>
+                <span className="text-xs sm:text-xs font-normal text-blue-100">qayta urinish</span>
               )}
             </button>
           )

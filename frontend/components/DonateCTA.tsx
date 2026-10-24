@@ -27,32 +27,19 @@ export default function DonateCTA({ variant = 'card', className = '', headingId 
   }
 
   return (
-    <div
-      className={`glass-card rounded-2xl border border-rose-500/15 bg-rose-500/[0.04] p-5 shadow-inner dark:border-rose-400/15 ${className}`}
-    >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
-            <Heart aria-hidden="true" className="h-5 w-5" fill="currentColor" />
-          </div>
-          <div className="min-w-0 flex-1">
-            {headingId ? (
-              <h2 id={headingId} className="font-black text-gray-900 dark:text-white">Loyihaga hissa qo‘shing</h2>
-            ) : (
-              <p className="font-black text-gray-900 dark:text-white">Loyihaga hissa qo‘shing</p>
-            )}
-            <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-              GapirAI.uz — mustaqil loyiha. Har bir hissa videolarni ko‘proq odamga yetkazishga yordam beradi.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/donate"
-          className="w-full sm:w-auto text-center shrink-0 self-center rounded-xl bg-gradient-to-r from-rose-600 to-violet-600 px-4 py-2.5 text-sm font-bold text-white active:scale-95 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
-        >
-          Qo‘llab-quvvatlash
-        </Link>
+    <div className={`ui-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${className}`}>
+      <Heart aria-hidden="true" className="h-5 w-5 shrink-0 text-ui-muted" />
+      <div className="min-w-0 flex-1">
+        {headingId ? (
+          <h2 id={headingId} className="font-semibold text-ui-ink">Loyihaga hissa qoʻshing</h2>
+        ) : (
+          <p className="font-semibold text-ui-ink">Loyihaga hissa qoʻshing</p>
+        )}
+        <p className="mt-0.5 text-sm text-ui-muted">
+          GapirAI.uz — mustaqil loyiha. Har bir hissa videolarni koʻproq odamga yetkazishga yordam beradi.
+        </p>
       </div>
+      <Link href="/donate" className="ui-btn ui-btn-secondary shrink-0">Qoʻllab-quvvatlash</Link>
     </div>
   )
 }

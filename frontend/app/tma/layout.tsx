@@ -10,7 +10,7 @@ export default function TmaLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
-      <div className="min-h-screen bg-white text-gray-900 dark:bg-[#0f0f10] dark:text-gray-100">
+      <div className="min-h-screen bg-ui-surface text-ui-ink">
         {children}
       </div>
     </>

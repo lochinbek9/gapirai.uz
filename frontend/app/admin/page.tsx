@@ -112,8 +112,8 @@ function Card({ label, value, icon }: { label: string; value: string | number; i
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest break-words leading-tight">{label}</p>
-        <p className="text-xl sm:text-2xl font-extrabold text-white mt-1 break-words">{value}</p>
+        <p className="text-xs sm:text-[11px] font-semibold text-ui-muted break-words leading-tight">{label}</p>
+        <p className="text-xl sm:text-2xl font-semibold text-white mt-1 break-words">{value}</p>
       </div>
     </div>
   )
@@ -191,7 +191,7 @@ function TrendChart({
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-2">
         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-xs font-bold text-gray-300">{label}</span>
+        <span className="text-xs font-semibold text-gray-300">{label}</span>
       </div>
       <div className="relative">
         <svg
@@ -232,11 +232,11 @@ function TrendChart({
         </svg>
         {hp && (
           <div
-            className="absolute top-0 bg-black/80 border border-white/10 rounded-lg px-2 py-1 text-[11px] pointer-events-none whitespace-nowrap z-10"
+            className="absolute top-0 bg-black/80 border border-white/10 rounded-lg px-2 py-1 text-xs pointer-events-none whitespace-nowrap z-10"
             style={{ left: `${(hp.x / width) * 100}%`, transform: 'translate(-50%, -110%)' }}
           >
-            <div className="text-gray-400">{formatShortDate(hp.date)}</div>
-            <div className="text-white font-bold">{hp.value}</div>
+            <div className="text-ui-muted">{formatShortDate(hp.date)}</div>
+            <div className="text-white font-semibold">{hp.value}</div>
           </div>
         )}
       </div>
@@ -269,10 +269,10 @@ function DeltaCard({
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 min-w-0 shadow-lg">
-      <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest break-words leading-tight">{label}</p>
+      <p className="text-xs sm:text-[11px] font-semibold text-ui-muted break-words leading-tight">{label}</p>
       <div className="flex items-end gap-2 mt-1 flex-wrap">
-        <p className="text-xl sm:text-2xl font-extrabold text-white">{formattedVal}</p>
-        <span className="text-[11px] font-bold mb-1" style={{ color }}>
+        <p className="text-xl sm:text-2xl font-semibold text-white">{formattedVal}</p>
+        <span className="text-xs font-semibold mb-1" style={{ color }}>
           {diff !== 0 ? `${formattedDiff} (${previousLabel}: ${formattedPrev})` : `(${previousLabel}: ${formattedPrev})`}
         </span>
       </div>
@@ -293,13 +293,13 @@ function CenteredMessage({
 }) {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
+      <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-2xl p-8 text-center space-y-4 shadow-2xl">
         <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20">
           {icon}
         </div>
         <div className="space-y-1">
-          <h1 className="text-lg font-extrabold text-white">{title}</h1>
-          <p className="text-xs text-gray-400 leading-relaxed">{message}</p>
+          <h1 className="text-lg font-semibold text-white">{title}</h1>
+          <p className="text-xs text-ui-muted leading-relaxed">{message}</p>
         </div>
         {action}
       </div>
@@ -506,7 +506,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-9 h-9 animate-spin text-blue-400" />
-        <p className="text-xs text-gray-400 font-mono">Admin panel yuklanmoqda...</p>
+        <p className="text-xs text-ui-muted font-mono">Admin panel yuklanmoqda...</p>
       </div>
     )
   }
@@ -520,7 +520,7 @@ export default function AdminPage() {
         action={
           <Link
             href="/login"
-            className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-extrabold py-3 rounded-2xl transition-all text-sm shadow-xl"
+            className="inline-flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-2xl transition-all text-sm shadow-xl"
           >
             Kirish sahifasiga o'tish
           </Link>
@@ -538,7 +538,7 @@ export default function AdminPage() {
         action={
           <button
             onClick={logout}
-            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-3 rounded-2xl transition-all text-sm"
+            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-semibold py-3 rounded-2xl transition-all text-sm"
           >
             <LogOut className="w-4 h-4" />
             Chiqish
@@ -560,7 +560,7 @@ export default function AdminPage() {
               setStatsLoading(true)
               loadStats().finally(() => setStatsLoading(false))
             }}
-            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-3 rounded-2xl transition-all text-sm"
+            className="inline-flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-semibold py-3 rounded-2xl transition-all text-sm"
           >
             <RefreshCw className="w-4 h-4" />
             Qayta urinish
@@ -576,19 +576,19 @@ export default function AdminPage() {
     <div className="min-h-screen bg-slate-900 text-slate-100 p-3 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Modern Top Header */}
-        <header className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md shadow-xl">
+        <header className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shrink-0">
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">GapirAI Admin Suite</h1>
-                <span className="text-[10px] font-bold font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                <h1 className="text-lg sm:text-xl font-semibold text-white tracking-tight">GapirAI Admin Suite</h1>
+                <span className="text-xs font-semibold font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
                   v2.0 Pro
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <p className="text-xs text-ui-muted mt-0.5 flex items-center gap-2">
                 <span>{user?.email}</span>
                 <span>•</span>
                 <span className="text-emerald-400 flex items-center gap-1 font-medium">
@@ -601,16 +601,16 @@ export default function AdminPage() {
 
           <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap">
             {/* Live Tashkent Time Badge */}
-            <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono text-gray-300 shadow-inner">
+            <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono text-gray-300 ">
               <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span className="font-bold text-white">{currentTime}</span>
-              <span className="text-[10px] text-gray-500">Toshkent (UTC+5)</span>
+              <span className="font-semibold text-white">{currentTime}</span>
+              <span className="text-xs text-gray-500">Toshkent (UTC+5)</span>
             </div>
 
             {/* Change My Credentials */}
             <button
               onClick={openChangeCredModal}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/30 text-gray-400 hover:text-amber-400 transition"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/30 text-ui-muted hover:text-amber-400 transition"
               title="Login va parolni o'zgartirish"
             >
               <Key className="w-4 h-4" />
@@ -629,7 +629,7 @@ export default function AdminPage() {
             {/* Logout */}
             <button
               onClick={logout}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-gray-400 hover:text-rose-400 transition"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/30 text-ui-muted hover:text-rose-400 transition"
               title="Chiqish"
             >
               <LogOut className="w-4 h-4" />
@@ -656,7 +656,7 @@ export default function AdminPage() {
         )}
 
         {/* Primary Tab Navigation */}
-        <nav className="bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl sticky top-2 z-30 scrollbar-none">
+        <nav className="bg-slate-900/90 border border-white/10 rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-2xl sticky top-2 z-30 scrollbar-none">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id
             return (
@@ -665,14 +665,14 @@ export default function AdminPage() {
                 onClick={() => handleTabChange(tab.id)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-2 transition shrink-0 cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 font-bold'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                    ? 'bg-blue-600 text-white shadow-lg font-semibold'
+                    : 'text-ui-muted hover:text-gray-200 hover:bg-white/5'
                 }`}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
                 {tab.badge && (
-                  <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full">
+                  <span className="text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full">
                     {tab.badge}
                   </span>
                 )}
@@ -691,7 +691,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest">
+                  <h2 className="text-xs font-semibold text-gray-300 ">
                     Bugun (Toshkent vaqti UTC+5)
                   </h2>
                 </div>
@@ -742,10 +742,10 @@ export default function AdminPage() {
                       <button
                         key={g}
                         onClick={() => setGranularity(g)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                           granularity === g
                             ? 'bg-blue-500 text-white'
-                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                            : 'bg-white/5 text-ui-muted hover:bg-white/10 hover:text-gray-200'
                         }`}
                       >
                         {label}
@@ -788,14 +788,14 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                    <h3 className="text-xs font-semibold text-gray-200 ">
                       Bugungi dublyaj ishlari (Jonli navbat & holat)
                     </h3>
-                    <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                    <span className="text-xs font-mono font-semibold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
                       {stats.recent_jobs.length} ta bugun
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Faqat bugungi videolar (Maksimal 50 ta, xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
+                  <p className="text-xs text-ui-muted mt-0.5">Faqat bugungi videolar (Maksimal 50 ta, xatolik yuz berganlarni shu yerdan qayta urinish mumkin)</p>
                 </div>
                 <button
                   onClick={() => handleTabChange('jobs')}
@@ -808,7 +808,7 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.01] text-gray-400 uppercase text-[10px] font-semibold tracking-wider">
+                    <tr className="border-b border-white/10 bg-white/[0.01] text-ui-muted text-xs font-semibold ">
                       <th className="py-2.5 px-3">Vaqti</th>
                       <th className="py-2.5 px-3">Video</th>
                       <th className="py-2.5 px-3">Akkaunt</th>
@@ -820,7 +820,7 @@ export default function AdminPage() {
                   <tbody>
                     {stats.recent_jobs.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                        <td colSpan={6} className="py-8 text-center text-ui-muted text-xs">
                           Bugun hali yangi dublyaj ishlari yaratilmagan.
                         </td>
                       </tr>
@@ -831,7 +831,7 @@ export default function AdminPage() {
                       const isFailed = j.status === 'FAILED'
                       return (
                         <tr key={j.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3 text-gray-400 whitespace-nowrap font-mono text-[11px]">
+                          <td className="py-2.5 px-3 text-ui-muted whitespace-nowrap font-mono text-xs">
                             {formatTashkentDateTime(j.created_at) || '—'}
                           </td>
                           <td className="py-2.5 px-3 max-w-[260px] truncate">
@@ -845,21 +845,21 @@ export default function AdminPage() {
                               {j.video_title || j.youtube_url}
                             </a>
                           </td>
-                          <td className="py-2.5 px-3 max-w-[160px] truncate text-gray-300 font-mono text-[11px]">
+                          <td className="py-2.5 px-3 max-w-[160px] truncate text-gray-300 font-mono text-xs">
                             {j.user_email || 'Anonim'}
                           </td>
-                          <td className="py-2.5 px-3 text-[11px] font-mono text-gray-300">
+                          <td className="py-2.5 px-3 text-xs font-mono text-gray-300">
                             <span className="text-amber-300 font-semibold">
                               {j.tts_provider === 'gemini' ? 'Gemini' : j.tts_provider === 'edge' ? 'Edge' : 'Azure'}
                             </span>
-                            <span className="text-gray-500 text-[10px] ml-1">({j.voice_name || 'Charon'})</span>
+                            <span className="text-gray-500 text-xs ml-1">({j.voice_name || 'Charon'})</span>
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
                             {isNoSpeech ? (
-                              <span className="text-amber-400 font-semibold text-[11px]">Ovoz topilmadi</span>
+                              <span className="text-amber-400 font-semibold text-xs">Ovoz topilmadi</span>
                             ) : (
                               <span
-                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                                   isSuccess
                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                     : isFailed
@@ -877,7 +877,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => handleOverviewRetry(j.id)}
                                   disabled={retryingJobId === j.id}
-                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50"
                                   title="Qayta urinish"
                                 >
                                   <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
@@ -888,7 +888,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => handleOverviewRetry(j.id)}
                                   disabled={retryingJobId === j.id}
-                                  className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm shadow-indigo-500/10"
+                                  className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm "
                                   title="Admin: Ushbu tayyor videoni qayta tayyorlash"
                                 >
                                   <RefreshCw className={`w-3 h-3 ${retryingJobId === j.id ? 'animate-spin' : ''}`} />
@@ -899,7 +899,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => handleAdminCancel(j.id)}
                                   disabled={cancellingJobId === j.id}
-                                  className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold flex items-center gap-1 transition disabled:opacity-50"
+                                  className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50"
                                   title="To'xtatish va bekor qilish"
                                 >
                                   {cancellingJobId === j.id ? (
@@ -949,20 +949,20 @@ export default function AdminPage() {
             <div className="flex items-center gap-2 border-b border-white/10 pb-3">
               <button
                 onClick={() => setUsersSubTab('all')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                   usersSubTab === 'all'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-white/5 text-ui-muted hover:text-white hover:bg-white/10'
                 }`}
               >
                 👥 Barcha Foydalanuvchilar ({stats.users.total})
               </button>
               <button
                 onClick={() => setUsersSubTab('unactivated')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                   usersSubTab === 'unactivated'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-white/5 text-ui-muted hover:text-white hover:bg-white/10'
                 }`}
               >
                 🎯 1-videoda qolib ketganlar (Aktivlashmaganlar)
@@ -986,30 +986,30 @@ export default function AdminPage() {
             <div className="flex items-center gap-2 border-b border-white/10 pb-3">
               <button
                 onClick={() => setAnalyticsSubTab('funnel')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                   analyticsSubTab === 'funnel'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-white/5 text-ui-muted hover:text-white hover:bg-white/10'
                 }`}
               >
                 📉 Voronka Konversiyasi (Funnel)
               </button>
               <button
                 onClick={() => setAnalyticsSubTab('cohorts')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                   analyticsSubTab === 'cohorts'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-white/5 text-ui-muted hover:text-white hover:bg-white/10'
                 }`}
               >
                 🧬 Kohort Tahlili (Cohorts)
               </button>
               <button
                 onClick={() => setAnalyticsSubTab('retention')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                   analyticsSubTab === 'retention'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-white/5 text-ui-muted hover:text-white hover:bg-white/10'
                 }`}
               >
                 📊 Retention & Faollik (Activity)
@@ -1044,14 +1044,14 @@ export default function AdminPage() {
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-xl">
               <div className="px-5 py-4 bg-white/[0.02] border-b border-white/10 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-gray-200 ">
                     Haqiqiy to'lov qilgan mijozlar (Top to'lovchilar)
                   </h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-xs text-ui-muted mt-0.5">
                     Sinov va ichki to'lovlar chetlatilgan, sof 12 nafar real mijoz
                   </p>
                 </div>
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                <span className="text-xs font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
                   Jami: 774,000 UZS
                 </span>
               </div>
@@ -1059,12 +1059,12 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-left bg-white/[0.01]">
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">#</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mijoz</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">To'lovlar</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Jami summa</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sotib olingan xizmat</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted ">#</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted ">Mijoz</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted ">Email</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted text-center">To'lovlar</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted text-right">Jami summa</th>
+                      <th className="px-4 py-2.5 text-xs font-semibold text-ui-muted ">Sotib olingan xizmat</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1085,14 +1085,14 @@ export default function AdminPage() {
                       <tr key={c.email} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                         <td className="px-4 py-2.5 text-xs text-gray-500 font-mono">{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-semibold text-gray-200">{c.name}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-400 font-mono">{c.email}</td>
-                        <td className="px-4 py-2.5 text-xs text-center text-blue-400 font-bold">{c.count}</td>
-                        <td className="px-4 py-2.5 text-xs text-right font-mono font-bold text-emerald-400">
+                        <td className="px-4 py-2.5 text-xs text-ui-muted font-mono">{c.email}</td>
+                        <td className="px-4 py-2.5 text-xs text-center text-blue-400 font-semibold">{c.count}</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-mono font-semibold text-emerald-400">
                           {c.sum.toLocaleString('uz-UZ')} UZS
                         </td>
                         <td className="px-4 py-2.5 text-xs text-gray-300">
                           <span className="inline-flex items-center gap-1.5">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 font-mono">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-ui-muted font-mono">
                               {c.prov}
                             </span>
                             <span>{c.desc}</span>
@@ -1111,18 +1111,18 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="w-5 h-5 text-amber-400" />
-                    <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                    <h3 className="text-xs font-semibold text-amber-300 ">
                       Qaytarilishi Kerak Bo‘lgan To‘lovlar
                     </h3>
                   </div>
-                  <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg">
+                  <span className="text-xs font-mono font-semibold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg">
                     Jami: {refunds.total_amount.toLocaleString('uz-UZ')} UZS
                   </span>
                 </div>
                 <div className="overflow-x-auto bg-black/30 rounded-xl border border-white/5">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                      <tr className="border-b border-white/10 text-left text-ui-muted text-xs font-semibold">
                         <th className="p-3">Foydalanuvchi</th>
                         <th className="p-3">Aloqa</th>
                         <th className="p-3">Summa</th>
@@ -1134,10 +1134,10 @@ export default function AdminPage() {
                       {refunds.payments.map((p) => (
                         <tr key={p.payment_id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                           <td className="p-3 font-semibold text-gray-200">{p.user_name || 'Nomsiz'}</td>
-                          <td className="p-3 text-gray-400 font-mono">{p.user_email || p.user_phone || '—'}</td>
-                          <td className="p-3 font-bold text-amber-400">{p.amount.toLocaleString('uz-UZ')} UZS</td>
+                          <td className="p-3 text-ui-muted font-mono">{p.user_email || p.user_phone || '—'}</td>
+                          <td className="p-3 font-semibold text-amber-400">{p.amount.toLocaleString('uz-UZ')} UZS</td>
                           <td className="p-3 text-gray-300 truncate max-w-[200px]">{p.video_title || '—'}</td>
-                          <td className="p-3 font-mono text-gray-400">{p.click_transaction_id || '—'}</td>
+                          <td className="p-3 font-mono text-ui-muted">{p.click_transaction_id || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1169,13 +1169,13 @@ export default function AdminPage() {
             {/* Blocked Accounts Table */}
             {blocked && blocked.users.length > 0 && (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 shadow-xl">
-                <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-200 ">
                   Kontent siyosati orqali cheklangan akkauntlar
                 </h3>
                 <div className="overflow-x-auto bg-black/20 rounded-xl border border-white/5">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                      <tr className="border-b border-white/10 text-left text-ui-muted text-xs font-semibold">
                         <th className="p-3">Foydalanuvchi</th>
                         <th className="p-3">Aloqa</th>
                         <th className="p-3 text-center">Buzilishlar soni</th>
@@ -1186,9 +1186,9 @@ export default function AdminPage() {
                       {blocked.users.map((u) => (
                         <tr key={u.user_id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                           <td className="p-3 font-semibold text-gray-200">{u.name || 'Nomsiz'}</td>
-                          <td className="p-3 text-gray-400 font-mono">{u.email || u.phone || '—'}</td>
-                          <td className="p-3 text-center font-bold text-red-400">{u.violation_count}</td>
-                          <td className="p-3 text-gray-400 font-mono">{formatTashkentDateTime(u.last_violation_at) || '—'}</td>
+                          <td className="p-3 text-ui-muted font-mono">{u.email || u.phone || '—'}</td>
+                          <td className="p-3 text-center font-semibold text-red-400">{u.violation_count}</td>
+                          <td className="p-3 text-ui-muted font-mono">{formatTashkentDateTime(u.last_violation_at) || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1200,13 +1200,13 @@ export default function AdminPage() {
             {/* Recent Violations Log */}
             {blocked && blocked.recent_violations.length > 0 && (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 shadow-xl">
-                <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-200 ">
                   So‘nggi qoidabuzarlik hodisalari jurnali
                 </h3>
                 <div className="overflow-x-auto bg-black/20 rounded-xl border border-white/5">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-left text-gray-400 text-[10px] uppercase font-semibold">
+                      <tr className="border-b border-white/10 text-left text-ui-muted text-xs font-semibold">
                         <th className="p-3">Vaqt</th>
                         <th className="p-3">Video sarlavhasi</th>
                         <th className="p-3">Aniqlangan bosqich</th>
@@ -1216,7 +1216,7 @@ export default function AdminPage() {
                     <tbody>
                       {blocked.recent_violations.map((v) => (
                         <tr key={v.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                          <td className="p-3 font-mono text-gray-400">{formatTashkentDateTime(v.created_at)}</td>
+                          <td className="p-3 font-mono text-ui-muted">{formatTashkentDateTime(v.created_at)}</td>
                           <td className="p-3 text-gray-200 font-medium truncate max-w-[300px]">{v.video_title || '—'}</td>
                           <td className="p-3 text-gray-300">
                             {v.stage === 'metadata' ? 'Sarlavha (Metadata)' : 'Transkript (Nutq)'}
@@ -1255,8 +1255,8 @@ export default function AdminPage() {
 
       {/* ===== CHANGE MY CREDENTIALS MODAL ===== */}
       {changeCredOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 ">
+          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
               <div className="flex items-center gap-3">
@@ -1264,13 +1264,13 @@ export default function AdminPage() {
                   <Key className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-extrabold text-white">Login va parolni o'zgartirish</h2>
-                  <p className="text-[11px] text-gray-400">Administrator hisob ma'lumotlarini yangilash</p>
+                  <h2 className="text-sm font-semibold text-white">Login va parolni o'zgartirish</h2>
+                  <p className="text-xs text-ui-muted">Administrator hisob ma'lumotlarini yangilash</p>
                 </div>
               </div>
               <button
                 onClick={() => setChangeCredOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1280,7 +1280,7 @@ export default function AdminPage() {
             <form onSubmit={handleChangeCredSubmit} className="p-6 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-ui-muted mb-1.5">
                   Ism
                 </label>
                 <input
@@ -1294,7 +1294,7 @@ export default function AdminPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-ui-muted mb-1.5">
                   Email (login)
                 </label>
                 <input
@@ -1308,7 +1308,7 @@ export default function AdminPage() {
 
               {/* New Password */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-ui-muted mb-1.5">
                   Yangi parol <span className="text-gray-600 normal-case font-normal">(bo'sh qolsa o'zgarmaydi)</span>
                 </label>
                 <div className="relative">
@@ -1323,7 +1323,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setShowCredPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ui-muted hover:text-gray-200 transition"
                   >
                     {showCredPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1349,14 +1349,14 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setChangeCredOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold text-sm transition"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-semibold text-sm transition"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={changeCredLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-semibold text-sm transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {changeCredLoading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /><span>Saqlanmoqda...</span></>
@@ -1374,7 +1374,7 @@ export default function AdminPage() {
       {showScrollTop && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-6 right-6 z-40 p-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer backdrop-blur"
+          className="fixed bottom-6 right-6 z-40 p-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-2xl border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer "
           aria-label="Yuqoriga qaytish"
           title="Yuqoriga qaytish"
         >

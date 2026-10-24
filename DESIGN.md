@@ -173,6 +173,12 @@ Sticky Surface header at 90% with backdrop blur (functional, not decorative), 64
 ### Footer
 Ground band, hairline top, four columns, payment logos on white tiles with a hairline.
 
+### Page shell
+Every inner page (about, FAQ, terms, privacy, donate, install, public videos, dashboard, video, analysis, subtitles, 404) uses `PageShell` (`components/PageShell.tsx`): the same sticky header and footer as the homepage, `main#main` on Surface, content at `max-w-6xl` (reading pages `max-w-3xl`), and `PageTitle` for the H1 + lead. Long legal text uses `.ui-prose`. Auth pages (login, register, forgot password) are the one exception: a minimal top bar (logo + back link) and a centered 400px card on Ground. Back links are quiet text links ("← Mening videolarim"), not icon buttons.
+
+### Legacy classes
+`.glass-card`, `.glass-input` and `.btn-premium` still exist in older markup but now render as a plain card, input and ink button; `.mesh-gradient` is hidden. Tailwind `blue-*` is remapped to the logo-blue scale and `gray/slate/zinc/neutral-*` to the neutral token scale, so untouched utility classes stay on-system. New code uses the `ui-*` tokens directly.
+
 ## Do's and Don'ts
 
 ### Do:

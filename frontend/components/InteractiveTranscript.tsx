@@ -83,21 +83,21 @@ export default function InteractiveTranscript({
   if (!cues || cues.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-[24px] p-4 sm:p-6 border border-black/5 dark:border-white/10 space-y-4">
+    <div className="glass-card rounded-2xl p-4 sm:p-6 border border-ui-rule space-y-4">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/5 dark:border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-ui-rule">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-ui-accent-ink flex items-center justify-center font-semibold text-xs">
             <Play size={14} className="fill-blue-500" />
           </div>
           <div>
-            <h4 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
+            <h4 className="text-xs sm:text-sm font-semibold text-ui-ink flex items-center gap-2">
               <span>Interaktiv Transkript</span>
-              <span className="text-[10px] font-semibold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold text-ui-accent-ink bg-blue-500/10 px-2 py-0.5 rounded-full">
                 {cues.length} ta gap
               </span>
             </h4>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-ui-muted">
               Kerakli gapni bosing — video o&apos;sha daqiqadan ijro etiladi
             </p>
           </div>
@@ -107,49 +107,49 @@ export default function InteractiveTranscript({
           {hasBilingual && (
             <button
               onClick={() => setMode(mode === "uz" ? "bilingual" : "uz")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border ${
                 mode === "bilingual"
-                  ? "bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400"
-                  : "bg-black/5 dark:bg-white/5 border-transparent text-gray-600 dark:text-gray-400"
+                  ? "bg-blue-500/15 border-blue-500/30 text-ui-accent-ink"
+                  : "bg-ui-ground border-transparent text-ui-muted"
               }`}
               title="Ikki tilli ko'rinish"
             >
               <Globe size={13} />
-              <span className="text-[11px]">Bilingual</span>
+              <span className="text-xs">Bilingual</span>
             </button>
           )}
 
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border ${
               autoScroll
                 ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-black/5 dark:bg-white/5 border-transparent text-gray-500 dark:text-gray-400"
+                : "bg-ui-ground border-transparent text-ui-muted"
             }`}
             title="Sinxron skroll qilish"
           >
             <ArrowDownCircle size={13} />
-            <span className="text-[11px]">{autoScroll ? "Sinxron ON" : "Sinxron OFF"}</span>
+            <span className="text-xs">{autoScroll ? "Sinxron ON" : "Sinxron OFF"}</span>
           </button>
 
           <button
             onClick={handleCopyAll}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-ui-ground hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 transition flex items-center gap-1.5"
             title="Matndan nusxa olish"
           >
             {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-            <span className="text-[11px]">{copied ? "Nusxalandi" : "Nusxalash"}</span>
+            <span className="text-xs">{copied ? "Nusxalandi" : "Nusxalash"}</span>
           </button>
 
           {jobId && (
             <a
               href={`/api/jobs/${jobId}/subtitles.txt`}
               download
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 transition flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-ui-ground hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 transition flex items-center gap-1"
               title=".txt formatida yuklab olish"
             >
               <Download size={13} />
-              <span className="text-[11px] hidden xs:inline">.TXT</span>
+              <span className="text-xs hidden xs:inline">.TXT</span>
             </a>
           )}
         </div>
@@ -159,19 +159,20 @@ export default function InteractiveTranscript({
       <div className="relative">
         <Search
           size={14}
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ui-muted"
         />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Transkript bo'yicha qidirish"
           placeholder="Transkript bo'yicha so'z qidirish..."
-          className="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl pl-9 pr-4 py-2.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-full bg-ui-ground border border-ui-rule rounded-2xl pl-9 pr-4 py-2.5 text-xs text-ui-ink placeholder:text-ui-muted focus:outline-none focus:ring-2 focus:ring-blue-500/20"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ui-muted hover:text-gray-600 dark:hover:text-gray-200"
           >
             ✕
           </button>
@@ -198,10 +199,10 @@ export default function InteractiveTranscript({
             >
               {/* Timestamp Badge */}
               <span
-                className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg flex-shrink-0 transition-colors ${
+                className={`font-mono text-xs font-semibold px-2 py-0.5 rounded-lg flex-shrink-0 transition-colors ${
                   isActive
-                    ? "bg-blue-500 text-white shadow-sm shadow-blue-500/30"
-                    : "bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 group-hover:bg-blue-500/10"
+                    ? "bg-blue-500 text-white shadow-sm "
+                    : "bg-ui-ground text-ui-muted group-hover:text-blue-500 group-hover:bg-blue-500/10"
                 }`}
               >
                 {formatTime(cue.start)}
@@ -220,7 +221,7 @@ export default function InteractiveTranscript({
                 </p>
 
                 {mode === "bilingual" && cue.origText && (
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 italic leading-snug">
+                  <p className="text-xs text-ui-muted italic leading-snug">
                     {cue.origText}
                   </p>
                 )}
@@ -230,7 +231,7 @@ export default function InteractiveTranscript({
         })}
 
         {filteredCues.length === 0 && (
-          <div className="py-8 text-center text-xs text-gray-400 dark:text-gray-500">
+          <div className="py-8 text-center text-xs text-ui-muted">
             &ldquo;{searchQuery}&rdquo; so&apos;zi bo&apos;yicha hech narsa topilmadi
           </div>
         )}

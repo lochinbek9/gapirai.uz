@@ -69,12 +69,12 @@ export default function CustomSelect({
         className={`w-full flex items-center justify-between gap-2 bg-[#0b0f19] hover:bg-[#111827] text-gray-200 border border-white/10 hover:border-white/20 rounded-xl px-3 py-1.5 text-xs font-medium transition shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <span className="flex items-center gap-1.5 truncate">
-          {icon && <span className="text-gray-400 shrink-0">{icon}</span>}
+          {icon && <span className="text-ui-muted shrink-0">{icon}</span>}
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           <span className="truncate">{selectedOption?.label || placeholder}</span>
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 ${
+          className={`w-3.5 h-3.5 text-ui-muted shrink-0 transition-transform duration-200 ${
             isOpen ? 'rotate-180 text-blue-400' : ''
           }`}
         />
@@ -82,7 +82,7 @@ export default function CustomSelect({
 
       {isOpen && (
         <div
-          className={`absolute z-50 mt-1 min-w-[170px] max-w-[280px] w-full right-0 bg-[#0c1222] border border-white/15 rounded-xl shadow-2xl p-1 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden ${menuClassName}`}
+          className={`absolute z-50 mt-1 min-w-[170px] max-w-[280px] w-full right-0 bg-[#0c1222] border border-white/15 rounded-xl shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-150 overflow-hidden ${menuClassName}`}
           style={{ colorScheme: 'dark' }}
         >
           <div className="max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-white/10">
@@ -107,7 +107,7 @@ export default function CustomSelect({
                     <span className="truncate">{opt.label}</span>
                     {opt.badge && (
                       <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                        className={`text-xs px-1.5 py-0.2 rounded font-mono ${
                           opt.badgeColor || 'bg-white/10 text-gray-300'
                         }`}
                       >

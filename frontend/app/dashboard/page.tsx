@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PageShell from '@/components/PageShell'
 import { useAuth } from '@/hooks/useAuth'
 import {
   listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl,
@@ -29,50 +30,50 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
   const isUnlimited = sub.minutes?.is_unlimited || (sub.minutes?.monthly_cap ?? 0) >= 99999
 
   return (
-    <div className="glass-card rounded-2xl p-4 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+    <div className="glass-card rounded-2xl p-4 sm:p-5 border border-ui-rule flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-ui-accent-ink flex items-center justify-center shrink-0">
           <Crown className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Joriy tarif</p>
+          <p className="text-ui-muted text-xs font-semibold ">Joriy tarif</p>
           <div className="flex items-center gap-2">
-            <p className="text-lg font-black text-gray-900 dark:text-white">{planName}</p>
+            <p className="text-lg font-semibold text-ui-ink">{planName}</p>
             {isAdmin && (
-              <span className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+              <span className="text-xs font-semibold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/10 text-ui-accent-ink border border-blue-500/20">
                 ADMIN
               </span>
             )}
           </div>
         </div>
-        <div className="sm:ml-3 text-xs text-gray-500 dark:text-gray-400 space-y-0.5 w-full sm:w-auto">
+        <div className="sm:ml-3 text-xs text-ui-muted space-y-0.5 w-full sm:w-auto">
           {sub.minutes && (
             <>
               {isUnlimited ? (
                 <p>
-                  <span className="font-bold text-violet-600 dark:text-violet-400">Cheksiz daqiqa</span>
-                  <span className="text-gray-500 text-[11px] ml-1.5 font-medium">(Barcha AI provayderlar faol)</span>
+                  <span className="font-semibold text-ui-accent-ink">Cheksiz daqiqa</span>
+                  <span className="text-gray-500 text-xs ml-1.5 font-medium">(Barcha AI provayderlar faol)</span>
                 </p>
               ) : (
                 <p>
-                  <span className="font-bold text-gray-800 dark:text-gray-200">{sub.minutes.monthly_remaining}</span>
+                  <span className="font-semibold text-ui-ink">{sub.minutes.monthly_remaining}</span>
                   {' / '}{sub.minutes.monthly_cap} daqiqa qoldi (oylik)
                 </p>
               )}
               {sub.minutes.monthly_used > 0 && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-ui-muted">
                   {sub.minutes.monthly_used} daqiqa ishlatildi
                 </p>
               )}
               {sub.minutes.purchased > 0 && !isUnlimited && (
-                <p className="text-violet-500 dark:text-violet-400 font-semibold">
+                <p className="text-ui-accent-ink font-semibold">
                   + {sub.minutes.purchased} sotib olingan daqiqa
                 </p>
               )}
             </>
           )}
           {sub.plan !== 'free' && sub.expires_at && !isUnlimited && (
-            <p className={expiresSoon ? 'text-amber-500 font-bold' : ''}>
+            <p className={expiresSoon ? 'text-amber-500 font-semibold' : ''}>
               {formatTashkentDate(sub.expires_at)} gacha
             </p>
           )}
@@ -82,7 +83,7 @@ function PlanCard({ sub, onRenew, renewing }: { sub: CurrentSubscription | null;
         <Link
           href="/pricing"
           onClick={sub.plan !== 'free' && expiresSoon ? (e) => { e.preventDefault(); onRenew() } : undefined}
-          className="flex items-center justify-center gap-2 btn-premium text-xs font-bold px-4 py-2.5 rounded-xl shadow-md w-full sm:w-auto"
+          className="flex items-center justify-center gap-2 btn-premium text-xs font-semibold px-4 py-2.5 rounded-xl w-full sm:w-auto"
         >
           {renewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
           {sub.plan === 'free' ? "Tarifni oshirish" : expiresSoon ? 'Yangilash' : 'Tariflarni ko\'rish'}
@@ -103,7 +104,7 @@ function StatusBadge({
 }) {
   if (status === 'completed') {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold bg-emerald-500/10 text-ui-green-ink border-emerald-500/20">
         <CheckCircle2 className="w-3 h-3" />
         Tayyor
       </span>
@@ -115,7 +116,7 @@ function StatusBadge({
       errorMessage?.toLowerCase().includes('bekor qilindi')
     if (isCancelled) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-slate-500/10 text-slate-400 border-slate-500/20">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-slate-500/10 text-slate-400 border-slate-500/20">
           <CircleSlash className="w-3 h-3 text-slate-400" />
           Bekor qilindi
         </span>
@@ -125,7 +126,7 @@ function StatusBadge({
     const isContentBlocked = errorCode === 'CONTENT_BLOCKED' || errorMessage?.toLowerCase().includes('kontent siyosati') || errorMessage?.toLowerCase().includes('taqiqlangan')
     if (isNoSpeech) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
           <MicOff className="w-3 h-3" />
           Nutq topilmadi
         </span>
@@ -133,26 +134,26 @@ function StatusBadge({
     }
     if (isContentBlocked) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
           <ShieldAlert className="w-3 h-3" />
           Rad etildi
         </span>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-red-500/10 text-ui-red-ink border-red-500/20">
         <XCircle className="w-3 h-3" />
         Xatolik
       </span>
     )
   }
   const cfg: Record<string, { color: string; icon: React.ReactNode }> = {
-    pending: { color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', icon: <Clock className="w-3 h-3" /> },
+    pending: { color: 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20', icon: <Clock className="w-3 h-3" /> },
   }
-  const def = { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
+  const def = { color: 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20', icon: <Loader2 className="w-3 h-3 animate-spin" /> }
   const { color, icon } = cfg[status] || def
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${color}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold ${color}`}>
       {icon}
       {STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status}
     </span>
@@ -200,25 +201,25 @@ function VideoCard({
   const styleDisplayName = job.voice_style && job.voice_style !== 'neutral' ? job.voice_style : 'Neytral'
 
   return (
-    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-indigo-500/20 rounded-2xl overflow-hidden transition-all duration-300">
+    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-blue-500/20 rounded-2xl overflow-hidden transition-all duration-300">
       {/* Thumbnail */}
       <div className="relative aspect-video bg-black/10 dark:bg-slate-900/60 overflow-hidden">
         {job.video_thumbnail ? (
           <img src={thumbnail} alt={job.video_title || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/[0.02]">
-            <Youtube className="w-12 h-12 text-slate-400 dark:text-slate-700" />
+          <div className="w-full h-full flex items-center justify-center bg-ui-ground">
+            <Youtube className="w-12 h-12 text-ui-muted" />
           </div>
         )}
         {/* Duration badge */}
-        <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-lg font-mono font-bold tracking-tighter">
+        <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-xs px-2 py-0.5 rounded-lg font-mono font-semibold tracking-tighter">
           {duration}
         </div>
         {/* Play overlay for ready jobs */}
         {isReady && (
-          <Link href={`/video/${job.job_id}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm">
+          <Link href={`/video/${job.job_id}`} aria-label={`${job.video_title || 'Video'} — ochish`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 ">
             <div className="w-12 h-12 bg-white/95 rounded-2xl flex items-center justify-center shadow-lg transition transform translate-y-2 group-hover:translate-y-0 duration-300">
-              <Play className="w-5 h-5 text-indigo-600 fill-indigo-600 ml-0.5" />
+              <Play className="w-5 h-5 text-blue-600 fill-blue-600 ml-0.5" />
             </div>
           </Link>
         )}
@@ -227,9 +228,9 @@ function VideoCard({
           <Link
             href={`/video/${job.job_id}`}
             title="Jarayonni ko'rish"
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 "
           >
-            <div className="px-3 py-1.5 bg-indigo-600/90 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-lg">
+            <div className="px-3 py-1.5 bg-blue-600/90 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-lg">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               <span>Jarayonni ko'rish</span>
             </div>
@@ -239,24 +240,24 @@ function VideoCard({
         {!isReady && !isFailed && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
             <div
-              className="h-full bg-indigo-500 transition-all duration-300"
+              className="h-full bg-blue-500 transition-all duration-300"
               style={{ width: `${Math.max(5, Math.min(100, job.progress || 0))}%` }}
             />
           </div>
         )}
         {/* Top-left: Voice & Gender badge */}
-        <div className="absolute top-2.5 left-2.5 bg-black/75 text-white text-[9px] font-bold tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm">
-          {isFemale ? <Mic2 className="w-3 h-3 text-pink-400" /> : <Mic2 className="w-3 h-3 text-indigo-400" />}
+        <div className="absolute top-2.5 left-2.5 bg-black/75 text-white text-xs font-semibold tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 ">
+          {isFemale ? <Mic2 className="w-3 h-3 text-blue-400" /> : <Mic2 className="w-3 h-3 text-blue-400" />}
           <span>{genderDisplayName} • {voiceDisplayName}</span>
         </div>
         {/* Top-right: Provider badge */}
         <div className="absolute top-2.5 right-2.5">
-          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-md ${
+          <span className={`text-xs font-semibold px-2 py-1 rounded-lg shadow-md ${
             prov === 'gemini'
-              ? 'bg-violet-900/80 text-violet-200 border border-violet-500/30'
-              : prov === 'edge'
-              ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-500/30'
-              : 'bg-sky-900/80 text-sky-200 border border-sky-500/30'
+            ? 'bg-blue-900/80 text-blue-200 border border-blue-500/30'
+            : prov === 'edge'
+            ? 'bg-emerald-900/80 text-emerald-200 border border-emerald-500/30'
+            : 'bg-blue-900/80 text-blue-200 border border-blue-500/30'
           }`}>
             {prov === 'gemini' ? 'HD' : prov === 'edge' ? 'Standart' : 'Neural'}
           </span>
@@ -265,27 +266,27 @@ function VideoCard({
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
-          <Link href={`/video/${job.job_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+        <h3 className="text-ui-ink font-semibold text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
+          <Link href={`/video/${job.job_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition">
             {job.video_title || 'Yuklanmoqda...'}
           </Link>
         </h3>
 
         {/* Metadata chips */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[10px]">
-          <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border ${
+        <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
+          <span className={`px-2 py-0.5 rounded-md font-semibold border ${
             prov === 'gemini'
-              ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20'
-              : prov === 'edge'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-              : 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
+            ? 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20'
+            : prov === 'edge'
+            ? 'bg-emerald-500/10 text-ui-green-ink border-emerald-500/20'
+            : 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20'
           }`}>
             {prov === 'gemini' ? 'GapirAI HD' : prov === 'edge' ? 'Standart' : 'Neural HD'}
           </span>
-          <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+          <span className="px-2 py-0.5 rounded-md font-medium bg-ui-ground text-gray-700 dark:text-gray-300 border border-ui-rule">
             {voiceDisplayName} ({genderDisplayName})
           </span>
-          <span className="px-1.5 py-0.5 rounded-md font-medium text-gray-400 dark:text-gray-500 bg-black/[0.02] dark:bg-white/[0.02]">
+          <span className="px-1.5 py-0.5 rounded-md font-medium text-ui-muted bg-ui-ground">
             Ohang: {styleDisplayName}
           </span>
         </div>
@@ -296,18 +297,18 @@ function VideoCard({
             {isReady ? (
               <Link
                 href={`/video/${job.job_id}`}
-                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-bold"
+                className="text-xs text-ui-accent-ink hover:text-blue-500 font-semibold"
               >
                 Ko'rish →
               </Link>
             ) : !isFailed ? (
               <Link
                 href={`/video/${job.job_id}`}
-                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium flex items-center gap-1"
+                className="text-xs text-ui-accent-ink hover:text-blue-500 font-medium flex items-center gap-1"
                 title="Jarayonni ko'rish"
               >
                 <span>Jarayon</span>
-                {job.progress ? <span className="font-mono text-[11px]">({Math.round(job.progress)}%)</span> : null}
+                {job.progress ? <span className="font-mono text-xs">({Math.round(job.progress)}%)</span> : null}
                 <span>→</span>
               </Link>
             ) : null}
@@ -316,7 +317,7 @@ function VideoCard({
                 onClick={() => onRetry(job.job_id, false)}
                 disabled={isRetrying}
                 title="Qayta urinish (retry)"
-                className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+                className="text-ui-muted hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
               >
                 <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
               </button>
@@ -326,9 +327,9 @@ function VideoCard({
                 onClick={() => onRetry(job.job_id, true)}
                 disabled={isRetrying}
                 title="Qayta yaratish (Regenerate)"
-                className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+                className="text-ui-muted hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
               >
-                <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
+                <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-ui-accent-ink' : ''}`} />
               </button>
             )}
             <button
@@ -338,7 +339,7 @@ function VideoCard({
                 onDelete(job.job_id)
               }}
               disabled={isDeleting || isRetrying}
-              className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+              className="text-ui-muted hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
               title="O'chirish"
             >
               {isDeleting ? (
@@ -382,7 +383,7 @@ function AnalysisCard({
     ''
 
   return (
-    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-violet-500/20 rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between">
+    <div className="group glass-card hover:translate-y-[-2px] hover:shadow-xl hover:border-blue-500/20 rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between">
       <div>
         {/* Thumbnail */}
         <div className="relative aspect-video bg-black/10 dark:bg-slate-900/60 overflow-hidden">
@@ -393,27 +394,27 @@ function AnalysisCard({
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/[0.02]">
-              <Sparkles className="w-12 h-12 text-violet-400" />
+            <div className="w-full h-full flex items-center justify-center bg-ui-ground">
+              <Sparkles className="w-12 h-12 text-blue-400" />
             </div>
           )}
 
           {/* Duration badge */}
           {duration && (
-            <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-lg font-mono font-bold tracking-tighter">
+            <div className="absolute bottom-2.5 right-2.5 bg-black/75 text-white text-xs px-2 py-0.5 rounded-lg font-mono font-semibold tracking-tighter">
               {duration}
             </div>
           )}
 
           {/* Top-left: AI Tahlil badge */}
-          <div className="absolute top-2.5 left-2.5 bg-violet-950/80 text-violet-200 border border-violet-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 backdrop-blur-sm shadow-md">
-            <Sparkles className="w-3 h-3 text-violet-400" />
+          <div className="absolute top-2.5 left-2.5 bg-blue-950/80 text-blue-200 border border-blue-500/30 text-xs font-semibold px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-md">
+            <Sparkles className="w-3 h-3 text-blue-400" />
             <span>AI Tahlil</span>
           </div>
 
           {/* Top-right: Language badge */}
           <div className="absolute top-2.5 right-2.5">
-            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-md bg-black/75 text-white border border-white/10">
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg shadow-md bg-black/75 text-white border border-white/10">
               {analysis.language.toUpperCase()}
             </span>
           </div>
@@ -421,9 +422,9 @@ function AnalysisCard({
           {/* Hover overlay */}
           <Link
             href={`/video-analysis/${analysis.id}`}
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 "
           >
-            <div className="px-3.5 py-2 bg-white text-gray-900 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg transition transform translate-y-1 group-hover:translate-y-0">
+            <div className="px-3.5 py-2 bg-white text-gray-900 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-lg transition transform translate-y-1 group-hover:translate-y-0">
               <Play className="w-4 h-4 fill-gray-900 ml-0.5" />
               <span>Tahlilni ko'rish</span>
             </div>
@@ -433,7 +434,7 @@ function AnalysisCard({
           {!isReady && !isFailed && (
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-300"
+                className="h-full bg-blue-500 transition-all duration-300"
                 style={{ width: `${Math.max(5, Math.min(100, analysis.progress || 0))}%` }}
               />
             </div>
@@ -442,35 +443,35 @@ function AnalysisCard({
 
         {/* Content */}
         <div className="p-4">
-          <h3 className="text-gray-900 dark:text-white font-bold text-sm line-clamp-2 mb-1.5 min-h-[2.5rem]">
+          <h3 className="text-ui-ink font-semibold text-sm line-clamp-2 mb-1.5 min-h-[2.5rem]">
             <Link
               href={`/video-analysis/${analysis.id}`}
-              className="hover:text-violet-600 dark:hover:text-violet-400 transition"
+              className="hover:text-blue-600 dark:hover:text-blue-400 transition"
             >
               {analysis.video_title || 'YouTube video tahlili'}
             </Link>
           </h3>
 
           {summaryText && (
-            <p className="text-gray-500 dark:text-gray-400 text-xs line-clamp-2 mb-3 leading-relaxed">
+            <p className="text-ui-muted text-xs line-clamp-2 mb-3 leading-relaxed">
               {summaryText}
             </p>
           )}
 
           {/* Chips */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[10px]">
+          <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
             {analysis.chapters && analysis.chapters.length > 0 && (
-              <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+              <span className="px-2 py-0.5 rounded-md font-medium bg-ui-ground text-gray-700 dark:text-gray-300 border border-ui-rule">
                 {analysis.chapters.length} ta bob
               </span>
             )}
             {analysis.key_points && analysis.key_points.length > 0 && (
-              <span className="px-2 py-0.5 rounded-md font-medium bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-black/5 dark:border-white/5">
+              <span className="px-2 py-0.5 rounded-md font-medium bg-ui-ground text-gray-700 dark:text-gray-300 border border-ui-rule">
                 {analysis.key_points.length} asosiy fikr
               </span>
             )}
             {analysis.notes && (
-              <span className="px-2 py-0.5 rounded-md font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+              <span className="px-2 py-0.5 rounded-md font-medium bg-blue-500/10 text-ui-accent-ink border border-blue-500/20">
                 Konspekt mavjud
               </span>
             )}
@@ -479,20 +480,20 @@ function AnalysisCard({
       </div>
 
       {/* Footer / Status */}
-      <div className="p-4 pt-0 border-t border-black/5 dark:border-white/5 mt-2 flex items-center justify-between">
+      <div className="p-4 pt-0 border-t border-ui-rule mt-2 flex items-center justify-between">
         <div>
           {isReady ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-emerald-500/10 text-ui-green-ink border-emerald-500/20">
               <CheckCircle2 className="w-3 h-3" />
               Tayyor
             </span>
           ) : isFailed ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold tracking-wider bg-red-500/10 text-ui-red-ink border-red-500/20">
               <XCircle className="w-3 h-3" />
               Xatolik
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-semibold bg-blue-500/10 text-ui-accent-ink border-blue-500/20">
               <Loader2 className="w-3 h-3 animate-spin" />
               {analysis.status_message || 'Tahlil qilinmoqda'}
             </span>
@@ -505,7 +506,7 @@ function AnalysisCard({
               onClick={() => onRetry(analysis.id)}
               disabled={isRetrying}
               title="Qayta urinish (Retry)"
-              className="text-gray-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+              className="text-ui-muted hover:text-emerald-500 hover:bg-emerald-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             >
               <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-emerald-500' : ''}`} />
             </button>
@@ -515,21 +516,21 @@ function AnalysisCard({
               onClick={() => onRetry(analysis.id)}
               disabled={isRetrying}
               title="Qayta tahlil qilish (Regenerate)"
-              className="text-gray-400 hover:text-violet-500 hover:bg-violet-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+              className="text-ui-muted hover:text-blue-500 hover:bg-blue-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             >
-              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-violet-500' : ''}`} />
+              <RotateCw className={`w-4 h-4 ${isRetrying ? 'animate-spin text-ui-accent-ink' : ''}`} />
             </button>
           )}
           <Link
             href={`/video-analysis/${analysis.id}`}
-            className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-500 font-bold whitespace-nowrap"
+            className="text-xs text-ui-accent-ink hover:text-blue-500 font-semibold whitespace-nowrap"
           >
             Ko'rish →
           </Link>
           <button
             onClick={() => onDelete(analysis.id)}
             disabled={isDeleting || isRetrying}
-            className="text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
+            className="text-ui-muted hover:text-red-500 hover:bg-red-500/10 transition p-1.5 rounded-xl disabled:opacity-50"
             title="O'chirish"
           >
             {isDeleting ? (
@@ -544,110 +545,44 @@ function AnalysisCard({
   )
 }
 
-function MeshBackground() {
-  return (
-    <div className="mesh-gradient">
-      <div className="mesh-gradient-blob blob-1" />
-      <div className="mesh-gradient-blob blob-2" />
-      <div className="mesh-gradient-blob blob-3" />
-    </div>
-  );
-}
 
 /**
  * FreeTierConversionBanner — only shown to free-plan users.
  * Offers a quick jump to /pricing with Starter pack & subscription highlights.
  */
 function FreeTierConversionBanner({ onDismiss }: { onDismiss: () => void }) {
+  const OPTIONS = [
+    { href: '/pricing#minute-packs', icon: Package, name: 'Bir martalik paket', value: '+15 daqiqa', note: '4 900 soʻm, kuymaydi', action: 'Sotib olish' },
+    { href: '/pricing#plans', icon: Zap, name: 'Standart', value: '350 daqiqa / 30 kun', note: '720p, ustuvor navbat', action: 'Tarifni koʻrish' },
+    { href: '/pricing#plans', icon: Crown, name: 'Pro', value: '600 daqiqa / 30 kun', note: '1080p, ovoz variantlari', action: 'Tarifni koʻrish' },
+  ]
   return (
-    <div className="relative mb-6 rounded-2xl overflow-hidden border border-violet-500/30 shadow-2xl shadow-violet-900/20">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-950/80 via-indigo-950/80 to-slate-900/90 backdrop-blur-sm" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_60%)]" />
-
-      {/* Dismiss button */}
+    <section aria-labelledby="upgrade-title" className="ui-card relative mb-6 p-5 sm:p-6">
       <button
+        type="button"
         onClick={onDismiss}
-        className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition"
+        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg text-ui-muted transition hover:bg-ui-ground hover:text-ui-ink"
         aria-label="Yopish"
       >
-        <X className="w-3.5 h-3.5" />
+        <X aria-hidden="true" className="h-4 w-4" />
       </button>
-
-      <div className="relative z-10 p-5 sm:p-6">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-violet-400" />
-          </div>
-          <div>
-            <h3 className="text-white font-extrabold text-sm sm:text-base leading-tight">
-              Bepul daqiqalaringiz tugamoqda?
-            </h3>
-            <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">
-              Bir necha soniyada daqiqa paketi olib, dublyajni to'xtovsiz davom ettiring.
-            </p>
-          </div>
-        </div>
-
-        {/* Cards row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Starter pack */}
-          <Link
-            href="/pricing#packages"
-            className="group flex flex-col gap-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 hover:bg-emerald-500/15 transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-emerald-300 font-extrabold text-xs uppercase tracking-wider">Starter paketi</span>
-            </div>
-            <p className="text-white font-bold text-base leading-none">+15 daqiqa</p>
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              Bir martalik maxsus taklif. Tez sinab ko'rish uchun ideal.
-            </p>
-            <span className="mt-auto self-start text-emerald-400 text-[11px] font-bold group-hover:underline">
-              Sotib olish →
-            </span>
-          </Link>
-
-          {/* Standart plan */}
-          <Link
-            href="/pricing#plans"
-            className="group flex flex-col gap-2 p-4 rounded-xl bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 hover:bg-blue-500/15 transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="text-blue-300 font-extrabold text-xs uppercase tracking-wider">Standart tarif</span>
-            </div>
-            <p className="text-white font-bold text-base leading-none">350 daq / oy</p>
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              720p sifat, yuqori ustuvorlik navbati, oylik abonement.
-            </p>
-            <span className="mt-auto self-start text-blue-400 text-[11px] font-bold group-hover:underline">
-              Tarifni ko'rish →
-            </span>
-          </Link>
-
-          {/* Pro plan */}
-          <Link
-            href="/pricing#plans"
-            className="group flex flex-col gap-2 p-4 rounded-xl bg-violet-500/10 border border-violet-500/25 hover:border-violet-400/50 hover:bg-violet-500/15 transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-violet-400 shrink-0" />
-              <span className="text-violet-300 font-extrabold text-xs uppercase tracking-wider">Pro tarif</span>
-            </div>
-            <p className="text-white font-bold text-base leading-none">600 daq / oy</p>
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              1080p sifat, Azure Neural TTS, eng yuqori ustuvorlik.
-            </p>
-            <span className="mt-auto self-start text-violet-400 text-[11px] font-bold group-hover:underline">
-              Pro olish →
-            </span>
-          </Link>
-        </div>
-      </div>
-    </div>
+      <h2 id="upgrade-title" className="pr-10 text-lg font-semibold text-ui-ink">Bepul daqiqalaringiz tugamoqdami?</h2>
+      <p className="mt-1 text-sm text-ui-muted">Paket yoki obuna bilan dublyajni toʻxtovsiz davom ettiring.</p>
+      <ul className="mt-5 grid gap-3 sm:grid-cols-3">
+        {OPTIONS.map(({ href, icon: Icon, name, value, note, action }) => (
+          <li key={name}>
+            <Link href={href} className="group flex h-full flex-col rounded-control border border-ui-rule p-4 transition hover:border-ui-muted/60">
+              <span className="flex items-center gap-2 text-sm text-ui-muted">
+                <Icon aria-hidden="true" className="h-4 w-4" /> {name}
+              </span>
+              <span className="mt-2 text-base font-semibold text-ui-ink tabular-nums">{value}</span>
+              <span className="mt-0.5 text-sm text-ui-muted">{note}</span>
+              <span className="mt-3 text-sm font-medium text-ui-accent-ink group-hover:underline">{action}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -796,8 +731,9 @@ export default function DashboardPage() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#050101] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div className="flex min-h-screen items-center justify-center bg-ui-surface" role="status">
+        <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
+        <span className="sr-only">Yuklanmoqda</span>
       </div>
     )
   }
@@ -806,57 +742,46 @@ export default function DashboardPage() {
   const processingCount = jobsStats ? jobsStats.processing : jobs.filter(j => !['completed', 'failed'].includes(j.status)).length
   const totalCount = jobsStats ? jobsStats.total : jobs.length
 
-  return (
-    <div className="min-h-screen relative flex flex-col transition-colors duration-300">
-      <MeshBackground />
+  const TAB = (active: boolean) =>
+    `flex min-h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition ${
+      active ? 'bg-ui-surface text-ui-ink shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_rgb(var(--ui-rule))]' : 'text-ui-muted hover:text-ui-ink'
+    }`
 
-      {/* Header */}
-      <header className="border-b border-black/5 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl sticky top-0 z-10 transition-colors">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-4 flex items-center justify-between gap-2">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
-            <img src="/logo.webp" alt="GapirAI.uz" width={120} height={32} className="h-8 sm:h-12 md:h-16 w-auto object-contain dark:hidden transition duration-300 group-hover:scale-105" />
-            <img src="/logodark.webp" alt="GapirAI.uz" width={120} height={32} className="h-8 sm:h-12 md:h-16 w-auto object-contain hidden dark:block transition duration-300 group-hover:scale-105" />
-          </Link>
-          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
-            <div className="hidden md:flex items-center gap-2 text-gray-600 dark:text-gray-300 transition-colors">
-              <User2 className="w-4 h-4 text-blue-500 shrink-0" />
-              <span className="text-xs font-bold truncate max-w-[120px]">{user.name}</span>
-            </div>
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 sm:gap-2 btn-premium text-xs font-bold px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl shadow-md whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4 shrink-0" />
-              <span className="hidden xs:inline">Yangi video</span>
+  return (
+    <PageShell>
+      <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-10 sm:px-6 sm:pt-14">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-[-0.03em] text-ui-ink sm:text-4xl">Mening videolarim</h1>
+            <p className="mt-2 flex items-center gap-1.5 text-[15px] text-ui-muted">
+              <User2 aria-hidden="true" className="h-4 w-4" />
+              <span className="truncate">{user.name}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/" className="ui-btn ui-btn-primary">
+              <Plus aria-hidden="true" className="h-4 w-4" /> Yangi video
             </Link>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 sm:gap-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-bold transition px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 whitespace-nowrap"
-            >
-              <LogOut className="w-4 h-4 shrink-0" />
-              <span className="hidden xs:inline">Chiqish</span>
+            <button type="button" onClick={handleLogout} className="ui-btn ui-btn-secondary">
+              <LogOut aria-hidden="true" className="h-4 w-4" /> Chiqish
             </button>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-6 sm:py-8 flex-1">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-6 sm:mb-8">
-          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Jami</p>
-            <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-white">{totalCount}</p>
-          </div>
-          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Tayyor</p>
-            <p className="text-xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">{completedCount}</p>
-          </div>
-          <div className="glass-card rounded-2xl p-3 sm:p-5 border border-black/5 dark:border-white/5 shadow-inner">
-            <p className="text-gray-500 dark:text-gray-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider mb-0.5 sm:mb-1">Jarayonda</p>
-            <p className="text-xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">{processingCount}</p>
-          </div>
-        </div>
+        <dl className="mt-8 grid grid-cols-3 divide-x divide-ui-rule rounded-card border border-ui-rule">
+          {[
+            ['Jami', totalCount],
+            ['Tayyor', completedCount],
+            ['Jarayonda', processingCount],
+          ].map(([label, value]) => (
+            <div key={label as string} className="px-4 py-4 sm:px-6 sm:py-5">
+              <dt className="text-sm text-ui-muted">{label}</dt>
+              <dd className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-ui-ink tabular-nums sm:text-3xl">{value}</dd>
+            </div>
+          ))}
+        </dl>
 
+        <div className="mt-6" />
         <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
 
         {/* Conversion banner: only for free users who haven't dismissed it */}
@@ -869,53 +794,31 @@ export default function DashboardPage() {
         <DonateCTA className="mb-6" />
 
         {/* Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-fit">
-            <button
-              onClick={() => setActiveTab('dubbing')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                activeTab === 'dubbing'
-                  ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <Youtube className="w-4 h-4 text-rose-500" />
-              <span>Dublyaj videolarim</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 font-mono">
-                {jobs.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('analysis')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                activeTab === 'analysis'
-                  ? 'bg-white dark:bg-white/10 text-violet-600 dark:text-violet-400 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-violet-500" />
-              <span>Video tahlillari</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 font-mono font-bold">
-                {analyses.length}
-              </span>
-            </button>
-          </div>
+        <div role="tablist" aria-label="Videolar turi" className="mb-6 mt-4 inline-flex gap-1 rounded-control bg-ui-ground p-1">
+          <button type="button" role="tab" aria-selected={activeTab === 'dubbing'} onClick={() => setActiveTab('dubbing')} className={TAB(activeTab === 'dubbing')}>
+            <Youtube aria-hidden="true" className="h-4 w-4" />
+            <span>Dublyaj</span>
+            <span className="text-xs text-ui-muted tabular-nums">{jobs.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'analysis'} onClick={() => setActiveTab('analysis')} className={TAB(activeTab === 'analysis')}>
+            <Sparkles aria-hidden="true" className="h-4 w-4" />
+            <span>Tahlillar</span>
+            <span className="text-xs text-ui-muted tabular-nums">{analyses.length}</span>
+          </button>
         </div>
 
         {/* Content by active tab */}
         {activeTab === 'dubbing' && (
           jobsLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="flex items-center justify-center py-20" role="status">
+              <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
+              <span className="sr-only">Yuklanmoqda</span>
             </div>
           ) : jobs.length === 0 ? (
-            <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
-              <Youtube className="w-16 h-16 text-gray-300 dark:text-slate-800 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video yo'q</p>
-              <Link href="/" className="text-blue-500 hover:underline text-xs font-bold uppercase tracking-wider">
-                Birinchi videoni dublyaj qiling →
-              </Link>
+            <div className="rounded-card border border-dashed border-ui-rule px-6 py-16 text-center">
+              <p className="text-lg font-semibold text-ui-ink">Hali video yoʻq</p>
+              <p className="mt-1 text-[15px] text-ui-muted">YouTube havolasini yuboring — tayyor videolar shu yerda saqlanadi.</p>
+              <Link href="/" className="ui-btn ui-btn-primary mt-6">Birinchi videoni dublyaj qilish</Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -935,19 +838,15 @@ export default function DashboardPage() {
 
         {activeTab === 'analysis' && (
           analysesLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+            <div className="flex items-center justify-center py-20" role="status">
+              <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
+              <span className="sr-only">Yuklanmoqda</span>
             </div>
           ) : analyses.length === 0 ? (
-            <div className="text-center py-20 glass-card rounded-3xl p-8 border border-black/5 dark:border-white/5">
-              <Sparkles className="w-16 h-16 text-violet-300 dark:text-violet-900/60 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500 dark:text-gray-400 font-bold mb-2">Hali video tahlil qilinmagan</p>
-              <p className="text-xs text-gray-400 mb-4 max-w-sm mx-auto">
-                YouTube videoning xulosasi, asosiy fikrlari va transkriptini bir necha soniyada oling.
-              </p>
-              <Link href="/" className="text-violet-500 hover:underline text-xs font-bold uppercase tracking-wider">
-                Video tahlil qilish →
-              </Link>
+            <div className="rounded-card border border-dashed border-ui-rule px-6 py-16 text-center">
+              <p className="text-lg font-semibold text-ui-ink">Hali video tahlil qilinmagan</p>
+              <p className="mx-auto mt-1 max-w-sm text-[15px] text-ui-muted">YouTube videoning xulosasi, asosiy fikrlari va konspektini oling — daqiqa sarflamaydi.</p>
+              <Link href="/?mode=analyze" className="ui-btn ui-btn-primary mt-6">Video tahlil qilish</Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -964,7 +863,7 @@ export default function DashboardPage() {
             </div>
           )
         )}
-      </main>
-    </div>
+      </div>
+    </PageShell>
   )
 }
