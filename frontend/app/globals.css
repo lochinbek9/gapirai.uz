@@ -29,23 +29,66 @@
   --primary-glow: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
 }
 
+/* ── Metro tizimi tokenlari (DESIGN.md) ─────────────────
+   Marmar (yorug') / tungi bekat graniti (qorong'i). Uch liniya rangi faqat
+   ma'no tashiydi: qizil = Dublyaj, ko'k = Subtitr, yashil = Tahlil.
+   *-ink variantlari matn sifatida fonda >=4.5:1 kontrastga ega. */
+:root {
+  --m-ground: 241 238 232;
+  --m-surface: 251 250 247;
+  --m-ink: 27 27 29;
+  --m-muted: 84 81 76;
+  --m-rule: 214 208 196;
+  --m-plaque: 31 31 34;
+  --m-plaque-ink: 244 241 235;
+  --m-brass: 169 134 72;
+  --m-red: 200 32 43;
+  --m-red-ink: 178 24 34;
+  --m-blue: 29 91 168;
+  --m-blue-ink: 26 82 152;
+  --m-green: 24 128 74;
+  --m-green-ink: 19 107 61;
+}
+.dark {
+  --m-ground: 18 18 20;
+  --m-surface: 28 28 31;
+  --m-ink: 241 238 232;
+  --m-muted: 185 180 170;
+  --m-rule: 58 58 64;
+  --m-plaque: 40 40 45;
+  --m-plaque-ink: 244 241 235;
+  --m-brass: 196 163 104;
+  --m-red: 212 45 56;
+  --m-red-ink: 255 120 128;
+  --m-blue: 45 108 190;
+  --m-blue-ink: 130 178 240;
+  --m-green: 24 128 74;
+  --m-green-ink: 104 205 150;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
+
+::selection {
+  background: rgb(var(--m-red) / 0.85);
+  color: #fff;
+}
+input, textarea { caret-color: rgb(var(--m-red)); }
 
 html {
   min-height: 100%;
   scroll-behavior: smooth;
   scrollbar-width: auto;
-  scrollbar-color: #818cf8 rgba(15, 23, 42, 0.85);
+  scrollbar-color: rgb(var(--m-muted) / 0.6) transparent;
 }
 
 * {
-  scrollbar-color: #818cf8 rgba(15, 23, 42, 0.85);
+  scrollbar-color: rgb(var(--m-muted) / 0.6) transparent;
 }
 
 body {
   background-color: var(--bg-color);
   color: var(--text-primary);
-  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   position: relative;
   overflow-x: hidden;
@@ -112,34 +155,22 @@ body {
 
 /* ── Scrollbar (Aniq ko'rinadigan qulay yurgich) ─── */
 ::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.85);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+  background: rgb(var(--m-muted) / 0.55);
   border-radius: 9999px;
-  border: 3px solid rgba(15, 23, 42, 0.85);
-  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.3), 0 0 6px rgba(99, 102, 241, 0.35);
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  border: 3px solid rgb(var(--m-ground));
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
-  border: 3px solid rgba(15, 23, 42, 0.85);
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--m-muted) / 0.85);
 }
-::-webkit-scrollbar-thumb:hover,
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #818cf8 0%, #a855f7 100%);
-  border: 2px solid rgba(15, 23, 42, 0.85);
-  box-shadow: 0 0 12px rgba(139, 92, 246, 0.65), inset 0 0 6px rgba(255, 255, 255, 0.5);
-}
-::-webkit-scrollbar-thumb:active,
-.dark ::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg, #a855f7 0%, #c084fc 100%);
-  border: 2px solid rgba(15, 23, 42, 0.85);
-  box-shadow: 0 0 16px rgba(192, 132, 252, 0.9);
+::-webkit-scrollbar-thumb:active {
+  background: rgb(var(--m-ink));
 }
 
 /* Horizontal scrollbar (jadvallar va gorizontal konteynerlar uchun) */
@@ -147,11 +178,11 @@ body {
   height: 12px;
 }
 ::-webkit-scrollbar-thumb:horizontal {
-  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-  border: 2px solid rgba(15, 23, 42, 0.85);
+  background: rgb(var(--m-muted) / 0.55);
+  border: 3px solid rgb(var(--m-ground));
 }
 ::-webkit-scrollbar-thumb:horizontal:hover {
-  background: linear-gradient(90deg, #818cf8 0%, #a855f7 100%);
+  background: rgb(var(--m-muted) / 0.85);
 }
 ::-webkit-scrollbar-thumb:horizontal:active {
   background: linear-gradient(90deg, #a855f7 0%, #c084fc 100%);
@@ -203,7 +234,7 @@ body {
    focus-visible:ring-* bundan ustun turadi). */
 @layer base {
   :focus-visible {
-    outline: 2px solid #7c3aed;
+    outline: 2px solid rgb(var(--m-blue));
     outline-offset: 2px;
   }
 }
@@ -306,4 +337,71 @@ body {
     transparent
   );
   animation: shimmer 2s infinite;
+}
+
+/* ── Metro komponentlari ─────────────────────────────────
+   Holatlar grammatikasi: hover = bir pog'ona to'qroq, bosilgan = 1px pastga,
+   o'chirilgan = qoida rangi fon + muted matn, faol = liniya rangi. */
+@layer components {
+  .m-label {
+    font-family: var(--font-sign), var(--font-sans), sans-serif;
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(var(--m-muted));
+  }
+  .m-input {
+    background: rgb(var(--m-surface));
+    border: 2px solid rgb(var(--m-rule));
+    border-radius: 6px;
+    color: rgb(var(--m-ink));
+    transition: border-color 0.15s ease;
+  }
+  .m-input:hover { border-color: rgb(var(--m-muted) / 0.6); }
+  .m-input:focus-within, .m-input:focus { border-color: rgb(var(--m-ink)); }
+  .m-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0 1.25rem;
+    border-radius: 6px;
+    font-family: var(--font-sign), var(--font-sans), sans-serif;
+    font-weight: 700;
+    font-size: 1.0625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgb(var(--m-plaque));
+    transition: filter 0.15s ease, transform 0.1s ease, background-color 0.15s ease;
+  }
+  .m-btn:hover:not(:disabled) { filter: brightness(0.9); }
+  .m-btn:active:not(:disabled) { transform: translateY(1px); }
+  .m-btn:disabled {
+    background: rgb(var(--m-rule));
+    color: rgb(var(--m-muted));
+    cursor: not-allowed;
+  }
+  .m-btn-red { background: rgb(var(--m-red)); }
+  .m-btn-blue { background: rgb(var(--m-blue)); }
+  .m-btn-green { background: rgb(var(--m-green)); }
+  .m-btn-ghost {
+    background: transparent;
+    color: rgb(var(--m-ink));
+    box-shadow: inset 0 0 0 2px rgb(var(--m-rule));
+  }
+  .m-btn-ghost:hover:not(:disabled) { filter: none; box-shadow: inset 0 0 0 2px rgb(var(--m-ink)); }
+  .m-plaque {
+    background: rgb(var(--m-plaque));
+    color: rgb(var(--m-plaque-ink));
+    border-radius: 6px;
+  }
+  .m-num { font-variant-numeric: tabular-nums; }
+}
+
+@keyframes metro-train {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--train-to, 0)); }
 }
