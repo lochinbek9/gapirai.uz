@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T07:58:56Z",
+  "title": "Design System: GapirAI.uz",
+  "extensions": {
+    "colorMeta": {
+      "marble-ground": {
+        "role": "neutral",
+        "displayName": "Marble Wall",
+        "canonical": "#F1EEE8",
+        "tonalRamp": [
+          "#30291D",
+          "#4F4530",
+          "#6F6044",
+          "#8F7C57",
+          "#AE9D7A",
+          "#C5B9A0",
+          "#DCD5C6",
+          "#F5F3EF"
+        ]
+      },
+      "marble-surface": {
+        "role": "neutral",
+        "displayName": "Polished Marble",
+        "canonical": "#FBFAF7",
+        "tonalRamp": [
+          "#332D1A",
+          "#554A2B",
+          "#77683C",
+          "#99864D",
+          "#B8A670",
+          "#CCBF99",
+          "#E0D9C2",
+          "#F6F4EE"
+        ]
+      },
+      "granite-ink": {
+        "role": "neutral",
+        "displayName": "Granite Ink",
+        "canonical": "#1B1B1D",
+        "tonalRamp": [
+          "#252528",
+          "#3D3D42",
+          "#56565C",
+          "#6F6F77",
+          "#909098",
+          "#B0B0B5",
+          "#CFCFD3",
+          "#F2F2F3"
+        ]
+      },
+      "granite-muted": {
+        "role": "neutral",
+        "displayName": "Worn Granite",
+        "canonical": "#54514C",
+        "tonalRamp": [
+          "#282724",
+          "#43413D",
+          "#5E5A55",
+          "#78746D",
+          "#99958F",
+          "#B6B3AF",
+          "#D3D2CF",
+          "#F3F2F2"
+        ]
+      },
+      "joint-rule": {
+        "role": "neutral",
+        "displayName": "Tile Joint",
+        "canonical": "#D6D0C4",
+        "tonalRamp": [
+          "#2D291F",
+          "#4B4434",
+          "#695F49",
+          "#877A5E",
+          "#A79A81",
+          "#C0B7A5",
+          "#D9D4C9",
+          "#F5F3F0"
+        ]
+      },
+      "plaque-granite": {
+        "role": "neutral",
+        "displayName": "Enamel Plaque",
+        "canonical": "#1F1F22",
+        "tonalRamp": [
+          "#242428",
+          "#3D3D43",
+          "#55555D",
+          "#6D6D78",
+          "#8F8F99",
+          "#AFAFB6",
+          "#CFCFD3",
+          "#F2F2F3"
+        ]
+      },
+      "plaque-ink": {
+        "role": "neutral",
+        "displayName": "Plaque Lettering",
+        "canonical": "#F4F1EB",
+        "tonalRamp": [
+          "#312A1B",
+          "#52462D",
+          "#73623F",
+          "#947E51",
+          "#B39E75",
+          "#C9BA9C",
+          "#DED6C4",
+          "#F6F3EF"
+        ]
+      },
+      "brass": {
+        "role": "tertiary",
+        "displayName": "Chandelier Brass",
+        "canonical": "#A98648",
+        "tonalRamp": [
+          "#362B17",
+          "#594726",
+          "#7D6335",
+          "#A18045",
+          "#BFA069",
+          "#D1BB94",
+          "#E4D6BF",
+          "#F7F4ED"
+        ]
+      },
+      "line-red": {
+        "role": "primary",
+        "displayName": "Dublyaj Line Red",
+        "canonical": "#C8202B",
+        "tonalRamp": [
+          "#420B0E",
+          "#6E1218",
+          "#9A1921",
+          "#C6202B",
+          "#E14651",
+          "#EA7B82",
+          "#F2B0B4",
+          "#FBE9EA"
+        ]
+      },
+      "line-blue": {
+        "role": "secondary",
+        "displayName": "Subtitr Line Blue",
+        "canonical": "#1D5BA8",
+        "tonalRamp": [
+          "#0B2341",
+          "#133B6D",
+          "#1A5298",
+          "#226AC4",
+          "#488CDF",
+          "#7DADE8",
+          "#B1CEF1",
+          "#E9F1FB"
+        ]
+      },
+      "line-green": {
+        "role": "tertiary",
+        "displayName": "Tahlil Line Green",
+        "canonical": "#18804A",
+        "tonalRamp": [
+          "#0C4025",
+          "#146B3E",
+          "#1C9657",
+          "#24C170",
+          "#4BDD91",
+          "#7EE7B0",
+          "#B2F1D0",
+          "#EAFBF2"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Station Plaque",
+        "purpose": "Hero H1 on the granite plaque only."
+      },
+      "headline": {
+        "displayName": "Stop Headline",
+        "purpose": "Section stops on the spine; pricing titles."
+      },
+      "title": {
+        "displayName": "Station Name",
+        "purpose": "Station, plan and line names."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Leads and descriptions, 60-70ch."
+      },
+      "label": {
+        "displayName": "Sign Label",
+        "purpose": "Field and board labels, uppercase."
+      }
+    },
+    "shadows": [
+      {
+        "name": "train",
+        "value": "drop-shadow(0 3px 4px rgb(0 0 0 / .25))",
+        "purpose": "The SVG train on the line map."
+      },
+      {
+        "name": "floating",
+        "value": "0 12px 32px rgb(0 0 0 / .18)",
+        "purpose": "Menus and the floating feedback button only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "train-run",
+        "value": "left 1600ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Train runs the line once on load and moves to the job stage; none under prefers-reduced-motion."
+      },
+      {
+        "name": "state",
+        "value": "150ms ease",
+        "purpose": "Button brightness, border colour."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "420px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Default action: pay, sign up, buy, open bot.",
+      "html": "<button class=\"ds-btn\">Sotib olish</button>",
+      "css": ".ds-btn{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;display:inline-flex;align-items:center;min-height:48px;padding:0 20px;border:0;border-radius:6px;background:#1F1F22;color:#fff;font-size:17px;cursor:pointer;transition:filter .15s ease,transform .1s ease}.ds-btn:hover{filter:brightness(.9)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #1D5BA8;outline-offset:2px}"
+    },
+    {
+      "name": "Line Button (Dublyaj)",
+      "kind": "button",
+      "refersTo": "button-line-red",
+      "description": "Only the selected service's start action.",
+      "html": "<button class=\"ds-btn-red\">Dublaj qilish</button>",
+      "css": ".ds-btn-red{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;min-height:56px;padding:0 24px;border:0;border-radius:6px;background:#C8202B;color:#fff;font-size:17px;cursor:pointer}.ds-btn-red:hover{filter:brightness(.9)}.ds-btn-red:disabled{background:#D6D0C4;color:#54514C;cursor:not-allowed}.ds-btn-red:focus-visible{outline:2px solid #1D5BA8;outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action, other services.",
+      "html": "<button class=\"ds-btn-ghost\"><span class=\"ds-dot\"></span>Subtitr yaratish</button>",
+      "css": ".ds-btn-ghost{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 20px;border:0;border-radius:6px;background:transparent;color:#1B1B1D;box-shadow:inset 0 0 0 2px #D6D0C4;font-size:17px;cursor:pointer}.ds-btn-ghost:hover{box-shadow:inset 0 0 0 2px #1B1B1D}.ds-dot{width:10px;height:10px;border-radius:50%;background:#1D5BA8}"
+    },
+    {
+      "name": "URL Gate",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The real first action: link field with paste, start button beside it.",
+      "html": "<label class=\"ds-label\" for=\"ds-u\">YouTube havolasi</label><div class=\"ds-input\"><input id=\"ds-u\" placeholder=\"youtube.com/watch?v=...\"></div>",
+      "css": ".ds-label{font-family:'Barlow Condensed',Barlow,sans-serif;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#54514C;display:block;margin-bottom:8px}.ds-input{display:flex;align-items:center;min-height:56px;padding:0 16px;background:#FBFAF7;border:2px solid #D6D0C4;border-radius:6px}.ds-input:hover{border-color:#8f8a82}.ds-input:focus-within{border-color:#1B1B1D}.ds-input input{flex:1;border:0;background:transparent;font:500 16px Barlow,sans-serif;color:#1B1B1D;outline:none}"
+    },
+    {
+      "name": "Station Plaque",
+      "kind": "custom",
+      "refersTo": "plaque",
+      "description": "Hero H1 and headed boards.",
+      "html": "<div class=\"ds-plaque\"><h1>Dunyo bilimlari oʻzbek tilida</h1></div>",
+      "css": ".ds-plaque{background:#1F1F22;color:#fff;border-radius:6px;border-bottom:10px solid #C8202B;padding:24px 32px}.ds-plaque h1{margin:0;font:800 64px/0.9 'Barlow Condensed',Barlow,sans-serif;text-transform:uppercase;letter-spacing:-.015em}"
+    },
+    {
+      "name": "Line Map",
+      "kind": "custom",
+      "description": "Signature: five stations, train stops at the job stage.",
+      "html": "<div class=\"ds-line\"><i></i><b style=\"left:0\"></b><b style=\"left:25%\"></b><b style=\"left:50%\"></b><b class=\"on\" style=\"left:75%\"></b><b style=\"left:100%\"></b></div>",
+      "css": ".ds-line{position:relative;height:48px;margin:0 12px}.ds-line i{position:absolute;left:0;right:0;top:20px;height:8px;border-radius:9999px;background:#C8202B}.ds-line b{position:absolute;top:12px;width:24px;height:24px;margin-left:-12px;border-radius:50%;border:5px solid #C8202B;background:#FBFAF7}.ds-line b.on{background:#C8202B}"
+    },
+    {
+      "name": "Station Board",
+      "kind": "custom",
+      "description": "Dated real numbers.",
+      "html": "<dl class=\"ds-board\"><div><dt>Tayyor dublajlar</dt><dd>1 030</dd></div><p>24.10.2026 holatiga.</p></dl>",
+      "css": ".ds-board{margin:0;background:#1F1F22;color:#F4F1EB;border-radius:6px;outline:1px solid #A98648;outline-offset:2px}.ds-board div{display:flex;justify-content:space-between;align-items:baseline;padding:16px 24px}.ds-board dt{font:700 18px 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.04em;opacity:.8}.ds-board dd{margin:0;font:800 36px 'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums;color:#fff}.ds-board p{margin:0;padding:10px 24px;border-top:6px solid #C8202B;font:400 14px Barlow,sans-serif;opacity:.8}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tashkent Metro Line",
+    "overview": "A video travels from its own language to Uzbek the way a train runs a metro line: Havola, Nutq, Tarjima, Ovoz, Tayyor. Marble walls (light) or night-station granite (dark), enamel plaques with a thick base rule, round station markers on one continuous line, and line colours that mean something. Proof is concrete: the real form is the ticket machine, numbers sit on a dated station board, the train stops at the job's real stage.",
+    "keyCharacteristics": [
+      "One continuous red spine with ring stops",
+      "Granite plaques with line-colour base rules",
+      "Semantic line colours, one active at a time",
+      "One family: Barlow + Barlow Condensed",
+      "Flat surfaces, 6px plates, brass hairline frames"
+    ],
+    "rules": [
+      {
+        "name": "The One Active Line Rule",
+        "body": "At most one line colour is filled at a time; other services show a coloured dot on ink/ghost controls.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning-Only Rule",
+        "body": "Red, blue and green never decorate; generic actions are ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The Signage Rule",
+        "body": "Condensed caps for names and headings only; never body sentences.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Wall Rule",
+        "body": "No glass, blur or glow; depth comes from material.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put long pages on the Spine",
+      "Do use *-ink variants for coloured text (>=4.5:1)",
+      "Do date every statistic and source it from production",
+      "Do keep the URL field and start button in the first viewport"
+    ],
+    "donts": [
+      "Don't fill more than one line colour at a time",
+      "Don't use gradients, glass, blur or glows",
+      "Don't put eyebrow labels above headings",
+      "Don't use brass as text or add a second typeface",
+      "Don't interrupt the first viewport with a modal"
+    ]
+  }
+}
