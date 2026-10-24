@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react'
 import Script from 'next/script'
 
-const DEFAULT_CLIENT_ID = "235172384103-60v6m8mvikofqioqroeeubtir7dpdt4q.apps.googleusercontent.com"
+const DEFAULT_CLIENT_ID = "235172384103-ppm31k0mdn5co7fanr9ed4hcqb8u00qt.apps.googleusercontent.com"
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID
 
 declare global {
