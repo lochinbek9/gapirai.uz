@@ -50,8 +50,8 @@ function StatCard({
   const pct = diff !== null && compareTo ? Math.round((diff / compareTo) * 100) : null
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</div>
-      <div className="text-2xl font-extrabold text-white mt-1 tabular-nums">{value.toLocaleString()}</div>
+      <div className="text-xs font-semibold text-ui-muted ">{label}</div>
+      <div className="text-2xl font-semibold text-white mt-1 tabular-nums">{value.toLocaleString()}</div>
       {diff !== null ? (
         <div
           className={`text-[11px] mt-1 flex items-center gap-1 font-semibold ${
@@ -66,7 +66,7 @@ function StatCard({
           </span>
         </div>
       ) : (
-        hint && <div className="text-[11px] mt-1 text-gray-500">{hint}</div>
+        hint && <div className="text-xs mt-1 text-gray-500">{hint}</div>
       )}
     </div>
   )
@@ -144,14 +144,14 @@ function ActiveUsersChart({ series, monthly }: { series: ActiveUsersReport['seri
       </svg>
       {hp && hover !== null && (
         <div
-          className="absolute top-0 bg-black/85 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] pointer-events-none whitespace-nowrap z-10"
+          className="absolute top-0 bg-black/85 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs pointer-events-none whitespace-nowrap z-10"
           style={{
             left: `${((padLeft + hover * slot + slot / 2) / width) * 100}%`,
             transform: `translate(${hover > n * 0.75 ? '-100%' : hover < n * 0.25 ? '0' : '-50%'}, 0)`,
           }}
         >
-          <div className="text-gray-400 mb-0.5">{formatBucket(hp.date, true)}{monthly ? ' (oy)' : ''}</div>
-          <div className="text-white font-bold">Jami kirgan: {hp.active.toLocaleString()}</div>
+          <div className="text-ui-muted mb-0.5">{formatBucket(hp.date, true)}{monthly ? ' (oy)' : ''}</div>
+          <div className="text-white font-semibold">Jami kirgan: {hp.active.toLocaleString()}</div>
           <div style={{ color: COLOR_NEW }}>Yangi: {hp.new.toLocaleString()}</div>
           <div style={{ color: COLOR_RETURNING }}>Qaytgan: {hp.returning.toLocaleString()}</div>
         </div>
@@ -195,11 +195,11 @@ export default function AdminActiveUsersPanel({ includeInternal = false }: { inc
     <section className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h2 className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+          <h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
             <Users className="w-4 h-4 text-blue-400" />
             Saytga kirgan foydalanuvchilar
           </h2>
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             Toshkent vaqti bo&apos;yicha · faqat ro&apos;yxatdan o&apos;tib, tizimga kirganlar
             {data ? ` · ma'lumot ${formatBucket(data.data_since, true)} dan` : ''}
           </p>
@@ -223,7 +223,7 @@ export default function AdminActiveUsersPanel({ includeInternal = false }: { inc
       )}
 
       {!data && loading && (
-        <div className="flex items-center justify-center py-10 text-gray-400 text-xs gap-2">
+        <div className="flex items-center justify-center py-10 text-ui-muted text-xs gap-2">
           <Loader2 className="w-4 h-4 animate-spin text-blue-400" /> Yuklanmoqda...
         </div>
       )}
@@ -250,15 +250,15 @@ export default function AdminActiveUsersPanel({ includeInternal = false }: { inc
                     key={p.id}
                     type="button"
                     onClick={() => setPeriod(p.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                      period === p.id ? 'bg-blue-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                      period === p.id ? 'bg-blue-500 text-white' : 'bg-white/5 text-ui-muted hover:bg-white/10 hover:text-gray-200'
                     }`}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-3 text-[11px] text-gray-400">
+              <div className="flex items-center gap-3 text-xs text-ui-muted">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLOR_RETURNING }} /> Qaytgan
                 </span>
@@ -269,7 +269,7 @@ export default function AdminActiveUsersPanel({ includeInternal = false }: { inc
             </div>
             <ActiveUsersChart series={data.series} monthly={data.period === '12m'} />
             {periodTotal && (
-              <p className="text-[11px] text-gray-500">
+              <p className="text-xs text-gray-500">
                 {data.period === '12m' ? 'Oylik' : 'Kunlik'} qiymatlar yig&apos;indisi: {periodTotal.active.toLocaleString()} kirish
                 (shundan yangi {periodTotal.new.toLocaleString()}). Bitta foydalanuvchi bir necha kun kirsa, har kuni alohida sanaladi.
               </p>

@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T10:27:46Z",
+  "title": "Design System: GapirAI.uz",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "#F6F7F9",
+        "tonalRamp": [
+          "#3E3E3E",
+          "#626364",
+          "#878889",
+          "#ACADAE",
+          "#F8F9FA",
+          "#FAFBFC",
+          "#FDFDFE",
+          "#FEFEFF"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#404040",
+          "#666666",
+          "#8C8C8C",
+          "#B2B2B2",
+          "#FFFFFF",
+          "#FFFFFF",
+          "#FFFFFF",
+          "#FFFFFF"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0B0D12",
+        "tonalRamp": [
+          "#030304",
+          "#040507",
+          "#06070A",
+          "#08090D",
+          "#484A4D",
+          "#858688",
+          "#C2C2C4",
+          "#EBECEC"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#585E6A",
+        "tonalRamp": [
+          "#16181A",
+          "#23262A",
+          "#30343A",
+          "#3E424A",
+          "#82868F",
+          "#ACAEB4",
+          "#D5D7DA",
+          "#F2F2F3"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#E5E7EB",
+        "tonalRamp": [
+          "#393A3B",
+          "#5C5C5E",
+          "#7E7F81",
+          "#A0A2A4",
+          "#ECEDF0",
+          "#F2F3F5",
+          "#F8F9FA",
+          "#FDFDFD"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Logo Blue",
+        "canonical": "#2B5CF0",
+        "tonalRamp": [
+          "#0B173C",
+          "#112560",
+          "#183384",
+          "#1E40A8",
+          "#6085F4",
+          "#95AEF8",
+          "#CAD6FB",
+          "#EEF2FE"
+        ]
+      },
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Logo Blue Text",
+        "canonical": "#204CD6",
+        "tonalRamp": [
+          "#081336",
+          "#0D1E56",
+          "#122A76",
+          "#163596",
+          "#5879E0",
+          "#90A6EA",
+          "#C7D2F5",
+          "#EDF1FC"
+        ]
+      },
+      "red": {
+        "role": "error",
+        "displayName": "Error",
+        "canonical": "#DC2626",
+        "tonalRamp": [
+          "#370A0A",
+          "#580F0F",
+          "#791515",
+          "#9A1B1B",
+          "#E55C5C",
+          "#EE9292",
+          "#F6C9C9",
+          "#FCEEEE"
+        ]
+      },
+      "red-ink": {
+        "role": "error",
+        "displayName": "Error Text",
+        "canonical": "#B91C1C",
+        "tonalRamp": [
+          "#2E0707",
+          "#4A0B0B",
+          "#660F0F",
+          "#821414",
+          "#CA5555",
+          "#DC8E8E",
+          "#EEC6C6",
+          "#F9EDED"
+        ]
+      },
+      "green": {
+        "role": "success",
+        "displayName": "Success",
+        "canonical": "#16A34A",
+        "tonalRamp": [
+          "#062912",
+          "#09411E",
+          "#0C5A29",
+          "#0F7234",
+          "#50BA77",
+          "#8AD1A4",
+          "#C5E8D2",
+          "#ECF8F1"
+        ]
+      },
+      "green-ink": {
+        "role": "success",
+        "displayName": "Success Text",
+        "canonical": "#15803D",
+        "tonalRamp": [
+          "#05200F",
+          "#083318",
+          "#0C4622",
+          "#0F5A2B",
+          "#50A06E",
+          "#8AC09E",
+          "#C4DFCE",
+          "#ECF5EF"
+        ]
+      },
+      "night-ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "canonical": "#121215",
+        "tonalRamp": [
+          "#040405",
+          "#070708",
+          "#0A0A0C",
+          "#0D0D0F",
+          "#4D4D50",
+          "#88888A",
+          "#C4C4C4",
+          "#ECECEC"
+        ]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Night Surface",
+        "canonical": "#0B0B0D",
+        "tonalRamp": [
+          "#030303",
+          "#040405",
+          "#060607",
+          "#080809",
+          "#48484A",
+          "#858586",
+          "#C2C2C2",
+          "#EBEBEC"
+        ]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "#F4F5F7",
+        "tonalRamp": [
+          "#3D3D3E",
+          "#626263",
+          "#868788",
+          "#ABACAD",
+          "#F7F8F9",
+          "#FAFAFB",
+          "#FCFCFD",
+          "#FEFEFE"
+        ]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "Night Muted",
+        "canonical": "#A0A5B0",
+        "tonalRamp": [
+          "#28292C",
+          "#404246",
+          "#585B61",
+          "#70737B",
+          "#B8BCC4",
+          "#D0D2D8",
+          "#E7E8EB",
+          "#F7F8F9"
+        ]
+      },
+      "night-rule": {
+        "role": "neutral",
+        "displayName": "Night Hairline",
+        "canonical": "#27282E",
+        "tonalRamp": [
+          "#0A0A0C",
+          "#101012",
+          "#151619",
+          "#1B1C20",
+          "#5D5E62",
+          "#939496",
+          "#C9C9CB",
+          "#EEEEEE"
+        ]
+      },
+      "night-accent": {
+        "role": "primary",
+        "displayName": "Night Blue",
+        "canonical": "#567CFF",
+        "tonalRamp": [
+          "#161F40",
+          "#223266",
+          "#2F448C",
+          "#3C57B2",
+          "#809DFF",
+          "#AABEFF",
+          "#D5DEFF",
+          "#F1F5FF"
+        ]
+      },
+      "night-accent-ink": {
+        "role": "primary",
+        "displayName": "Night Blue Text",
+        "canonical": "#85A3FF",
+        "tonalRamp": [
+          "#212940",
+          "#354166",
+          "#495A8C",
+          "#5D72B2",
+          "#A4BAFF",
+          "#C2D1FF",
+          "#E0E8FF",
+          "#F5F8FF"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page H1 only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles and plan names."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Leads and descriptions, max 60ch, in Muted."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, tabs, buttons; sentence case."
+      }
+    },
+    "shadows": [
+      {
+        "name": "form-card",
+        "value": "0 1px 2px rgb(0 0 0 / .04), 0 12px 40px -12px rgb(0 0 0 / .12)",
+        "purpose": "Hero form card only (none in dark)."
+      },
+      {
+        "name": "segment",
+        "value": "0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px rgb(var(--ui-rule))",
+        "purpose": "Selected segmented tab."
+      },
+      {
+        "name": "floating",
+        "value": "0 12px 32px rgb(0 0 0 / .12)",
+        "purpose": "Menus and the floating feedback button."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 64px rgb(0 0 0 / .25)",
+        "purpose": "Modal dialogs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "150ms ease",
+        "purpose": "Hover, border and fill changes."
+      },
+      {
+        "name": "panel",
+        "value": "framer-motion fade + 8px rise",
+        "purpose": "Hero card phase changes (idle/processing/done/error)."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action: Dublaj qilish, Bepul boshlash, pay.",
+      "html": "<button class=\"ds-btn ds-primary\">Dublaj qilish</button>",
+      "css": ".ds-btn{font-family:Geist,system-ui,sans-serif;font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:0;border-radius:10px;cursor:pointer;transition:opacity .15s ease,transform .1s ease}.ds-btn:hover{opacity:.88}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #2B5CF0;outline-offset:2px}.ds-primary{background:#0B0D12;color:#fff}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Alternative actions: Kirish, Sotib olish, free plan.",
+      "html": "<button class=\"ds-btn ds-secondary\">Kirish</button>",
+      "css": ".ds-btn{font-family:Geist,system-ui,sans-serif;font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:0;border-radius:10px;cursor:pointer;transition:opacity .15s ease,transform .1s ease}.ds-btn:hover{opacity:.88}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #2B5CF0;outline-offset:2px}.ds-secondary{background:#fff;color:#0B0D12;box-shadow:inset 0 0 0 1px #E5E7EB}.ds-secondary:hover{background:#F6F7F9;opacity:1}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "URL field with leading icon and paste action.",
+      "html": "<input class=\"ds-input\" placeholder=\"youtube.com/watch?v=...\">",
+      "css": ".ds-input{font:400 16px Geist,system-ui,sans-serif;min-height:48px;padding:0 12px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;color:#0B0D12;outline:none}.ds-input:focus{border-color:#2B5CF0;box-shadow:0 0 0 3px rgb(43 92 240 / .15)}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Services, plans, feedback, packs list.",
+      "html": "<div class=\"ds-card\"><h3>Standart</h3><p>Muntazam ko'radiganlar uchun</p></div>",
+      "css": ".ds-card{font-family:Geist,system-ui,sans-serif;background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:24px;color:#0B0D12}.ds-card p{color:#585E6A;margin:4px 0 0;font-size:14px}.ds-card h3{margin:0;font-size:18px;font-weight:600}"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "tabs",
+      "refersTo": "segmented",
+      "description": "Service and billing-period switch.",
+      "html": "<div class=\"ds-seg\"><button aria-selected=\"true\">Dublyaj</button><button>Subtitr</button><button>Tahlil</button></div>",
+      "css": ".ds-seg{display:inline-flex;gap:4px;padding:4px;background:#F6F7F9;border-radius:10px;font:500 14px Geist,system-ui,sans-serif}.ds-seg button{border:0;background:none;color:#585E6A;min-height:40px;padding:0 16px;border-radius:8px;cursor:pointer}.ds-seg [aria-selected=true]{background:#fff;color:#0B0D12;box-shadow:0 1px 2px rgb(0 0 0/.08),0 0 0 1px #E5E7EB}"
+    },
+    {
+      "name": "Selectable Tile",
+      "kind": "radio",
+      "refersTo": "card",
+      "description": "Voice, sample, language and provider choices.",
+      "html": "<button class=\"ds-tile\" aria-checked=\"true\">Avtomatik<small>Spikerga qarab</small></button>",
+      "css": ".ds-tile{display:flex;flex-direction:column;align-items:flex-start;font:500 15px Geist,system-ui,sans-serif;padding:10px 12px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;color:#0B0D12}.ds-tile small{font-size:13px;color:#585E6A;font-weight:400}.ds-tile[aria-checked=true]{border-color:#2B5CF0;box-shadow:0 0 0 1px #2B5CF0;background:rgb(43 92 240/.06)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The standard, played straight",
+    "overview": "A clean, international AI-product look at the ElevenLabs/HeyGen/Rask/Linear bar: white or near-black ground, neutral greys, hairline borders, one accent from the logo blue, Geist. The hero is the working form; every number is real and dated.",
+    "keyCharacteristics": [
+      "Centered hero with the real form card",
+      "One accent (logo blue) for state and links",
+      "Ink primary buttons",
+      "Hairline borders, 16px cards, 10px controls",
+      "Geist 400/500/600, tabular numerals"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Blue marks state and links, never decoration or large fills; primary CTAs are ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Shouting Rule",
+        "body": "No uppercase labels, no eyebrows, no weight above 600.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Keep the working form in the first viewport",
+      "Date every statistic",
+      "Use *-ink variants for coloured text"
+    ],
+    "donts": [
+      "Gradients, glow, glass, extra accent hues",
+      "Condensed display type or themed metaphors",
+      "Unsupported badges or claims",
+      "Modals in the first viewport"
+    ]
+  }
+}

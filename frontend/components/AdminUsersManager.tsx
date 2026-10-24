@@ -72,8 +72,8 @@ class SafeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
       return (
         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center text-xs text-red-300">
           <AlertCircle className="w-6 h-6 mx-auto mb-2 text-red-400" />
-          <p className="font-bold">Foydalanuvchilar bo'limini yuklashda xatolik yuz berdi.</p>
-          <p className="text-gray-400 mt-1">{this.state.error?.message}</p>
+          <p className="font-semibold">Foydalanuvchilar bo'limini yuklashda xatolik yuz berdi.</p>
+          <p className="text-ui-muted mt-1">{this.state.error?.message}</p>
           <button
             onClick={() => this.setState({ hasError: false })}
             className="mt-3 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white font-semibold"
@@ -302,7 +302,7 @@ function AdminUsersManagerInner() {
 
   const planOptions: SelectOption[] = [
     { value: 'all', label: 'Barcha tariflar' },
-    { value: 'free', label: 'Bepul (Free)', icon: <Sparkles className="w-3.5 h-3.5 text-gray-400" /> },
+    { value: 'free', label: 'Bepul (Free)', icon: <Sparkles className="w-3.5 h-3.5 text-ui-muted" /> },
     { value: 'paid', label: 'Pullik (Standart + Pro)', icon: <Crown className="w-3.5 h-3.5 text-amber-400" /> },
     { value: 'standard', label: 'Standart tarif', icon: <Zap className="w-3.5 h-3.5 text-blue-400" /> },
     { value: 'pro', label: 'Pro tarif', icon: <Crown className="w-3.5 h-3.5 text-amber-400" /> },
@@ -477,11 +477,11 @@ function AdminUsersManagerInner() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-extrabold text-white tracking-wide flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
             <Coins className="w-4 h-4 text-amber-400" />
             Foydalanuvchilar va Tariflarni boshqarish
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-ui-muted mt-0.5">
             Foydalanuvchilarga tarif yoqish, daqiqa qo'shish yoki so'm summasi orqali hisoblash
           </p>
         </div>
@@ -495,7 +495,7 @@ function AdminUsersManagerInner() {
               setCreateModalOpen(true)
               setError(null)
             }}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-blue-500/25 shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-lg shrink-0"
           >
             <UserPlus className="w-4 h-4" />
             <span>Yangi odam qo'shish</span>
@@ -523,7 +523,7 @@ function AdminUsersManagerInner() {
           {/* Search Input */}
           <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-ui-muted absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={search}
@@ -539,7 +539,7 @@ function AdminUsersManagerInner() {
                     setPage(1)
                     fetchUsers('', 1, planFilter, balanceFilter, sortBy, dateRange, startDate, endDate)
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ui-muted hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -621,7 +621,7 @@ function AdminUsersManagerInner() {
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <Info className="w-4 h-4 text-blue-400" />
               <span>Tizimning Avtomatik Xulosalari va Tavsiyalari</span>
-              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+              <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                 {summary?.period_label || (
                   dateRange === 'today' ? 'Bugun' :
                   dateRange === '7d' ? 'So\'nggi 7 kun' :
@@ -634,14 +634,14 @@ function AdminUsersManagerInner() {
             </h3>
 
             {summary && (
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 backdrop-blur-sm">
-                <span className="text-gray-400">Jami: <strong className="text-white font-mono">{summary.total.toLocaleString()}</strong></span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 ">
+                <span className="text-ui-muted">Jami: <strong className="text-white font-mono">{summary.total.toLocaleString()}</strong></span>
                 <span className="text-gray-600">•</span>
-                <span className="text-gray-400">Pullik: <strong className="text-amber-400 font-mono">{summary.paid_count}</strong></span>
+                <span className="text-ui-muted">Pullik: <strong className="text-amber-400 font-mono">{summary.paid_count}</strong></span>
                 <span className="text-gray-600">•</span>
-                <span className="text-gray-400">Kuymas paket: <strong className="text-emerald-400 font-mono">{summary.has_package_count}</strong></span>
+                <span className="text-ui-muted">Kuymas paket: <strong className="text-emerald-400 font-mono">{summary.has_package_count}</strong></span>
                 <span className="text-gray-600">•</span>
-                <span className="text-gray-400">Balansi 0: <strong className="text-rose-400 font-mono">{summary.zero_balance_count}</strong></span>
+                <span className="text-ui-muted">Balansi 0: <strong className="text-rose-400 font-mono">{summary.zero_balance_count}</strong></span>
               </div>
             )}
           </div>
@@ -659,7 +659,7 @@ function AdminUsersManagerInner() {
                     : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
                 }`}
               >
-                <div className="font-bold flex items-center gap-1.5">
+                <div className="font-semibold flex items-center gap-1.5">
                   {ins.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                   {ins.type === 'caution' && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
                   {ins.type === 'success' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
@@ -678,25 +678,25 @@ function AdminUsersManagerInner() {
         <table className="w-full text-sm min-w-[880px]">
           <thead>
             <tr className="border-b border-white/10 text-left">
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Foydalanuvchi</th>
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Qo'shilgan vaqti</th>
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Tarif</th>
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Daqiqa Balansi</th>
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Amal qilish muddati</th>
-              <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right whitespace-nowrap">Harakatlar</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted whitespace-nowrap">Foydalanuvchi</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted whitespace-nowrap">Qo'shilgan vaqti</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted whitespace-nowrap">Tarif</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted whitespace-nowrap">Daqiqa Balansi</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted whitespace-nowrap">Amal qilish muddati</th>
+              <th className="px-4 py-3 text-xs font-semibold text-ui-muted text-right whitespace-nowrap">Harakatlar</th>
             </tr>
           </thead>
           <tbody>
             {loading && safeUsers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-gray-400">
+                <td colSpan={6} className="py-12 text-center text-ui-muted">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-400 mb-2" />
                   Yuklanmoqda...
                 </td>
               </tr>
             ) : safeUsers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-400">
+                <td colSpan={6} className="py-8 text-center text-ui-muted">
                   Foydalanuvchi topilmadi
                 </td>
               </tr>
@@ -712,7 +712,7 @@ function AdminUsersManagerInner() {
                   <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition">
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-semibold text-xs shrink-0">
                           {initial}
                         </div>
                         <div className="min-w-0">
@@ -724,20 +724,20 @@ function AdminUsersManagerInner() {
                               </span>
                             )}
                             {u.role === 'admin' && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30">
                                 <Shield className="w-3 h-3" />
                                 ADMIN
                               </span>
                             )}
                             {u.is_active === false && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
                                 <Lock className="w-3 h-3" />
                                 BLOKLANGAN
                               </span>
                             )}
                           </div>
                           {(u.name || u.phone) && u.email && (
-                            <div className="text-[11px] text-gray-400 truncate max-w-[200px]">
+                            <div className="text-xs text-ui-muted truncate max-w-[200px]">
                               {[u.name, u.phone].filter(Boolean).join(' • ')}
                             </div>
                           )}
@@ -751,25 +751,25 @@ function AdminUsersManagerInner() {
                         <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                         <span>{createdDt.date}</span>
                       </div>
-                      <div className="text-[10px] text-gray-500 font-mono mt-0.5 pl-5">
+                      <div className="text-xs text-gray-500 font-mono mt-0.5 pl-5">
                         {createdDt.time || '—'}
                       </div>
                     </td>
 
                     <td className="px-4 py-3 whitespace-nowrap">
                       {planKey === 'pro' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
                           <Crown className="w-3.5 h-3.5 text-amber-400" />
                           PRO
                         </span>
                       ) : planKey === 'standard' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30">
                           <Zap className="w-3.5 h-3.5 text-blue-400" />
                           STANDART
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-gray-400 border border-white/10">
-                          <Sparkles className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-ui-muted border border-white/10">
+                          <Sparkles className="w-3.5 h-3.5 text-ui-muted" />
                           BEPUL
                         </span>
                       )}
@@ -777,9 +777,9 @@ function AdminUsersManagerInner() {
 
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-xs text-white">
-                        <span className="font-extrabold text-blue-400">{bal.total_available ?? 0}</span> daqiqa
+                        <span className="font-semibold text-blue-400">{bal.total_available ?? 0}</span> daqiqa
                       </div>
-                      <div className="text-[10px] text-gray-400 flex items-center gap-1.5">
+                      <div className="text-xs text-ui-muted flex items-center gap-1.5">
                         <span>Oylik: {bal.monthly_remaining ?? 0}/{bal.monthly_cap ?? 5} daq</span>
                         {(bal.purchased ?? 0) > 0 && (
                           <span className="text-emerald-400 font-semibold">+{bal.purchased} kuymas</span>
@@ -787,10 +787,10 @@ function AdminUsersManagerInner() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-400">
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-ui-muted">
                       {u.expires_at ? (
                         <span className="flex items-center gap-1 text-gray-300">
-                          <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                          <Calendar className="w-3.5 h-3.5 text-ui-muted" />
                           {formatTashkentDate(u.expires_at)}
                         </span>
                       ) : (
@@ -862,7 +862,7 @@ function AdminUsersManagerInner() {
       </div>
 
       {/* Pagination summary */}
-      <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+      <div className="flex items-center justify-between text-xs text-ui-muted px-1">
         <span>Jami topildi: <strong className="text-white">{total}</strong> ta foydalanuvchi</span>
         {total > 20 && (
           <div className="flex items-center gap-2">
@@ -887,21 +887,21 @@ function AdminUsersManagerInner() {
 
       {/* MODAL 1: ADD / DEDUCT MINUTES MODAL */}
       {minuteModalUser && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
                   <Coins className={`w-5 h-5 ${actionType === 'deduct' ? 'text-rose-400' : 'text-emerald-400'}`} />
                   {actionType === 'deduct' ? "Daqiqa yoki Summa ayirish" : "Daqiqa yoki Summa qo'shish"}
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
+                <p className="text-xs text-ui-muted mt-0.5 truncate max-w-[280px]">
                   {minuteModalUser.email || minuteModalUser.phone || minuteModalUser.name || 'Foydalanuvchi'}
                 </p>
               </div>
               <button
                 onClick={() => setMinuteModalUser(null)}
-                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -912,10 +912,10 @@ function AdminUsersManagerInner() {
               <button
                 type="button"
                 onClick={() => setActionType('add')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
                   actionType === 'add'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-ui-muted hover:text-white'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" /> Balansga qo'shish
@@ -923,10 +923,10 @@ function AdminUsersManagerInner() {
               <button
                 type="button"
                 onClick={() => setActionType('deduct')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 ${
                   actionType === 'deduct'
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-ui-muted hover:text-white'
                 }`}
               >
                 <Minus className="w-3.5 h-3.5" /> Balansdan ayirish
@@ -935,7 +935,7 @@ function AdminUsersManagerInner() {
 
             {/* Balans turi tanlash (Kuymas vs Tarif) */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+              <label className="text-xs font-semibold text-ui-muted flex items-center justify-between">
                 <span>Daqiqa / Balans turi:</span>
                 <span className="text-gray-500 font-normal lowercase">qaysi balansga ta'sir qilsin?</span>
               </label>
@@ -946,17 +946,17 @@ function AdminUsersManagerInner() {
                   className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                     balanceType === 'kuymas'
                       ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                      : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
                       Kuymas daqiqa
                     </span>
                     {balanceType === 'kuymas' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                   </div>
-                  <div className="text-[10px] text-gray-400 leading-tight">
+                  <div className="text-xs text-ui-muted leading-tight">
                     Paket (muddatsiz, oydan-oyga o'tadi)
                   </div>
                 </button>
@@ -967,17 +967,17 @@ function AdminUsersManagerInner() {
                   className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                     balanceType === 'tarif'
                       ? 'bg-blue-500/15 border-blue-500/50 text-white shadow-sm'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                      : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-blue-400 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
                       Tarif / Oylik
                     </span>
                     {balanceType === 'tarif' && <Check className="w-3.5 h-3.5 text-blue-400" />}
                   </div>
-                  <div className="text-[10px] text-gray-400 leading-tight">
+                  <div className="text-xs text-ui-muted leading-tight">
                     Oylik reja kvotasi (oy oxirida yangilanadi)
                   </div>
                 </button>
@@ -987,12 +987,12 @@ function AdminUsersManagerInner() {
             {/* Joriy balans ko'rsatkichi */}
             <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs flex flex-col gap-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Jami mavjud balans:</span>
-                <span className="text-white font-extrabold text-sm">
+                <span className="text-ui-muted">Jami mavjud balans:</span>
+                <span className="text-white font-semibold text-sm">
                   {minuteModalUser.balance?.total_available ?? 0} daqiqa
                 </span>
               </div>
-              <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-white/5">
+              <div className="flex justify-between items-center text-xs pt-1.5 border-t border-white/5">
                 <span className="text-blue-300 font-medium">
                   Oylik tarif: {minuteModalUser.balance?.monthly_remaining ?? 0}/{minuteModalUser.balance?.monthly_cap ?? 5} daq
                 </span>
@@ -1004,7 +1004,7 @@ function AdminUsersManagerInner() {
 
             {/* Quick presets */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+              <label className="text-xs font-semibold text-ui-muted ">
                 {actionType === 'deduct' ? "Tezkor ayirish:" : "Tezkor summalar:"}
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -1020,7 +1020,7 @@ function AdminUsersManagerInner() {
                     key={p.amount}
                     type="button"
                     onClick={() => applyPreset(p.amount)}
-                    className={`px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-gray-200 transition text-center ${
+                    className={`px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 transition text-center ${
                       actionType === 'deduct' ? 'hover:border-rose-500/50' : 'hover:border-emerald-500/50'
                     }`}
                   >
@@ -1067,7 +1067,7 @@ function AdminUsersManagerInner() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-gray-400 bg-black/20 p-2.5 rounded-xl border border-white/5">
+              <div className="flex items-center justify-between text-xs text-ui-muted bg-black/20 p-2.5 rounded-xl border border-white/5">
                 <span>1 daqiqa kursi:</span>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -1080,7 +1080,7 @@ function AdminUsersManagerInner() {
                 </div>
               </div>
 
-              <p className="text-[11px] text-gray-400 leading-relaxed">
+              <p className="text-xs text-ui-muted leading-relaxed">
                 {actionType === 'deduct' ? (
                   balanceType === 'tarif' ? (
                     <>⚠️ Belgilangan daqiqa foydalanuvchining <span className="text-rose-400 font-semibold">oylik tarif kvotasidan</span> yechib olinadi.</>
@@ -1100,17 +1100,17 @@ function AdminUsersManagerInner() {
                 <button
                   type="button"
                   onClick={() => setMinuteModalUser(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs transition"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading || (!minutes && !amountUzs)}
-                  className={`flex-1 py-2.5 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${
+                  className={`flex-1 py-2.5 rounded-xl text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${
                     actionType === 'deduct'
-                      ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-lg shadow-rose-900/30'
-                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
+                      ? ' bg-rose-600 hover:bg-rose-500 shadow-lg '
+                      : ' bg-emerald-600 hover:bg-emerald-500 '
                   }`}
                 >
                   {actionLoading ? (
@@ -1132,21 +1132,21 @@ function AdminUsersManagerInner() {
 
       {/* MODAL 2: SET PLAN MODAL */}
       {planModalUser && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
                   <Zap className="w-5 h-5 text-blue-400" />
                   Tarif rejasini biriktirish
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
+                <p className="text-xs text-ui-muted mt-0.5 truncate max-w-[280px]">
                   {planModalUser.email || planModalUser.phone || planModalUser.name || 'Foydalanuvchi'}
                 </p>
               </div>
               <button
                 onClick={() => setPlanModalUser(null)}
-                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1173,16 +1173,16 @@ function AdminUsersManagerInner() {
                         className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
                           isSelected
                             ? 'bg-blue-600/20 border-blue-500 text-white'
-                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                         }`}
                       >
                         <div className="flex items-center justify-between w-full mb-1">
-                          <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-400' : 'text-gray-400'}`} />
+                          <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-400' : 'text-ui-muted'}`} />
                           {isSelected && <Check className="w-3.5 h-3.5 text-blue-400" />}
                         </div>
                         <div>
-                          <div className="font-bold text-xs text-white">{p.label}</div>
-                          <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{p.desc}</div>
+                          <div className="font-semibold text-xs text-white">{p.label}</div>
+                          <div className="text-xs text-ui-muted leading-tight mt-0.5">{p.desc}</div>
                         </div>
                       </button>
                     )
@@ -1209,7 +1209,7 @@ function AdminUsersManagerInner() {
                         className={`py-1.5 rounded-lg border text-xs font-medium transition ${
                           planDays === d.days
                             ? 'bg-blue-500/20 border-blue-500 text-white'
-                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                         }`}
                       >
                         {d.label}
@@ -1232,7 +1232,7 @@ function AdminUsersManagerInner() {
                   type="checkbox"
                   checked={resetMonthly}
                   onChange={(e) => setResetMonthly(e.target.checked)}
-                  className="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-0"
+                  className="rounded bg-white/5 border-white/10 text-ui-accent-ink focus:ring-0"
                 />
                 <span>Oylik sarflangan daqiqalarni 0 ga tushirish (yangi davr boshlash)</span>
               </label>
@@ -1241,14 +1241,14 @@ function AdminUsersManagerInner() {
                 <button
                   type="button"
                   onClick={() => setPlanModalUser(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs transition"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                 >
                   {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Tarifni faollashtirish
@@ -1261,21 +1261,21 @@ function AdminUsersManagerInner() {
 
       {/* MODAL 3: CREATE USER MODAL */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
                   <UserPlus className="w-5 h-5 text-blue-400" />
                   Yangi odam qo'shish
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-ui-muted mt-0.5">
                   Oddiy foydalanuvchi yoki administrator yarating
                 </p>
               </div>
               <button
                 onClick={() => setCreateModalOpen(false)}
-                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1326,7 +1326,7 @@ function AdminUsersManagerInner() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ui-muted hover:text-white"
                     title={showPassword ? 'Yashirish' : "Ko'rsatish"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1364,15 +1364,15 @@ function AdminUsersManagerInner() {
                             ? r.id === 'admin'
                               ? 'bg-violet-600/20 border-violet-500 text-white'
                               : 'bg-blue-600/20 border-blue-500 text-white'
-                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <Icon className={`w-4 h-4 ${isSelected ? (r.id === 'admin' ? 'text-violet-400' : 'text-blue-400') : 'text-gray-400'}`} />
+                          <Icon className={`w-4 h-4 ${isSelected ? (r.id === 'admin' ? 'text-violet-400' : 'text-blue-400') : 'text-ui-muted'}`} />
                           {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
                         </div>
-                        <div className="font-bold text-xs text-white">{r.label}</div>
-                        <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{r.desc}</div>
+                        <div className="font-semibold text-xs text-white">{r.label}</div>
+                        <div className="text-xs text-ui-muted leading-tight mt-0.5">{r.desc}</div>
                       </button>
                     )
                   })}
@@ -1384,13 +1384,13 @@ function AdminUsersManagerInner() {
                   type="checkbox"
                   checked={createForm.is_internal}
                   onChange={(e) => setCreateForm((f) => ({ ...f, is_internal: e.target.checked }))}
-                  className="rounded bg-white/5 border-white/10 text-blue-500 focus:ring-0"
+                  className="rounded bg-white/5 border-white/10 text-ui-accent-ink focus:ring-0"
                 />
                 <span>Ichki hisob (jamoa a'zosi — statistikaga kirmaydi)</span>
               </label>
 
               {createForm.role === 'admin' && (
-                <p className="text-[11px] text-violet-300 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 leading-relaxed">
+                <p className="text-xs text-violet-300 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 leading-relaxed">
                   ⚠️ Administrator barcha foydalanuvchilar, to'lovlar va tizim sozlamalariga to'liq kirish huquqiga ega bo'ladi.
                 </p>
               )}
@@ -1399,14 +1399,14 @@ function AdminUsersManagerInner() {
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs transition"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                 >
                   {createLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                   Qo'shish
@@ -1419,21 +1419,21 @@ function AdminUsersManagerInner() {
 
       {/* MODAL 4: EDIT CREDENTIALS / ROLE MODAL */}
       {editModalUser && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
                   <Key className="w-5 h-5 text-amber-400" />
                   Parol va rolni o'zgartirish
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[280px]">
+                <p className="text-xs text-ui-muted mt-0.5 truncate max-w-[280px]">
                   {editModalUser.email || editModalUser.phone || editModalUser.name || 'Foydalanuvchi'}
                 </p>
               </div>
               <button
                 onClick={() => setEditModalUser(null)}
-                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1464,13 +1464,13 @@ function AdminUsersManagerInner() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ui-muted hover:text-white"
                     title={showPassword ? 'Yashirish' : "Ko'rsatish"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500">Kamida 6 belgi. Bo'sh qolsa, joriy parol saqlanadi.</p>
+                <p className="text-xs text-gray-500">Kamida 6 belgi. Bo'sh qolsa, joriy parol saqlanadi.</p>
               </div>
 
               <div className="space-y-1.5">
@@ -1487,12 +1487,12 @@ function AdminUsersManagerInner() {
                         key={r.id}
                         type="button"
                         onClick={() => setEditForm((f) => ({ ...f, role: r.id }))}
-                        className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                        className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
                           isSelected
                             ? r.id === 'admin'
                               ? 'bg-violet-600/20 border-violet-500 text-white'
                               : 'bg-blue-600/20 border-blue-500 text-white'
-                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            : 'bg-white/5 border-white/10 text-ui-muted hover:bg-white/10'
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5" />
@@ -1557,14 +1557,14 @@ function AdminUsersManagerInner() {
                 <button
                   type="button"
                   onClick={() => setEditModalUser(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 font-semibold text-xs transition"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={editLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                 >
                   {editLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Saqlash

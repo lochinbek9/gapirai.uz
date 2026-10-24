@@ -101,7 +101,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
   if (state === "success") {
     return (
       <div className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center">
-        <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Video qabul qilindi — ishlov berish boshlandi.</p>
+        <p className="text-sm font-semibold text-ui-green-ink">Video qabul qilindi — ishlov berish boshlandi.</p>
       </div>
     );
   }
@@ -109,15 +109,15 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
   return (
     <div className="w-full space-y-3">
       {state === "uploading" ? (
-        <div className="glass-card rounded-2xl p-4 space-y-3 border border-gray-200/60 dark:border-white/10">
+        <div className="glass-card rounded-2xl p-4 space-y-3 border border-ui-rule">
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-            <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-violet-500 shrink-0" />
+            <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
             <span className="truncate flex-1 font-medium">{pendingFile?.name}</span>
-            <span className="font-mono text-gray-500 dark:text-gray-400 font-bold">{progress}%</span>
+            <span className="font-mono text-ui-muted font-semibold">{progress}%</span>
           </div>
           <div className="w-full h-1.5 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full transition-all duration-200"
+              className="h-full bg-blue-600 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -146,12 +146,12 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
             tabIndex={0}
             aria-label="Video faylni yuklash uchun bosing yoki shu yerga tashlang"
             className={`cursor-pointer flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-2xl p-6 transition ${
-              dragActive ? "border-violet-500 bg-violet-500/10" : "border-gray-300 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 hover:bg-black/[0.04] dark:hover:bg-white/10"
+              dragActive ? "border-blue-500 bg-blue-500/10" : "border-ui-rule bg-ui-ground hover:bg-black/[0.04] dark:hover:bg-white/10"
             }`}
           >
-            <UploadCloud aria-hidden="true" className="w-7 h-7 text-violet-600 dark:text-violet-400" />
-            <p className="text-sm font-bold text-gray-900 dark:text-white">📁 Videoni yuklash</p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center">
+            <UploadCloud aria-hidden="true" className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm font-semibold text-ui-ink">Videoni yuklash</p>
+            <p className="text-xs text-ui-muted text-center">
               MP4, MOV, MKV yoki WebM &middot; {formatMaxSize(UPLOAD_MAX_SIZE_BYTES)} gacha
             </p>
             <input
@@ -167,7 +167,7 @@ export default function UploadRecoveryPrompt({ jobId, onUploaded }: UploadRecove
             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3.5 flex items-start gap-2.5">
               <FileVideo aria-hidden="true" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <div className="flex-1 space-y-2">
-                <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>
+                <p className="text-xs text-ui-red-ink font-medium">{error}</p>
                 {pendingFile && (
                   <button
                     onClick={handleRetry}

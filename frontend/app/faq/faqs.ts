@@ -1,22 +1,22 @@
 export const FAQS = [
   {
     q: "GapirAI.uz qanday ishlaydi?",
-    a: "Platformamizga xorijiy tildagi YouTube video havolasini kiritganingizda, tizim avtomatik ravishda audioni ajratib oladi, nutqni matnga aylantiradi (OpenAI Whisper), o'zbek tiliga professional darajada tarjima qiladi (GPT-4o) hamda eng so'nggi ovoz sintezi (Azure Speech AI) yordamida o'zbek tilida tabiiy ovoz beradi."
+    a: "YouTube havolasini yoki video faylni yuborasiz. Tizim videodagi nutqni matnga aylantiradi, uni sun'iy intellekt yordamida tabiiy o'zbek tiliga tarjima qiladi, spikerning jinsiga mos o'zbekcha ovoz bilan qayta yozadi va videoga qo'shadi. Xohlasangiz, ovozsiz faqat subtitr (.srt / .vtt) yoki qisqa tahlil (xulosa, konspekt, test) olishingiz mumkin."
   },
   {
     q: "Platformadan foydalanish bepulmi?",
-    a: "Bepul tarifda oyiga 5 daqiqa dublyaj bepul. Ko'proq kerak bo'lsa oylik tarifga o'ting (Standart — oyiga 350 daqiqa, 49 000 so'm; Pro — oyiga 600 daqiqa, premium ovoz va 1080p, 199 000 so'm) yoki qo'shimcha daqiqa paketi sotib oling (+35 daqiqa — 15 000 so'm, +70 — 25 000, +140 — 45 000, +350 — 100 000). Sarf haqiqiy video davomiyligi bo'yicha hisoblanadi. Sotib olingan daqiqalar tugamaydi va keyingi oyga o'tadi. Bitta video — maksimal 120 daqiqa."
+    a: "Bepul tarifda har 30 kunda 5 daqiqa beriladi. Ko'proq kerak bo'lsa obuna bo'ling (Standart — 350 daqiqa, 49 000 so'm; Pro — 600 daqiqa, 1080p va ovoz variantlari, 199 000 so'm) yoki bir martalik daqiqa paketi oling (+35 daqiqa — 15 000 so'm, +70 — 25 000, +140 — 45 000, +350 — 100 000). Sarf videoning haqiqiy davomiyligi bo'yicha hisoblanadi. Sotib olingan daqiqalar kuymaydi. Bitta video — 120 daqiqagacha. Tezkor tahlil daqiqa sarflamaydi."
   },
   {
     q: "Dublyaj qilish qancha vaqt oladi?",
-    a: "O'rtacha hisobda videoni qayta ishlash davomiyligi video uzunligining 30% ini tashkil qiladi. Masalan, 10 daqiqalik video taxminan 3 daqiqa ichida tayyor bo'ladi. Jarayon davomida taxminiy vaqt ekranda ko'rsatib turiladi."
+    a: "Bu video uzunligiga va navbatdagi videolar soniga bog'liq: qisqa videolar tezroq, uzun ma'ruzalar ko'proq vaqt oladi. Jarayon bosqichlari sahifada jonli ko'rinib turadi; sahifani yopsangiz ham ish davom etadi va tayyor video \"Mening videolarim\" bo'limida saqlanadi."
   },
   {
     q: "Dublyaj jarayonini bekor qilsa bo'ladimi?",
-    a: "Ha, jarayon davomida xohlagan vaqtingizda 'Jarayonni bekor qilish' tugmasini bosib, ishni to'xtatishingiz mumkin. Agar dublyaj bir necha marta urinishdan keyin ham muvaffaqiyatsiz tugasa, sarflangan daqiqalar hisobingizga qaytariladi."
+    a: "Ha, jarayon davomida \"Jarayonni bekor qilish\" tugmasini bosishingiz mumkin. Dastlabki 30 soniya ichida bekor qilinsa, daqiqalar to'liq qaytariladi. Video texnik sabab bilan tayyor bo'lmasa, sarflangan daqiqalar avtomatik qaytariladi."
   },
   {
     q: "Agar dublyaj jarayonida xatolik yuz bersa nima bo'ladi?",
-    a: "Agar tizimda yoki tarjimada xatolik yuz bersa, tizim avtomatik ravishda jarayonni qayta tiklashga (retry) harakat qiladi. Agar butunlay muvaffaqiyatsiz bo'lsa, to'liq xatolik sababi ekranda ko'rsatiladi va siz bosh sahifaga qaytib qaytadan urinib ko'rishingiz mumkin."
+    a: "Tizim avval jarayonni avtomatik qayta urinib ko'radi. Baribir muvaffaqiyatsiz bo'lsa, xatolik sababi ekranda ko'rsatiladi va daqiqalar balansingizga qaytadi. YouTube videoni yuklashga ruxsat bermasa, videoni fayl sifatida yuklab dublyaj qilishingiz mumkin."
   }
 ]

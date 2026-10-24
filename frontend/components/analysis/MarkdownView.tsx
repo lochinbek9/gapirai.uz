@@ -37,13 +37,13 @@ export default function MarkdownView({ content, className = "", showCopy = true 
       const token = match[0];
       if (token.startsWith("***") && token.endsWith("***")) {
         parts.push(
-          <strong key={key++} className="font-bold italic text-white">
+          <strong key={key++} className="font-semibold italic text-white">
             {token.slice(3, -3)}
           </strong>
         );
       } else if (token.startsWith("**") && token.endsWith("**")) {
         parts.push(
-          <strong key={key++} className="font-bold text-white">
+          <strong key={key++} className="font-semibold text-white">
             {token.slice(2, -2)}
           </strong>
         );
@@ -85,7 +85,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
     if (trimmed.startsWith("```")) {
       if (inCodeBlock) {
         blocks.push(
-          <pre key={blockKey++} className="bg-black/60 border border-white/10 rounded-xl p-4 overflow-x-auto my-3 font-mono text-xs text-blue-200">
+          <pre key={blockKey++} className="bg-black/60 border border-ui-rule rounded-xl p-4 overflow-x-auto my-3 font-mono text-xs text-ui-accent-ink">
             <code>{codeBuffer.join("\n")}</code>
           </pre>
         );
@@ -110,7 +110,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
     // Headers
     if (trimmed.startsWith("### ")) {
       blocks.push(
-        <h3 key={blockKey++} className="text-base font-bold text-blue-400 mt-5 mb-2.5 flex items-center gap-2">
+        <h3 key={blockKey++} className="text-base font-semibold text-ui-accent-ink mt-5 mb-2.5 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-400/80 inline-block" />
           <span>{renderInline(trimmed.replace(/^###\s+/, ""))}</span>
         </h3>
@@ -120,8 +120,8 @@ export default function MarkdownView({ content, className = "", showCopy = true 
 
     if (trimmed.startsWith("## ")) {
       blocks.push(
-        <h2 key={blockKey++} className="text-lg md:text-xl font-black text-white mt-7 mb-3 pb-2 border-b border-white/10 flex items-center gap-2">
-          <span className="text-blue-500">#</span>
+        <h2 key={blockKey++} className="text-lg md:text-xl font-semibold text-ui-ink mt-7 mb-3 pb-2 border-b border-ui-rule flex items-center gap-2">
+          <span className="text-ui-accent-ink">#</span>
           <span>{renderInline(trimmed.replace(/^##\s+/, ""))}</span>
         </h2>
       );
@@ -130,7 +130,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
 
     if (trimmed.startsWith("# ")) {
       blocks.push(
-        <h1 key={blockKey++} className="text-xl md:text-2xl font-black text-white mt-6 mb-4 pb-2 border-b border-blue-500/20">
+        <h1 key={blockKey++} className="text-xl md:text-2xl font-semibold text-ui-ink mt-6 mb-4 pb-2 border-b border-blue-500/20">
           {renderInline(trimmed.replace(/^#\s+/, ""))}
         </h1>
       );
@@ -139,7 +139,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
 
     if (trimmed.startsWith("#### ")) {
       blocks.push(
-        <h4 key={blockKey++} className="text-sm font-bold text-gray-200 mt-3 mb-1.5 uppercase tracking-wide">
+        <h4 key={blockKey++} className="text-sm font-semibold text-ui-ink mt-3 mb-1.5 ">
           {renderInline(trimmed.replace(/^####\s+/, ""))}
         </h4>
       );
@@ -149,7 +149,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
     // Blockquote
     if (trimmed.startsWith("> ")) {
       blocks.push(
-        <blockquote key={blockKey++} className="border-l-4 border-blue-500/60 bg-blue-500/5 px-4 py-2.5 rounded-r-xl my-2.5 text-gray-300 italic text-sm">
+        <blockquote key={blockKey++} className="border-l-4 border-blue-500/60 bg-blue-500/5 px-4 py-2.5 rounded-r-xl my-2.5 text-ui-muted italic text-sm">
           {renderInline(trimmed.replace(/^>\s+/, ""))}
         </blockquote>
       );
@@ -160,7 +160,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
     if (/^[-*]\s+/.test(trimmed)) {
       const itemText = trimmed.replace(/^[-*]\s+/, "");
       blocks.push(
-        <div key={blockKey++} className="flex items-start gap-2.5 my-1.5 pl-1.5 text-sm text-gray-300 leading-relaxed">
+        <div key={blockKey++} className="flex items-start gap-2.5 my-1.5 pl-1.5 text-sm text-ui-muted leading-relaxed">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 mt-2" />
           <div className="flex-1">{renderInline(itemText)}</div>
         </div>
@@ -172,8 +172,8 @@ export default function MarkdownView({ content, className = "", showCopy = true 
     const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (orderedMatch) {
       blocks.push(
-        <div key={blockKey++} className="flex items-start gap-2.5 my-1.5 pl-1 text-sm text-gray-300 leading-relaxed">
-          <span className="text-[11px] font-mono font-bold text-blue-400 bg-blue-500/10 rounded px-1.5 py-0.5 shrink-0 mt-0.5">
+        <div key={blockKey++} className="flex items-start gap-2.5 my-1.5 pl-1 text-sm text-ui-muted leading-relaxed">
+          <span className="text-xs font-mono font-semibold text-ui-accent-ink bg-blue-500/10 rounded px-1.5 py-0.5 shrink-0 mt-0.5">
             {orderedMatch[1]}
           </span>
           <div className="flex-1">{renderInline(orderedMatch[2])}</div>
@@ -184,7 +184,7 @@ export default function MarkdownView({ content, className = "", showCopy = true 
 
     // Regular paragraph
     blocks.push(
-      <p key={blockKey++} className="text-sm text-gray-300 leading-relaxed my-2">
+      <p key={blockKey++} className="text-sm text-ui-muted leading-relaxed my-2">
         {renderInline(trimmed)}
       </p>
     );
@@ -196,12 +196,12 @@ export default function MarkdownView({ content, className = "", showCopy = true 
         <div className="flex justify-end mb-3">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-gray-300 hover:text-white transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ui-ground hover:bg-ui-ground border border-ui-rule text-xs font-medium text-ui-muted hover:text-ui-ink transition shadow-sm"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Nusxalandi</span>
+                <Check className="w-3.5 h-3.5 text-ui-green-ink" />
+                <span className="text-ui-green-ink">Nusxalandi</span>
               </>
             ) : (
               <>

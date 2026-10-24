@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import PlatformFeedbackWidget from "@/components/PlatformFeedbackWidget";
 import PwaProvider from "@/components/PwaProvider";
 
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+// Geist: zamonaviy neytral sans; next/font uni build paytida yuklab, loyihaning o'zidan beradi.
+const geist = Geist({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://gapirai.uz'),
@@ -164,10 +165,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${geist.variable} font-sans`}>
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200] focus:rounded-xl focus:bg-violet-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200] focus:rounded-xl focus:bg-blue-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
         >
           Asosiy kontentga o&apos;tish
         </a>

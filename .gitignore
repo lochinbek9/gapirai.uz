@@ -45,3 +45,8 @@ ai-dubber-backup/
 auto_recovery_pipeline.py
 RECOVERY_PIPELINE_STATUS.json
 KELDIK_*.txt
+
+# Impeccable: lokal ish fayllari (qaror eskizlari, review suratlari, savol sahifasi holati)
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/questions/

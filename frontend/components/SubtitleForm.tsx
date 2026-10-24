@@ -23,20 +23,18 @@ export default function SubtitleForm() {
         value={source}
         onChange={setSource}
         items={[
-          { id: "url", label: "YouTube havolasi", icon: Youtube },
-          { id: "file", label: "Video fayl", icon: FileVideo },
+          { id: "url", label: <><span className="sm:hidden">Havola</span><span className="hidden sm:inline">YouTube havolasi</span></>, icon: Youtube },
+          { id: "file", label: <><span className="sm:hidden">Fayl</span><span className="hidden sm:inline">Video fayl</span></>, icon: FileVideo },
         ]}
-        className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5"
+        className="flex gap-5 border-b border-ui-rule"
         tabClassName={(active) =>
-          `flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
-            active
-              ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
-              : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          `-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 pt-0.5 text-sm font-medium transition ${
+            active ? "border-ui-ink text-ui-ink" : "border-transparent text-ui-muted hover:text-ui-ink"
           }`}
       />
       <div className="space-y-1.5">
-        <span id="sub-lang-label" className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1">Video tili</span>
-        <div className="flex flex-col sm:flex-row gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5" role="group" aria-labelledby="sub-lang-label">
+        <span id="sub-lang-label" className="ui-label block">Video tili</span>
+        <div className="grid gap-2 sm:grid-cols-2" role="group" aria-labelledby="sub-lang-label">
           {([
             ["auto", "Boshqa til (Ingliz, Rus, Turk...) → O'zbekcha tarjima"],
             ["uz", "Video o'zbek tilida (faqat matnga aylantirish)"],
@@ -46,17 +44,17 @@ export default function SubtitleForm() {
               type="button"
               onClick={() => setLang(id)}
               aria-pressed={lang === id}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold text-center leading-snug transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+              className={`rounded-control border px-3 py-2.5 text-left text-sm font-medium leading-snug transition ${
                 lang === id
-                  ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
-                  : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  ? "border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]"
+                  : "border-ui-rule text-ui-ink hover:border-ui-muted/60"
               }`}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+        <p className="text-sm text-ui-muted">
           {lang === "uz"
             ? "Videodagi o'zbekcha nutq to'g'ridan-to'g'ri o'zbekcha subtitrga aylantiriladi (tarjimasiz)."
             : "Chet tildagi (ingliz, rus, turk va b.) nutq avtomatik aniqlanib, o'zbekchaga tarjima qilinadi."}

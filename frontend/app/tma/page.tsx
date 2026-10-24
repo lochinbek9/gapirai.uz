@@ -44,14 +44,14 @@ export default function TmaBridge() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-8 text-center">
         <AlertCircle className="h-9 w-9 text-red-500" />
-        <p className="text-sm text-gray-600 dark:text-gray-300">{error}</p>
+        <p className="text-sm text-ui-muted">{error}</p>
       </div>
     )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <Loader2 className="h-7 w-7 animate-spin text-violet-500" />
+      <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
     </div>
   )
 }

@@ -81,7 +81,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
             <TrendingDown className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
               Ro'yxatdan To'lovgacha Konversiya Voronkasi
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-medium">
                 Funnel Analytics
@@ -136,10 +136,10 @@ export default function AdminFunnelManager({ token }: { token: string }) {
               <span>Ro'yxatdan o'tgan</span>
               <Users className="w-4 h-4 text-violet-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-white">
+            <div className="text-xl sm:text-2xl font-semibold text-white">
               {data.stages[0]?.count ?? 0}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-xs text-slate-500 mt-1">
               {getDaysLabel(selectedDays)} davrida
             </div>
           </div>
@@ -149,10 +149,10 @@ export default function AdminFunnelManager({ token }: { token: string }) {
               <span>To'lov qilganlar</span>
               <Award className="w-4 h-4 text-emerald-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-emerald-400">
+            <div className="text-xl sm:text-2xl font-semibold text-emerald-400">
               {data.stages[data.stages.length - 1]?.count ?? 0}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-xs text-slate-500 mt-1">
               Haqiqiy xaridorlar
             </div>
           </div>
@@ -162,10 +162,10 @@ export default function AdminFunnelManager({ token }: { token: string }) {
               <span>Umumiy Konversiya</span>
               <TrendingUp className="w-4 h-4 text-amber-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-amber-400">
+            <div className="text-xl sm:text-2xl font-semibold text-amber-400">
               {data.metrics.overall_conversion_pct}%
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-xs text-slate-500 mt-1">
               Ro'yxatdan $\rightarrow$ To'lovgacha
             </div>
           </div>
@@ -175,10 +175,10 @@ export default function AdminFunnelManager({ token }: { token: string }) {
               <span>Jami Tushum</span>
               <Wallet className="w-4 h-4 text-blue-400" />
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-white truncate">
+            <div className="text-xl sm:text-2xl font-semibold text-white truncate">
               {data.metrics.total_revenue_uzs.toLocaleString('uz-UZ')} UZS
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
+            <div className="text-xs text-slate-500 mt-1">
               {data.metrics.approved_transactions_count} ta to'lov (o'rt. chek: {data.metrics.average_order_value_uzs.toLocaleString('uz-UZ')} UZS)
             </div>
           </div>
@@ -205,14 +205,14 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                 <div key={stage.key} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-slate-300">
-                      <span className="w-5 h-5 rounded-full bg-white/10 text-[11px] font-bold flex items-center justify-center text-slate-400">
+                      <span className="w-5 h-5 rounded-full bg-white/10 text-xs font-semibold flex items-center justify-center text-slate-400">
                         {index + 1}
                       </span>
                       <IconComp className="w-4 h-4 text-violet-400" />
                       <span className="font-medium text-white">{stage.label}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-white">{stage.count.toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-white">{stage.count.toLocaleString()}</span>
                       <span className="text-slate-400 font-mono w-14 text-right">
                         {stage.pct_of_top}%
                       </span>
@@ -223,7 +223,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                   <div className="h-3.5 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
                     {widthPct > 0 ? (
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-500 transition-all duration-700 shadow-sm"
+                        className="h-full rounded-full bg-violet-600 transition-all duration-700 shadow-sm"
                         style={{ width: `${widthPct}%` }}
                       />
                     ) : (
@@ -233,9 +233,9 @@ export default function AdminFunnelManager({ token }: { token: string }) {
 
                   {/* Connector between steps: markazlashtirilgan chiroyli ko'rsatkich, sonlarning tepasida turib xalaqit bermaydi */}
                   {index < data.stages.length - 1 && (
-                    <div className="flex items-center justify-center gap-2.5 py-1 text-[11px]">
+                    <div className="flex items-center justify-center gap-2.5 py-1 text-xs">
                       <div className="h-px bg-white/5 flex-1" />
-                      <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 px-3 py-0.5 rounded-full font-mono text-[10px]">
+                      <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 px-3 py-0.5 rounded-full font-mono text-xs">
                         <span className="text-emerald-400 flex items-center gap-1 font-semibold">
                           <ArrowRight className="w-2.5 h-2.5" />
                           {data.stages[index + 1].conversion_from_prev}% o'tish
@@ -280,7 +280,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                     : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
                 }`}
               >
-                <div className="font-bold flex items-center gap-1.5">
+                <div className="font-semibold flex items-center gap-1.5">
                   {ins.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                   {ins.type === 'caution' && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
                   {ins.type === 'success' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
@@ -299,7 +299,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Obunalar va Daqiqa Paketlari */}
           <div className="bg-black/20 border border-white/10 rounded-xl p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h3 className="text-xs font-semibold text-slate-400">
               Xarid turlari bo'yicha tushum
             </h3>
             <div className="space-y-2.5">
@@ -308,7 +308,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                   <div className="w-2.5 h-2.5 rounded-full bg-violet-400" />
                   <span>Daqiqa paketlari (Minute packs)</span>
                 </div>
-                <span className="font-bold text-white">
+                <span className="font-semibold text-white">
                   {data.metrics.minute_packs_revenue_uzs.toLocaleString('uz-UZ')} UZS
                 </span>
               </div>
@@ -317,7 +317,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                   <div className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
                   <span>Obuna tariflari (Subscriptions)</span>
                 </div>
-                <span className="font-bold text-white">
+                <span className="font-semibold text-white">
                   {data.metrics.subscription_revenue_uzs.toLocaleString('uz-UZ')} UZS
                 </span>
               </div>
@@ -326,7 +326,7 @@ export default function AdminFunnelManager({ token }: { token: string }) {
 
           {/* To'lov tizimlari bo'yicha */}
           <div className="bg-black/20 border border-white/10 rounded-xl p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h3 className="text-xs font-semibold text-slate-400">
               To'lov tizimlari taqsimoti
             </h3>
             {data.providers && data.providers.length > 0 ? (
@@ -334,12 +334,12 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                 {data.providers.map((p) => (
                   <div key={p.provider} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-slate-300">
-                      <span className="font-bold text-white">{p.provider}</span>
+                      <span className="font-semibold text-white">{p.provider}</span>
                       <span className="text-slate-500">({p.count} ta)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">{p.total_uzs.toLocaleString('uz-UZ')} UZS</span>
-                      <span className="text-slate-400 font-mono text-[11px]">({p.pct}%)</span>
+                      <span className="font-semibold text-white">{p.total_uzs.toLocaleString('uz-UZ')} UZS</span>
+                      <span className="text-slate-400 font-mono text-xs">({p.pct}%)</span>
                     </div>
                   </div>
                 ))}
@@ -380,12 +380,12 @@ export default function AdminFunnelManager({ token }: { token: string }) {
                       <tr key={rc.payment_id} className="hover:bg-white/5 transition">
                         <td className="py-2.5 px-4">
                           <div className="font-medium text-white">{rc.user_name}</div>
-                          <div className="text-[11px] text-slate-500">{rc.user_email || rc.user_phone || 'ID: ' + rc.user_id.slice(0, 8)}</div>
+                          <div className="text-xs text-slate-500">{rc.user_email || rc.user_phone || 'ID: ' + rc.user_id.slice(0, 8)}</div>
                         </td>
                         <td className="py-2.5 px-4 font-medium text-violet-300">{rc.item_label}</td>
-                        <td className="py-2.5 px-4 font-bold text-white">{rc.amount_uzs.toLocaleString('uz-UZ')} UZS</td>
+                        <td className="py-2.5 px-4 font-semibold text-white">{rc.amount_uzs.toLocaleString('uz-UZ')} UZS</td>
                         <td className="py-2.5 px-4">
-                          <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-slate-300">
+                          <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs font-semibold text-slate-300">
                             {rc.provider}
                           </span>
                         </td>

@@ -72,8 +72,8 @@ export default function AdminCookiesManager({ token }: { token: string }) {
             <Cookie className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">YouTube Cookies Boshqaruvi</h2>
-            <p className="text-xs text-gray-400">
+            <h2 className="text-lg font-semibold text-white">YouTube Cookies Boshqaruvi</h2>
+            <p className="text-xs text-ui-muted">
               YouTube bot-tekshiruvlari va yuklab olish xatoliklarini to&apos;liq oldini olish uchun cookies.txt
             </p>
           </div>
@@ -106,7 +106,7 @@ export default function AdminCookiesManager({ token }: { token: string }) {
       {cookieHealth && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-            <span className="text-[11px] text-gray-400 font-medium">Holat:</span>
+            <span className="text-xs text-ui-muted font-medium">Holat:</span>
             <div className="mt-1 flex items-center gap-2">
               {cookieHealth.exists ? (
                 cookieHealth.is_fresh ? (
@@ -127,22 +127,22 @@ export default function AdminCookiesManager({ token }: { token: string }) {
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-            <span className="text-[11px] text-gray-400 font-medium">Cookie soni:</span>
-            <p className="mt-1 text-sm font-bold text-white">
+            <span className="text-xs text-ui-muted font-medium">Cookie soni:</span>
+            <p className="mt-1 text-sm font-semibold text-white">
               {cookieHealth.cookie_count || 0} ta sessiya
             </p>
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-            <span className="text-[11px] text-gray-400 font-medium">Fayl hajmi:</span>
-            <p className="mt-1 text-sm font-bold text-white">
+            <span className="text-xs text-ui-muted font-medium">Fayl hajmi:</span>
+            <p className="mt-1 text-sm font-semibold text-white">
               {cookieHealth.size ? `${(cookieHealth.size / 1024).toFixed(1)} KB` : '0 KB'}
             </p>
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-            <span className="text-[11px] text-gray-400 font-medium">So&apos;nggi yangilanish:</span>
-            <p className="mt-1 text-sm font-bold text-white truncate" title={cookieHealth.updated_at || 'Mavjud emas'}>
+            <span className="text-xs text-ui-muted font-medium">So&apos;nggi yangilanish:</span>
+            <p className="mt-1 text-sm font-semibold text-white truncate" title={cookieHealth.updated_at || 'Mavjud emas'}>
               {cookieHealth.updated_at || 'Mavjud emas'}
             </p>
           </div>
@@ -169,7 +169,7 @@ export default function AdminCookiesManager({ token }: { token: string }) {
               {selectedFile ? selectedFile.name : 'cookies.txt faylini tanlash'}
             </label>
             {selectedFile && (
-              <span className="text-xs text-gray-400 truncate max-w-xs">
+              <span className="text-xs text-ui-muted truncate max-w-xs">
                 {(selectedFile.size / 1024).toFixed(1)} KB
               </span>
             )}
@@ -211,7 +211,7 @@ export default function AdminCookiesManager({ token }: { token: string }) {
             <Info className="w-4 h-4" />
             <span>Qanday qilib cookies.txt eksport qilinadi?</span>
           </div>
-          <ol className="list-decimal list-inside space-y-1 text-gray-400 pl-1 text-[11px] leading-relaxed">
+          <ol className="list-decimal list-inside space-y-1 text-ui-muted pl-1 text-xs leading-relaxed">
             <li>Chrome yoki Brave brauzeringizga <strong>&ldquo;Get cookies.txt LOCALLY&rdquo;</strong> kengaytmasini o&apos;rnating.</li>
             <li><strong>youtube.com</strong> sahifasiga o&apos;tib o&apos;z hisobingizga kiring.</li>
             <li>Kengaytmani oching va <strong>&ldquo;Export&rdquo;</strong> tugmasini bosib <code className="text-blue-300">cookies.txt</code> faylini yuklab oling.</li>

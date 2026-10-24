@@ -53,7 +53,7 @@ function renderInlineText(text: string): React.ReactNode {
     const token = match[0];
     if (token.startsWith("**") && token.endsWith("**")) {
       parts.push(
-        <strong key={key++} className="font-bold text-white tracking-wide">
+        <strong key={key++} className="font-semibold text-white tracking-wide">
           {token.slice(2, -2)}
         </strong>
       );
@@ -65,7 +65,7 @@ function renderInlineText(text: string): React.ReactNode {
       );
     } else if (token.startsWith("`") && token.endsWith("`")) {
       parts.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded bg-white/10 text-cyan-300 font-mono text-xs border border-white/5">
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-white/10 text-blue-300 font-mono text-xs border border-white/5">
           {token.slice(1, -1)}
         </code>
       );
@@ -482,25 +482,25 @@ export default function NotesTab({
   return (
     <div className="space-y-6">
       {/* 1. HERO HEADER BANNER */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-900/30 via-black/40 to-blue-900/20 p-5 sm:p-7 backdrop-blur-xl shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-ui-rule bg-blue-900/30 via-black/40 p-5 sm:p-7 shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 border border-violet-500/30 shadow-sm">
-                <Sparkles className="w-3 h-3 text-violet-400" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-ui-accent-ink border border-blue-500/30 shadow-sm">
+                <Sparkles className="w-3 h-3 text-ui-accent-ink" />
                 AI Konspekt
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-gray-300 border border-white/10">
-                <Clock className="w-3 h-3 text-blue-400" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-ui-ground text-ui-muted border border-ui-rule">
+                <Clock className="w-3 h-3 text-ui-accent-ink" />
                 ~{stats.minutes} daqiqalik o'qish
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-gray-400 border border-white/10">
-                <FileText className="w-3 h-3 text-emerald-400" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-ui-ground text-ui-muted border border-ui-rule">
+                <FileText className="w-3 h-3 text-ui-green-ink" />
                 {stats.words} ta so'z
               </span>
             </div>
 
-            <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white leading-tight tracking-tight">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-ui-ink leading-tight tracking-tight">
               {parsed?.mainTitle}
             </h2>
 
@@ -512,16 +512,16 @@ export default function NotesTab({
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-ui-rule">
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 hover:text-white transition shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-xs font-semibold text-ui-ink hover:text-ui-ink transition shadow-sm active:scale-95"
               title="Konspekt matnini nusxalash"
             >
               {copied ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Nusxalandi</span>
+                  <Check className="w-3.5 h-3.5 text-ui-green-ink" />
+                  <span className="text-ui-green-ink">Nusxalandi</span>
                 </>
               ) : (
                 <>
@@ -533,19 +533,19 @@ export default function NotesTab({
 
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 hover:text-white transition shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-xs font-semibold text-ui-ink hover:text-ui-ink transition shadow-sm active:scale-95"
               title="Markdown (.md) fayl sifatida yuklab olish"
             >
-              <Download className="w-3.5 h-3.5 text-blue-400" />
+              <Download className="w-3.5 h-3.5 text-ui-accent-ink" />
               <span className="hidden sm:inline">Yuklab olish</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 hover:text-white transition shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-xs font-semibold text-ui-ink hover:text-ui-ink transition shadow-sm active:scale-95"
               title="Faqat konspektning o'zini toza PDF shaklida saqlash yoki chop etish"
             >
-              <Printer className="w-3.5 h-3.5 text-violet-400" />
+              <Printer className="w-3.5 h-3.5 text-ui-accent-ink" />
               <span className="hidden sm:inline">PDF / Chop etish</span>
             </button>
 
@@ -557,10 +557,10 @@ export default function NotesTab({
                   }
                 }}
                 disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-200 hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-xs font-semibold text-ui-accent-ink hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
                 title="Konspektni to'liq transkript asosida qaytadan chuqur yaratish"
               >
-                <Sparkles className={`w-3.5 h-3.5 text-violet-400 ${loading ? "animate-spin" : ""}`} />
+                <Sparkles className={`w-3.5 h-3.5 text-ui-accent-ink ${loading ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">Qayta yaratish</span>
               </button>
             )}
@@ -568,16 +568,14 @@ export default function NotesTab({
         </div>
 
         {/* Ambient background glow */}
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
       {/* 2. MUNDARIJA / QUICK NAVIGATION PILLS */}
       {parsed?.sections && parsed.sections.length > 1 && (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-sm">
+        <div className="rounded-2xl border border-ui-rule bg-ui-ground p-4 ">
           <div className="flex items-center gap-2 mb-3">
-            <Bookmark className="w-4 h-4 text-violet-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300">
+            <Bookmark className="w-4 h-4 text-ui-accent-ink" />
+            <h3 className="text-xs font-semibold text-ui-muted">
               Mundarija (Tezkor o'tish)
             </h3>
           </div>
@@ -586,16 +584,16 @@ export default function NotesTab({
               <button
                 key={sec.id}
                 onClick={() => scrollToSection(sec.id)}
-                className="group flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-violet-600/20 border border-white/10 hover:border-violet-500/40 text-xs font-medium text-gray-300 hover:text-white transition shadow-sm"
+                className="group flex items-center gap-2 px-3 py-1.5 rounded-xl bg-ui-ground hover:bg-blue-600/20 border border-ui-rule hover:border-blue-500/40 text-xs font-medium text-ui-muted hover:text-ui-ink transition shadow-sm"
               >
                 {sec.number ? (
-                  <span className="text-[10px] font-mono font-bold text-violet-400 group-hover:text-violet-300">
+                  <span className="text-xs font-mono font-semibold text-ui-accent-ink group-hover:text-ui-accent-ink">
                     {sec.number}
                   </span>
                 ) : sec.isConclusion ? (
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  <Sparkles className="w-3 h-3 text-ui-green-ink" />
                 ) : (
-                  <ChevronRight className="w-3 h-3 text-gray-500 group-hover:text-violet-400" />
+                  <ChevronRight className="w-3 h-3 text-ui-muted group-hover:text-ui-accent-ink" />
                 )}
                 <span className="truncate max-w-[200px]">{sec.title}</span>
               </button>
@@ -612,13 +610,13 @@ export default function NotesTab({
               <div
                 key={sec.id}
                 id={sec.id}
-                className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-black/40 to-teal-950/20 p-5 sm:p-6 backdrop-blur-sm shadow-lg space-y-4"
+                className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-950/20 via-black/40 p-5 sm:p-6 shadow-lg space-y-4"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-ui-green-ink flex items-center justify-center font-semibold">
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white">
+                  <h3 className="text-base sm:text-lg font-semibold text-ui-ink">
                     {sec.title}
                   </h3>
                 </div>
@@ -627,14 +625,14 @@ export default function NotesTab({
                   {sec.items.map((item, idx) => (
                     <div
                       key={idx}
-                      className="p-3.5 rounded-xl bg-white/[0.03] border border-emerald-500/15 space-y-1 hover:border-emerald-500/30 transition"
+                      className="p-3.5 rounded-xl bg-ui-ground border border-emerald-500/15 space-y-1 hover:border-emerald-500/30 transition"
                     >
                       {item.label && (
-                        <p className="text-xs font-bold text-emerald-300 uppercase tracking-wide">
+                        <p className="text-xs font-semibold text-ui-green-ink ">
                           {item.label}
                         </p>
                       )}
-                      <p className="text-xs text-gray-300 leading-relaxed">
+                      <p className="text-xs text-ui-muted leading-relaxed">
                         {renderInlineText(item.content)}
                       </p>
                     </div>
@@ -648,17 +646,17 @@ export default function NotesTab({
             <div
               key={sec.id}
               id={sec.id}
-              className="group relative rounded-2xl border border-white/10 hover:border-violet-500/30 bg-gradient-to-b from-white/[0.04] to-black/20 p-5 sm:p-6 backdrop-blur-sm transition-all duration-300 shadow-md hover:shadow-xl space-y-4"
+              className="group relative rounded-2xl border border-ui-rule hover:border-blue-500/30 from-white/[0.04] to-black/20 p-5 sm:p-6 transition-all duration-300 shadow-md hover:shadow-xl space-y-4"
             >
               {/* Section Header */}
               <div className="flex items-start gap-3.5">
                 {sec.number && (
-                  <div className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-lg shadow-violet-500/20 border border-white/20">
+                  <div className="shrink-0 w-9 h-9 rounded-xl bg-blue-600 text-white font-mono font-semibold text-xs flex items-center justify-center shadow-lg border border-ui-rule">
                     {sec.number}
                   </div>
                 )}
                 <div className="flex-1 pt-0.5">
-                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-violet-200 transition">
+                  <h3 className="text-base sm:text-lg font-semibold text-ui-ink group-hover:text-ui-accent-ink transition">
                     {sec.title}
                   </h3>
                 </div>
@@ -671,17 +669,17 @@ export default function NotesTab({
                     return (
                       <div
                         key={idx}
-                        className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-transparent p-4 space-y-1.5 transition shadow-sm"
+                        className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-4 space-y-1.5 transition shadow-sm"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center">
                             <Lightbulb className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                             {item.label || "Tushuncha (Nazariya)"}
                           </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-7">
+                        <p className="text-xs sm:text-sm text-ui-ink leading-relaxed pl-7">
                           {renderInlineText(item.content)}
                         </p>
                       </div>
@@ -692,17 +690,17 @@ export default function NotesTab({
                     return (
                       <div
                         key={idx}
-                        className="rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/[0.08] to-transparent p-4 space-y-1.5 transition shadow-sm"
+                        className="rounded-xl border border-blue-500/30 bg-blue-500/[0.08] p-4 space-y-1.5 transition shadow-sm"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-md bg-blue-500/20 text-ui-accent-ink flex items-center justify-center">
                             <Wrench className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                          <span className="text-xs font-semibold text-ui-accent-ink">
                             {item.label || "Amaliyot va Qadamlar"}
                           </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-7">
+                        <p className="text-xs sm:text-sm text-ui-ink leading-relaxed pl-7">
                           {renderInlineText(item.content)}
                         </p>
                       </div>
@@ -713,17 +711,17 @@ export default function NotesTab({
                     return (
                       <div
                         key={idx}
-                        className="rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/[0.08] to-transparent p-4 space-y-1.5 transition shadow-sm"
+                        className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] p-4 space-y-1.5 transition shadow-sm"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-md bg-ui-green/10 text-ui-green-ink flex items-center justify-center">
                             <Sparkles className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                          <span className="text-xs font-semibold text-ui-green-ink">
                             {item.label || "Tavsiya"}
                           </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-7">
+                        <p className="text-xs sm:text-sm text-ui-ink leading-relaxed pl-7">
                           {renderInlineText(item.content)}
                         </p>
                       </div>
@@ -734,15 +732,15 @@ export default function NotesTab({
                     return (
                       <div
                         key={idx}
-                        className="rounded-xl border border-white/10 bg-gradient-to-r from-violet-500/[0.08] to-transparent hover:border-violet-500/30 p-3.5 space-y-1.5 transition shadow-sm"
+                        className="rounded-xl border border-ui-rule bg-blue-500/[0.08] hover:border-blue-500/30 p-3.5 space-y-1.5 transition shadow-sm"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-violet-400 shadow-sm" />
-                          <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+                          <span className="w-2 h-2 rounded-full bg-blue-400 shadow-sm" />
+                          <span className="text-xs font-semibold text-ui-accent-ink">
                             {item.label}
                           </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-200 leading-relaxed pl-4">
+                        <p className="text-xs sm:text-sm text-ui-ink leading-relaxed pl-4">
                           {renderInlineText(item.content)}
                         </p>
                       </div>
@@ -752,16 +750,16 @@ export default function NotesTab({
                   return (
                     <div
                       key={idx}
-                      className="flex items-start gap-2.5 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs sm:text-sm text-gray-300 leading-relaxed"
+                      className="flex items-start gap-2.5 p-2 rounded-lg bg-ui-ground border border-ui-rule text-xs sm:text-sm text-ui-muted leading-relaxed"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0 mt-2" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 mt-2" />
                       <div className="flex-1">{renderInlineText(item.content)}</div>
                     </div>
                   );
                 })}
 
                 {sec.rawText && (
-                  <div className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                  <div className="text-xs sm:text-sm text-ui-muted leading-relaxed whitespace-pre-line">
                     {renderInlineText(sec.rawText)}
                   </div>
                 )}

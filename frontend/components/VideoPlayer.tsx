@@ -49,8 +49,8 @@ function loadSubSettings(): SubSettings {
 function CcIcon({ on }: { on: boolean }) {
   return (
     <span
-      className={`text-[9px] font-extrabold border rounded px-[4px] py-[1.5px] leading-none tracking-tight select-none transition-colors uppercase ${
-        on ? "border-red-500 bg-red-500/20 text-red-400" : "border-white/40 text-white/60 hover:text-white hover:border-white"
+      className={`text-xs font-semibold border rounded px-[4px] py-[1.5px] leading-none tracking-tight select-none transition-colors ${
+        on ? "border-white bg-white text-black" : "border-white/40 text-white/60 hover:text-white hover:border-white"
       }`}
     >
       sub
@@ -96,17 +96,17 @@ function SubPanel({
   return (
     <div className="absolute bottom-[72px] right-2 z-50 bg-black/95 border border-white/10 rounded-2xl p-4 w-72 shadow-2xl text-white text-xs">
       <div className="flex items-center justify-between mb-3">
-        <span className="font-bold text-sm">Subtitr sozlamalari</span>
+        <span className="font-semibold text-sm">Subtitr sozlamalari</span>
         <button onClick={onClose} className="text-white/40 hover:text-white transition">✕</button>
       </div>
 
       {/* Font size */}
       <div className="mb-3">
-        <p className="text-white/50 mb-1.5 uppercase tracking-wider text-[10px]">Shrift o'lchami</p>
+        <p className="text-white/50 mb-1.5 text-xs">Shrift o'lchami</p>
         <div className="flex gap-1.5">
           {SIZES.map(s => (
             <button key={s.v} onClick={() => update({ fontSize: s.v })}
-              className={`flex-1 py-1.5 rounded-lg font-bold transition text-sm ${
+              className={`flex-1 py-1.5 rounded-lg font-semibold transition text-sm ${
                 settings.fontSize === s.v
                   ? "bg-blue-500 text-white"
                   : "bg-white/10 text-white/60 hover:bg-white/20"
@@ -118,11 +118,11 @@ function SubPanel({
 
       {/* Background opacity */}
       <div className="mb-3">
-        <p className="text-white/50 mb-1.5 uppercase tracking-wider text-[10px]">Fon shaffoflik</p>
+        <p className="text-white/50 mb-1.5 text-xs">Fon shaffoflik</p>
         <div className="flex gap-1.5">
           {BGOPTS.map(o => (
             <button key={o.v} onClick={() => update({ bgOpacity: o.v })}
-              className={`flex-1 py-1.5 rounded-lg transition text-[10px] font-semibold ${
+              className={`flex-1 py-1.5 rounded-lg transition text-xs font-semibold ${
                 settings.bgOpacity === o.v
                   ? "bg-blue-500 text-white"
                   : "bg-white/10 text-white/50 hover:bg-white/20"
@@ -134,7 +134,7 @@ function SubPanel({
 
       {/* Text color */}
       <div className="mb-3">
-        <p className="text-white/50 mb-1.5 uppercase tracking-wider text-[10px]">Matn rangi</p>
+        <p className="text-white/50 mb-1.5 text-xs">Matn rangi</p>
         <div className="flex gap-2">
           {COLORS.map(c => (
             <button key={c.v} onClick={() => update({ textColor: c.v })}
@@ -150,11 +150,11 @@ function SubPanel({
 
       {/* Text opacity */}
       <div>
-        <p className="text-white/50 mb-1.5 uppercase tracking-wider text-[10px]">Matn aniqligi</p>
+        <p className="text-white/50 mb-1.5 text-xs">Matn aniqligi</p>
         <div className="flex gap-1.5">
           {OPACITIES.map(o => (
             <button key={o.v} onClick={() => update({ textOpacity: o.v })}
-              className={`flex-1 py-1.5 rounded-lg transition text-[10px] font-semibold ${
+              className={`flex-1 py-1.5 rounded-lg transition text-xs font-semibold ${
                 settings.textOpacity === o.v
                   ? "bg-blue-500 text-white"
                   : "bg-white/10 text-white/50 hover:bg-white/20"
@@ -660,7 +660,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
       {/* Floating quality change toast */}
       {qualityToast && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-slate-950/90 text-white border border-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-none">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-slate-950/90 text-white border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-none">
           <Sparkles className="w-3.5 h-3.5 text-blue-400" />
           <span>{qualityToast}</span>
         </div>
@@ -706,7 +706,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             type="button"
             onClick={(e) => { e.stopPropagation(); togglePlay(); }}
             aria-label={playing ? "Pauza" : "Ijro"}
-            className="pointer-events-auto w-14 h-14 sm:w-20 sm:h-20 bg-black/40 sm:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl"
+            className="pointer-events-auto w-14 h-14 sm:w-20 sm:h-20 bg-black/40 sm:bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl"
           >
             {playing
               ? <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="white" />
@@ -720,7 +720,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         className="absolute bottom-0 left-0 right-0 z-30 transition-opacity duration-300"
         style={{ opacity: ctrlVisible ? 1 : 0, pointerEvents: ctrlVisible ? "auto" : "none" }}
       >
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 from-black/95 via-black/60 pointer-events-none" />
         <div ref={ctrlBarRef} className="relative px-3 sm:px-6 pb-2 sm:pb-4 pt-8 sm:pt-14">
           {/* Video Title, Channel Name & Watermark (YouTube style) -- telefonda
               faqat to'liq ekranda: kichik pleerda u videoning yarmini yopardi. */}
@@ -729,7 +729,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               <div className="min-w-0 flex-1">
                 {resolvedTitle && (
                   <h3
-                    className="text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-1 drop-shadow-md tracking-tight"
+                    className="text-white font-semibold text-sm sm:text-base md:text-lg leading-snug line-clamp-1 drop-shadow-md tracking-tight"
                     title={resolvedTitle}
                   >
                     {resolvedTitle}
@@ -765,9 +765,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           >
             <div className={`${scrubbing ? "h-1.5" : "h-1"} group-hover/bar:h-1.5 bg-white/25 rounded-full relative transition-all duration-100`}>
               <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full" style={{ width: `${bufferedPct}%` }} />
-              <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
+              <div className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
               <div
-                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-red-600 rounded-full shadow-lg transition-transform ${
+                className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-blue-500 rounded-full shadow-lg transition-transform ${
                   scrubbing || isTouch ? "scale-100" : "scale-0 group-hover/bar:scale-100"
                 }`}
                 style={{ left: `${progressPct}%` }}
@@ -779,7 +779,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="text-white hover:text-red-500 transition flex-shrink-0 focus:outline-none"
+              className="text-white hover:text-white/80 transition flex-shrink-0 focus:outline-none"
               title={playing ? "Pauza (k)" : "Ijro (k)"}
             >
               {playing ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5" fill="currentColor" />}
@@ -798,7 +798,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             <div className="flex items-center gap-1.5 flex-shrink-0 group/vol">
               <button
                 onClick={toggleMute}
-                className="text-white hover:text-red-500 transition focus:outline-none"
+                className="text-white hover:text-white/80 transition focus:outline-none"
                 title={muted ? "Ovozni yoqish (m)" : "Ovozni o'chirish (m)"}
               >
                 {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -808,14 +808,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                   to'liq ekran tugmasini ekrandan siqib chiqarardi. */}
               <input
                 type="range" min="0" max="1" step="0.05"
+                aria-label="Ovoz balandligi"
                 value={muted ? 0 : volume}
                 onChange={changeVol}
-                className="hidden sm:block w-20 accent-red-600 cursor-pointer"
+                className="hidden sm:block w-20 accent-blue-500 cursor-pointer"
               />
             </div>
 
             {/* Time */}
-            <span className="text-white/80 text-[11px] sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0 whitespace-nowrap">
+            <span className="text-white/80 text-xs sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0 whitespace-nowrap">
               {fmt(progress)} / {fmt(duration)}
             </span>
 
@@ -850,7 +851,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                   setShowPanel(false);
                 }}
                 title="Video sifati (360p, 720p, 1080p)"
-                className={`h-7 px-2.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1.5 select-none ${
+                className={`h-7 px-2.5 rounded-lg text-xs font-semibold border transition flex items-center gap-1.5 select-none ${
                   showQualityMenu
                     ? "bg-blue-600 text-white border-blue-400 shadow-sm"
                     : "bg-white/10 hover:bg-white/20 text-white/90 border-white/20"
@@ -865,11 +866,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               {/* Quality popover */}
               {showQualityMenu && (
                 <div
-                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 backdrop-blur-md border border-white/15 rounded-xl p-2 w-48 shadow-2xl text-white text-xs"
+                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 border border-white/15 rounded-xl p-2 w-48 shadow-2xl text-white text-xs"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/10">
-                    <span className="font-bold text-[10px] text-white/50 uppercase tracking-wider">Video sifati</span>
+                    <span className="font-semibold text-xs text-white/50 ">Video sifati</span>
                     <button
                       onClick={() => setShowQualityMenu(false)}
                       className="text-white/40 hover:text-white transition text-xs leading-none"
@@ -905,8 +906,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                           }`}
                         >
                           <div className="flex flex-col">
-                            <span className="font-bold leading-tight">{opt.resolution}</span>
-                            <span className="text-[10px] text-white/50">{label}</span>
+                            <span className="font-semibold leading-tight">{opt.resolution}</span>
+                            <span className="text-xs text-white/50">{label}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             {isBusy ? (

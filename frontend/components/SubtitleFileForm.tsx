@@ -148,7 +148,7 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
-        <span id="sub-file-label" className="block text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide ml-1">
+        <span id="sub-file-label" className="ui-label block">
           Video fayl
         </span>
 
@@ -162,31 +162,31 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
             onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
             onDragLeave={() => setDragActive(false)}
             onDrop={(e) => { e.preventDefault(); setDragActive(false); pick(e.dataTransfer.files?.[0]); }}
-            className={`glass-input flex flex-col items-center justify-center gap-2 px-4 py-8 sm:py-10 rounded-2xl sm:rounded-3xl cursor-pointer text-center border-2 border-dashed transition-all duration-300 ${
-              dragActive ? "border-blue-500 bg-blue-500/10" : "border-black/10 dark:border-white/10 hover:border-blue-500/50"
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-control border border-dashed bg-ui-surface px-4 py-8 text-center transition sm:py-10 ${
+              dragActive ? "border-ui-ink bg-ui-ground" : "border-ui-rule hover:border-ui-muted"
             }`}
           >
-            <UploadCloud aria-hidden="true" className="w-8 h-8 text-blue-500" />
-            <p className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200">
+            <UploadCloud aria-hidden="true" className="h-8 w-8 text-ui-muted" />
+            <p className="text-[15px] font-medium text-ui-ink">
               Video faylni tanlang yoki shu yerga tashlang
             </p>
-            <p id="sub-file-formats" className="text-xs text-slate-600 dark:text-slate-400">
+            <p id="sub-file-formats" className="text-sm text-ui-muted">
               MP4, MOV, MKV yoki WebM · {formatSize(SUBTITLE_UPLOAD_MAX_BYTES)} gacha · 120 daqiqagacha
             </p>
           </div>
         ) : (
-          <div className="glass-input flex items-center gap-3 px-4 py-3.5 rounded-2xl sm:rounded-3xl">
-            <FileVideo aria-hidden="true" className="w-6 h-6 text-blue-500 flex-shrink-0" />
+          <div className="ui-input flex items-center gap-3 px-4 py-3.5">
+            <FileVideo aria-hidden="true" className="h-6 w-6 shrink-0 text-ui-muted" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 truncate">{file.name}</p>
-              <p className="text-xs text-slate-600 dark:text-slate-400">{formatSize(file.size)}</p>
+              <p className="truncate text-[15px] font-medium text-ui-ink">{file.name}</p>
+              <p className="text-sm text-ui-muted">{formatSize(file.size)}</p>
             </div>
             {!uploading && (
               <button
                 type="button"
                 onClick={() => { checkId.current++; setFile(null); setError(null); setMinutesNote(null); if (inputRef.current) inputRef.current.value = ""; }}
                 aria-label="Faylni olib tashlash"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition"
+                className="rounded-lg p-2 text-ui-muted transition hover:bg-ui-red/10 hover:text-ui-red-ink"
               >
                 <X aria-hidden="true" size={16} />
               </button>
@@ -201,25 +201,25 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
           className="hidden"
           onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }}
         />
-        <p className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+        <p className="text-sm text-ui-muted">
           {sourceLanguage === "uz" ? "Nutq o'zbekcha matnga aylantirilib (tarjimasiz), " : "Videodagi nutq o'zbekchaga tarjima qilinib, "}subtitr (.srt/.vtt/.txt) tayyorlanadi — dublyaj audiosi yo'q.
         </p>
       </div>
 
       {uploading && (
         <div className="space-y-2">
-          <div className="h-2 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+          <div className="h-2 overflow-hidden rounded-full bg-ui-rule">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all duration-300"
+              className="h-full rounded-full bg-ui-accent transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-gray-300">
+          <div className="flex items-center justify-between text-sm font-semibold text-ui-muted">
             <span>
               {progress < 100 ? `Yuklanmoqda... ${progress}%` : "Server faylni tekshirmoqda..."}
             </span>
             {progress < 100 && (
-              <button type="button" onClick={cancel} className="text-red-700 dark:text-red-400 font-bold hover:underline">
+              <button type="button" onClick={cancel} className="text-ui-red-ink font-medium hover:underline">
                 Bekor qilish
               </button>
             )}
@@ -228,7 +228,7 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
       )}
 
       {minutesNote && !uploading && (
-        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border border-amber-600/40 rounded-control px-4 py-3">
           {minutesNote}{" "}
           <Link href="/pricing?reason=insufficient_minutes" className="underline hover:text-amber-900 dark:hover:text-amber-200">
             Daqiqa sotib olish yoki tarifni yangilash
@@ -237,7 +237,7 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
       )}
 
       {!isLoggedIn && (
-        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border border-amber-600/40 rounded-control px-4 py-3">
           Subtitr yaratish uchun{" "}
           <Link href="/login" className="underline hover:text-amber-900 dark:hover:text-amber-200">kiring</Link>
           {" "}yoki{" "}
@@ -250,22 +250,16 @@ export default function SubtitleFileForm({ sourceLanguage = "auto" }: { sourceLa
           role="alert"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-rose-500/10 border border-rose-500/25 rounded-2xl p-4 flex gap-3 items-center"
+          className="rounded-control border border-ui-red/30 bg-ui-red/[0.05] px-4 py-3"
         >
-          <div aria-hidden="true" className="w-2 h-2 shrink-0 rounded-full bg-rose-500" />
-          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{error}</p>
+                    <p className="text-[15px] font-medium text-ui-red-ink">{error}</p>
         </motion.div>
       )}
 
       <motion.button
         type="submit"
         disabled={uploading || !file}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full flex items-center justify-center gap-3
-                   btn-premium
-                   text-white font-extrabold py-4 sm:py-5 rounded-2xl sm:rounded-[24px]
-                   transition-all duration-300 text-sm shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
+                className="ui-btn ui-btn-primary min-h-12 w-full"
       >
         {uploading ? (
           <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Yuklanmoqda...</>

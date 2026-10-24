@@ -49,15 +49,13 @@ export default function DubbingForm({
         value={source}
         onChange={setSource}
         items={[
-          { id: "url", label: "YouTube havolasi", icon: Youtube },
-          { id: "file", label: "Video fayl yuklash", icon: FileVideo },
+          { id: "url", label: <><span className="sm:hidden">Havola</span><span className="hidden sm:inline">YouTube havolasi</span></>, icon: Youtube },
+          { id: "file", label: <><span className="sm:hidden">Fayl</span><span className="hidden sm:inline">Video fayl yuklash</span></>, icon: FileVideo },
         ]}
-        className="flex gap-1 p-1 rounded-2xl bg-black/5 dark:bg-white/5"
+        className="flex gap-5 border-b border-ui-rule"
         tabClassName={(active) =>
-          `flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
-            active
-              ? "bg-white dark:bg-white/10 text-blue-700 dark:text-blue-300 shadow-sm"
-              : "text-slate-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          `-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 pt-0.5 text-sm font-medium transition ${
+            active ? "border-ui-ink text-ui-ink" : "border-transparent text-ui-muted hover:text-ui-ink"
           }`}
       />
 

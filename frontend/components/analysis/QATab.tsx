@@ -72,19 +72,19 @@ export default function QATab({
         className="space-y-4 max-h-[460px] min-h-[180px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10"
       >
         {history.length === 0 && !asking && (
-          <div className="py-6 px-4 text-center space-y-4 rounded-2xl border border-white/5 bg-white/[0.02]">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+          <div className="py-6 px-4 text-center space-y-4 rounded-2xl border border-ui-rule bg-ui-ground">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-ui-accent-ink flex items-center justify-center mx-auto">
               <Bot className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-sm font-bold text-white">AI Ustoz — Savol-javob</h4>
-              <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed">{emptyText}</p>
+              <h4 className="text-sm font-semibold text-ui-ink">AI Ustoz — Savol-javob</h4>
+              <p className="text-xs text-ui-muted max-w-md mx-auto leading-relaxed">{emptyText}</p>
             </div>
 
             {/* Suggested quick questions */}
             <div className="space-y-2 pt-2">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center justify-center gap-1">
-                <Sparkles className="w-3 h-3 text-blue-400" />
+              <p className="text-xs font-semibold text-ui-muted flex items-center justify-center gap-1">
+                <Sparkles className="w-3 h-3 text-ui-accent-ink" />
                 Namuna savollar
               </p>
               <div className="flex flex-wrap justify-center gap-2">
@@ -93,7 +93,7 @@ export default function QATab({
                     key={i}
                     type="button"
                     onClick={() => handleQuickQuestion(sq)}
-                    className="text-xs px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-gray-300 hover:text-white transition text-left"
+                    className="text-xs px-3 py-1.5 rounded-xl bg-ui-ground hover:bg-ui-ground border border-ui-rule text-ui-muted hover:text-ui-ink transition text-left"
                   >
                     {sq}
                   </button>
@@ -108,34 +108,34 @@ export default function QATab({
           <div key={i} className="space-y-3">
             {/* User message */}
             <div className="flex justify-end gap-2.5 items-start pl-8">
-              <div className="bg-gradient-to-r from-blue-600/90 to-indigo-600/90 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm shadow-md max-w-xl">
+              <div className=" bg-blue-600/90 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm shadow-md max-w-xl">
                 <p className="font-medium leading-relaxed">{qa.question}</p>
               </div>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-ui-accent-ink flex items-center justify-center shrink-0 mt-0.5">
                 <User className="w-4 h-4" />
               </div>
             </div>
 
             {/* AI Answer message */}
             <div className="flex justify-start gap-2.5 items-start pr-8">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 mt-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-ui-accent-ink flex items-center justify-center shrink-0 mt-1">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="flex-1 bg-white/[0.04] border border-white/10 rounded-2xl rounded-tl-sm p-4 space-y-3 shadow-md max-w-2xl">
+              <div className="flex-1 bg-ui-ground border border-ui-rule rounded-2xl rounded-tl-sm p-4 space-y-3 shadow-md max-w-2xl">
                 <div className="text-sm">
                   <MarkdownView content={qa.answer} showCopy={false} />
                 </div>
 
                 {/* Timestamps & Copy buttons */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-ui-rule text-xs">
                   {qa.timestamps && qa.timestamps.length > 0 ? (
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-gray-500">Video daqiqasi:</span>
+                      <span className="text-xs text-ui-muted">Video daqiqasi:</span>
                       {qa.timestamps.map((ts, ti) => (
                         <button
                           key={ti}
                           onClick={() => onSeek(ts)}
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-md px-2 py-0.5 transition"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-ui-accent-ink bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-md px-2 py-0.5 transition"
                           title="Videoni shu daqiqasidan qo'yish"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
@@ -149,12 +149,12 @@ export default function QATab({
 
                   <button
                     onClick={() => handleCopyAnswer(qa.answer, i)}
-                    className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-white transition ml-auto"
+                    className="inline-flex items-center gap-1 text-xs text-ui-muted hover:text-ui-ink transition ml-auto"
                   >
                     {copiedIndex === i ? (
                       <>
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-400">Nusxalandi</span>
+                        <Check className="w-3 h-3 text-ui-green-ink" />
+                        <span className="text-ui-green-ink">Nusxalandi</span>
                       </>
                     ) : (
                       <>
@@ -175,10 +175,10 @@ export default function QATab({
             {/* Show current question */}
             {(pendingQuestion || question) && (
               <div className="flex justify-end gap-2.5 items-start pl-8 opacity-80">
-                <div className="bg-gradient-to-r from-blue-600/60 to-indigo-600/60 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm shadow-md max-w-xl">
+                <div className=" bg-blue-600/60 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm shadow-md max-w-xl">
                   <p className="font-medium leading-relaxed">{pendingQuestion || question}</p>
                 </div>
-                <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-ui-accent-ink flex items-center justify-center shrink-0 mt-0.5">
                   <User className="w-4 h-4" />
                 </div>
               </div>
@@ -186,11 +186,11 @@ export default function QATab({
 
             {/* AI Generating Indicator */}
             <div className="flex justify-start gap-2.5 items-start pr-8">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0 mt-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 text-ui-accent-ink flex items-center justify-center shrink-0 mt-1">
                 <Bot className="w-4 h-4 animate-pulse" />
               </div>
-              <div className="bg-white/[0.04] border border-blue-500/20 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-3 text-xs text-blue-300">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+              <div className="bg-ui-ground border border-blue-500/20 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-3 text-xs text-ui-accent-ink">
+                <Loader2 className="w-4 h-4 animate-spin text-ui-accent-ink" />
                 <span>AI javob tayyorlamoqda...</span>
                 <span className="flex gap-1 ml-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
@@ -211,13 +211,13 @@ export default function QATab({
             onChange={(e) => onQuestionChange(e.target.value)}
             disabled={asking}
             placeholder={asking ? "Javob kutilmoqda..." : placeholder}
-            className="w-full bg-white/[0.05] border border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition disabled:opacity-50"
+            className="w-full bg-ui-ground border border-ui-rule rounded-xl pl-4 pr-10 py-3 text-sm text-ui-ink placeholder:text-ui-muted focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition disabled:opacity-50"
           />
           {question && !asking && (
             <button
               type="button"
               onClick={() => onQuestionChange("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs px-1"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-ui-muted hover:text-ui-muted text-xs px-1"
             >
               ✕
             </button>
@@ -226,7 +226,7 @@ export default function QATab({
         <button
           type="submit"
           disabled={asking || !question.trim()}
-          className="px-4 py-3 flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold transition shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          className="px-4 py-3 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >
           {asking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>

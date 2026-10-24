@@ -17,35 +17,21 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 transition-colors">
-      <div className="glass-card rounded-[24px] p-8 max-w-md w-full text-center space-y-5">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-500/10 text-blue-500 mx-auto">
-          <AlertTriangle className="w-7 h-7" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Nimadur noto'g'ri ketdi</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-            Sahifani yuklashda kutilmagan xatolik yuz berdi. Qaytadan urinib ko'ring — muammo davom etsa, bosh sahifaga qayting.
-          </p>
-          {error.digest && (
-            <p className="text-[10px] text-gray-400 dark:text-gray-600 font-mono">Xato ID: {error.digest}</p>
-          )}
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={reset}
-            className="btn-premium flex-1 py-3 rounded-2xl font-bold text-sm inline-flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" /> Qaytadan urinish
+    <main id="main" className="flex min-h-[70vh] items-center justify-center bg-ui-surface px-4 py-16 text-ui-ink">
+      <div className="max-w-md text-center">
+        <AlertTriangle aria-hidden="true" className="mx-auto h-6 w-6 text-ui-muted" />
+        <h1 className="mt-5 text-3xl font-semibold tracking-[-0.03em]">Nimadir notoʻgʻri ketdi</h1>
+        <p className="mt-3 text-base leading-relaxed text-ui-muted">
+          Sahifani yuklashda kutilmagan xatolik yuz berdi. Qaytadan urinib koʻring — muammo davom etsa, bosh sahifaga qayting.
+        </p>
+        {error.digest && <p className="mt-2 font-mono text-xs text-ui-muted">Xato ID: {error.digest}</p>}
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <button type="button" onClick={reset} className="ui-btn ui-btn-primary">
+            <RotateCcw aria-hidden="true" className="h-4 w-4" /> Qaytadan urinish
           </button>
-          <Link
-            href="/"
-            className="flex-1 py-3 glass-input rounded-2xl font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all text-sm inline-flex items-center justify-center"
-          >
-            Bosh sahifa
-          </Link>
+          <Link href="/" className="ui-btn ui-btn-secondary">Bosh sahifa</Link>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

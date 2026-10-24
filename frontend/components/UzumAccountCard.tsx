@@ -27,24 +27,24 @@ export default function UzumAccountCard({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-violet-500/25 bg-violet-500/[0.05] p-4 text-left">
+    <div className="space-y-3 rounded-xl border border-blue-500/25 bg-blue-500/[0.05] p-4 text-left">
       {deeplink && (
         <>
-          <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <p className="text-xs font-semibold text-ui-muted">
             {amount.toLocaleString('uz-UZ')} so‘m to‘lash uchun Uzum ilovasini oching:
           </p>
           <a
             href={deeplink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 active:scale-[0.98]"
           >
             <ExternalLink className="h-4 w-4" /> Uzum ilovasida to‘lash
           </a>
         </>
       )}
 
-      <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+      <p className="text-xs font-semibold text-ui-muted">
         {deeplink ? (
           <>
             Ilova ochilmasa, Uzum’da <b>To‘lovlar</b> bo‘limidan quyidagi hisob raqamini qo‘lda kiriting:
@@ -57,7 +57,7 @@ export default function UzumAccountCard({
         )}
       </p>
       <div className="flex items-center gap-2">
-        <span className="flex-1 rounded-lg bg-black/5 px-3 py-2 text-center font-mono text-lg font-bold tracking-wider text-gray-900 dark:bg-black/30 dark:text-white">
+        <span className="flex-1 rounded-lg bg-black/5 px-3 py-2 text-center font-mono text-lg font-semibold tracking-wider text-gray-900 dark:bg-black/30 dark:text-white">
           {account}
         </span>
         <button
@@ -68,7 +68,7 @@ export default function UzumAccountCard({
           {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
-      <p className="text-[11px] text-gray-400">To‘lov tasdiqlangach sahifa avtomatik yangilanadi.</p>
+      <p className="text-xs text-ui-muted">To‘lov tasdiqlangach sahifa avtomatik yangilanadi.</p>
     </div>
   )
 }

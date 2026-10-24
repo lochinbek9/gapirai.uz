@@ -432,7 +432,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
       default:
         return {
           label: 'Kutilmoqda',
-          color: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+          color: 'bg-gray-500/10 text-ui-muted border-gray-500/30',
           dot: 'bg-gray-400',
         }
     }
@@ -459,7 +459,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
-      <div className="bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-black border border-white/10 rounded-2xl p-5 sm:p-6 backdrop-blur-xl">
+      <div className=" bg-blue-900/30 border border-white/10 rounded-2xl p-5 sm:p-6 ">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
@@ -467,10 +467,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 <Layers className="w-5 h-5" />
               </span>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                <h2 className="text-lg sm:text-xl font-semibold text-white tracking-tight">
                   Dublyaj Joblari va Xarajatlar Tahlili
                 </h2>
-                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+                <p className="text-xs sm:text-sm text-ui-muted mt-0.5">
                   Har bir dublyaj jarayoni, uning holati, TTS, STT va LLM xarajatlari hamda unit economics tahlili
                 </p>
               </div>
@@ -487,7 +487,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   setIncludeInternal(e.target.checked)
                   setPage(1)
                 }}
-                className="rounded border-gray-600 bg-black/40 text-blue-500 focus:ring-0"
+                className="rounded border-gray-600 bg-black/40 text-ui-accent-ink focus:ring-0"
               />
               <span>Dasturchi / Test hisoblarni ham ko‘rsatish</span>
             </label>
@@ -509,16 +509,16 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6">
             {/* Card 1: Total & Success */}
             <div className="bg-black/40 border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                 <span>Jami Dublyajlar</span>
-                <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                   {summary.success_rate_pct}% muvaffaqiyat
                 </span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-white font-mono">
+              <div className="text-xl sm:text-2xl font-semibold text-white font-mono">
                 {summary.total_jobs.toLocaleString()}
               </div>
-              <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+              <div className="flex items-center gap-3 mt-2 text-xs text-ui-muted">
                 <span className="text-emerald-400">✓ {summary.completed_jobs} tayyor</span>
                 <span className="text-rose-400">✗ {summary.failed_jobs} xatolik</span>
                 {summary.processing_jobs > 0 && (
@@ -532,37 +532,37 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
             {/* Card 2: Cost Summary */}
             <div className="bg-black/40 border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                 <span>Sahifa Xarajati</span>
-                <span className="text-[11px] font-mono text-blue-400">
+                <span className="text-xs font-mono text-blue-400">
                   ${summary.page_total_cost_usd} USD
                 </span>
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono">
-                {summary.page_total_cost_uzs.toLocaleString()} <span className="text-xs text-gray-400 font-normal">UZS</span>
+              <div className="text-xl sm:text-2xl font-semibold text-emerald-400 font-mono">
+                {summary.page_total_cost_uzs.toLocaleString()} <span className="text-xs text-ui-muted font-normal">UZS</span>
               </div>
-              <div className="text-[11px] text-gray-400 mt-2">
+              <div className="text-xs text-ui-muted mt-2">
                 1 ta video o‘rtacha: <span className="text-gray-200 font-medium">{summary.page_avg_job_cost_uzs.toLocaleString()} UZS</span>
               </div>
             </div>
 
             {/* Card 3: Total Audio Duration */}
             <div className="bg-black/40 border border-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                 <span>Muvaffaqiyatli Dublyaj Vaqti</span>
                 <Clock className="w-3.5 h-3.5 text-blue-400" />
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-white font-mono">
-                {summary.total_completed_duration_min.toLocaleString()} <span className="text-xs text-gray-400 font-normal">daqiqa</span>
+              <div className="text-xl sm:text-2xl font-semibold text-white font-mono">
+                {summary.total_completed_duration_min.toLocaleString()} <span className="text-xs text-ui-muted font-normal">daqiqa</span>
               </div>
-              <div className="text-[11px] text-gray-400 mt-2">
+              <div className="text-xs text-ui-muted mt-2">
                 Taxminan: <span className="text-gray-200 font-medium">{Math.round(summary.total_completed_duration_min / 60)} soat</span> video
               </div>
             </div>
 
             {/* Card 4: Providers Breakdown */}
             <div className="bg-black/40 border border-white/10 rounded-xl p-4">
-              <div className="text-xs text-gray-400 mb-1.5 flex items-center justify-between">
+              <div className="text-xs text-ui-muted mb-1.5 flex items-center justify-between">
                 <span>TTS Provayderlar</span>
                 <Cpu className="w-3.5 h-3.5 text-purple-400" />
               </div>
@@ -570,7 +570,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {Object.entries(summary.providers).map(([prov, count]) => (
                   <span
                     key={prov}
-                    className="inline-flex items-center gap-1 text-[11px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-300 font-mono"
+                    className="inline-flex items-center gap-1 text-xs bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-300 font-mono"
                   >
                     <span className="font-semibold text-white capitalize">{prov}:</span> {count}
                   </span>
@@ -604,8 +604,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${
                   statusFilter === tab.id
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-black/20 text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-blue-600 text-white shadow-md '
+                    : 'bg-black/20 text-ui-muted hover:text-white hover:bg-white/5'
                 }`}
               >
                 {tab.label}
@@ -617,7 +617,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Search Input */}
             <div className="relative min-w-[180px] sm:min-w-[220px] flex-1">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-ui-muted absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Qidirish (Nomi, URL, ID, Email...)"
@@ -628,7 +628,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ui-muted hover:text-white"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -742,7 +742,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   aria-pressed={viewMode === id}
                   title={label}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                    viewMode === id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                    viewMode === id ? 'bg-blue-600 text-white' : 'text-ui-muted hover:text-white'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -787,7 +787,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-white/10 bg-white/[0.02] text-gray-400 text-[11px] font-semibold tracking-wider uppercase">
+              <tr className="border-b border-white/10 bg-white/[0.02] text-ui-muted text-xs font-semibold ">
                 <th className="py-3 px-4">Video & ID</th>
                 <th className="py-3 px-4">Foydalanuvchi</th>
                 <th className="py-3 px-4 whitespace-nowrap">Tarif & Balans</th>
@@ -846,7 +846,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                 <Play className="w-4 h-4" />
                               </div>
                             )}
-                            <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/80 font-mono text-gray-200 px-1 rounded">
+                            <span className="absolute bottom-0.5 right-0.5 text-xs bg-black/80 font-mono text-gray-200 px-1 rounded">
                               {formatDurationBadge(job.video_duration)}
                             </span>
                           </div>
@@ -866,7 +866,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                 href={jobLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2 py-0.5 rounded font-mono font-medium transition"
+                                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2 py-0.5 rounded font-mono font-medium transition"
                                 title={`To'liq havola: ${jobLink}`}
                               >
                                 <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -880,17 +880,17 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                   copyToClipboard(fullUrl, job.id)
                                 }}
                                 title="To'liq havolani nusxalash (Copy URL)"
-                                className="text-gray-400 hover:text-white flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded text-[10px] transition"
+                                className="text-ui-muted hover:text-white flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded text-xs transition"
                               >
                                 {copiedId === job.id ? (
                                   <>
                                     <Check className="w-2.5 h-2.5 text-emerald-400" />
-                                    <span className="text-emerald-400 text-[9px]">Nusxalandi</span>
+                                    <span className="text-emerald-400 text-xs">Nusxalandi</span>
                                   </>
                                 ) : (
                                   <>
                                     <Copy className="w-2.5 h-2.5" />
-                                    <span className="text-[9px]">URL</span>
+                                    <span className="text-xs">URL</span>
                                   </>
                                 )}
                               </button>
@@ -901,7 +901,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                   href={job.youtube_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[10px] text-gray-400 hover:text-red-400 flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition"
+                                  className="text-xs text-ui-muted hover:text-red-400 flex items-center gap-0.5 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition"
                                   title="YouTube original videosini ochish"
                                 >
                                   <span>YT</span>
@@ -914,7 +914,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                                   href={`/outputs/${job.id}/video/dubbed_final.mp4`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono transition"
+                                  className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono transition"
                                   title="To'g'ridan-to'g'ri MP4 faylni ochish"
                                 >
                                   <span>MP4</span>
@@ -922,7 +922,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               )}
 
                               {job.subtitle_only && (
-                                <span className="text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1 rounded">
+                                <span className="text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1 rounded">
                                   Subtitr
                                 </span>
                               )}
@@ -937,11 +937,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           <p className="font-medium text-white text-xs truncate">
                             {job.user.name || 'Mehmon (Anonim)'}
                           </p>
-                          <p className="text-[11px] text-gray-400 truncate">
+                          <p className="text-xs text-ui-muted truncate">
                             {job.user.email || job.user.phone || '—'}
                           </p>
                           {job.user.is_internal && (
-                            <span className="inline-block mt-0.5 text-[9px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-1 rounded">
+                            <span className="inline-block mt-0.5 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-1 rounded">
                               Dasturchi / Test
                             </span>
                           )}
@@ -953,25 +953,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         <div className="space-y-1">
                           <div>
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
                                 job.user.plan?.toLowerCase() === 'pro'
                                   ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
                                   : job.user.plan?.toLowerCase() === 'standard' || job.user.plan?.toLowerCase() === 'standart'
                                   ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                                  : 'bg-white/5 text-gray-400 border-white/10'
+                                  : 'bg-white/5 text-ui-muted border-white/10'
                               }`}
                             >
                               {job.user.plan || 'Bepul'}
                             </span>
                           </div>
-                          <div className="text-[11px] font-mono text-gray-300 flex items-center gap-1">
+                          <div className="text-xs font-mono text-gray-300 flex items-center gap-1">
                             <span className="text-gray-500">Balans:</span>
                             <span className="font-semibold text-emerald-400">
                               {typeof job.user.balance_minutes === 'number'
                                 ? job.user.balance_minutes.toFixed(1)
                                 : '—'}
                             </span>
-                            <span className="text-[10px] text-gray-500">daq</span>
+                            <span className="text-xs text-gray-500">daq</span>
                           </div>
                         </div>
                       </td>
@@ -983,17 +983,17 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
                             <span>{formatDateTime(job.created_at).date}</span>
                           </div>
-                          <div className="flex items-center gap-1 text-[11px] text-gray-400 font-mono">
+                          <div className="flex items-center gap-1 text-xs text-ui-muted font-mono">
                             <Clock className="w-2.5 h-2.5 text-gray-500 shrink-0" />
                             <span>{formatDateTime(job.created_at).time}</span>
                             {getRelativeTime(job.created_at) && (
-                              <span className="text-[10px] text-blue-400/90 bg-blue-500/10 px-1 rounded ml-1 font-sans">
+                              <span className="text-xs text-blue-400/90 bg-blue-500/10 px-1 rounded ml-1 font-sans">
                                 {getRelativeTime(job.created_at)}
                               </span>
                             )}
                           </div>
                           {job.completed_at && (
-                            <div className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1" title="Tugallangan vaqti">
+                            <div className="text-xs text-emerald-400/90 font-mono flex items-center gap-1" title="Tugallangan vaqti">
                               <span>✓</span>
                               <span>{formatDateTime(job.completed_at).time}</span>
                             </div>
@@ -1005,14 +1005,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <td className="py-3.5 px-4 min-w-[170px]">
                         <div className="space-y-1">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusInfo.color}`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border ${statusInfo.color}`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
                             <span>{statusInfo.label}</span>
                           </span>
 
                           {job.processing_seconds !== null && (
-                            <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                            <p className="text-xs text-ui-muted flex items-center gap-1">
                               <Clock className="w-2.5 h-2.5" />
                               <span>{formatSeconds(job.processing_seconds)}</span>
                             </p>
@@ -1020,7 +1020,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                           {job.error_code && (
                             <p
-                              className={`text-[10px] font-mono truncate max-w-[150px] ${
+                              className={`text-xs font-mono truncate max-w-[150px] ${
                                 isNoSpeech ? 'text-amber-400 font-semibold' : 'text-rose-400'
                               }`}
                               title={job.error_message || ''}
@@ -1033,22 +1033,22 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                       {/* Models */}
                       <td className="py-3.5 px-4 min-w-[160px]">
-                        <div className="space-y-1 text-[11px]">
+                        <div className="space-y-1 text-xs">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-gray-500 text-[10px]">TTS:</span>
-                            <span className="font-medium text-cyan-400 uppercase text-[10px] bg-cyan-500/10 px-1 rounded border border-cyan-500/20">
+                            <span className="text-gray-500 text-xs">TTS:</span>
+                            <span className="font-medium text-cyan-400 text-xs bg-cyan-500/10 px-1 rounded border border-cyan-500/20">
                               {job.models.tts_provider}
                             </span>
                             {job.models.voice_name && (
-                              <span className="text-gray-400 text-[10px] truncate max-w-[80px]" title={job.models.voice_name}>
+                              <span className="text-ui-muted text-xs truncate max-w-[80px]" title={job.models.voice_name}>
                                 {job.models.voice_name.replace('uz-UZ-', '')}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-[10px]">
+                          <div className="flex items-center gap-1 text-xs">
                             <span className="text-gray-500">STT:</span>
                             <span
-                              className="text-gray-300 font-mono text-[9px] truncate max-w-[120px]"
+                              className="text-gray-300 font-mono text-xs truncate max-w-[120px]"
                               title={job.models.stt_display || job.models.stt_model || 'whisper-1'}
                             >
                               {job.models.is_groq ? 'Groq Whisper' : (job.models.stt_display || job.models.stt_model?.replace('gemini-', 'gem-') || 'whisper-1')}
@@ -1057,7 +1057,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           <div className="pt-0.5">
                             {job.models.gemini_key_tier === 'paid' ? (
                               <span
-                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                className="inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
                                 title={job.models.gemini_key_used ? `Gemini kaliti: ${job.models.gemini_key_used}` : 'Gemini pullik kalit'}
                               >
                                 <span>💎</span>
@@ -1065,7 +1065,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               </span>
                             ) : (
                               <span
-                                className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20"
+                                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300/80 border border-blue-500/20"
                                 title={job.models.gemini_key_used ? `Gemini kaliti: ${job.models.gemini_key_used}` : 'Gemini bepul kalit hovuzi'}
                               >
                                 <span>🆓</span>
@@ -1080,15 +1080,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <td className="py-3.5 px-4 text-right min-w-[180px]">
                         <div>
                           {/* Total UZS & USD */}
-                          <div className="text-sm font-bold font-mono text-emerald-400">
-                            {(job.costs?.total_cost_uzs ?? 0).toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">UZS</span>
+                          <div className="text-sm font-semibold font-mono text-emerald-400">
+                            {(job.costs?.total_cost_uzs ?? 0).toLocaleString()} <span className="text-xs text-ui-muted font-normal">UZS</span>
                           </div>
-                          <div className="text-[10px] font-mono text-gray-400">
+                          <div className="text-xs font-mono text-ui-muted">
                             ${job.costs?.total_cost_usd ?? 0} USD
                           </div>
 
                           {/* Breakdown pills */}
-                          <div className="flex items-center justify-end gap-1.5 mt-1 text-[9px] text-gray-400 font-mono">
+                          <div className="flex items-center justify-end gap-1.5 mt-1 text-xs text-ui-muted font-mono">
                             <span title="TTS xarajati" className={(job.costs?.tts_cost_usd ?? 0) === 0 ? "text-emerald-400 font-medium" : ""}>
                               TTS: {(job.costs?.tts_cost_usd ?? 0) === 0 ? "$0 (Bepul)" : `$${job.costs?.tts_cost_usd ?? 0}`}
                             </span>
@@ -1102,10 +1102,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                           {/* Payment badge if paid */}
                           {job.payment.has_payment && (
-                            <div className="mt-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 inline-flex items-center gap-1">
+                            <div className="mt-1 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 inline-flex items-center gap-1">
                               <span>Tushum: +{job.payment.revenue_uzs.toLocaleString()} UZS</span>
                               {job.payment.margin_pct !== null && (
-                                <span className="font-bold">({job.payment.margin_pct}%)</span>
+                                <span className="font-semibold">({job.payment.margin_pct}%)</span>
                               )}
                             </div>
                           )}
@@ -1142,7 +1142,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               onClick={() => openRetryModal(job)}
                               disabled={retryingId === job.id}
                               title="Admin: Ushbu tayyor videoni yangi ovoz yoki modellar bilan qayta tayyorlash"
-                              className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm shadow-indigo-500/10"
+                              className="px-2 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 text-xs font-semibold flex items-center gap-1 transition disabled:opacity-50 shadow-sm "
                             >
                               <RefreshCw className={`w-3 h-3 ${retryingId === job.id ? 'animate-spin' : ''}`} />
                               <span>Qayta tayyorlash</span>
@@ -1205,25 +1205,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         )}
                         {/* To'q fon: badge rangi yarim shaffof, yorug' rasm ustida o'qilmay qolardi */}
                         <span className="absolute top-2 left-2 rounded-full bg-black/80">
-                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
                             <span>{statusInfo.label}</span>
                           </span>
                         </span>
                         <span className="absolute top-2 right-2 flex gap-1">
                           {job.is_public && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-600/90 text-white px-1.5 py-0.5 rounded">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-600/90 text-white px-1.5 py-0.5 rounded">
                               <Globe className="w-3 h-3" />
                               Ommaviy
                             </span>
                           )}
                           {job.subtitle_only && (
-                            <span className="text-[10px] bg-purple-600/80 text-white px-1.5 py-0.5 rounded">
+                            <span className="text-xs bg-purple-600/80 text-white px-1.5 py-0.5 rounded">
                               Subtitr
                             </span>
                           )}
                         </span>
-                        <span className="absolute bottom-1.5 right-1.5 text-[11px] bg-black/80 font-mono text-gray-100 px-1.5 py-0.5 rounded">
+                        <span className="absolute bottom-1.5 right-1.5 text-xs bg-black/80 font-mono text-gray-100 px-1.5 py-0.5 rounded">
                           {formatDurationBadge(job.video_duration)}
                         </span>
                       </a>
@@ -1239,20 +1239,20 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         </button>
                         <p className="mt-1 text-xs text-gray-300 truncate">
                           {isBlocked && (
-                            <span className="mr-1.5 text-[10px] font-bold uppercase text-rose-400">Bloklangan</span>
+                            <span className="mr-1.5 text-xs font-semibold text-rose-400">Bloklangan</span>
                           )}
                           {job.user.name || 'Mehmon (Anonim)'}
                           {job.user.plan && job.user.plan.toLowerCase() !== 'free' && (
-                            <span className="ml-1.5 text-[10px] font-bold uppercase text-purple-300">{job.user.plan}</span>
+                            <span className="ml-1.5 text-xs font-semibold text-purple-300">{job.user.plan}</span>
                           )}
                         </p>
-                        <p className="text-[11px] text-gray-500 truncate">{job.user.email || job.user.phone || '—'}</p>
-                        <p className="mt-0.5 text-[11px] text-gray-400">
+                        <p className="text-xs text-gray-500 truncate">{job.user.email || job.user.phone || '—'}</p>
+                        <p className="mt-0.5 text-xs text-ui-muted">
                           {relative && `${relative} · `}
                           {formatDateTime(job.created_at).date} {formatDateTime(job.created_at).time}
                         </p>
                         {job.error_code && (
-                          <p className="mt-0.5 text-[10px] font-mono text-rose-400 truncate" title={job.error_message || ''}>
+                          <p className="mt-0.5 text-xs font-mono text-rose-400 truncate" title={job.error_message || ''}>
                             {job.error_code}
                           </p>
                         )}
@@ -1265,7 +1265,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               onClick={() => handleToggleVisibility(job)}
                               disabled={busyAction !== null}
                               title={job.is_public ? "Ommaviy videolardan olib tashlash" : "Saytdagi \"Ommaviy videolar\" bo'limiga chiqarish"}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition disabled:opacity-50 ${
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition disabled:opacity-50 ${
                                 job.is_public
                                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25'
                                   : 'bg-white/5 text-gray-300 border-white/10 hover:text-white hover:bg-white/10'
@@ -1281,7 +1281,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                               onClick={() => handleToggleBlockUser(job)}
                               disabled={busyAction !== null}
                               title={isBlocked ? 'Foydalanuvchini blokdan chiqarish' : 'Foydalanuvchini bloklash'}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition disabled:opacity-50 ${
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition disabled:opacity-50 ${
                                 isBlocked
                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
                                   : 'bg-white/5 text-gray-300 border-white/10 hover:text-rose-300 hover:bg-rose-500/10'
@@ -1297,7 +1297,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             disabled={busyAction !== null}
                             title="Videoni butunlay o'chirish"
                             aria-label="Videoni o'chirish"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border bg-white/5 text-gray-300 border-white/10 hover:text-rose-300 hover:bg-rose-500/10 hover:border-rose-500/30 transition disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border bg-white/5 text-gray-300 border-white/10 hover:text-rose-300 hover:bg-rose-500/10 hover:border-rose-500/30 transition disabled:opacity-50"
                           >
                             <Trash2 className={`w-3 h-3 ${busyAction === `del:${job.id}` ? 'animate-pulse' : ''}`} />
                             <span>O‘chirish</span>
@@ -1333,7 +1333,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
         {/* Pagination footer (faqat jadvalda; kartochkalar cheksiz aylantiriladi) */}
         {viewMode === 'table' && pagination && pagination.total_pages > 1 && (
-          <div className="p-4 border-t border-white/10 bg-white/[0.01] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-400">
+          <div className="p-4 border-t border-white/10 bg-white/[0.01] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ui-muted">
             <div>
               Jami <span className="font-semibold text-white">{pagination.total_items}</span> ta job,{' '}
               sahifa <span className="font-semibold text-white">{pagination.page}</span> / {pagination.total_pages}
@@ -1366,7 +1366,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
       {/* Detailed Slide-over / Modal for Selected Job */}
       {selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 animate-in fade-in duration-200">
           <div className="bg-[#12141a] border border-white/20 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#12141a] z-10">
@@ -1375,13 +1375,13 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   <FileText className="w-4 h-4" />
                 </span>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-white">Job Tafsilotlari & Xarajatlar</h3>
-                  <p className="text-[11px] font-mono text-gray-400">{selectedJob.id}</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-white">Job Tafsilotlari & Xarajatlar</h3>
+                  <p className="text-xs font-mono text-ui-muted">{selectedJob.id}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedJob(null)}
-                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ui-muted hover:text-white transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1400,7 +1400,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 )}
                 <div className="space-y-1.5 min-w-0 flex-1">
                   <h4 className="font-semibold text-white text-sm line-clamp-2">{selectedJob.video_title}</h4>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ui-muted">
                     <span>Davomiyligi: <strong className="text-gray-200">{formatDurationBadge(selectedJob.video_duration)}</strong></span>
                     <span>Qayta ishlash: <strong className="text-gray-200">{formatSeconds(selectedJob.processing_seconds)}</strong></span>
                     <span>Uringan vaqti: <strong className="text-white font-mono">{formatDateTime(selectedJob.created_at).full}</strong></span>
@@ -1425,7 +1425,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               {/* Status & Error Section */}
               <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Holat & Bosqich</span>
+                  <span className="text-xs font-semibold text-ui-muted ">Holat & Bosqich</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${getStatusBadge(selectedJob.status).color}`}>
                     {getStatusBadge(selectedJob.status).label} ({Math.round(selectedJob.progress)}%)
                   </span>
@@ -1439,7 +1439,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       <ShieldAlert className="w-4 h-4" />
                       <span>Xatolik: {selectedJob.error_code || 'NOMAʼLUM'}</span>
                     </div>
-                    <p className="text-rose-300 font-mono text-[11px] whitespace-pre-wrap break-all">
+                    <p className="text-rose-300 font-mono text-xs whitespace-pre-wrap break-all">
                       {selectedJob.error_message}
                     </p>
                   </div>
@@ -1449,15 +1449,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               {/* Unit Economics Breakdown Card */}
               <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                  <span className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                     <span>Unit Economics (Xarajatlar Tafsiloti)</span>
                   </span>
                   <div className="text-right">
-                    <div className="text-base font-bold font-mono text-emerald-400">
+                    <div className="text-base font-semibold font-mono text-emerald-400">
                       {(selectedJob.costs?.total_cost_uzs ?? 0).toLocaleString()} UZS
                     </div>
-                    <div className="text-[10px] text-gray-400 font-mono">
+                    <div className="text-xs text-ui-muted font-mono">
                       ${selectedJob.costs?.total_cost_usd ?? 0} USD
                     </div>
                   </div>
@@ -1466,18 +1466,18 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* TTS */}
                   <div className="p-3 bg-black/30 rounded-lg border border-white/5">
-                    <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                    <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                       <span>TTS (Ovoz)</span>
                       <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
                     </div>
-                    <div className="text-sm font-bold text-white font-mono">
+                    <div className="text-sm font-semibold text-white font-mono">
                       ${selectedJob.costs?.tts_cost_usd ?? 0} USD
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1">
+                    <div className="text-xs text-ui-muted mt-1">
                       {(selectedJob.costs?.tts_characters ?? 0).toLocaleString()} ta belgi
                     </div>
                     {(selectedJob.costs?.cache_hits_count ?? 0) > 0 && (
-                      <div className="text-[10px] text-emerald-400 mt-0.5">
+                      <div className="text-xs text-emerald-400 mt-0.5">
                         Kesh: +${selectedJob.costs?.cache_saved_usd ?? 0} tejandi
                       </div>
                     )}
@@ -1485,43 +1485,43 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                   {/* STT */}
                   <div className="p-3 bg-black/30 rounded-lg border border-white/5">
-                    <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                    <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                       <span>STT (Nutq)</span>
                       <Cpu className="w-3.5 h-3.5 text-purple-400" />
                     </div>
-                    <div className="text-sm font-bold font-mono flex items-center gap-1.5">
+                    <div className="text-sm font-semibold font-mono flex items-center gap-1.5">
                       <span className={(selectedJob.costs?.stt_cost_usd ?? 0) === 0 ? "text-emerald-400" : "text-white"}>
                         ${selectedJob.costs?.stt_cost_usd ?? 0} USD
                       </span>
                       {(selectedJob.costs?.stt_cost_usd ?? 0) === 0 && (
-                        <span className="text-[10px] font-sans font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <span className="text-xs font-sans font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                           Bepul
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1">
+                    <div className="text-xs text-ui-muted mt-1">
                       Model: {selectedJob.models.stt_model || 'Whisper'}
                     </div>
                   </div>
 
                   {/* LLM */}
                   <div className="p-3 bg-black/30 rounded-lg border border-white/5">
-                    <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                    <div className="flex items-center justify-between text-xs text-ui-muted mb-1">
                       <span>Tarjima (LLM)</span>
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                     </div>
-                    <div className="text-sm font-bold text-white font-mono">
+                    <div className="text-sm font-semibold text-white font-mono">
                       ${selectedJob.costs?.llm_cost_usd ?? 0} USD
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1">
+                    <div className="text-xs text-ui-muted mt-1">
                       Model: {selectedJob.models.translation_model || 'Gemini'}
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-gray-400">
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-ui-muted">
                   <span>1 daqiqa dublyaj narxi:</span>
-                  <span className="font-bold text-white font-mono">
+                  <span className="font-semibold text-white font-mono">
                     {(selectedJob.costs?.cost_per_minute_uzs ?? 0).toLocaleString()} UZS / daqiqa
                   </span>
                 </div>
@@ -1529,21 +1529,21 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {/* AI Key Tier Status */}
                 <div className="p-2.5 bg-black/25 rounded-lg border border-white/5 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-[11px]">Gemini kalit toifasi:</span>
+                    <span className="text-ui-muted text-xs">Gemini kalit toifasi:</span>
                     {selectedJob.models.gemini_key_tier === 'paid' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         <span>💎</span>
                         <span>Pullik (Balansli) kalit</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
                         <span>🆓</span>
                         <span>Bepul kalit (30+ hovuz)</span>
                       </span>
                     )}
                   </div>
                   {selectedJob.models.gemini_key_used && (
-                    <span className="font-mono text-[10px] text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs text-ui-muted bg-white/5 px-1.5 py-0.5 rounded">
                       {selectedJob.models.gemini_key_used}
                     </span>
                   )}
@@ -1554,15 +1554,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-between text-xs">
                     <div>
                       <p className="font-semibold text-emerald-400">Mijoz to‘lovi mavjud ({selectedJob.payment.provider})</p>
-                      <p className="text-gray-300 text-[11px] mt-0.5">
+                      <p className="text-gray-300 text-xs mt-0.5">
                         Tushum: {selectedJob.payment.revenue_uzs.toLocaleString()} UZS
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold font-mono text-emerald-300 text-sm">
+                      <p className="font-semibold font-mono text-emerald-300 text-sm">
                         +{selectedJob.payment.profit_uzs?.toLocaleString()} UZS
                       </p>
-                      <p className="text-[10px] text-emerald-400">
+                      <p className="text-xs text-emerald-400">
                         Marja: {selectedJob.payment.margin_pct}%
                       </p>
                     </div>
@@ -1573,21 +1573,21 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               {/* QA Summary */}
               {selectedJob.qa_summary && (
                 <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-ui-muted ">
                     Audio QA Avtomatik Tekshiruvi
                   </span>
                   <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
                     <div className="p-2 bg-black/30 rounded border border-white/5">
-                      <div className="text-gray-400 text-[10px]">Segmentlar</div>
-                      <div className="font-bold text-white font-mono mt-0.5">{selectedJob.qa_summary.total_segments}</div>
+                      <div className="text-ui-muted text-xs">Segmentlar</div>
+                      <div className="font-semibold text-white font-mono mt-0.5">{selectedJob.qa_summary.total_segments}</div>
                     </div>
                     <div className="p-2 bg-black/30 rounded border border-white/5">
-                      <div className="text-gray-400 text-[10px]">Muvaffaqiyatli</div>
-                      <div className="font-bold text-emerald-400 font-mono mt-0.5">{selectedJob.qa_summary.passed_segments}</div>
+                      <div className="text-ui-muted text-xs">Muvaffaqiyatli</div>
+                      <div className="font-semibold text-emerald-400 font-mono mt-0.5">{selectedJob.qa_summary.passed_segments}</div>
                     </div>
                     <div className="p-2 bg-black/30 rounded border border-white/5">
-                      <div className="text-gray-400 text-[10px]">O‘rtacha Ball</div>
-                      <div className="font-bold text-cyan-400 font-mono mt-0.5">{selectedJob.qa_summary.avg_score || '—'}</div>
+                      <div className="text-ui-muted text-xs">O‘rtacha Ball</div>
+                      <div className="font-semibold text-cyan-400 font-mono mt-0.5">{selectedJob.qa_summary.avg_score || '—'}</div>
                     </div>
                   </div>
                 </div>
@@ -1605,7 +1605,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       handleCancelJob(id)
                     }}
                     disabled={cancellingId === selectedJob.id}
-                    className="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                    className="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                     <span>Jarayonni to‘xtatish</span>
@@ -1619,7 +1619,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       openRetryModal(target)
                     }}
                     disabled={retryingId === selectedJob.id}
-                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${retryingId === selectedJob.id ? 'animate-spin' : ''}`} />
                     <span>Qayta ishga tushirish (Retry)</span>
@@ -1633,7 +1633,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       openRetryModal(target)
                     }}
                     disabled={retryingId === selectedJob.id}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50 shadow-sm shadow-indigo-500/10"
+                    className="px-3.5 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50 shadow-sm "
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${retryingId === selectedJob.id ? 'animate-spin' : ''}`} />
                     <span>Qayta tayyorlash (Regenerate)</span>
@@ -1732,7 +1732,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
         }
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 sm:p-4">
             <div className="bg-[#11141f] border border-white/10 rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               {/* Header */}
               <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#11141f]">
@@ -1741,15 +1741,15 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                     <RefreshCw className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white">Qayta ishga tushirish (AI Modellar)</h3>
-                    <p className="text-xs text-gray-400 line-clamp-1 max-w-[320px] sm:max-w-[400px]">
+                    <h3 className="text-sm sm:text-base font-semibold text-white">Qayta ishga tushirish (AI Modellar)</h3>
+                    <p className="text-xs text-ui-muted line-clamp-1 max-w-[320px] sm:max-w-[400px]">
                       {retryModalJob.video_title}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setRetryModalJob(null)}
-                  className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition"
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-ui-muted hover:text-white transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1759,7 +1759,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
               <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
                 {/* Video Info pill */}
                 <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 text-gray-400">
+                  <div className="flex items-center gap-2 text-ui-muted">
                     <span>Davomiyligi:</span>
                     <strong className="text-white font-mono">
                       {Math.floor(retryModalJob.video_duration / 60)} daq {retryModalJob.video_duration % 60} soniya
@@ -1767,8 +1767,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   </div>
                   {retryModalJob.error_code && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-gray-400">Oxirgi xatolik:</span>
-                      <span className="text-[10px] font-mono text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
+                      <span className="text-xs text-ui-muted">Oxirgi xatolik:</span>
+                      <span className="text-xs font-mono text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
                         {retryModalJob.error_code}
                       </span>
                     </div>
@@ -1778,11 +1778,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {/* 1. TTS OVOZ SINTEZI */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <label className="text-xs font-semibold text-white flex items-center gap-1.5">
                       <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
                       <span>TTS Ovoz Sintezi (Ovoz yaratish):</span>
                     </label>
-                    <span className="text-[10px] text-cyan-300 font-mono">
+                    <span className="text-xs text-cyan-300 font-mono">
                       {estTTSUzs > 0 ? `~${estTTSUzs.toLocaleString()} UZS` : '0 UZS'}
                     </span>
                   </div>
@@ -1793,7 +1793,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       onClick={() => setRetryTtsOption('gemini_paid')}
                       className={`cursor-pointer rounded-xl p-3 border transition-all ${
                         retryTtsOption === 'gemini_paid'
-                          ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/5'
+                          ? 'bg-amber-500/10 border-amber-500/50 shadow-md '
                           : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                       }`}
                     >
@@ -1806,16 +1806,16 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             onChange={() => setRetryTtsOption('gemini_paid')}
                             className="accent-amber-500"
                           />
-                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                          <span className="text-xs font-semibold text-white flex items-center gap-1">
                             <span>💎</span>
                             <span>Gemini: Pullik API (Tavsiya etiladi)</span>
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                        <span className="text-xs font-mono font-semibold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
                           ~{estTTSUzs.toLocaleString()} UZS (~${estTTSUsd.toFixed(3)})
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                      <p className="text-xs text-ui-muted mt-1 pl-5">
                         Balansli pullik Gemini kaliti orqali yuqori sifatli va cheklovlarsiz sintez.
                       </p>
                     </div>
@@ -1825,7 +1825,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       onClick={() => setRetryTtsOption('edge')}
                       className={`cursor-pointer rounded-xl p-3 border transition-all ${
                         retryTtsOption === 'edge'
-                          ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/5'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md '
                           : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                       }`}
                     >
@@ -1838,16 +1838,16 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             onChange={() => setRetryTtsOption('edge')}
                             className="accent-emerald-500"
                           />
-                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                          <span className="text-xs font-semibold text-white flex items-center gap-1">
                             <span>⚡</span>
                             <span>Microsoft Edge Neural: Bepul</span>
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <span className="text-xs font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                           0 UZS ($0.00)
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                      <p className="text-xs text-ui-muted mt-1 pl-5">
                         Madina / Sardor ovozlari orqali 100% bepul sintez (Zaxirada Azure/Gemini himoyasi).
                       </p>
                     </div>
@@ -1857,7 +1857,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       onClick={() => setRetryTtsOption('azure')}
                       className={`cursor-pointer rounded-xl p-3 border transition-all ${
                         retryTtsOption === 'azure'
-                          ? 'bg-cyan-500/10 border-cyan-500/50 shadow-md shadow-cyan-500/5'
+                          ? 'bg-cyan-500/10 border-cyan-500/50 shadow-md '
                           : 'bg-white/[0.02] border-white/10 hover:border-white/20'
                       }`}
                     >
@@ -1870,16 +1870,16 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             onChange={() => setRetryTtsOption('azure')}
                             className="accent-cyan-500"
                           />
-                          <span className="text-xs font-bold text-white flex items-center gap-1">
+                          <span className="text-xs font-semibold text-white flex items-center gap-1">
                             <span>☁️</span>
                             <span>Microsoft Azure Speech (Rasmiy API)</span>
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                        <span className="text-xs font-mono font-semibold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
                           ~{Math.round((estChars / 1000) * 0.016 * 12800).toLocaleString()} UZS (~$0.016/1k)
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                      <p className="text-xs text-ui-muted mt-1 pl-5">
                         Azure Cognitive Services rasmiy kaliti orqali tezkor va ishonchli sintez (500k bepul limiti mavjud).
                       </p>
                     </div>
@@ -1915,21 +1915,21 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           </span>
                         </div>
                         {isFreeKeysInCooldown ? (
-                          <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+                          <span className="text-xs font-mono font-semibold text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
                             🔒 BLOKLANGAN (429 Limit)
                           </span>
                         ) : (
-                          <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                          <span className="text-xs font-mono font-semibold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
                             ~{estTTSUzs.toLocaleString()} UZS (~${estTTSUsd.toFixed(3)})
                           </span>
                         )}
                       </div>
                       {isFreeKeysInCooldown ? (
-                        <p className="text-[11px] text-rose-400 font-medium mt-1 pl-5">
+                        <p className="text-xs text-rose-400 font-medium mt-1 pl-5">
                           ⛔ Barcha bepul kalitlar 429 limitda! Tiklanishiga aniq: <strong>{exactCooldownText}</strong> qoldi. Iltimos, Pullik API yoki 100% bepul Microsoft Edge tanlang.
                         </p>
                       ) : (
-                        <p className="text-[10px] text-amber-400/90 mt-1 pl-5">
+                        <p className="text-xs text-amber-400/90 mt-1 pl-5">
                           ⚠️ Google bepul kalitlarida TTS kvotasi past va ko‘pincha 429 xatosi beradi. Real stavka: ~${estTTSUsd.toFixed(3)}.
                         </p>
                       )}
@@ -1940,11 +1940,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {/* 2. STT TRANSKRIPSIYA */}
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <label className="text-xs font-semibold text-white flex items-center gap-1.5">
                       <Cpu className="w-3.5 h-3.5 text-purple-400" />
                       <span>STT Transkripsiya (Nutqni aniqlash):</span>
                     </label>
-                    <span className="text-[10px] text-purple-300 font-mono">
+                    <span className="text-xs text-purple-300 font-mono">
                       {estSTTUzs > 0 ? `~${estSTTUzs.toLocaleString()} UZS` : '0 UZS'}
                     </span>
                   </div>
@@ -1971,7 +1971,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             />
                             <span>✅ Saqlangan transkript (Kesh, 0 UZS)</span>
                           </label>
-                          <span className="text-[10px] font-mono text-purple-300">Vaqt tejaladi</span>
+                          <span className="text-xs font-mono text-purple-300">Vaqt tejaladi</span>
                         </div>
                       </div>
                     )}
@@ -1996,7 +1996,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>⚡ Groq Whisper (Bepul)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                        <span className="text-xs font-mono text-emerald-400">0 UZS</span>
                       </div>
                     </div>
 
@@ -2028,11 +2028,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           <span>🆓 Gemini Flash (Bepul)</span>
                         </label>
                         {isFreeKeysInCooldown ? (
-                          <span className="text-[9px] font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
                             429 ({exactCooldownText})
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono text-blue-300">0 UZS ($0)</span>
+                          <span className="text-xs font-mono text-blue-300">0 UZS ($0)</span>
                         )}
                       </div>
                     </div>
@@ -2057,7 +2057,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>💎 Gemini Flash (Pullik)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-amber-300">
+                        <span className="text-xs font-mono text-amber-300">
                           ~{Math.round(durMin * 0.002 * 12800).toLocaleString()} UZS
                         </span>
                       </div>
@@ -2083,7 +2083,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>🤖 OpenAI Whisper</span>
                         </label>
-                        <span className="text-[10px] font-mono text-gray-300">
+                        <span className="text-xs font-mono text-gray-300">
                           ~{Math.round(durMin * 0.006 * 12800).toLocaleString()} UZS
                         </span>
                       </div>
@@ -2094,11 +2094,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 {/* 3. LLM TARJIMA */}
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <label className="text-xs font-semibold text-white flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       <span>LLM Tarjima (O‘zbek tiliga o‘girish):</span>
                     </label>
-                    <span className="text-[10px] text-indigo-300 font-mono">
+                    <span className="text-xs text-indigo-300 font-mono">
                       {estLLMUzs > 0 ? `~${estLLMUzs.toLocaleString()} UZS` : '0 UZS'}
                     </span>
                   </div>
@@ -2125,7 +2125,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                             />
                             <span>✅ Saqlangan tarjima (Kesh, 0 UZS)</span>
                           </label>
-                          <span className="text-[10px] font-mono text-indigo-300">Mavjud matn</span>
+                          <span className="text-xs font-mono text-indigo-300">Mavjud matn</span>
                         </div>
                       </div>
                     )}
@@ -2158,11 +2158,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           <span>🆓 Gemini 3.8 (Bepul pool)</span>
                         </label>
                         {isFreeKeysInCooldown ? (
-                          <span className="text-[9px] font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-mono text-rose-300 bg-rose-500/20 px-1.5 py-0.5 rounded">
                             429 ({exactCooldownText})
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono text-emerald-400">0 UZS</span>
+                          <span className="text-xs font-mono text-emerald-400">0 UZS</span>
                         )}
                       </div>
                     </div>
@@ -2187,7 +2187,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>⚡ Groq Cloud LPU (Bepul, 0 UZS)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-emerald-400">0 UZS (LPU tezkor)</span>
+                        <span className="text-xs font-mono text-emerald-400">0 UZS (LPU tezkor)</span>
                       </div>
                     </div>
 
@@ -2211,7 +2211,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>💎 Gemini 3.8 (Pullik API)</span>
                         </label>
-                        <span className="text-[10px] font-mono text-amber-300">
+                        <span className="text-xs font-mono text-amber-300">
                           ~{Math.round((estChars / 1000) * 0.0005 * 12800).toLocaleString()} UZS
                         </span>
                       </div>
@@ -2237,7 +2237,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                           />
                           <span>🤖 GPT-4o Mini</span>
                         </label>
-                        <span className="text-[10px] font-mono text-gray-300">
+                        <span className="text-xs font-mono text-gray-300">
                           ~{Math.round((estChars / 1000) * 0.001 * 12800).toLocaleString()} UZS
                         </span>
                       </div>
@@ -2247,25 +2247,25 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
                 {/* COST BREAKDOWN CARD */}
                 <div className="bg-black/40 border border-white/10 rounded-xl p-3.5 space-y-1.5 font-mono text-xs">
-                  <div className="flex justify-between text-gray-400 text-[11px]">
+                  <div className="flex justify-between text-ui-muted text-xs">
                     <span>TTS Ovoz sintezi:</span>
                     <span className={estTTSUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
                       {estTTSUzs > 0 ? `~${estTTSUzs.toLocaleString()} UZS (~$${estTTSUsd.toFixed(3)})` : '0 UZS (Bepul)'}
                     </span>
                   </div>
-                  <div className="flex justify-between text-gray-400 text-[11px]">
+                  <div className="flex justify-between text-ui-muted text-xs">
                     <span>STT Transkripsiya:</span>
                     <span className={estSTTUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
                       {estSTTUzs > 0 ? `~${estSTTUzs.toLocaleString()} UZS (~$${estSTTUsd.toFixed(3)})` : '0 UZS (Bepul)'}
                     </span>
                   </div>
-                  <div className="flex justify-between text-gray-400 text-[11px]">
+                  <div className="flex justify-between text-ui-muted text-xs">
                     <span>LLM Tarjima:</span>
                     <span className={estLLMUzs > 0 ? 'text-amber-300 font-semibold' : 'text-emerald-400'}>
                       {estLLMUzs > 0 ? `~${estLLMUzs.toLocaleString()} UZS (~$${estLLMUsd.toFixed(4)})` : '0 UZS (Bepul)'}
                     </span>
                   </div>
-                  <div className="flex justify-between font-bold text-xs pt-2 border-t border-white/10">
+                  <div className="flex justify-between font-semibold text-xs pt-2 border-t border-white/10">
                     <span className="text-white font-sans">Jami kutilayotgan xarajat:</span>
                     <span className={estTotalUzs > 0 ? 'text-amber-400' : 'text-emerald-400'}>
                       ~{estTotalUzs.toLocaleString()} UZS {estTotalUsd > 0 && `(~$${estTotalUsd.toFixed(3)})`}
@@ -2279,7 +2279,7 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 <button
                   type="button"
                   onClick={() => setRetryModalJob(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-ui-muted hover:text-white hover:bg-white/5 transition"
                 >
                   Bekor qilish
                 </button>
@@ -2293,10 +2293,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         retrySttOption === 'gemini_free' ||
                         retryLlmOption === 'gemini_free'))
                   }
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                     estTotalUzs > 0
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white '
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white '
                   }`}
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${retryingId === retryModalJob.id ? 'animate-spin' : ''}`} />

@@ -32,12 +32,12 @@ export default function SubtitleResult({ job, onReset }: Props) {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl px-6 py-4 transition-colors"
+        className="flex items-center gap-3 rounded-control border border-ui-green/30 bg-ui-green/[0.06] px-4 py-3"
       >
-        <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-500 transition-colors shrink-0" strokeWidth={2.5} />
+        <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-ui-green-ink" />
         <div>
-          <h3 className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest transition-colors">Subtitr tayyor!</h3>
-          <p className="text-[11px] text-emerald-600/60 dark:text-emerald-400/60 font-medium transition-colors">
+          <h3 className="text-[15px] font-semibold text-ui-ink">Subtitr tayyor!</h3>
+          <p className="text-sm text-ui-muted">
             {job.video_title || "Video"}
           </p>
         </div>
@@ -46,27 +46,27 @@ export default function SubtitleResult({ job, onReset }: Props) {
       <div className="grid grid-cols-3 gap-3">
         <a
           href={getSubtitleDownloadUrl(job.job_id, "srt")}
-          className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-500 text-white font-bold text-sm hover:opacity-90 transition"
+          className="ui-btn ui-btn-primary min-h-20 w-full flex-col"
         >
           <Download className="w-5 h-5" />
           .SRT
         </a>
         <a
           href={getSubtitleDownloadUrl(job.job_id, "vtt")}
-          className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-200 font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition"
+          className="ui-btn ui-btn-secondary min-h-20 w-full flex-col"
         >
           <Download className="w-5 h-5" />
           .VTT
         </a>
         <a
           href={getSubtitleDownloadUrl(job.job_id, "txt")}
-          className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-200 font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition"
+          className="ui-btn ui-btn-secondary min-h-20 w-full flex-col"
         >
           <FileText className="w-5 h-5" />
           .TXT (matn)
         </a>
       </div>
-      <p className="-mt-3 text-[10px] text-gray-400 dark:text-gray-500 text-center">
+      <p className="-mt-3 text-xs text-ui-muted text-center">
         .SRT/.VTT — vaqt kodli subtitr (pleer va montaj dasturlari uchun); .TXT — faqat matn.
       </p>
 
@@ -75,20 +75,20 @@ export default function SubtitleResult({ job, onReset }: Props) {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowText((v) => !v)}
-              className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+              className="text-xs font-semibold text-ui-muted hover:text-ui-ink transition"
             >
               {showText ? "Matnni yashirish" : "Matnni ko'rsatish"}
             </button>
             <button
               onClick={copyText}
-              className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-ui-muted hover:text-ui-ink transition"
             >
               <Copy className="w-3 h-3" />
               {copied ? "Nusxalandi" : "Matnni nusxalash"}
             </button>
           </div>
           {showText && (
-            <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] p-4 max-h-64 overflow-y-auto">
+            <p className="mt-3 text-sm text-ui-muted leading-relaxed whitespace-pre-line rounded-2xl bg-ui-ground p-4 max-h-64 overflow-y-auto">
               {job.translated_text}
             </p>
           )}

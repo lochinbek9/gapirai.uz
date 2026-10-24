@@ -26,8 +26,8 @@ function ShareInner() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-      <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
-      <p className="text-sm text-gray-500 dark:text-slate-400">Havola ochilmoqda…</p>
+      <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+      <p className="text-sm text-ui-muted">Havola ochilmoqda…</p>
     </div>
   )
 }
