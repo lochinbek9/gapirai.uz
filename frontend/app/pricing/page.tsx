@@ -3,26 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  Crown,
-  Loader2,
-  Sparkles,
-  Zap,
-  ShieldCheck,
-  Clock,
-  HelpCircle,
-  ChevronDown,
-  Flame,
-  Star,
-  Layers,
-  Sparkle,
-  Gift,
-  MessageCircle,
-  ExternalLink,
-} from 'lucide-react'
+import { AlertCircle, Check, Loader2, Minus } from 'lucide-react'
 import {
   getPlans,
   subscribeToPlan,
@@ -39,12 +20,22 @@ import {
 } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
+import SiteHeader from '@/components/metro/SiteHeader'
+import { Spine, SpineStop } from '@/components/metro/Spine'
+import Footer from '@/components/Footer'
 import UzumAccountCard from '@/components/UzumAccountCard'
 import PaynetOrderCard from '@/components/PaynetOrderCard'
 
 type PayProvider = 'click' | 'payme' | 'uzum' | 'paynet'
 
-const PLAN_ICONS: Record<string, any> = { free: Sparkles, standard: Zap, pro: Crown }
+const PROVIDERS: { id: PayProvider; name: string }[] = [
+  { id: 'click', name: 'Click' },
+  { id: 'payme', name: 'Payme' },
+  { id: 'uzum', name: 'Uzum' },
+  { id: 'paynet', name: 'Paynet' },
+]
+
+const som = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')
 
 export default function PricingPage() {
   const router = useRouter()
@@ -66,8 +57,8 @@ export default function PricingPage() {
   const [shortfallMinutes, setShortfallMinutes] = useState<number | null>(null)
   const [videoDurationMinutes, setVideoDurationMinutes] = useState<number | null>(null)
 
-  // FAQ Accordion
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
+  // To'lov usuli bir marta tanlanadi -- har tarif/paket yonida 4 ta tugma o'rniga
+  const [provider, setProvider] = useState<PayProvider>('click')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -177,793 +168,389 @@ export default function PricingPage() {
   const hasPurchasedMinutes = Boolean((current?.minutes?.purchased ?? 0) > 0)
   const isPaidCustomer = hasPaidPlan || hasPurchasedMinutes
 
+  const visiblePlans = (plans.length ? plans : DEFAULT_PLANS).filter(
+    (plan) => plan.tier === 'free' || plan.period_days === (billingCycle === 'yearly' ? 365 : 30)
+  )
+  const perMinute = (plan: PlanDef) =>
+    plan.price > 0 && plan.monthly_minutes > 0
+      ? Math.round((plan.discounted_price && billingCycle === 'monthly' ? plan.discounted_price : plan.price) / (plan.period_days === 365 ? plan.monthly_minutes * 12 : plan.monthly_minutes))
+      : 0
+
+  const ROWS: { label: string; value: (plan: PlanDef) => React.ReactNode }[] = [
+    { label: 'Har 30 kunda', value: (p) => <><strong className="m-num text-metro-ink">{p.monthly_minutes}</strong> daqiqa</> },
+    { label: '1 daqiqa narxi', value: (p) => (perMinute(p) ? <span className="m-num">~{som(perMinute(p))} so&apos;m</span> : <span className="text-metro-muted">—</span>) },
+    { label: 'Video sifati', value: (p) => <span className="m-num">{p.max_resolution} gacha</span> },
+    { label: 'Navbat', value: (p) => (p.priority ? 'Ustuvor' : 'Umumiy') },
+    { label: 'Ovoz variantlari', value: (p) => (p.tier === 'pro' ? 'Tanlash mumkin' : <span className="text-metro-muted">Avtomatik</span>) },
+    { label: 'Bitta video', value: () => '120 daqiqagacha' },
+    { label: 'Tezkor tahlil', value: () => 'Daqiqa sarflamaydi' },
+  ]
+
+  const planPrice = (plan: PlanDef) => {
+    const monthlyEquivalent = plan.period_days === 365 ? Math.round(plan.price / 12) : null
+    if (plan.price === 0) return <span className="block"><span className="font-sign text-5xl font-extrabold text-white m-num">0</span> <span className="text-base text-metro-plaque-ink/80">so&apos;m</span></span>
+    if (plan.discounted_price && billingCycle === 'monthly') {
+      return (
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-sign text-5xl font-extrabold text-white m-num">{som(plan.discounted_price)}</span>
+          <span className="text-base text-metro-plaque-ink/70 line-through m-num">{som(plan.price)}</span>
+          <span className="text-base text-metro-plaque-ink/80">so&apos;m / oy · −10%</span>
+        </span>
+      )
+    }
+    return (
+      <span className="block">
+        <span className="font-sign text-5xl font-extrabold text-white m-num">{som(monthlyEquivalent ?? plan.price)}</span>{' '}
+        <span className="text-base text-metro-plaque-ink/80">so&apos;m / oy</span>
+        {monthlyEquivalent !== null && <span className="mt-1 block text-sm text-metro-plaque-ink/80 m-num">Yiliga {som(plan.price)} so&apos;m</span>}
+      </span>
+    )
+  }
+
+  const planAction = (plan: PlanDef) => {
+    const isCurrent = current?.plan === plan.tier
+    if (isCurrent) return <span className="m-btn m-btn-ghost w-full cursor-default">Joriy tarifingiz</span>
+    if (plan.id === 'free') {
+      return (
+        <Link href={isLoggedIn ? '/' : '/register'} className="m-btn m-btn-ghost w-full">
+          {isLoggedIn ? 'Video yuborish' : "Bepul ro'yxatdan o'tish"}
+        </Link>
+      )
+    }
+    return (
+      <button type="button" onClick={() => handleSubscribe(plan.id, provider)} disabled={subscribing === plan.id} className="m-btn w-full">
+        {subscribing === plan.id ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Kutilmoqda...</> : `${PROVIDERS.find((x) => x.id === provider)?.name} orqali to'lash`}
+      </button>
+    )
+  }
+
   return (
-    <div className="min-h-screen relative flex flex-col items-center py-10 px-4 sm:px-6 transition-colors duration-300">
-      <MeshBackground />
+    <>
+      <SiteHeader current="pricing" />
+      <main id="main" tabIndex={-1} className="bg-metro-ground text-metro-ink focus:outline-none">
+        <div className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14 lg:px-8">
+          {/* Sarlavha va balans */}
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <h1 className="font-sign text-6xl font-extrabold uppercase leading-none text-metro-ink sm:text-7xl">Tariflar</h1>
+              <p className="mt-4 max-w-[60ch] text-lg leading-relaxed text-metro-muted">
+                Hisob daqiqada yuritiladi: dublaj ham, subtitr ham videoning haqiqiy davomiyligicha daqiqa sarflaydi.
+                Tezkor tahlil daqiqa sarflamaydi. Bepul tarifda har 30 kunda 5 daqiqa.
+              </p>
+            </div>
+            {isLoggedIn && current && (
+              <div className="m-plaque px-5 py-4">
+                <p className="font-sign text-sm font-bold uppercase tracking-wide text-metro-plaque-ink/75">Balansingiz</p>
+                <p className="mt-1 font-sign text-4xl font-extrabold text-white m-num">
+                  {current.minutes.total_available} <span className="text-xl">daqiqa</span>
+                </p>
+                {current.minutes.purchased > 0 && (
+                  <p className="mt-1 text-sm text-metro-plaque-ink/80 m-num">shundan {current.minutes.purchased} tasi kuymaydi</p>
+                )}
+              </div>
+            )}
+          </div>
 
-      <div className="w-full max-w-5xl z-10 space-y-10">
-        {/* Navigation & Breadcrumb */}
-        <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition duration-200 bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-xl border border-black/5 dark:border-white/10"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Bosh sahifaga qaytish
-          </Link>
+          {!isLoggedIn && !authLoading && (
+            <p className="mt-8 rounded-[6px] border-2 border-metro-rule bg-metro-surface px-4 py-3 text-base text-metro-ink">
+              Obuna bo&apos;lish yoki paket olish uchun{' '}
+              <Link href="/login" className="font-bold underline underline-offset-4">kiring</Link> yoki{' '}
+              <Link href="/register" className="font-bold underline underline-offset-4">bepul ro&apos;yxatdan o&apos;ting</Link>.
+            </p>
+          )}
 
-          {isLoggedIn && current && (
-            <div className="flex items-center gap-2 text-xs font-medium bg-violet-500/10 border border-violet-500/20 px-3 py-1.5 rounded-xl text-violet-700 dark:text-violet-300">
-              <span>Balansingiz:</span>
-              <strong className="font-bold text-violet-900 dark:text-white">
-                {current.minutes.total_available} daqiqa
-              </strong>
-              {current.minutes.purchased > 0 && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                  (+{current.minutes.purchased} kuymas)
-                </span>
-              )}
+          {error && (
+            <p role="alert" className="mt-6 rounded-[6px] border-2 border-metro-red/50 bg-metro-red/5 px-4 py-3 text-base font-semibold text-metro-red-ink">
+              {error}
+            </p>
+          )}
+
+          {discountOffer?.active && (
+            <div className="mt-8 rounded-[6px] border-2 border-amber-600/50 bg-amber-500/10 px-5 py-4">
+              <p className="font-sign text-xl font-extrabold uppercase text-metro-ink">Ilk video uchun 10% chegirma — 24 soat</p>
+              <p className="mt-1 text-base text-metro-muted">
+                Birinchi videongiz tayyor bo&apos;lgani uchun barcha tarif va paketlarga 10% chegirma narxi avtomatik qo&apos;llandi.
+              </p>
             </div>
           )}
-        </div>
 
-        {/* Hero Section */}
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shadow-sm">
-            <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-            <span>10,000+ daqiqa professional AI dublyaj qilindi</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-black text-gray-900 dark:text-white tracking-tight leading-tight">
-            Shaffof va Qulay Tariflar
-          </h1>
-
-          <p className="text-sm sm:text-base text-gray-600 dark:text-slate-300 leading-relaxed">
-            Ortiqcha studiya xarajatlarisiz, daqiqasiga atigi <span className="font-bold text-violet-600 dark:text-violet-400">140 so'mdan</span> professional dublyaj qiling. Doimiy foydalanish uchun <span className="font-bold text-violet-600 dark:text-violet-400">oylik tejamkor obunalar</span> yoki muddatsiz saqlanadigan <span className="font-bold text-emerald-600 dark:text-emerald-400">kuymaydigan daqiqa paketlari</span>ni tanlang!
-          </p>
-
-          {/* Value Pills */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 font-semibold">
-              <Check className="w-3.5 h-3.5 text-violet-500" /> Oylik qulay tariflar
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-semibold">
-              <Check className="w-3.5 h-3.5 text-emerald-500" /> Paketlar kuymaydi
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-semibold">
-              <Clock className="w-3.5 h-3.5 text-blue-500" /> 1-2 daqiqada tayyor
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-semibold">
-              <Sparkles className="w-3.5 h-3.5 text-purple-500" /> 100% tabiiy intonatsiyali ovoz
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> Kafolatlangan sifat
-            </span>
-          </div>
-        </div>
-
-        {!isLoggedIn && !authLoading && (
-          <p className="text-center text-xs sm:text-sm text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3 max-w-lg mx-auto shadow-sm">
-            Tarifga obuna bo'lish yoki paket olish uchun{' '}
-            <Link href="/login" className="font-bold underline hover:text-amber-900 dark:hover:text-amber-200">
-              tizimga kiring
-            </Link>{' '}
-            yoki{' '}
-            <Link href="/register" className="font-bold underline hover:text-amber-900 dark:hover:text-amber-200">
-              bepul ro'yxatdan o'ting
-            </Link>.
-          </p>
-        )}
-
-        {error && (
-          <p className="text-center text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 max-w-md mx-auto shadow-sm">
-            {error}
-          </p>
-        )}
-
-        {/* Active 10% First Video Welcome Discount Banner */}
-        {discountOffer?.active && (
-          <div className="max-w-2xl mx-auto p-4 rounded-3xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-purple-500/20 border border-amber-500/40 text-gray-900 dark:text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-amber-500/25 text-amber-500 shrink-0">
-                <Gift className="w-6 h-6 animate-bounce" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-500">
-                    Maxsus Taklif • 10% Chegirma
-                  </span>
-                  <span className="text-[10px] bg-amber-500/25 text-amber-600 dark:text-amber-300 font-mono font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                    24 SOAT FAOL
-                  </span>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                  Ilk videongiz tayyor bo&apos;lgani munosabati bilan barcha tarif va daqiqa paketlariga 10% chegirma narxlari avtomatik qo&apos;llanildi!
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Expired Discount Soft-Landing with Admin Contacts */}
-        {discountOffer?.expired && !isPaidCustomer && (
-          <div className="max-w-2xl mx-auto p-4 rounded-3xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 text-gray-900 dark:text-white shadow-md space-y-3">
-            <div className="flex items-center gap-2.5">
-              <Clock className="w-5 h-5 text-blue-400 shrink-0" />
-              <div className="text-xs">
-                <span className="font-bold text-blue-400">24 soatlik chegirma muddati tugabdimi?</span>
-                <span className="text-gray-600 dark:text-gray-300 ml-1">
-                  Ko&apos;nglingizni aslo cho&apos;ktirmang! Adminlarimiz bilan to&apos;g&apos;ridan-to&apos;g&apos;ri bog&apos;lanib maxsus chegirma so&apos;rashingiz mumkin:
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <a
-                href="https://t.me/goldendevuz?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-600 dark:text-blue-300 transition text-xs font-semibold group"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-blue-400" />
-                  <span>@goldendevuz</span>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
-              </a>
-              <a
-                href="https://t.me/mentor_lochinbek?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-2.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-600 dark:text-blue-300 transition text-xs font-semibold group"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-blue-400" />
-                  <span>@mentor_lochinbek</span>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
-              </a>
-            </div>
-          </div>
-        )}
-
-        {/* Monthly / Yearly Switcher */}
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <span className={`text-sm font-bold transition ${billingCycle === 'monthly' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
-            Oylik to'lov
-          </span>
-          <button
-            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-            className="relative w-12 h-7 rounded-full bg-violet-500/20 border border-violet-500/40 transition focus:outline-none"
-            aria-label="To'lov davrini almashtirish"
-          >
-            <span
-              className={`absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-violet-600 transition-transform ${
-                billingCycle === 'yearly' ? 'translate-x-[22px]' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          <span className={`text-sm font-bold transition flex items-center gap-1.5 ${billingCycle === 'yearly' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
-            Yillik obuna
-            <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-              2 oy bepul (17% tejash)
-            </span>
-          </span>
-        </div>
-
-        {/* Plan Cards */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-3 gap-6 items-stretch">
-            {(plans.length ? plans : DEFAULT_PLANS)
-              .filter((plan) => plan.tier === 'free' || plan.period_days === (billingCycle === 'yearly' ? 365 : 30))
-              .map((plan) => {
-                const Icon = PLAN_ICONS[plan.tier] || Sparkles
-                const isCurrent = current?.plan === plan.tier
-                const isPro = plan.tier === 'pro'
-                const isStandard = plan.tier === 'standard'
-                const monthlyEquivalent = plan.period_days === 365 ? Math.round(plan.price / 12) : null
-
-                // Unit economic calculation: price per minute
-                const perMinuteCost =
-                  plan.price > 0 && plan.monthly_minutes > 0
-                    ? Math.round(plan.price / (billingCycle === 'yearly' ? plan.monthly_minutes * 12 : plan.monthly_minutes))
-                    : 0
-
-                return (
-                  <div
-                    key={plan.id}
-                    className={`glass-card relative border rounded-3xl p-6 flex flex-col justify-between transition duration-200 ${
-                      isCurrent
-                        ? 'border-emerald-500/60 ring-2 ring-emerald-500/20 bg-emerald-500/[0.02] shadow-xl'
-                        : isPro
-                        ? 'border-violet-500/50 shadow-[0_0_40px_-10px] shadow-violet-500/25 bg-white/80 dark:bg-white/[0.03]'
-                        : isStandard
-                        ? 'border-blue-500/30 bg-white/80 dark:bg-white/[0.03]'
-                        : 'border-black/5 dark:border-white/10 bg-white/60 dark:bg-white/[0.02]'
-                    }`}
-                  >
-                    {/* Badge 1: If current plan, show top-right mini component badge */}
-                    {isCurrent && (
-                      <span className="absolute -top-3 right-4 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3 py-1 rounded-full shadow-md shadow-emerald-600/20 flex items-center gap-1 border border-emerald-400/30">
-                        <Check className="w-3 h-3" />
-                        Joriy tarifingiz
-                      </span>
-                    )}
-
-                    {/* Badge 2: If user is NOT yet paid, show "Tavsiya etiladi" on Pro. If paid, hide it completely! */}
-                    {!isPaidCustomer && isPro && !isCurrent && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-3.5 py-1 rounded-full shadow-lg shadow-violet-500/30">
-                        Tavsiya etiladi
-                      </span>
-                    )}
-
-                    {/* Card Header */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-inner ${
-                            isPro
-                              ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400'
-                              : isStandard
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                              : 'bg-gray-500/15 text-gray-600 dark:text-gray-400'
-                          }`}
-                        >
-                          <Icon className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-black text-gray-900 dark:text-white">{plan.name}</h3>
-                          <span className="text-[11px] font-medium text-gray-500 dark:text-slate-400">
-                            {plan.tier === 'free'
-                              ? 'Sinov uchun'
-                              : plan.tier === 'standard'
-                              ? 'Yaratuvchilar uchun'
-                              : 'Professional & Kanallar'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Price Display */}
-                      <div className="pt-1">
-                        {plan.discounted_price && plan.price > 0 && billingCycle === 'monthly' ? (
-                          <div className="flex flex-col">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-3xl sm:text-4xl font-black text-amber-500 tracking-tight">
-                                {plan.discounted_price.toLocaleString('uz-UZ')}
-                              </span>
-                              <span className="text-base font-bold text-gray-400 line-through">
-                                {plan.price.toLocaleString('uz-UZ')}
-                              </span>
-                              <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-slate-400">
-                                so&apos;m/oy
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                              10% ilk video chegirmasi faol!
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
-                              {plan.price === 0 ? 'Bepul' : (monthlyEquivalent ?? plan.price).toLocaleString('uz-UZ')}
-                            </span>
-                            {plan.price > 0 && (
-                              <span className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-slate-400">
-                                so&apos;m/oy
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {monthlyEquivalent !== null && (
-                          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
-                            Yillik to'lov: {plan.price.toLocaleString('uz-UZ')} so'm
-                          </p>
-                        )}
-
-                        {/* Unit price callout */}
-                        {perMinuteCost > 0 ? (
-                          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/20">
-                            <span>~{perMinuteCost} so'm / daqiqa</span>
-                            {isStandard && <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">— eng qulay!</span>}
-                          </div>
-                        ) : (
-                          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-500/10 text-gray-600 dark:text-gray-300 text-xs font-bold border border-gray-500/20">
-                            <span>0 so'm / har oy 5 daqiqa</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Feature Checklist */}
-                      <ul className="space-y-2.5 text-xs sm:text-sm text-gray-600 dark:text-slate-300 pt-3 border-t border-black/5 dark:border-white/10">
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>
-                            <strong className="text-gray-900 dark:text-white">Oyiga {plan.monthly_minutes} daqiqa</strong> oylik kvota (oy oxirida yangilanadi)
-                          </span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>1 video — maksimal 120 daqiqagacha</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>{plan.priority ? 'Ustuvor yuqori tezlikdagi navbat' : 'Standart qayta ishlash navbati'}</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>{isPro ? 'Studiya darajasidagi Azure TTS ovozlar' : 'Tabiiy, tiniq AI ovozlar'}</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>Video sifati: <strong className="text-gray-900 dark:text-white">{plan.max_resolution}</strong> gacha</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Check className="w-4 h-4 text-violet-500 dark:text-violet-400 shrink-0" />
-                          <span>Video tahlil va xulosalar — cheklovsiz</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    {/* Bottom CTA & Payment Buttons */}
-                    <div className="pt-6 space-y-2">
-                      <button
-                        onClick={() => plan.id !== 'free' && handleSubscribe(plan.id, 'click')}
-                        disabled={plan.id === 'free' || isCurrent || subscribing === plan.id}
-                        className={`w-full py-3 rounded-2xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm ${
-                          plan.id === 'free' || isCurrent
-                            ? 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:opacity-95 shadow-lg shadow-violet-600/25'
-                        }`}
-                      >
-                        {subscribing === plan.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" /> Kutilmoqda...
-                          </>
-                        ) : isCurrent ? (
-                          'Joriy tarif'
-                        ) : plan.id === 'free' ? (
-                          'Bepul tarif'
-                        ) : (
-                          'Click orqali to\'lash'
-                        )}
-                      </button>
-
-                      {plan.id !== 'free' && !isCurrent && (
-                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                          <button
-                            onClick={() => handleSubscribe(plan.id, 'payme')}
-                            disabled={subscribing === plan.id}
-                            className="py-2 px-1 rounded-xl font-bold text-[11px] text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition text-center truncate bg-white/50 dark:bg-white/[0.02]"
-                          >
-                            Payme
-                          </button>
-                          <button
-                            onClick={() => handleSubscribe(plan.id, 'uzum')}
-                            disabled={subscribing === plan.id}
-                            className="py-2 px-1 rounded-xl font-bold text-[11px] text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition text-center truncate bg-white/50 dark:bg-white/[0.02]"
-                          >
-                            Uzum
-                          </button>
-                          <button
-                            onClick={() => handleSubscribe(plan.id, 'paynet')}
-                            disabled={subscribing === plan.id}
-                            className="py-2 px-1 rounded-xl font-bold text-[11px] text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition text-center truncate bg-white/50 dark:bg-white/[0.02]"
-                          >
-                            Paynet
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-          </div>
-        )}
-
-        {/* Kuymaydigan Daqiqa Paketlari (Minute Packs) */}
-        <div id="minute-packs" className="space-y-6 pt-8">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-              <Check className="w-3.5 h-3.5" />
-              <span>Muddatsiz va Kuymas Paketlar</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
-              Kuymaydigan Daqiqa Paketlari
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-400 max-w-xl mx-auto">
-              Obunasiz yoki obunangizga qo'shimcha tarzda oling. Bir martalik to'lov — xarid qilingan daqiqalar <strong className="text-emerald-600 dark:text-emerald-400">hech qachon kuymaydi</strong>, keyingi oylarga cheklovsiz o'tadi!
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 items-stretch">
-            {packs.map((p) => {
-              const isStarter = p.minutes === 15
-              const isPopular = p.minutes === 70
-              const isBestValue = p.minutes === 350
-              const isAlreadyBought = Boolean(isStarter && p.already_purchased)
-              const perMin = Math.round(p.price / p.minutes)
-
-              return (
-                <div
-                  key={p.minutes}
-                  className={`rounded-3xl border transition duration-200 ${
-                    isStarter
-                      ? 'border-emerald-500/50 bg-emerald-500/[0.04]'
-                      : isPopular
-                      ? 'border-violet-500/50 bg-violet-500/[0.04]'
-                      : isBestValue
-                      ? 'border-amber-500/50 bg-amber-500/[0.04]'
-                      : 'border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03]'
-                  } backdrop-blur p-4 flex flex-col justify-between items-center text-center relative h-full`}
+          {discountOffer?.expired && !isPaidCustomer && (
+            <div className="mt-8 rounded-[6px] border-2 border-metro-rule bg-metro-surface px-5 py-4">
+              <p className="text-base text-metro-ink">
+                24 soatlik chegirma muddati tugadimi? Admin bilan bog&apos;lanib, chegirma so&apos;rashingiz mumkin:{' '}
+                <a
+                  href="https://t.me/mentor_lochinbek?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold underline underline-offset-4"
                 >
-                  {/* Top Badge area */}
-                  <div className="h-6 flex items-center justify-center w-full mb-1">
-                    {isStarter ? (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                        Starter (1 marta)
-                      </span>
-                    ) : isPopular ? (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-500/30">
-                        Eng mashhur
-                      </span>
-                    ) : isBestValue ? (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                        Eng tejamkor
-                      </span>
-                    ) : (
-                      <span className="h-4 block" aria-hidden="true" />
-                    )}
-                  </div>
+                  @mentor_lochinbek<span className="sr-only"> (Telegram, yangi oynada)</span>
+                </a>
+              </p>
+            </div>
+          )}
 
-                  {/* Value and Price */}
-                  <div className="flex flex-col items-center justify-center my-auto py-2">
-                    <span className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                      +{p.minutes}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-slate-500 font-semibold mt-0.5">
-                      daqiqa
-                    </span>
-                    {p.discounted_price ? (
-                      <div className="flex flex-col items-center mt-2">
-                        <span className="text-sm font-bold text-amber-500">
-                          {p.discounted_price.toLocaleString('uz-UZ')} so&apos;m
-                        </span>
-                        <span className="text-[11px] text-gray-400 line-through">
-                          {p.price.toLocaleString('uz-UZ')} so&apos;m
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-sm font-bold text-violet-600 dark:text-violet-400 mt-2">
-                        {p.price.toLocaleString('uz-UZ')} so&apos;m
-                      </span>
-                    )}
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
-                      ~{perMin} so'm / daq
-                    </span>
-                  </div>
+          {/* Boshqaruv: davr va to'lov usuli */}
+          <div className="mt-12 flex flex-col gap-5 border-y-2 border-metro-rule py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div role="radiogroup" aria-label="To'lov davri" className="inline-flex rounded-[6px] bg-metro-surface p-1 shadow-[inset_0_0_0_2px_rgb(var(--m-rule))]">
+              {(['monthly', 'yearly'] as const).map((cycle) => (
+                <button
+                  key={cycle}
+                  type="button"
+                  role="radio"
+                  aria-checked={billingCycle === cycle}
+                  onClick={() => setBillingCycle(cycle)}
+                  className={`min-h-11 rounded-[4px] px-4 font-sign text-base font-bold uppercase tracking-wide transition ${
+                    billingCycle === cycle ? 'bg-metro-ink text-metro-ground' : 'text-metro-muted hover:text-metro-ink'
+                  }`}
+                >
+                  {cycle === 'monthly' ? 'Oylik' : 'Yillik · 2 oy tekin'}
+                </button>
+              ))}
+            </div>
+            <fieldset className="flex flex-wrap items-center gap-2">
+              <legend className="m-label mb-2 block w-full sm:float-left sm:mb-0 sm:mr-2 sm:w-auto sm:py-2">To&apos;lov usuli</legend>
+              {PROVIDERS.map((p) => (
+                <label
+                  key={p.id}
+                  className={`flex min-h-11 cursor-pointer items-center rounded-[6px] px-3.5 text-base font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-metro-blue ${
+                    provider === p.id ? 'bg-metro-ink text-metro-ground' : 'text-metro-ink shadow-[inset_0_0_0_2px_rgb(var(--m-rule))] hover:shadow-[inset_0_0_0_2px_rgb(var(--m-muted))]'
+                  }`}
+                >
+                  <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} className="sr-only" />
+                  {p.name}
+                </label>
+              ))}
+            </fieldset>
+          </div>
 
-                  {/* Bottom Action Buttons */}
-                  <div className="w-full space-y-1.5 mt-auto pt-2">
+        </div>
+        <Spine tight>
+          {/* Tarif taxtasi */}
+          {loading ? (
+            <div className="flex justify-center py-20" role="status">
+              <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-metro-muted" />
+              <span className="sr-only">Tariflar yuklanmoqda</span>
+            </div>
+          ) : (
+            <SpineStop id="plans" title="Obuna tariflari">
+              {/* Kompyuter: bitta jadval -- qatorlar bo'yicha solishtirish */}
+              <div className="hidden overflow-hidden rounded-[6px] border-2 border-metro-plaque bg-metro-surface outline outline-1 outline-offset-2 outline-metro-brass lg:block">
+                <table className="w-full table-fixed text-left">
+                  <caption className="sr-only">Tariflarni solishtirish</caption>
+                  <thead className="bg-metro-plaque text-metro-plaque-ink">
+                    <tr className="border-b-[6px] border-metro-red">
+                      <td className="w-[22%] p-6 align-bottom">
+                        <span className="font-sign text-base font-bold uppercase tracking-wide text-metro-plaque-ink/70">Tarif</span>
+                      </td>
+                      {visiblePlans.map((plan) => (
+                        <th key={plan.id} scope="col" className="border-l border-metro-plaque-ink/15 p-6 align-top font-normal">
+                          <span className="flex items-center gap-2">
+                            <span className="font-sign text-3xl font-extrabold uppercase text-white">{plan.name.replace(' (yillik)', '')}</span>
+                            {current?.plan === plan.tier && (
+                              <span className="rounded-[3px] bg-metro-plaque-ink px-2 py-0.5 font-sign text-sm font-bold uppercase text-metro-plaque">Joriy</span>
+                            )}
+                          </span>
+                          <span className="mt-4 block">{planPrice(plan)}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ROWS.map((row) => (
+                      <tr key={row.label} className="border-b border-metro-rule last:border-b-0">
+                        <th scope="row" className="px-6 py-4 text-base font-semibold text-metro-muted">{row.label}</th>
+                        {visiblePlans.map((plan) => (
+                          <td key={plan.id} className="border-l-2 border-metro-rule px-6 py-4 text-base text-metro-ink">{row.value(plan)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-metro-rule">
+                      <td className="px-6 py-5" />
+                      {visiblePlans.map((plan) => (
+                        <td key={plan.id} className="border-l-2 border-metro-rule px-6 py-5">{planAction(plan)}</td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Telefon/planshet: har tarif o'z bloki */}
+              <ul className="space-y-5 lg:hidden">
+                {visiblePlans.map((plan) => (
+                  <li key={plan.id} className="overflow-hidden rounded-[6px] border-2 border-metro-plaque bg-metro-surface">
+                    <div className="border-b-[6px] border-metro-red bg-metro-plaque p-5 text-metro-plaque-ink">
+                      <h3 className="flex items-center gap-2 font-sign text-3xl font-extrabold uppercase text-white">
+                        {plan.name.replace(' (yillik)', '')}
+                        {current?.plan === plan.tier && (
+                          <span className="rounded-[3px] bg-metro-plaque-ink px-2 py-0.5 font-sign text-sm font-bold uppercase text-metro-plaque">Joriy</span>
+                        )}
+                      </h3>
+                      <div className="mt-3">{planPrice(plan)}</div>
+                    </div>
+                    <dl className="divide-y divide-metro-rule px-5">
+                      {ROWS.map((row) => (
+                        <div key={row.label} className="flex items-baseline justify-between gap-4 py-3">
+                          <dt className="text-base text-metro-muted">{row.label}</dt>
+                          <dd className="text-right text-base text-metro-ink">{row.value(plan)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <div className="p-5 pt-3">{planAction(plan)}</div>
+                  </li>
+                ))}
+              </ul>
+            </SpineStop>
+          )}
+
+          {/* Bir martalik daqiqalar */}
+          <SpineStop id="minute-packs" title="Bir martalik daqiqalar">
+            <p className="-mt-2 max-w-[62ch] text-lg leading-relaxed text-metro-muted">
+              Obunasiz yoki obunaga qo&apos;shimcha. Sotib olingan daqiqalar hech qachon kuymaydi va obuna tugasa ham saqlanadi.
+            </p>
+            <ul className="mt-8 divide-y-2 divide-metro-rule border-y-2 border-metro-rule">
+              {packs.map((p) => {
+                const isAlreadyBought = Boolean(p.one_time && p.already_purchased)
+                const price = p.discounted_price ?? p.price
+                return (
+                  <li key={p.minutes} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 py-5 sm:grid-cols-[180px_1fr_220px]">
+                    <p className="whitespace-nowrap font-sign text-4xl font-extrabold text-metro-ink m-num">
+                      +{p.minutes} <span className="text-xl uppercase">daqiqa</span>
+                    </p>
+                    <div className="text-right sm:text-left">
+                      <p className="text-lg font-bold text-metro-ink m-num">
+                        {som(price)} so&apos;m
+                        {p.discounted_price ? <span className="ml-2 text-base font-normal text-metro-muted line-through">{som(p.price)}</span> : null}
+                      </p>
+                      <p className="text-sm text-metro-muted m-num">
+                        ~{som(Math.round(price / p.minutes))} so&apos;m / daqiqa{p.one_time ? ' · faqat bir marta olinadi' : ''}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => handleBuyPack(p.minutes, 'click')}
+                      type="button"
+                      onClick={() => handleBuyPack(p.minutes, provider)}
                       disabled={buyingPack === p.minutes || isAlreadyBought}
-                      className="w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                      className="m-btn col-span-2 w-full sm:col-span-1"
                     >
                       {buyingPack === p.minutes ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                       ) : isAlreadyBought ? (
-                        'Xarid qilingan'
+                        'Olingan'
                       ) : (
-                        'Sotib olish'
+                        `Sotib olish · ${PROVIDERS.find((x) => x.id === provider)?.name}`
                       )}
                     </button>
-                    <div className="grid grid-cols-3 w-full gap-1">
-                      <button
-                        onClick={() => handleBuyPack(p.minutes, 'payme')}
-                        disabled={buyingPack === p.minutes || isAlreadyBought}
-                        className="py-1 px-0.5 rounded-lg text-[10px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        Payme
-                      </button>
-                      <button
-                        onClick={() => handleBuyPack(p.minutes, 'uzum')}
-                        disabled={buyingPack === p.minutes || isAlreadyBought}
-                        className="py-1 px-0.5 rounded-lg text-[10px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        Uzum
-                      </button>
-                      <button
-                        onClick={() => handleBuyPack(p.minutes, 'paynet')}
-                        disabled={buyingPack === p.minutes || isAlreadyBought}
-                        className="py-1 px-0.5 rounded-lg text-[10px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 border border-black/10 dark:border-white/10 transition text-center truncate disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        Paynet
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </SpineStop>
 
-        {/* Taqqoslash Bloki: Oddiy Studiya vs GapirAI */}
-        <div className="space-y-4 pt-10">
-          <div className="text-center space-y-1">
-            <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
-              Nega GapirAI tanlanadi?
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400">
-              An'anaviy ovoz yozish studiyasi va GapirAI sun'iy intellekti solishtirmasi
-            </p>
-          </div>
+          <SpineStop id="qoidalar" title="Daqiqa qanday sarflanadi">
+            <ul className="grid max-w-5xl gap-x-10 gap-y-5 text-lg leading-relaxed text-metro-muted lg:grid-cols-2">
+              {[
+                ['Haqiqiy davomiylik', "12 daqiqa 40 soniyalik video — 12,7 daqiqa. Yaxlitlash yoki yashirin to'lov yo'q."],
+                ['Avval obuna, keyin paket', "Avval obunaning 30 kunlik daqiqalari ishlatiladi, ular tugasa — sotib olingan, kuymaydigan daqiqalar."],
+                ['30 kunda yangilanadi', "Obuna daqiqalari har 30 kunda yangilanadi; ishlatilmagan qoldiq keyingi davrga o'tmaydi."],
+                ['Nosozlikda qaytariladi', "Video texnik sabab bilan tayyor bo'lmasa, sarflangan daqiqa balansingizga avtomatik qaytadi."],
+              ].map(([t, d]) => (
+                <li key={t} className="flex gap-3">
+                  <Check aria-hidden="true" className="mt-1.5 h-5 w-5 shrink-0 text-metro-ink" />
+                  <span>
+                    <strong className="text-metro-ink">{t}.</strong> {d}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </SpineStop>
 
-          <div className="bg-white/80 dark:bg-white/[0.03] border border-black/5 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm">
-            <table className="w-full text-xs sm:text-sm text-left">
-              <thead>
-                <tr className="border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02]">
-                  <th className="p-3.5 sm:p-4 font-bold text-gray-500 dark:text-slate-400">Xususiyat</th>
-                  <th className="p-3.5 sm:p-4 font-bold text-gray-400 dark:text-slate-500">Oddiy Studiya</th>
-                  <th className="p-3.5 sm:p-4 font-bold text-violet-600 dark:text-violet-400 bg-violet-500/[0.06]">GapirAI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                <tr>
-                  <td className="p-3.5 sm:p-4 font-medium text-gray-900 dark:text-white">1 soatlik video narxi</td>
-                  <td className="p-3.5 sm:p-4 text-rose-600 dark:text-rose-400 font-semibold">250 000 — 500 000 so'm</td>
-                  <td className="p-3.5 sm:p-4 text-emerald-600 dark:text-emerald-400 font-bold bg-violet-500/[0.06]">
-                    ~8 400 — 15 000 so'm (95% tejash!)
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-3.5 sm:p-4 font-medium text-gray-900 dark:text-white">Tayyor bo'lish vaqti</td>
-                  <td className="p-3.5 sm:p-4 text-gray-500 dark:text-slate-400">3 — 7 ish kuni</td>
-                  <td className="p-3.5 sm:p-4 text-gray-900 dark:text-white font-bold bg-violet-500/[0.06]">
-                    1 — 2 daqiqada tayyor
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-3.5 sm:p-4 font-medium text-gray-900 dark:text-white">Daqiqalar muddati</td>
-                  <td className="p-3.5 sm:p-4 text-gray-500 dark:text-slate-400">Mavjud emas</td>
-                  <td className="p-3.5 sm:p-4 text-emerald-600 dark:text-emerald-400 font-bold bg-violet-500/[0.06]">
-                    Paketlar kuymaydi (muddatsiz) • Obunada oylik kvota
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-3.5 sm:p-4 font-medium text-gray-900 dark:text-white">Video tahlil va xulosalar</td>
-                  <td className="p-3.5 sm:p-4 text-gray-500 dark:text-slate-400">Qo'shimcha to'lov</td>
-                  <td className="p-3.5 sm:p-4 text-gray-900 dark:text-white font-bold bg-violet-500/[0.06]">
-                    100% tekin va avtomatik
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 100% Qoniqish Kafolati Banneri */}
-        <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/25 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <div className="space-y-1.5 flex-1">
-            <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white">
-              100% Xavfsiz To'lov va Qoniqish Kafolati
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 leading-relaxed">
-              Barcha to'lovlar Click, Payme, Uzum va Paynet orqali rasmiy fiskal soliq cheki bilan qabul qilinadi. Agar video qayta ishlashda texnik nosozlik kuzatilsa, sarflangan daqiqangiz <strong className="text-emerald-600 dark:text-emerald-400">100% to'liq balansingizga avtomatik qaytariladi</strong>.
-            </p>
-          </div>
-        </div>
-
-        {/* FAQ Accordion */}
-        <div className="space-y-4 pt-6">
-          <div className="text-center space-y-1">
-            <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
-              Ko'p beriladigan savollar
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400">
-              Tariflar va daqiqa paketlari bo'yicha muhim ma'lumotlar
-            </p>
-          </div>
-
-          <div className="space-y-2.5 max-w-3xl mx-auto">
-            {[
-              {
-                q: "Obunadagi daqiqalar oy oxirida nima bo'ladi (kuyadimi)?",
-                a: "Ha, obuna (Standart, Pro) har oy uchun ajratiladigan oylik kvotadir va yangi to'lov davrida yangilanadi (foydalanilmagan qoldiq keyingi oyga o'tmaydi, ya'ni kuyadi). Agar sizga muddatsiz, hech qachon kuymaydigan daqiqalar kerak bo'lsa, 'Kuymaydigan Daqiqa Paketlari' bo'limidan bir martalik paket xarid qilishingiz mumkin — ularning muddati cheksiz!",
-              },
-              {
-                q: "Alohida xarid qilingan daqiqa paketlari qachondir kuydimi yoki o'chib ketadimi?",
-                a: "Yo'q! Paket sifatida sotib olingan barcha daqiqalar (Starter, 35, 70, 140, 350 daqiqa) hech qachon kuymaydi. Ular hisobingizda muddatsiz saqlanadi va obunangiz tugasa ham saqlanib qoladi.",
-              },
-              {
-                q: "Oylik obunadagi daqiqalar bilan paket daqiqalari qanday sarflanadi?",
-                a: "Tizim har doim foydalanuvchi foydasiga ishlaydi: avval oylik obuna bergan daqiqalar ishlatiladi (chunki ular oy oxirida yangilanadi). Agar oylik kvota tugasa, xarid qilingan kuymas paket daqiqalaringiz sarflana boshlaydi.",
-              },
-              {
-                q: "Video davomiyligi qanday hisoblanadi?",
-                a: "Faqat videoning haqiqiy uzunligi (masalan: 12 daqiqa 40 soniya) hisoblanadi. Hech qanday yashirin ortiqcha yaxlitlash yoki qo'shimcha to'lovlar olinmaydi.",
-              },
-              {
-                q: "To'lovlar qanday tizimlar orqali amalga oshiriladi?",
-                a: "Siz Click, Payme, Uzum Bank yoki Paynet orqali o'zingizning Uzcard, Humo yoki Visa kartangiz bilan to'lov qilishingiz mumkin. Har bir to'lovga rasmiy elektron chek taqdim etiladi.",
-              },
-              {
-                q: "Obunani bekor qilish yoki boshqa tarifga o'tish mumkinmi?",
-                a: "Ha, istagan vaqtda tarifingizni o'zgartirishingiz yoki to'xtatishingiz mumkin. Hech qanday majburiy bog'lanish yoki jarimalar mavjud emas.",
-              },
-            ].map((faq, idx) => {
-              const isOpen = openFaq === idx
-              return (
-                <div
-                  key={idx}
-                  className="bg-white/80 dark:bg-white/[0.03] border border-black/5 dark:border-white/10 rounded-2xl overflow-hidden transition"
-                >
-                  <button
-                    onClick={() => setOpenFaq(isOpen ? null : idx)}
-                    className="w-full p-4 text-left flex items-center justify-between gap-3 text-xs sm:text-sm font-bold text-gray-900 dark:text-white"
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${
-                        isOpen ? 'rotate-180 text-violet-500' : ''
-                      }`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-4 pb-4 pt-1 text-xs sm:text-sm text-gray-600 dark:text-slate-300 leading-relaxed border-t border-black/5 dark:border-white/5">
-                      {faq.a}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        <DonateCTA variant="line" className="pt-2 pb-6" />
-      </div>
-
-      {/* Uzum Account Modal */}
-      {uzumAccount && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setUzumAccount(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-[#1b1b20]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <UzumAccountCard
-              account={uzumAccount.account}
-              amount={uzumAccount.amount}
-              deeplink={uzumAccount.deeplink}
-            />
-            <button
-              onClick={() => setUzumAccount(null)}
-              className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
-            >
-              Yopish
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Paynet Order Modal */}
-      {paynetOrder && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setPaynetOrder(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-[#1b1b20]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} />
-            <button
-              onClick={() => setPaynetOrder(null)}
-              className="mt-3 w-full rounded-xl bg-black/5 py-2.5 text-sm font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300"
-            >
-              Yopish
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Insufficient Minutes Modal */}
-      {showInsufficientMinutes && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setShowInsufficientMinutes(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-[#1b1b20]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
-              <AlertCircle className="h-6 w-6" />
+          <SpineStop id="savollar" title="Savollar" marker="end">
+            <div className="divide-y-2 divide-metro-rule border-y-2 border-metro-rule">
+              {[
+                {
+                  q: 'Obunani bekor qilish yoki boshqa tarifga o‘tish mumkinmi?',
+                  a: "Ha, istalgan vaqtda tarifni o'zgartirishingiz yoki to'xtatishingiz mumkin. Majburiy muddat yoki jarima yo'q.",
+                },
+                {
+                  q: 'Qaysi kartalar bilan to‘lash mumkin?',
+                  a: 'Click, Payme, Uzum yoki Paynet orqali — Uzcard, Humo yoki Visa kartangiz bilan.',
+                },
+                {
+                  q: 'Subtitr ham daqiqa sarflaydimi?',
+                  a: "Ha, subtitr ham dublaj kabi video davomiyligicha daqiqa sarflaydi. Tezkor tahlil (xulosa, konspekt, test) daqiqa sarflamaydi.",
+                },
+                {
+                  q: 'Bepul tarifda nima bor?',
+                  a: "Har 30 kunda 5 daqiqa dublaj yoki subtitr, 360p sifatda yuklab olish. Uzunroq videolar uchun bir martalik paket yoki obuna oling.",
+                },
+              ].map((faq) => (
+                <details key={faq.q} className="group py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold text-metro-ink [&::-webkit-details-marker]:hidden">
+                    {faq.q}
+                    <Minus aria-hidden="true" className="hidden h-5 w-5 shrink-0 group-open:block" />
+                    <span aria-hidden="true" className="font-sign text-2xl leading-none group-open:hidden">+</span>
+                  </summary>
+                  <p className="mt-3 max-w-[70ch] text-base leading-relaxed text-metro-muted">{faq.a}</p>
+                </details>
+              ))}
             </div>
-            <h3 className="text-lg font-black text-gray-900 dark:text-white">Daqiqangiz yetarli emas</h3>
-            {videoDurationMinutes && shortfallMinutes ? (
-              <div className="mt-2 space-y-2 text-sm text-gray-600 dark:text-slate-300">
-                <p className="text-xs">
-                  Siz tanlagan video: <strong className="text-gray-900 dark:text-white">{videoDurationMinutes} daqiqa</strong>
-                </p>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-medium">
-                  Yetishmayotgan daqiqa: <strong>{shortfallMinutes} daqiqa</strong>
-                </div>
-                {(() => {
-                  const rec = shortfallMinutes
-                    ? packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]
-                    : packs[0]
-                  const recPlan = shortfallMinutes
-                    ? shortfallMinutes <= 350
-                      ? plans.find((p) => p.id === 'standard') || {
-                          id: 'standard',
-                          name: 'Standart',
-                          monthly_minutes: 350,
-                          price: 49000,
-                        }
-                      : plans.find((p) => p.id === 'pro') || {
-                          id: 'pro',
-                          name: 'Pro',
-                          monthly_minutes: 600,
-                          price: 199000,
-                        }
-                    : null
-                  return rec ? (
-                    <div className="space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <p>
-                        Tavsiya etilgan paket:{' '}
-                        <strong className="text-violet-600 dark:text-violet-400">+{rec.minutes} daqiqa</strong> (
-                        {rec.price.toLocaleString('uz-UZ')} so'm). Ortib qolgan daqiqalar kuymaydi!
-                      </p>
-                      {recPlan && (
-                        <p>
-                          Yoki oylik tejamkorlik uchun{' '}
-                          <strong className="text-indigo-600 dark:text-indigo-400">{recPlan.name} tarifiga</strong> (
-                          {recPlan.monthly_minutes} daqiqa/oy — {recPlan.price.toLocaleString('uz-UZ')} so'm)
-                          o'tishingiz mumkin.
-                        </p>
-                      )}
-                    </div>
-                  ) : null
-                })()}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-                Bu videoni dublyaj qilish uchun oylik byudjetingiz yetmayapti. Qo'shimcha daqiqa paketini sotib oling —
-                kuymaydi, muddatsiz saqlanadi.
-              </p>
-            )}
+            <DonateCTA variant="line" className="mt-12 justify-start" />
+          </SpineStop>
 
-            <button
-              onClick={scrollToPacks}
-              className="mt-5 w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-bold text-white transition hover:opacity-90 shadow-lg shadow-violet-500/25"
-            >
-              Qo'shimcha kuymas daqiqa olish
-            </button>
+        </Spine>
 
-            <button
-              onClick={scrollToPacks}
-              className="mt-2 w-full rounded-2xl bg-black/5 dark:bg-white/10 py-2.5 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/20 transition"
-            >
-              Barcha paketlar va tariflarni ko'rish
-            </button>
-            <button
-              onClick={() => setShowInsufficientMinutes(false)}
-              className="mt-1 w-full py-2 text-xs text-gray-400 dark:text-slate-500 hover:underline"
-            >
-              Yopish
-            </button>
+        {/* Uzum hisob oynasi */}
+        {uzumAccount && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setUzumAccount(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Uzum orqali to'lov" className="w-full max-w-sm rounded-[6px] bg-metro-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} />
+              <button onClick={() => setUzumAccount(null)} className="m-btn m-btn-ghost mt-3 w-full">Yopish</button>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Paynet buyurtma oynasi */}
+        {paynetOrder && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setPaynetOrder(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Paynet orqali to'lov" className="w-full max-w-sm rounded-[6px] bg-metro-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} />
+              <button onClick={() => setPaynetOrder(null)} className="m-btn m-btn-ghost mt-3 w-full">Yopish</button>
+            </div>
+          </div>
+        )}
+
+        {/* Daqiqa yetmadi oynasi */}
+        {showInsufficientMinutes && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowInsufficientMinutes(false)}>
+            <div role="dialog" aria-modal="true" aria-labelledby="short-title" className="w-full max-w-sm rounded-[6px] border-t-[8px] border-metro-plaque bg-metro-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <AlertCircle aria-hidden="true" className="h-6 w-6 text-metro-ink" />
+              <h2 id="short-title" className="mt-3 font-sign text-3xl font-extrabold uppercase text-metro-ink">Daqiqa yetmadi</h2>
+              {videoDurationMinutes && shortfallMinutes ? (
+                <div className="mt-3 space-y-2 text-base text-metro-muted">
+                  <p>Video davomiyligi: <strong className="text-metro-ink m-num">{videoDurationMinutes} daqiqa</strong></p>
+                  <p>Yetishmayapti: <strong className="text-metro-red-ink m-num">{shortfallMinutes} daqiqa</strong></p>
+                  {(() => {
+                    const rec = packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]
+                    return rec ? (
+                      <p>
+                        Mos paket: <strong className="text-metro-ink m-num">+{rec.minutes} daqiqa</strong> ({som(rec.price)} so&apos;m). Ortib qolgani kuymaydi.
+                      </p>
+                    ) : null
+                  })()}
+                </div>
+              ) : (
+                <p className="mt-3 text-base text-metro-muted">
+                  Bu video uchun balansingiz yetmayapti. Bir martalik paket oling — u kuymaydi.
+                </p>
+              )}
+              <button onClick={scrollToPacks} className="m-btn mt-6 w-full">Daqiqa sotib olish</button>
+              <button onClick={() => setShowInsufficientMinutes(false)} className="m-btn m-btn-ghost mt-2 w-full">Yopish</button>
+            </div>
+          </div>
+        )}
+      </main>
+      <Footer />
+    </>
   )
 }
 
@@ -975,70 +562,11 @@ const DEFAULT_PACKS: MinutePack[] = [
   { minutes: 350, price: 100000 },
 ]
 
-function MeshBackground() {
-  return (
-    <div className="mesh-gradient">
-      <div className="mesh-gradient-blob blob-1" />
-      <div className="mesh-gradient-blob blob-2" />
-      <div className="mesh-gradient-blob blob-3" />
-    </div>
-  )
-}
-
+// API javob bermasa ko'rsatiladigan zaxira -- backend/services/plans.py PLANS bilan bir xil bo'lishi shart
 const DEFAULT_PLANS: PlanDef[] = [
-  {
-    id: 'free',
-    name: 'Bepul',
-    price: 0,
-    monthly_minutes: 5,
-    priority: false,
-    tts_tier: 'edge',
-    tier: 'free',
-    period_days: 30,
-    max_resolution: '360p',
-  },
-  {
-    id: 'standard',
-    name: 'Standart',
-    price: 49000,
-    monthly_minutes: 350,
-    priority: false,
-    tts_tier: 'edge',
-    tier: 'standard',
-    period_days: 30,
-    max_resolution: '720p',
-  },
-  {
-    id: 'standard_yearly',
-    name: 'Standart (yillik)',
-    price: 490000,
-    monthly_minutes: 350,
-    priority: false,
-    tts_tier: 'edge',
-    tier: 'standard',
-    period_days: 365,
-    max_resolution: '720p',
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 199000,
-    monthly_minutes: 600,
-    priority: true,
-    tts_tier: 'premium',
-    tier: 'pro',
-    period_days: 30,
-    max_resolution: '1080p',
-  },
-  {
-    id: 'pro_yearly',
-    name: 'Pro (yillik)',
-    price: 1990000,
-    monthly_minutes: 600,
-    priority: true,
-    tts_tier: 'premium',
-    tier: 'pro',
-    period_days: 365,
-    max_resolution: '1080p',
-  },
+  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'gemini', tier: 'free', period_days: 30, max_resolution: '360p' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 350, priority: true, tts_tier: 'gemini', tier: 'standard', period_days: 30, max_resolution: '720p' },
+  { id: 'standard_yearly', name: 'Standart (yillik)', price: 490000, monthly_minutes: 350, priority: true, tts_tier: 'gemini', tier: 'standard', period_days: 365, max_resolution: '720p' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 600, priority: true, tts_tier: 'gemini', tier: 'pro', period_days: 30, max_resolution: '1080p' },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1990000, monthly_minutes: 600, priority: true, tts_tier: 'gemini', tier: 'pro', period_days: 365, max_resolution: '1080p' },
 ]
