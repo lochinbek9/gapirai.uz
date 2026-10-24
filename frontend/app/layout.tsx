@@ -1,15 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed } from "next/font/google";
+import { Geist } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import PlatformFeedbackWidget from "@/components/PlatformFeedbackWidget";
 import PwaProvider from "@/components/PwaProvider";
 
-// Bitta shrift oilasi: Barlow (matn) + Barlow Condensed (bekat lavhalari).
-// next/font ularni build paytida yuklab, loyihaning o'zidan beradi.
-const barlow = Barlow({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-sans" });
-const barlowSign = Barlow_Condensed({ subsets: ["latin", "latin-ext"], weight: ["600", "700", "800"], display: "swap", variable: "--font-sign" });
+// Geist: zamonaviy neytral sans; next/font uni build paytida yuklab, loyihaning o'zidan beradi.
+const geist = Geist({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--font-sans" });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://gapirai.uz'),
@@ -167,7 +165,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
         />
       </head>
-      <body className={`${barlow.variable} ${barlowSign.variable} font-sans`}>
+      <body className={`${geist.variable} font-sans`}>
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200] focus:rounded-xl focus:bg-violet-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:shadow-lg"

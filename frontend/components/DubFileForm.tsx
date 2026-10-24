@@ -223,7 +223,7 @@ export default function DubFileForm({
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
-        <span id="dub-file-label" className="m-label block">
+        <span id="dub-file-label" className="ui-label block">
           Video fayl
         </span>
 
@@ -237,31 +237,31 @@ export default function DubFileForm({
             onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
             onDragLeave={() => setDragActive(false)}
             onDrop={(e) => { e.preventDefault(); setDragActive(false); pick(e.dataTransfer.files?.[0]); }}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[6px] border-2 border-dashed bg-metro-surface px-4 py-8 text-center transition sm:py-10 ${
-              dragActive ? "border-metro-ink bg-metro-ground" : "border-metro-rule hover:border-metro-muted"
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-control border border-dashed bg-ui-surface px-4 py-8 text-center transition sm:py-10 ${
+              dragActive ? "border-ui-ink bg-ui-ground" : "border-ui-rule hover:border-ui-muted"
             }`}
           >
-            <UploadCloud aria-hidden="true" className="h-8 w-8 text-metro-muted" />
-            <p className="text-base font-bold text-metro-ink">
+            <UploadCloud aria-hidden="true" className="h-8 w-8 text-ui-muted" />
+            <p className="text-[15px] font-medium text-ui-ink">
               Video faylni tanlang yoki shu yerga tashlang
             </p>
-            <p id="dub-file-formats" className="text-sm text-metro-muted">
+            <p id="dub-file-formats" className="text-sm text-ui-muted">
               MP4, MOV, MKV yoki WebM · {formatSize(SUBTITLE_UPLOAD_MAX_BYTES)} gacha · 120 daqiqagacha
             </p>
           </div>
         ) : (
-          <div className="m-input flex items-center gap-3 px-4 py-3.5">
-            <FileVideo aria-hidden="true" className="h-6 w-6 shrink-0 text-metro-muted" />
+          <div className="ui-input flex items-center gap-3 px-4 py-3.5">
+            <FileVideo aria-hidden="true" className="h-6 w-6 shrink-0 text-ui-muted" />
             <div className="flex-1 min-w-0">
-              <p className="truncate text-base font-bold text-metro-ink">{file.name}</p>
-              <p className="text-sm text-metro-muted">{formatSize(file.size)}</p>
+              <p className="truncate text-[15px] font-medium text-ui-ink">{file.name}</p>
+              <p className="text-sm text-ui-muted">{formatSize(file.size)}</p>
             </div>
             {!uploading && (
               <button
                 type="button"
                 onClick={() => { checkId.current++; setFile(null); setError(null); setMinutesNote(null); if (inputRef.current) inputRef.current.value = ""; }}
                 aria-label="Faylni olib tashlash"
-                className="rounded-[4px] p-2 text-metro-muted transition hover:bg-metro-red/10 hover:text-metro-red-ink"
+                className="rounded-lg p-2 text-ui-muted transition hover:bg-ui-red/10 hover:text-ui-red-ink"
               >
                 <X aria-hidden="true" size={16} />
               </button>
@@ -276,7 +276,7 @@ export default function DubFileForm({
           className="hidden"
           onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }}
         />
-        <p className="text-sm text-metro-muted">
+        <p className="text-sm text-ui-muted">
           Qurilmangizdagi video to'liq o'zbek tiliga sun'iy intellekt orqali tarjima qilinib, dublyaj qilinadi.
         </p>
       </div>
@@ -285,7 +285,7 @@ export default function DubFileForm({
 
       {/* Voice gender selector */}
       <fieldset className="space-y-2">
-        <legend id="dub-file-gender-label" className="m-label block mb-2">
+        <legend id="dub-file-gender-label" className="ui-label block mb-2">
           Ovoz jinsi
         </legend>
         <div role="radiogroup" aria-labelledby="dub-file-gender-label" className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -302,14 +302,14 @@ export default function DubFileForm({
                 tabIndex={isFocusable ? 0 : -1}
                 onKeyDown={(e) => onGenderKeyDown(e, index)}
                 onClick={() => handleGenderChange(opt.value)}
-                className={`flex min-h-16 flex-col items-start justify-center rounded-[6px] border-2 px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue ${
-                  isSelected ? "border-metro-ink bg-metro-ink text-metro-ground" : "border-metro-rule text-metro-ink hover:border-metro-muted"
+                className={`flex min-h-[3.75rem] flex-col items-start justify-center rounded-control border px-3 py-2.5 text-left transition ${
+                  isSelected ? "border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]" : "border-ui-rule text-ui-ink hover:border-ui-muted/60"
                 }`}
               >
-                <span className="font-sign text-lg font-bold uppercase leading-none tracking-wide">
+                <span className="text-[15px] font-medium leading-tight">
                   {opt.label}
                 </span>
-                <span className={`mt-1 text-sm leading-tight ${isSelected ? "text-metro-ground/80" : "text-metro-muted"}`}>{opt.desc}</span>
+                <span className="mt-1 text-[13px] leading-tight text-ui-muted">{opt.desc}</span>
               </button>
             );
           })}
@@ -319,7 +319,7 @@ export default function DubFileForm({
       {/* Gemini ovoz tanlash (faqat Pro foydalanuvchi Gemini tanlaganda) */}
       {isProUser && isGemini && gender !== "auto" && (
         <div className="space-y-1.5 pt-1">
-          <span id="dub-file-variant-label" className="text-sm text-metro-muted uppercase tracking-wide font-bold">
+          <span id="dub-file-variant-label" className="text-sm text-ui-muted font-medium">
             Ovoz variantini tanlang:
           </span>
           <div role="group" aria-labelledby="dub-file-variant-label" className="grid grid-cols-3 gap-1.5">
@@ -334,11 +334,11 @@ export default function DubFileForm({
                     onVoiceNameChange?.(v.id);
                   }}
                   aria-pressed={active}
-                  className={`rounded-[6px] border-2 px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue ${
-                    active ? "border-metro-ink text-metro-ink" : "border-metro-rule text-metro-muted hover:border-metro-muted"
+                  className={`rounded-control border px-2 py-2 text-left transition ${
+                    active ? "border-ui-accent text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]" : "border-ui-rule text-ui-muted hover:border-ui-muted/60"
                   }`}
                 >
-                  <div className="text-xs font-bold">{v.label}</div>
+                  <div className="text-xs font-medium">{v.label}</div>
                   <div className="truncate text-xs">{v.desc}</div>
                 </button>
               );
@@ -349,18 +349,18 @@ export default function DubFileForm({
 
       {uploading && (
         <div className="space-y-2">
-          <div className="h-2 overflow-hidden rounded-full bg-metro-rule">
+          <div className="h-2 overflow-hidden rounded-full bg-ui-rule">
             <div
-              className="h-full rounded-full bg-metro-ink transition-all duration-300"
+              className="h-full rounded-full bg-ui-accent transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-sm font-semibold text-metro-muted">
+          <div className="flex items-center justify-between text-sm font-semibold text-ui-muted">
             <span>
               {progress < 100 ? `Yuklanmoqda... ${progress}%` : "Server faylni tekshirmoqda..."}
             </span>
             {progress < 100 && (
-              <button type="button" onClick={cancel} className="text-red-700 dark:text-red-400 font-bold hover:underline">
+              <button type="button" onClick={cancel} className="text-ui-red-ink font-medium hover:underline">
                 Bekor qilish
               </button>
             )}
@@ -369,7 +369,7 @@ export default function DubFileForm({
       )}
 
       {minutesNote && !uploading && (
-        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border-2 border-amber-600/40 rounded-[6px] px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border border-amber-600/40 rounded-control px-4 py-3">
           {minutesNote}{" "}
           <Link href="/pricing?reason=insufficient_minutes" className="underline hover:text-amber-900 dark:hover:text-amber-200">
             Daqiqa sotib olish yoki tarifni yangilash
@@ -378,7 +378,7 @@ export default function DubFileForm({
       )}
 
       {!isLoggedIn && (
-        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border-2 border-amber-600/40 rounded-[6px] px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border border-amber-600/40 rounded-control px-4 py-3">
           Video yuklash uchun{" "}
           <Link href="/login" className="underline hover:text-amber-900 dark:hover:text-amber-200">kiring</Link>
           {" "}yoki{" "}
@@ -391,16 +391,16 @@ export default function DubFileForm({
           role="alert"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="rounded-[6px] border-2 border-metro-red/50 bg-metro-red/5 px-4 py-3"
+          className="rounded-control border border-ui-red/30 bg-ui-red/[0.05] px-4 py-3"
         >
-                    <p className="text-base font-semibold text-metro-red-ink">{error}</p>
+                    <p className="text-[15px] font-medium text-ui-red-ink">{error}</p>
         </motion.div>
       )}
 
       <motion.button
         type="submit"
         disabled={uploading || !file}
-                className="m-btn m-btn-red min-h-14 w-full"
+                className="ui-btn ui-btn-primary min-h-12 w-full"
       >
         {uploading ? (
           <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Yuklanmoqda...</>
@@ -412,8 +412,8 @@ export default function DubFileForm({
       <ul className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
         {["100% avtomatik", "HD sifat", "O'zbek tilida"].map((label) => (
           <li key={label} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-metro-muted" />
-            <span className="m-label">{label}</span>
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ui-muted" />
+            <span className="ui-label">{label}</span>
           </li>
         ))}
       </ul>

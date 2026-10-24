@@ -115,7 +115,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
         <div className="absolute top-5 left-8 right-8 h-[2px] bg-black/5 dark:bg-white/[0.03] -z-0 transition-colors"></div>
         {/* Active Connector Line */}
         <motion.div 
-          className="absolute top-5 left-8 h-[2px] bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 shadow-[0_0_10px_rgba(59,130,246,0.5)] -z-0"
+          className="absolute top-5 left-8 h-[2px] bg-ui-accent -z-0"
           initial={{ width: 0 }}
           animate={{ width: `${(current / (STEPS.length - 1)) * 88}%` }}
           transition={{ duration: 1, ease: "easeInOut" }}
@@ -134,7 +134,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
                  {job.status === 'pending' || (job.progress || 0) <= 0 ? (
                    <span className="text-base font-bold text-amber-500 animate-pulse">Navbatda...</span>
                  ) : (
-                   <p className="text-4xl font-black text-gray-900 dark:text-white lining-nums tabular-nums transition-colors">
+                   <p className="text-4xl font-semibold tracking-[-0.03em] text-ui-ink lining-nums tabular-nums transition-colors">
                      {Math.round(job.progress)}<span className="text-blue-500 text-lg ml-0.5">%</span>
                    </p>
                  )}
@@ -148,7 +148,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
 
         <div className="relative h-3.5 w-full bg-black/5 dark:bg-white/[0.03] rounded-full overflow-hidden border border-black/5 dark:border-white/[0.05] p-[1.5px] transition-colors">
           <motion.div
-            className="h-full bg-gradient-to-r from-emerald-500 via-blue-500 to-violet-400 rounded-full"
+            className="h-full bg-ui-accent rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${job.progress}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}
@@ -165,7 +165,7 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
       {job.expected_end_time && !isFailed && job.status !== 'pending' && (job.progress || 0) > 0 && (
         <div className="bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] rounded-2xl p-4 text-center text-xs text-gray-500 dark:text-gray-400 space-y-1 transition-colors">
           <p className="font-bold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
-          <p className="text-gray-950 dark:text-white font-mono text-base font-black">
+          <p className="text-gray-950 dark:text-white font-mono text-base font-semibold">
             {formatTashkentTime(job.expected_end_time)}
           </p>
           <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">

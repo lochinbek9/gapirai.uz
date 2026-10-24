@@ -16,10 +16,10 @@ interface Props {
 export default function DonateCTA({ variant = 'card', className = '', headingId }: Props) {
   if (variant === 'line') {
     return (
-      <div className={`flex flex-wrap items-center justify-center gap-2 text-base text-metro-muted ${className}`}>
-        <Heart aria-hidden="true" className="h-4 w-4 text-metro-red" fill="currentColor" />
+      <div className={`flex flex-wrap items-center justify-center gap-2 text-[15px] text-ui-muted ${className}`}>
+        <Heart aria-hidden="true" className="h-4 w-4 text-ui-muted" />
         <span>GapirAI.uz sizga foydali bo‘ldimi?</span>
-        <Link href="/donate" className="font-semibold text-metro-red-ink underline-offset-4 hover:underline">
+        <Link href="/donate" className="font-medium text-ui-accent-ink underline-offset-4 hover:underline">
           Loyihani qo‘llab-quvvatlang
         </Link>
       </div>

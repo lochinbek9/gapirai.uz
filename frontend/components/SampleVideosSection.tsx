@@ -73,8 +73,8 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span id="samples-label" className="m-label">Namunalar</span>
-        <span className="text-sm text-metro-muted">Havola izlamasdan bittasini tanlang</span>
+        <span id="samples-label" className="ui-label">Namunalar</span>
+        <span className="text-sm text-ui-muted">Havola izlamasdan bittasini tanlang</span>
       </div>
 
       <div role="group" aria-labelledby="samples-label" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -87,24 +87,24 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
               type="button"
               onClick={() => onSelect(sample)}
               aria-pressed={isSelected}
-              className={`group flex flex-col overflow-hidden rounded-[6px] border-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue ${
-                isSelected ? "border-metro-ink" : "border-metro-rule hover:border-metro-muted"
+              className={`group flex flex-col overflow-hidden rounded-control border text-left transition ${
+                isSelected ? "border-ui-accent shadow-[0_0_0_1px_rgb(var(--ui-accent))]" : "border-ui-rule hover:border-ui-muted/60"
               }`}
             >
-              <span className="relative block aspect-video w-full overflow-hidden bg-metro-plaque">
+              <span className="relative block aspect-video w-full overflow-hidden bg-ui-ground">
                 <img src={sample.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                <span className="absolute bottom-1 right-1 rounded-[3px] bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white m-num">
+                <span className="absolute bottom-1 right-1 rounded-md bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
                   {sample.durationText}
                 </span>
                 {isSelected && (
-                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-[3px] bg-metro-ink px-1.5 py-0.5 text-[11px] font-bold text-metro-ground">
+                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-md bg-ui-accent px-1.5 py-0.5 text-[11px] font-medium text-white">
                     <Check aria-hidden="true" className="h-3 w-3" /> Tanlangan
                   </span>
                 )}
               </span>
               <span className="flex flex-1 flex-col gap-1.5 p-2.5">
-                <span className="line-clamp-2 text-sm font-bold leading-snug text-metro-ink">{sample.title}</span>
-                <span className="mt-auto flex items-center justify-between gap-1 text-xs text-metro-muted">
+                <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ui-ink">{sample.title}</span>
+                <span className="mt-auto flex items-center justify-between gap-1 text-xs text-ui-muted">
                   <span className="inline-flex items-center gap-1">
                     <Icon aria-hidden="true" className="h-3.5 w-3.5" />
                     {sample.category}

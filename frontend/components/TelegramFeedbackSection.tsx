@@ -46,14 +46,14 @@ export default function TelegramFeedbackSection() {
 
   return (
     <section id="fikr" data-feedback-section aria-labelledby="feedback-title" className="w-full">
-      <div className="rounded-[6px] border-2 border-metro-rule bg-metro-surface p-5 sm:p-6">
+      <div className="ui-card p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div>
-              <h2 id="feedback-title" className="font-sign text-2xl font-extrabold uppercase text-metro-ink">
+              <h2 id="feedback-title" className="text-xl font-semibold tracking-[-0.02em] text-ui-ink">
                 Fikr va takliflaringiz bormi?
               </h2>
-              <p className="text-base text-metro-muted">
+              <p className="mt-1 text-[15px] text-ui-muted">
                 GapirAI.uz ni yanada yaxshilashimiz uchun fikringizni bildiring!
               </p>
             </div>
@@ -68,20 +68,20 @@ export default function TelegramFeedbackSection() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="py-6 text-center space-y-3"
             >
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-metro-ink text-metro-ground">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ui-ink text-ui-ground">
                 <CheckCircle2 aria-hidden="true" className="w-6 h-6" />
               </div>
-              <p role="status" className="text-lg font-bold text-metro-ink">
+              <p role="status" className="text-lg font-semibold text-ui-ink">
                 Katta rahmat! Fikringiz qabul qilindi.
               </p>
-              <p className="mx-auto max-w-sm text-base leading-relaxed text-metro-muted">
+              <p className="mx-auto max-w-sm text-base leading-relaxed text-ui-muted">
                 Taklifingiz muvaffaqiyatli qabul qilindi va platformani yanada rivojlantirishda albatta inobatga olinadi.
               </p>
               <div className="pt-2 flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => setSuccess(false)}
-                  className="m-btn m-btn-ghost"
+                  className="ui-btn ui-btn-secondary"
                 >
                   Yana fikr bildirish
                 </button>
@@ -91,7 +91,7 @@ export default function TelegramFeedbackSection() {
             <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
               {/* Reyting (Yulduzchalar) */}
               <div className="flex flex-wrap items-center justify-between gap-2 py-1 px-1">
-                <span id="feedback-rating-label" className="text-base font-semibold text-metro-ink">
+                <span id="feedback-rating-label" className="text-[15px] font-medium text-ui-ink">
                   Platforma qanchalik ma&apos;qul keldi?
                 </span>
                 <StarRating value={rating} onChange={setRating} label="Platformaga baho" />
@@ -99,7 +99,7 @@ export default function TelegramFeedbackSection() {
 
               {/* Fikr / Izoh matni */}
               <div>
-                <label htmlFor="feedback-comment" className="m-label mb-1.5 block">Fikringiz</label>
+                <label htmlFor="feedback-comment" className="ui-label mb-1.5 block">Fikringiz</label>
                 <textarea
                   id="feedback-comment"
                   value={comment}
@@ -108,7 +108,7 @@ export default function TelegramFeedbackSection() {
                   rows={3}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? "feedback-error" : undefined}
-                  className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none resize-none"
+                  className="ui-input w-full px-3 py-2.5 text-base placeholder:text-ui-muted focus:outline-none resize-none"
                   required
                 />
               </div>
@@ -116,18 +116,18 @@ export default function TelegramFeedbackSection() {
               {/* Ism va Aloqa ma'lumotlari (ixtiyoriy) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="feedback-name" className="m-label mb-1.5 block">Ismingiz <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
+                  <label htmlFor="feedback-name" className="ui-label mb-1.5 block">Ismingiz <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
                   <input
                     id="feedback-name"
                     type="text"
                     autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none"
+                    className="ui-input w-full px-3 py-2.5 text-base placeholder:text-ui-muted focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="feedback-contact" className="m-label mb-1.5 block">Telegram yoki telefon <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
+                  <label htmlFor="feedback-contact" className="ui-label mb-1.5 block">Telegram yoki telefon <span className="normal-case tracking-normal font-normal">(ixtiyoriy)</span></label>
                   <input
                     id="feedback-contact"
                     type="text"
@@ -135,30 +135,30 @@ export default function TelegramFeedbackSection() {
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
                     placeholder="@username yoki telefon"
-                    className="m-input w-full px-3 py-2.5 text-base placeholder:text-metro-muted focus:outline-none"
+                    className="ui-input w-full px-3 py-2.5 text-base placeholder:text-ui-muted focus:outline-none"
                   />
                 </div>
               </div>
 
               {error && (
-                <p id="feedback-error" role="alert" className="text-base font-semibold text-metro-red-ink">
+                <p id="feedback-error" role="alert" className="text-[15px] font-medium text-ui-red-ink">
                   {error}
                 </p>
               )}
 
               {/* Yuborish tugmasi */}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-sm text-metro-muted">
+                <span className="text-sm text-ui-muted">
                   Fikringiz biz uchun juda qadrli
                 </span>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="m-btn"
+                  className="ui-btn"
                 >
                   {loading ? (
-                    <span aria-hidden="true" className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span aria-hidden="true" className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
                   ) : (
                     <Send aria-hidden="true" className="w-3.5 h-3.5" />
                   )}

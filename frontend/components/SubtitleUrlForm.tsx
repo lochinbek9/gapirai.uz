@@ -53,11 +53,11 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
-        <label htmlFor="sub-url" className="m-label block">
+        <label htmlFor="sub-url" className="ui-label block">
           YouTube havolasi
         </label>
-        <div className="m-input flex min-h-14 items-center gap-2 px-3 sm:px-4">
-          <Youtube aria-hidden="true" className="h-5 w-5 shrink-0 text-metro-red" />
+        <div className="ui-input flex min-h-12 items-center gap-2 pl-3 pr-1.5">
+          <Youtube aria-hidden="true" className="h-5 w-5 shrink-0 text-ui-muted" />
           <input
             id="sub-url"
             type="url"
@@ -66,25 +66,25 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="YouTube havolasini kiriting..."
-            className="min-w-0 flex-1 bg-transparent text-base font-medium text-metro-ink placeholder:text-metro-muted focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-base font-medium text-ui-ink placeholder:text-ui-muted focus:outline-none"
           />
           <button
             type="button"
             onClick={handlePaste}
-            className="flex shrink-0 items-center gap-1.5 rounded-[4px] px-2.5 py-2 font-sign text-sm font-bold uppercase tracking-wide text-metro-muted transition hover:bg-metro-ground hover:text-metro-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-ui-muted transition hover:bg-ui-ground hover:text-ui-ink"
           >
             <ClipboardPaste aria-hidden="true" size={14} />
             <span className="hidden sm:inline">Joylashtirish</span>
             <span className="sm:hidden">Qo&apos;yish</span>
           </button>
         </div>
-        <p className="text-sm text-metro-muted">
+        <p className="text-sm text-ui-muted">
           O'zbekcha subtitr (.srt/.vtt) yaratiladi — dublyaj audiosi yo'q, tezroq va TTS xarajatisiz.
         </p>
       </div>
 
       {!isLoggedIn && (
-        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border-2 border-amber-600/40 rounded-[6px] px-4 py-3">
+        <p className="text-base font-semibold text-amber-900 dark:text-amber-200 bg-amber-500/10 border border-amber-600/40 rounded-control px-4 py-3">
           Subtitr yaratish uchun{" "}
           <Link href="/login" className="underline hover:text-amber-900 dark:hover:text-amber-200">kiring</Link>
           {" "}yoki{" "}
@@ -97,16 +97,16 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
           role="alert"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="rounded-[6px] border-2 border-metro-red/50 bg-metro-red/5 px-4 py-3"
+          className="rounded-control border border-ui-red/30 bg-ui-red/[0.05] px-4 py-3"
         >
-                    <p className="text-base font-semibold text-metro-red-ink">{error}</p>
+                    <p className="text-[15px] font-medium text-ui-red-ink">{error}</p>
         </motion.div>
       )}
 
       <motion.button
         type="submit"
         disabled={loading || !url.trim()}
-                className="m-btn m-btn-blue min-h-14 w-full"
+                className="ui-btn ui-btn-primary min-h-12 w-full"
       >
         {loading ? (
           <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Subtitr yaratilmoqda...</>
@@ -118,8 +118,8 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
       <ul className="flex flex-wrap justify-center gap-4 sm:gap-8 pt-2">
         {["SRT", "VTT", "Vaqt kodlari", sourceLanguage === "uz" ? "O'zbekcha STT (tarjimasiz)" : "O'zbekcha tarjima"].map((label) => (
           <li key={label} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-metro-muted" />
-            <span className="m-label">{label}</span>
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ui-muted" />
+            <span className="ui-label">{label}</span>
           </li>
         ))}
       </ul>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, Check, Loader2, Minus } from 'lucide-react'
+import { AlertCircle, Check, Loader2, Plus } from 'lucide-react'
 import {
   getPlans,
   subscribeToPlan,
@@ -20,8 +20,7 @@ import {
 } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
-import SiteHeader from '@/components/metro/SiteHeader'
-import { Spine, SpineStop } from '@/components/metro/Spine'
+import SiteHeader from '@/components/home/SiteHeader'
 import Footer from '@/components/Footer'
 import UzumAccountCard from '@/components/UzumAccountCard'
 import PaynetOrderCard from '@/components/PaynetOrderCard'
@@ -177,122 +176,127 @@ export default function PricingPage() {
       : 0
 
   const ROWS: { label: string; value: (plan: PlanDef) => React.ReactNode }[] = [
-    { label: 'Har 30 kunda', value: (p) => <><strong className="m-num text-metro-ink">{p.monthly_minutes}</strong> daqiqa</> },
-    { label: '1 daqiqa narxi', value: (p) => (perMinute(p) ? <span className="m-num">~{som(perMinute(p))} so&apos;m</span> : <span className="text-metro-muted">—</span>) },
-    { label: 'Video sifati', value: (p) => <span className="m-num">{p.max_resolution} gacha</span> },
+    { label: 'Har 30 kunda', value: (p) => <><span className="font-medium tabular-nums">{p.monthly_minutes}</span> daqiqa</> },
+    { label: '1 daqiqa narxi', value: (p) => (perMinute(p) ? <span className="tabular-nums">~{som(perMinute(p))} so&apos;m</span> : <span className="text-ui-muted">—</span>) },
+    { label: 'Video sifati', value: (p) => <span className="tabular-nums">{p.max_resolution} gacha</span> },
     { label: 'Navbat', value: (p) => (p.priority ? 'Ustuvor' : 'Umumiy') },
-    { label: 'Ovoz variantlari', value: (p) => (p.tier === 'pro' ? 'Tanlash mumkin' : <span className="text-metro-muted">Avtomatik</span>) },
+    { label: 'Ovoz variantlari', value: (p) => (p.tier === 'pro' ? 'Tanlash mumkin' : <span className="text-ui-muted">Avtomatik</span>) },
     { label: 'Bitta video', value: () => '120 daqiqagacha' },
     { label: 'Tezkor tahlil', value: () => 'Daqiqa sarflamaydi' },
   ]
 
   const planPrice = (plan: PlanDef) => {
     const monthlyEquivalent = plan.period_days === 365 ? Math.round(plan.price / 12) : null
-    if (plan.price === 0) return <span className="block"><span className="font-sign text-5xl font-extrabold text-white m-num">0</span> <span className="text-base text-metro-plaque-ink/80">so&apos;m</span></span>
+    const big = 'text-[2.5rem] font-semibold leading-none tracking-[-0.03em] text-ui-ink tabular-nums'
+    if (plan.price === 0) return <p><span className={big}>0</span> <span className="text-[15px] text-ui-muted">so&apos;m</span></p>
     if (plan.discounted_price && billingCycle === 'monthly') {
       return (
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-sign text-5xl font-extrabold text-white m-num">{som(plan.discounted_price)}</span>
-          <span className="text-base text-metro-plaque-ink/70 line-through m-num">{som(plan.price)}</span>
-          <span className="text-base text-metro-plaque-ink/80">so&apos;m / oy · −10%</span>
-        </span>
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className={big}>{som(plan.discounted_price)}</span>
+          <span className="text-[15px] text-ui-muted line-through tabular-nums">{som(plan.price)}</span>
+          <span className="text-[15px] text-ui-muted">so&apos;m / oy · −10%</span>
+        </p>
       )
     }
     return (
-      <span className="block">
-        <span className="font-sign text-5xl font-extrabold text-white m-num">{som(monthlyEquivalent ?? plan.price)}</span>{' '}
-        <span className="text-base text-metro-plaque-ink/80">so&apos;m / oy</span>
-        {monthlyEquivalent !== null && <span className="mt-1 block text-sm text-metro-plaque-ink/80 m-num">Yiliga {som(plan.price)} so&apos;m</span>}
-      </span>
+      <div>
+        <p>
+          <span className={big}>{som(monthlyEquivalent ?? plan.price)}</span>{' '}
+          <span className="text-[15px] text-ui-muted">so&apos;m / oy</span>
+        </p>
+        {monthlyEquivalent !== null && <p className="mt-1.5 text-sm text-ui-muted tabular-nums">Yiliga {som(plan.price)} so&apos;m</p>}
+      </div>
     )
+  }
+
+  const PLAN_NOTE: Record<string, string> = {
+    free: 'Xizmatni sinab koʻrish uchun',
+    standard: 'Muntazam koʻradigan va oʻrganadiganlar uchun',
+    pro: 'Koʻp video bilan ishlaydigan blogerlar va jamoalar uchun',
   }
 
   const planAction = (plan: PlanDef) => {
     const isCurrent = current?.plan === plan.tier
-    if (isCurrent) return <span className="m-btn m-btn-ghost w-full cursor-default">Joriy tarifingiz</span>
+    if (isCurrent) return <span className="ui-btn ui-btn-secondary w-full cursor-default">Joriy tarifingiz</span>
     if (plan.id === 'free') {
       return (
-        <Link href={isLoggedIn ? '/' : '/register'} className="m-btn m-btn-ghost w-full">
+        <Link href={isLoggedIn ? '/' : '/register'} className="ui-btn ui-btn-secondary w-full">
           {isLoggedIn ? 'Video yuborish' : "Bepul ro'yxatdan o'tish"}
         </Link>
       )
     }
     return (
-      <button type="button" onClick={() => handleSubscribe(plan.id, provider)} disabled={subscribing === plan.id} className="m-btn w-full">
+      <button type="button" onClick={() => handleSubscribe(plan.id, provider)} disabled={subscribing === plan.id} className="ui-btn w-full">
         {subscribing === plan.id ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Kutilmoqda...</> : `${PROVIDERS.find((x) => x.id === provider)?.name} orqali to'lash`}
       </button>
     )
   }
 
+  const H2 = 'text-2xl font-semibold tracking-[-0.025em] text-ui-ink sm:text-3xl'
+
   return (
     <>
       <SiteHeader current="pricing" />
-      <main id="main" tabIndex={-1} className="bg-metro-ground text-metro-ink focus:outline-none">
-        <div className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14 lg:px-8">
-          {/* Sarlavha va balans */}
-          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div>
-              <h1 className="font-sign text-6xl font-extrabold uppercase leading-none text-metro-ink sm:text-7xl">Tariflar</h1>
-              <p className="mt-4 max-w-[60ch] text-lg leading-relaxed text-metro-muted">
-                Hisob daqiqada yuritiladi: dublaj ham, subtitr ham videoning haqiqiy davomiyligicha daqiqa sarflaydi.
-                Tezkor tahlil daqiqa sarflamaydi. Bepul tarifda har 30 kunda 5 daqiqa.
-              </p>
-            </div>
-            {isLoggedIn && current && (
-              <div className="m-plaque px-5 py-4">
-                <p className="font-sign text-sm font-bold uppercase tracking-wide text-metro-plaque-ink/75">Balansingiz</p>
-                <p className="mt-1 font-sign text-4xl font-extrabold text-white m-num">
-                  {current.minutes.total_available} <span className="text-xl">daqiqa</span>
-                </p>
-                {current.minutes.purchased > 0 && (
-                  <p className="mt-1 text-sm text-metro-plaque-ink/80 m-num">shundan {current.minutes.purchased} tasi kuymaydi</p>
-                )}
-              </div>
-            )}
+      <main id="main" tabIndex={-1} className="bg-ui-surface text-ui-ink focus:outline-none">
+        <div className="mx-auto max-w-6xl px-4 pt-12 sm:px-6 sm:pt-20">
+          {/* Sarlavha */}
+          <div className="mx-auto max-w-2xl text-center">
+            <h1 className="text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ui-ink sm:text-6xl">Tariflar</h1>
+            <p className="mx-auto mt-5 max-w-[56ch] text-lg leading-relaxed text-ui-muted [text-wrap:pretty]">
+              Hisob daqiqada yuritiladi: dublaj ham, subtitr ham videoning haqiqiy davomiyligicha daqiqa sarflaydi.
+              Tezkor tahlil daqiqa sarflamaydi.
+            </p>
           </div>
 
-          {!isLoggedIn && !authLoading && (
-            <p className="mt-8 rounded-[6px] border-2 border-metro-rule bg-metro-surface px-4 py-3 text-base text-metro-ink">
-              Obuna bo&apos;lish yoki paket olish uchun{' '}
-              <Link href="/login" className="font-bold underline underline-offset-4">kiring</Link> yoki{' '}
-              <Link href="/register" className="font-bold underline underline-offset-4">bepul ro&apos;yxatdan o&apos;ting</Link>.
+          {isLoggedIn && current && (
+            <p className="mx-auto mt-8 w-fit rounded-full border border-ui-rule bg-ui-ground px-4 py-2 text-[15px] text-ui-muted">
+              Balansingiz: <strong className="font-semibold text-ui-ink tabular-nums">{current.minutes.total_available} daqiqa</strong>
+              {current.minutes.purchased > 0 && <span className="tabular-nums"> · shundan {current.minutes.purchased} tasi kuymaydi</span>}
             </p>
           )}
 
-          {error && (
-            <p role="alert" className="mt-6 rounded-[6px] border-2 border-metro-red/50 bg-metro-red/5 px-4 py-3 text-base font-semibold text-metro-red-ink">
-              {error}
-            </p>
-          )}
-
-          {discountOffer?.active && (
-            <div className="mt-8 rounded-[6px] border-2 border-amber-600/50 bg-amber-500/10 px-5 py-4">
-              <p className="font-sign text-xl font-extrabold uppercase text-metro-ink">Ilk video uchun 10% chegirma — 24 soat</p>
-              <p className="mt-1 text-base text-metro-muted">
-                Birinchi videongiz tayyor bo&apos;lgani uchun barcha tarif va paketlarga 10% chegirma narxi avtomatik qo&apos;llandi.
+          <div className="mx-auto mt-8 max-w-3xl space-y-3">
+            {!isLoggedIn && !authLoading && (
+              <p className="rounded-control border border-ui-rule bg-ui-ground px-4 py-3 text-center text-[15px] text-ui-muted">
+                Obuna boʻlish yoki paket olish uchun{' '}
+                <Link href="/login" className="font-medium text-ui-ink underline underline-offset-4">kiring</Link> yoki{' '}
+                <Link href="/register" className="font-medium text-ui-ink underline underline-offset-4">bepul roʻyxatdan oʻting</Link>.
               </p>
-            </div>
-          )}
+            )}
 
-          {discountOffer?.expired && !isPaidCustomer && (
-            <div className="mt-8 rounded-[6px] border-2 border-metro-rule bg-metro-surface px-5 py-4">
-              <p className="text-base text-metro-ink">
-                24 soatlik chegirma muddati tugadimi? Admin bilan bog&apos;lanib, chegirma so&apos;rashingiz mumkin:{' '}
+            {error && (
+              <p role="alert" className="rounded-control border border-ui-red/30 bg-ui-red/[0.05] px-4 py-3 text-[15px] font-medium text-ui-red-ink">
+                {error}
+              </p>
+            )}
+
+            {discountOffer?.active && (
+              <div className="rounded-control border border-amber-500/30 bg-amber-500/[0.07] px-5 py-4">
+                <p className="font-semibold text-ui-ink">Ilk video uchun 10% chegirma — 24 soat</p>
+                <p className="mt-1 text-[15px] text-ui-muted">
+                  Birinchi videongiz tayyor boʻlgani uchun barcha tarif va paketlarga 10% chegirma narxi avtomatik qoʻllandi.
+                </p>
+              </div>
+            )}
+
+            {discountOffer?.expired && !isPaidCustomer && (
+              <p className="rounded-control border border-ui-rule bg-ui-ground px-5 py-4 text-[15px] text-ui-muted">
+                24 soatlik chegirma muddati tugadimi? Admin bilan bogʻlanib, chegirma soʻrashingiz mumkin:{' '}
                 <a
                   href="https://t.me/mentor_lochinbek?text=Salom!+GapirAI+da+birinchi+videomni+dublyaj+qildim.+10%25+chegirma+muddati+tugabdi,+menga+chegirma+bera+olasizmi?"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-bold underline underline-offset-4"
+                  className="font-medium text-ui-ink underline underline-offset-4"
                 >
                   @mentor_lochinbek<span className="sr-only"> (Telegram, yangi oynada)</span>
                 </a>
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Boshqaruv: davr va to'lov usuli */}
-          <div className="mt-12 flex flex-col gap-5 border-y-2 border-metro-rule py-5 sm:flex-row sm:items-center sm:justify-between">
-            <div role="radiogroup" aria-label="To'lov davri" className="inline-flex rounded-[6px] bg-metro-surface p-1 shadow-[inset_0_0_0_2px_rgb(var(--m-rule))]">
+          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+            <div role="radiogroup" aria-label="To'lov davri" className="inline-flex gap-1 rounded-control bg-ui-ground p-1">
               {(['monthly', 'yearly'] as const).map((cycle) => (
                 <button
                   key={cycle}
@@ -300,21 +304,26 @@ export default function PricingPage() {
                   role="radio"
                   aria-checked={billingCycle === cycle}
                   onClick={() => setBillingCycle(cycle)}
-                  className={`min-h-11 rounded-[4px] px-4 font-sign text-base font-bold uppercase tracking-wide transition ${
-                    billingCycle === cycle ? 'bg-metro-ink text-metro-ground' : 'text-metro-muted hover:text-metro-ink'
+                  className={`min-h-10 rounded-lg px-4 text-sm font-medium transition ${
+                    billingCycle === cycle
+                      ? 'bg-ui-surface text-ui-ink shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_rgb(var(--ui-rule))]'
+                      : 'text-ui-muted hover:text-ui-ink'
                   }`}
                 >
-                  {cycle === 'monthly' ? 'Oylik' : 'Yillik · 2 oy tekin'}
+                  {cycle === 'monthly' ? 'Oylik' : <>Yillik <span className={billingCycle === cycle ? 'text-ui-accent-ink' : ''}>· 2 oy tekin</span></>}
                 </button>
               ))}
             </div>
-            <fieldset className="flex flex-wrap items-center gap-2">
-              <legend className="m-label mb-2 block w-full sm:float-left sm:mb-0 sm:mr-2 sm:w-auto sm:py-2">To&apos;lov usuli</legend>
+            <fieldset className="flex flex-wrap items-center justify-center gap-1.5">
+              <legend className="sr-only">To&apos;lov usuli</legend>
+              <span aria-hidden="true" className="mr-1 text-sm text-ui-muted">Toʻlov:</span>
               {PROVIDERS.map((p) => (
                 <label
                   key={p.id}
-                  className={`flex min-h-11 cursor-pointer items-center rounded-[6px] px-3.5 text-base font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-metro-blue ${
-                    provider === p.id ? 'bg-metro-ink text-metro-ground' : 'text-metro-ink shadow-[inset_0_0_0_2px_rgb(var(--m-rule))] hover:shadow-[inset_0_0_0_2px_rgb(var(--m-muted))]'
+                  className={`flex min-h-10 cursor-pointer items-center rounded-lg border px-3 text-sm font-medium transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ui-accent ${
+                    provider === p.id
+                      ? 'border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]'
+                      : 'border-ui-rule text-ui-muted hover:text-ui-ink'
                   }`}
                 >
                   <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} className="sr-only" />
@@ -324,130 +333,98 @@ export default function PricingPage() {
             </fieldset>
           </div>
 
-        </div>
-        <Spine tight>
-          {/* Tarif taxtasi */}
-          {loading ? (
-            <div className="flex justify-center py-20" role="status">
-              <Loader2 aria-hidden="true" className="h-8 w-8 animate-spin text-metro-muted" />
-              <span className="sr-only">Tariflar yuklanmoqda</span>
-            </div>
-          ) : (
-            <SpineStop id="plans" title="Obuna tariflari">
-              {/* Kompyuter: bitta jadval -- qatorlar bo'yicha solishtirish */}
-              <div className="hidden overflow-hidden rounded-[6px] border-2 border-metro-plaque bg-metro-surface outline outline-1 outline-offset-2 outline-metro-brass lg:block">
-                <table className="w-full table-fixed text-left">
-                  <caption className="sr-only">Tariflarni solishtirish</caption>
-                  <thead className="bg-metro-plaque text-metro-plaque-ink">
-                    <tr className="border-b-[6px] border-metro-red">
-                      <td className="w-[22%] p-6 align-bottom">
-                        <span className="font-sign text-base font-bold uppercase tracking-wide text-metro-plaque-ink/70">Tarif</span>
-                      </td>
-                      {visiblePlans.map((plan) => (
-                        <th key={plan.id} scope="col" className="border-l border-metro-plaque-ink/15 p-6 align-top font-normal">
-                          <span className="flex items-center gap-2">
-                            <span className="font-sign text-3xl font-extrabold uppercase text-white">{plan.name.replace(' (yillik)', '')}</span>
-                            {current?.plan === plan.tier && (
-                              <span className="rounded-[3px] bg-metro-plaque-ink px-2 py-0.5 font-sign text-sm font-bold uppercase text-metro-plaque">Joriy</span>
-                            )}
-                          </span>
-                          <span className="mt-4 block">{planPrice(plan)}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ROWS.map((row) => (
-                      <tr key={row.label} className="border-b border-metro-rule last:border-b-0">
-                        <th scope="row" className="px-6 py-4 text-base font-semibold text-metro-muted">{row.label}</th>
-                        {visiblePlans.map((plan) => (
-                          <td key={plan.id} className="border-l-2 border-metro-rule px-6 py-4 text-base text-metro-ink">{row.value(plan)}</td>
-                        ))}
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-metro-rule">
-                      <td className="px-6 py-5" />
-                      {visiblePlans.map((plan) => (
-                        <td key={plan.id} className="border-l-2 border-metro-rule px-6 py-5">{planAction(plan)}</td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
+          {/* Tarif kartalari */}
+          <section id="plans" aria-label="Obuna tariflari" className="mt-10 scroll-mt-24">
+            {loading ? (
+              <div className="flex justify-center py-20" role="status">
+                <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
+                <span className="sr-only">Tariflar yuklanmoqda</span>
               </div>
-
-              {/* Telefon/planshet: har tarif o'z bloki */}
-              <ul className="space-y-5 lg:hidden">
-                {visiblePlans.map((plan) => (
-                  <li key={plan.id} className="overflow-hidden rounded-[6px] border-2 border-metro-plaque bg-metro-surface">
-                    <div className="border-b-[6px] border-metro-red bg-metro-plaque p-5 text-metro-plaque-ink">
-                      <h3 className="flex items-center gap-2 font-sign text-3xl font-extrabold uppercase text-white">
+            ) : (
+              <ul className="grid gap-4 lg:grid-cols-3">
+                {visiblePlans.map((plan) => {
+                  const isCurrent = current?.plan === plan.tier
+                  return (
+                    <li
+                      key={plan.id}
+                      className={`ui-card flex flex-col p-6 sm:p-7 ${isCurrent ? 'shadow-[0_0_0_1px_rgb(var(--ui-accent))] border-ui-accent' : ''}`}
+                    >
+                      <h2 className="flex items-center gap-2 text-lg font-semibold text-ui-ink">
                         {plan.name.replace(' (yillik)', '')}
-                        {current?.plan === plan.tier && (
-                          <span className="rounded-[3px] bg-metro-plaque-ink px-2 py-0.5 font-sign text-sm font-bold uppercase text-metro-plaque">Joriy</span>
+                        {isCurrent && (
+                          <span className="rounded-full bg-ui-accent/10 px-2 py-0.5 text-xs font-medium text-ui-accent-ink">Joriy</span>
                         )}
-                      </h3>
-                      <div className="mt-3">{planPrice(plan)}</div>
-                    </div>
-                    <dl className="divide-y divide-metro-rule px-5">
-                      {ROWS.map((row) => (
-                        <div key={row.label} className="flex items-baseline justify-between gap-4 py-3">
-                          <dt className="text-base text-metro-muted">{row.label}</dt>
-                          <dd className="text-right text-base text-metro-ink">{row.value(plan)}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                    <div className="p-5 pt-3">{planAction(plan)}</div>
-                  </li>
-                ))}
+                      </h2>
+                      <p className="mt-1 text-sm text-ui-muted lg:min-h-10">{PLAN_NOTE[plan.tier] ?? ''}</p>
+                      <div className="mt-6">{planPrice(plan)}</div>
+                      <div className="mt-6">{planAction(plan)}</div>
+                      <dl className="mt-6 divide-y divide-ui-rule border-t border-ui-rule">
+                        {ROWS.map((row) => (
+                          <div key={row.label} className="flex items-baseline justify-between gap-4 py-2.5 text-sm">
+                            <dt className="text-ui-muted">{row.label}</dt>
+                            <dd className="text-right text-ui-ink">{row.value(plan)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </li>
+                  )
+                })}
               </ul>
-            </SpineStop>
-          )}
+            )}
+          </section>
 
           {/* Bir martalik daqiqalar */}
-          <SpineStop id="minute-packs" title="Bir martalik daqiqalar">
-            <p className="-mt-2 max-w-[62ch] text-lg leading-relaxed text-metro-muted">
-              Obunasiz yoki obunaga qo&apos;shimcha. Sotib olingan daqiqalar hech qachon kuymaydi va obuna tugasa ham saqlanadi.
-            </p>
-            <ul className="mt-8 divide-y-2 divide-metro-rule border-y-2 border-metro-rule">
-              {packs.map((p) => {
-                const isAlreadyBought = Boolean(p.one_time && p.already_purchased)
-                const price = p.discounted_price ?? p.price
-                return (
-                  <li key={p.minutes} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 py-5 sm:grid-cols-[180px_1fr_220px]">
-                    <p className="whitespace-nowrap font-sign text-4xl font-extrabold text-metro-ink m-num">
-                      +{p.minutes} <span className="text-xl uppercase">daqiqa</span>
-                    </p>
-                    <div className="text-right sm:text-left">
-                      <p className="text-lg font-bold text-metro-ink m-num">
-                        {som(price)} so&apos;m
-                        {p.discounted_price ? <span className="ml-2 text-base font-normal text-metro-muted line-through">{som(p.price)}</span> : null}
+          <section id="minute-packs" aria-labelledby="packs-title" className="scroll-mt-24 pt-24">
+            <div className="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
+              <div>
+                <h2 id="packs-title" className={H2}>Bir martalik daqiqalar</h2>
+                <p className="mt-3 max-w-[44ch] text-base leading-relaxed text-ui-muted">
+                  Obunasiz yoki obunaga qoʻshimcha. Sotib olingan daqiqalar hech qachon kuymaydi va obuna tugasa ham saqlanadi.
+                </p>
+              </div>
+              <ul className="ui-card divide-y divide-ui-rule">
+                {packs.map((p) => {
+                  const isAlreadyBought = Boolean(p.one_time && p.already_purchased)
+                  const price = p.discounted_price ?? p.price
+                  return (
+                    <li key={p.minutes} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[120px_1fr_auto]">
+                      <p className="whitespace-nowrap text-lg font-semibold text-ui-ink tabular-nums">
+                        +{p.minutes} <span className="text-[15px] font-normal text-ui-muted">daqiqa</span>
                       </p>
-                      <p className="text-sm text-metro-muted m-num">
-                        ~{som(Math.round(price / p.minutes))} so&apos;m / daqiqa{p.one_time ? ' · faqat bir marta olinadi' : ''}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleBuyPack(p.minutes, provider)}
-                      disabled={buyingPack === p.minutes || isAlreadyBought}
-                      className="m-btn col-span-2 w-full sm:col-span-1"
-                    >
-                      {buyingPack === p.minutes ? (
-                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                      ) : isAlreadyBought ? (
-                        'Olingan'
-                      ) : (
-                        `Sotib olish · ${PROVIDERS.find((x) => x.id === provider)?.name}`
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </SpineStop>
+                      <div className="text-right sm:text-left">
+                        <p className="font-medium text-ui-ink tabular-nums">
+                          {som(price)} so&apos;m
+                          {p.discounted_price ? <span className="ml-2 text-sm font-normal text-ui-muted line-through">{som(p.price)}</span> : null}
+                        </p>
+                        <p className="text-[13px] text-ui-muted tabular-nums">
+                          ~{som(Math.round(price / p.minutes))} so&apos;m / daqiqa{p.one_time ? ' · faqat bir marta' : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleBuyPack(p.minutes, provider)}
+                        disabled={buyingPack === p.minutes || isAlreadyBought}
+                        aria-label={isAlreadyBought ? undefined : `${p.minutes} daqiqa sotib olish, ${PROVIDERS.find((x) => x.id === provider)?.name} orqali`}
+                        className="ui-btn ui-btn-secondary col-span-2 min-h-10 w-full px-4 text-sm sm:col-span-1 sm:w-auto"
+                      >
+                        {buyingPack === p.minutes ? (
+                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                        ) : isAlreadyBought ? (
+                          'Olingan'
+                        ) : (
+                          'Sotib olish'
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </section>
 
-          <SpineStop id="qoidalar" title="Daqiqa qanday sarflanadi">
-            <ul className="grid max-w-5xl gap-x-10 gap-y-5 text-lg leading-relaxed text-metro-muted lg:grid-cols-2">
+          <section id="qoidalar" aria-labelledby="rules-title" className="scroll-mt-24 pt-24">
+            <h2 id="rules-title" className={H2}>Daqiqa qanday sarflanadi</h2>
+            <ul className="mt-8 grid gap-x-10 gap-y-6 sm:grid-cols-2">
               {[
                 ['Haqiqiy davomiylik', "12 daqiqa 40 soniyalik video — 12,7 daqiqa. Yaxlitlash yoki yashirin to'lov yo'q."],
                 ['Avval obuna, keyin paket', "Avval obunaning 30 kunlik daqiqalari ishlatiladi, ular tugasa — sotib olingan, kuymaydigan daqiqalar."],
@@ -455,96 +432,99 @@ export default function PricingPage() {
                 ['Nosozlikda qaytariladi', "Video texnik sabab bilan tayyor bo'lmasa, sarflangan daqiqa balansingizga avtomatik qaytadi."],
               ].map(([t, d]) => (
                 <li key={t} className="flex gap-3">
-                  <Check aria-hidden="true" className="mt-1.5 h-5 w-5 shrink-0 text-metro-ink" />
-                  <span>
-                    <strong className="text-metro-ink">{t}.</strong> {d}
+                  <Check aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-ui-accent-ink" />
+                  <span className="text-base leading-relaxed text-ui-muted">
+                    <strong className="font-medium text-ui-ink">{t}.</strong> {d}
                   </span>
                 </li>
               ))}
             </ul>
-          </SpineStop>
+          </section>
 
-          <SpineStop id="savollar" title="Savollar" marker="end">
-            <div className="divide-y-2 divide-metro-rule border-y-2 border-metro-rule">
-              {[
-                {
-                  q: 'Obunani bekor qilish yoki boshqa tarifga o‘tish mumkinmi?',
-                  a: "Ha, istalgan vaqtda tarifni o'zgartirishingiz yoki to'xtatishingiz mumkin. Majburiy muddat yoki jarima yo'q.",
-                },
-                {
-                  q: 'Qaysi kartalar bilan to‘lash mumkin?',
-                  a: 'Click, Payme, Uzum yoki Paynet orqali — Uzcard, Humo yoki Visa kartangiz bilan.',
-                },
-                {
-                  q: 'Subtitr ham daqiqa sarflaydimi?',
-                  a: "Ha, subtitr ham dublaj kabi video davomiyligicha daqiqa sarflaydi. Tezkor tahlil (xulosa, konspekt, test) daqiqa sarflamaydi.",
-                },
-                {
-                  q: 'Bepul tarifda nima bor?',
-                  a: "Har 30 kunda 5 daqiqa dublaj yoki subtitr, 360p sifatda yuklab olish. Uzunroq videolar uchun bir martalik paket yoki obuna oling.",
-                },
-              ].map((faq) => (
-                <details key={faq.q} className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold text-metro-ink [&::-webkit-details-marker]:hidden">
-                    {faq.q}
-                    <Minus aria-hidden="true" className="hidden h-5 w-5 shrink-0 group-open:block" />
-                    <span aria-hidden="true" className="font-sign text-2xl leading-none group-open:hidden">+</span>
-                  </summary>
-                  <p className="mt-3 max-w-[70ch] text-base leading-relaxed text-metro-muted">{faq.a}</p>
-                </details>
-              ))}
+          <section id="savollar" aria-labelledby="faq-title" className="scroll-mt-24 pb-24 pt-24">
+            <div className="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
+              <h2 id="faq-title" className={H2}>Savollar</h2>
+              <div>
+                <div className="divide-y divide-ui-rule border-y border-ui-rule">
+                  {[
+                    {
+                      q: 'Obunani bekor qilish yoki boshqa tarifga o‘tish mumkinmi?',
+                      a: "Ha, istalgan vaqtda tarifni o'zgartirishingiz yoki to'xtatishingiz mumkin. Majburiy muddat yoki jarima yo'q.",
+                    },
+                    {
+                      q: 'Qaysi kartalar bilan to‘lash mumkin?',
+                      a: 'Click, Payme, Uzum yoki Paynet orqali — Uzcard, Humo yoki Visa kartangiz bilan.',
+                    },
+                    {
+                      q: 'Subtitr ham daqiqa sarflaydimi?',
+                      a: "Ha, subtitr ham dublaj kabi video davomiyligicha daqiqa sarflaydi. Tezkor tahlil (xulosa, konspekt, test) daqiqa sarflamaydi.",
+                    },
+                    {
+                      q: 'Bepul tarifda nima bor?',
+                      a: "Har 30 kunda 5 daqiqa dublaj yoki subtitr, 360p sifatda yuklab olish. Uzunroq videolar uchun bir martalik paket yoki obuna oling.",
+                    },
+                  ].map((faq) => (
+                    <details key={faq.q} className="group py-4">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ui-ink [&::-webkit-details-marker]:hidden">
+                        {faq.q}
+                        <Plus aria-hidden="true" className="h-4 w-4 shrink-0 text-ui-muted transition-transform group-open:rotate-45" />
+                      </summary>
+                      <p className="mt-2 max-w-[65ch] text-[15px] leading-relaxed text-ui-muted">{faq.a}</p>
+                    </details>
+                  ))}
+                </div>
+                <DonateCTA variant="line" className="mt-10 justify-start" />
+              </div>
             </div>
-            <DonateCTA variant="line" className="mt-12 justify-start" />
-          </SpineStop>
-
-        </Spine>
+          </section>
+        </div>
 
         {/* Uzum hisob oynasi */}
         {uzumAccount && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setUzumAccount(null)}>
-            <div role="dialog" aria-modal="true" aria-label="Uzum orqali to'lov" className="w-full max-w-sm rounded-[6px] bg-metro-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onClick={() => setUzumAccount(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Uzum orqali to'lov" className="w-full max-w-sm rounded-card border border-ui-rule bg-ui-surface p-5 shadow-[0_24px_64px_rgb(0_0_0/0.25)]" onClick={(e) => e.stopPropagation()}>
               <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} />
-              <button onClick={() => setUzumAccount(null)} className="m-btn m-btn-ghost mt-3 w-full">Yopish</button>
+              <button onClick={() => setUzumAccount(null)} className="ui-btn ui-btn-secondary mt-3 w-full">Yopish</button>
             </div>
           </div>
         )}
 
         {/* Paynet buyurtma oynasi */}
         {paynetOrder && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setPaynetOrder(null)}>
-            <div role="dialog" aria-modal="true" aria-label="Paynet orqali to'lov" className="w-full max-w-sm rounded-[6px] bg-metro-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onClick={() => setPaynetOrder(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Paynet orqali to'lov" className="w-full max-w-sm rounded-card border border-ui-rule bg-ui-surface p-5 shadow-[0_24px_64px_rgb(0_0_0/0.25)]" onClick={(e) => e.stopPropagation()}>
               <PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} />
-              <button onClick={() => setPaynetOrder(null)} className="m-btn m-btn-ghost mt-3 w-full">Yopish</button>
+              <button onClick={() => setPaynetOrder(null)} className="ui-btn ui-btn-secondary mt-3 w-full">Yopish</button>
             </div>
           </div>
         )}
 
         {/* Daqiqa yetmadi oynasi */}
         {showInsufficientMinutes && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowInsufficientMinutes(false)}>
-            <div role="dialog" aria-modal="true" aria-labelledby="short-title" className="w-full max-w-sm rounded-[6px] border-t-[8px] border-metro-plaque bg-metro-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <AlertCircle aria-hidden="true" className="h-6 w-6 text-metro-ink" />
-              <h2 id="short-title" className="mt-3 font-sign text-3xl font-extrabold uppercase text-metro-ink">Daqiqa yetmadi</h2>
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowInsufficientMinutes(false)}>
+            <div role="dialog" aria-modal="true" aria-labelledby="short-title" className="w-full max-w-sm rounded-card border border-ui-rule bg-ui-surface p-6 shadow-[0_24px_64px_rgb(0_0_0/0.25)]" onClick={(e) => e.stopPropagation()}>
+              <AlertCircle aria-hidden="true" className="h-5 w-5 text-ui-muted" />
+              <h2 id="short-title" className="mt-3 text-xl font-semibold tracking-[-0.02em] text-ui-ink">Daqiqa yetmadi</h2>
               {videoDurationMinutes && shortfallMinutes ? (
-                <div className="mt-3 space-y-2 text-base text-metro-muted">
-                  <p>Video davomiyligi: <strong className="text-metro-ink m-num">{videoDurationMinutes} daqiqa</strong></p>
-                  <p>Yetishmayapti: <strong className="text-metro-red-ink m-num">{shortfallMinutes} daqiqa</strong></p>
+                <div className="mt-3 space-y-2 text-[15px] text-ui-muted">
+                  <p>Video davomiyligi: <strong className="font-medium text-ui-ink tabular-nums">{videoDurationMinutes} daqiqa</strong></p>
+                  <p>Yetishmayapti: <strong className="font-medium text-ui-red-ink tabular-nums">{shortfallMinutes} daqiqa</strong></p>
                   {(() => {
                     const rec = packs.find((p) => p.minutes >= shortfallMinutes) || packs[packs.length - 1]
                     return rec ? (
                       <p>
-                        Mos paket: <strong className="text-metro-ink m-num">+{rec.minutes} daqiqa</strong> ({som(rec.price)} so&apos;m). Ortib qolgani kuymaydi.
+                        Mos paket: <strong className="font-medium text-ui-ink tabular-nums">+{rec.minutes} daqiqa</strong> ({som(rec.price)} so&apos;m). Ortib qolgani kuymaydi.
                       </p>
                     ) : null
                   })()}
                 </div>
               ) : (
-                <p className="mt-3 text-base text-metro-muted">
+                <p className="mt-3 text-[15px] text-ui-muted">
                   Bu video uchun balansingiz yetmayapti. Bir martalik paket oling — u kuymaydi.
                 </p>
               )}
-              <button onClick={scrollToPacks} className="m-btn mt-6 w-full">Daqiqa sotib olish</button>
-              <button onClick={() => setShowInsufficientMinutes(false)} className="m-btn m-btn-ghost mt-2 w-full">Yopish</button>
+              <button onClick={scrollToPacks} className="ui-btn mt-6 w-full">Daqiqa sotib olish</button>
+              <button onClick={() => setShowInsufficientMinutes(false)} className="ui-btn ui-btn-secondary mt-2 w-full">Yopish</button>
             </div>
           </div>
         )}

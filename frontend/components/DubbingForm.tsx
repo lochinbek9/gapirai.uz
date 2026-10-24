@@ -52,12 +52,10 @@ export default function DubbingForm({
           { id: "url", label: <><span className="sm:hidden">Havola</span><span className="hidden sm:inline">YouTube havolasi</span></>, icon: Youtube },
           { id: "file", label: <><span className="sm:hidden">Fayl</span><span className="hidden sm:inline">Video fayl yuklash</span></>, icon: FileVideo },
         ]}
-        className="inline-flex w-full gap-1 rounded-[6px] bg-metro-ground p-1 sm:w-auto"
+        className="flex gap-5 border-b border-ui-rule"
         tabClassName={(active) =>
-          `flex flex-1 items-center justify-center gap-2 rounded-[4px] px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue sm:flex-none ${
-            active
-              ? "bg-metro-surface text-metro-ink shadow-[0_1px_3px_rgb(0_0_0/0.12)]"
-              : "text-metro-muted hover:text-metro-ink"
+          `-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 pt-0.5 text-sm font-medium transition ${
+            active ? "border-ui-ink text-ui-ink" : "border-transparent text-ui-muted hover:text-ui-ink"
           }`}
       />
 

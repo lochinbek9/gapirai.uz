@@ -2,24 +2,24 @@
 import Link from 'next/link'
 import { Send, Youtube, Instagram, Mail, Smartphone, Apple } from 'lucide-react'
 
-const COL_TITLE = 'font-sign text-base font-bold uppercase tracking-[0.06em] text-metro-plaque-ink/70'
-const LINK = 'inline-block py-1.5 text-base text-metro-plaque-ink hover:text-white hover:underline underline-offset-4'
-const SOCIAL = 'flex h-11 w-11 items-center justify-center rounded-[6px] text-metro-plaque-ink shadow-[inset_0_0_0_2px_rgb(var(--m-plaque-ink)/0.25)] transition hover:text-white hover:shadow-[inset_0_0_0_2px_rgb(var(--m-plaque-ink)/0.7)]'
+const COL_TITLE = 'text-sm font-medium text-ui-ink'
+const LINK = 'inline-block py-1.5 text-[15px] text-ui-muted transition hover:text-ui-ink'
+const SOCIAL = 'flex h-10 w-10 items-center justify-center rounded-lg border border-ui-rule text-ui-muted transition hover:bg-ui-surface hover:text-ui-ink'
 
-/** Chiqish taxtasi: bekatdan chiqishdagi yo'nalish ko'rsatkichi kabi -- granit fon, ustunlar. */
 export default function Footer() {
   return (
-    <footer className="relative z-10 w-full border-t-[10px] border-metro-red bg-metro-plaque text-metro-plaque-ink">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+    <footer className="relative z-10 w-full border-t border-ui-rule bg-ui-ground text-ui-ink">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:py-16">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-4">
             <Link href="/" aria-label="GapirAI.uz — bosh sahifa" className="inline-block">
-              <img src="/logodark.webp" alt="" width={160} height={40} className="h-10 w-auto" />
+              <img src="/logo.webp" alt="" width={128} height={32} className="h-8 w-auto dark:hidden" />
+              <img src="/logodark.webp" alt="" width={128} height={32} className="hidden h-8 w-auto dark:block" />
             </Link>
-            <p className="max-w-[34ch] text-base leading-relaxed text-metro-plaque-ink/80">
+            <p className="max-w-[34ch] text-[15px] leading-relaxed text-ui-muted">
               Videolarni sun&apos;iy intellekt yordamida o&apos;zbek tiliga dublyaj qiluvchi platforma.
             </p>
-            <p className="text-sm text-metro-plaque-ink/70">© {new Date().getFullYear()} GapirAI.uz. Barcha huquqlar himoyalangan.</p>
+            <p className="text-sm text-ui-muted">© {new Date().getFullYear()} GapirAI.uz. Barcha huquqlar himoyalangan.</p>
           </div>
 
           <div>
@@ -65,17 +65,17 @@ export default function Footer() {
             </div>
             <h2 className={`${COL_TITLE} mt-8`}>Telefonga o&apos;rnatish</h2>
             <div className="mt-3 flex flex-wrap gap-2.5">
-              <Link href="/install#android" className="inline-flex h-11 items-center gap-2 rounded-[6px] bg-metro-plaque-ink px-4 font-sign text-base font-bold uppercase tracking-wide text-metro-plaque hover:bg-white">
+              <Link href="/install#android" className="ui-btn ui-btn-secondary min-h-10 px-3.5 text-sm">
                 <Smartphone aria-hidden="true" className="h-4 w-4" /> Android
               </Link>
-              <Link href="/install#ios" className="inline-flex h-11 items-center gap-2 rounded-[6px] bg-metro-plaque-ink px-4 font-sign text-base font-bold uppercase tracking-wide text-metro-plaque hover:bg-white">
+              <Link href="/install#ios" className="ui-btn ui-btn-secondary min-h-10 px-3.5 text-sm">
                 <Apple aria-hidden="true" className="h-4 w-4" /> iPhone
               </Link>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-4 border-t border-metro-plaque-ink/20 pt-8 sm:flex-row sm:items-center">
+        <div className="mt-12 flex flex-col gap-4 border-t border-ui-rule pt-8 sm:flex-row sm:items-center">
           <h2 className={`${COL_TITLE} shrink-0`}>To&apos;lov</h2>
           <ul className="flex flex-wrap items-center gap-2.5" aria-label="Qabul qilinadigan to'lov usullari">
             {[
@@ -84,12 +84,12 @@ export default function Footer() {
               ['/logos/uzum.png', 'Uzum'],
               ['/logos/paynetlogo.png', 'Paynet'],
             ].map(([src, name]) => (
-              <li key={name} className="flex h-11 w-24 items-center justify-center rounded-[6px] bg-white px-3">
+              <li key={name} className="flex h-10 w-24 items-center justify-center rounded-lg border border-ui-rule bg-white px-3">
                 <img src={src} alt={name} className="max-h-6 w-auto max-w-full object-contain" />
               </li>
             ))}
           </ul>
-          <Link href="/terms#tolovlar" className="text-sm text-metro-plaque-ink/80 underline underline-offset-4 hover:text-white sm:ml-auto">
+          <Link href="/terms#tolovlar" className="text-sm text-ui-muted underline underline-offset-4 hover:text-ui-ink sm:ml-auto">
             To&apos;lov usullari va xavfsizlik
           </Link>
         </div>

@@ -7,21 +7,20 @@ related_targets: ["frontend/app/pricing/page.tsx"]
 
 # Surface brief: homepage (/) and pricing (/pricing)
 
-Mode: Persuade. Audience: students, creators, everyday viewers, teams (see PRODUCT.md). Action: paste a YouTube link (or upload a file) and start a dub; on pricing, pick a plan or a minute pack and pay with Click/Payme/Uzum/Paynet. Proof: real dated platform numbers (24.10.2026: 1 030 finished dubs, ~9 084 dubbed minutes, 1 553 verified users), real pipeline stages, public dubs when the library has any. Constraints: logo kept; hero title "Dunyo bilimlari oʻzbek tilida" was set by the owner; no invented prices, speeds, testimonials or vendor claims.
+Mode: Persuade. Audience: students, creators, everyday viewers, teams (PRODUCT.md). Action: paste a YouTube link (or upload a file) and start; on pricing pick a plan or minute pack and pay with Click/Payme/Uzum/Paynet. Proof: dated real numbers (24.10.2026: 1 030 finished dubs, ~9 084 minutes, 1 553 verified users), real sample videos, public dubs when any exist. Constraints: logo kept; H1 "Dunyo bilimlari oʻzbek tilida" set by owner; no invented prices, speeds, testimonials or vendor claims.
+
+History: the "Toshkent metrosi" direction (seed:f612287775589770, assigned 4/7) was built and rejected by the owner on 2026-10-24 (style too heavy, palette disliked). The owner then took the standing exit: the category standard.
 
 ## Direction contract
 
-THESIS: A video travels from its language to Uzbek like a train on a Tashkent metro line: Havola → Nutq → Tarjima → Ovoz → Tayyor. Refuses the purple-gradient AI hero with a centred headline over a row of feature cards.
+THESIS: The category standard played straight, at ElevenLabs / HeyGen / Rask AI / Linear craft: the working dubbing form is the hero, the page then explains three outputs and how it works, all in quiet, precise UI. Refuses the purple-gradient glass hero and any themed metaphor.
 
-OWN-WORLD: Polished marble ground (light) or night-station granite (dark), granite ink, enamel sign plaques with a thick line-colour base rule, round station markers on a continuous line. Three line colours carry meaning only: red = Dublyaj, blue = Subtitr, green = Tahlil; one active at a time. Brass hairline for frames. One family (Barlow / Barlow Condensed), signage caps for plaques, tabular numerals on fare boards.
+OWN-WORLD: White ground (dark: near-black #0A0A0B), cool neutral greys, hairline 1px borders, 16px card radius, 10px controls, soft low shadows only on the form card. One accent: logo blue (#2B5CF0) for focus, links, selected states; primary buttons are ink (near-black / white in dark). Geist sans throughout, weight 600 display with -0.03em tracking, tabular numerals for prices and stats.
 
-STORY: The visitor reads the plaque, pastes a link at the turnstile, sees the five stations their video will pass, learns the three lines (dub, subtitles, analysis) and what each returns, sees dated real numbers, and on pricing reads a fare board: minutes per month, quality, queue, price per minute.
+STORY: Visitor reads one headline, pastes a link into the centered form card and starts; below sees real numbers, the three outputs (dub, subtitles, analysis) with what each costs, a four-step how-it-works, the Telegram bot, then footer. Pricing: three plan cards with honest facts, then minute packs and spending rules.
 
-FIRST VIEWPORT: Granite top bar with logo and line-coloured nav. Left 7 columns: enamel plaque with the H1, one-line lead, the real form (mode tabs as line selectors, URL input with the start button on the same row). Right 5 columns: a video frame showing an Uzbek subtitle over a real sample thumbnail, labelled as a demonstration. Full-width station line at the bottom of the viewport with five labelled stations; the primary action sits in the left column at eye height.
+FIRST VIEWPORT: Sticky white header (logo, Ommaviy videolar, Tariflar, Telegram bot; Kirish + primary "Bepul boshlash"). Centered H1 (~64px desktop / 40px mobile), one-line subhead, then the form card (max 720px) with segmented service tabs, URL field and ink "Dublaj qilish" button on one row; sample videos begin inside the viewport on desktop.
 
-FORM: Toshkent metrosi, assigned candidate 4 of 7. seed:f612287775589770
-Raises: one axis rules the page (the line is the spine every section hangs on); one active line colour at a time; dated real counter on a station board; strict state grammar (pressed, disabled, active, done); one type family.
-
-Signature interaction: on load the train runs the line once (Havola → Tayyor) and stops; when a link is pasted the first station lights. Motion: exponential ease-out, reduced-motion shows the stopped state.
+FORM: canon (category standard), owner-selected after re-roll exit. seed:f612287775589770
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

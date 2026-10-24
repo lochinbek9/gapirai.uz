@@ -42,6 +42,7 @@ An Uzbek-first AI dubbing service: the whole flow (speech recognition, translati
 ## Brand Commitments
 
 - The GapirAI.uz logo (`frontend/public/logo.webp`, `logodark.webp`) is kept. Colours, type and visual style are open to replacement (owner, 2026-10-24).
+- Visual direction (owner, 2026-10-24, after rejecting the "Tashkent metro" world as too heavy and its marble/red-blue-green palette): **the category standard, played straight** — clean, modern, international AI-product look. Craft bar: ElevenLabs, HeyGen, Rask AI, Linear/Vercel. No themed metaphors, no heavy condensed caps, no decorative palettes; one accent taken from the logo blue.
 
 ## Evidence on Hand
 

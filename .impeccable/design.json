@@ -1,226 +1,337 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-24T07:58:56Z",
+  "generatedAt": "2026-10-24T10:27:46Z",
   "title": "Design System: GapirAI.uz",
   "extensions": {
     "colorMeta": {
-      "marble-ground": {
+      "ground": {
         "role": "neutral",
-        "displayName": "Marble Wall",
-        "canonical": "#F1EEE8",
+        "displayName": "Ground",
+        "canonical": "#F6F7F9",
         "tonalRamp": [
-          "#30291D",
-          "#4F4530",
-          "#6F6044",
-          "#8F7C57",
-          "#AE9D7A",
-          "#C5B9A0",
-          "#DCD5C6",
-          "#F5F3EF"
+          "#3E3E3E",
+          "#626364",
+          "#878889",
+          "#ACADAE",
+          "#F8F9FA",
+          "#FAFBFC",
+          "#FDFDFE",
+          "#FEFEFF"
         ]
       },
-      "marble-surface": {
+      "surface": {
         "role": "neutral",
-        "displayName": "Polished Marble",
-        "canonical": "#FBFAF7",
+        "displayName": "Surface",
+        "canonical": "#FFFFFF",
         "tonalRamp": [
-          "#332D1A",
-          "#554A2B",
-          "#77683C",
-          "#99864D",
-          "#B8A670",
-          "#CCBF99",
-          "#E0D9C2",
-          "#F6F4EE"
+          "#404040",
+          "#666666",
+          "#8C8C8C",
+          "#B2B2B2",
+          "#FFFFFF",
+          "#FFFFFF",
+          "#FFFFFF",
+          "#FFFFFF"
         ]
       },
-      "granite-ink": {
+      "ink": {
         "role": "neutral",
-        "displayName": "Granite Ink",
-        "canonical": "#1B1B1D",
+        "displayName": "Ink",
+        "canonical": "#0B0D12",
         "tonalRamp": [
-          "#252528",
-          "#3D3D42",
-          "#56565C",
-          "#6F6F77",
-          "#909098",
-          "#B0B0B5",
-          "#CFCFD3",
+          "#030304",
+          "#040507",
+          "#06070A",
+          "#08090D",
+          "#484A4D",
+          "#858688",
+          "#C2C2C4",
+          "#EBECEC"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#585E6A",
+        "tonalRamp": [
+          "#16181A",
+          "#23262A",
+          "#30343A",
+          "#3E424A",
+          "#82868F",
+          "#ACAEB4",
+          "#D5D7DA",
           "#F2F2F3"
         ]
       },
-      "granite-muted": {
+      "rule": {
         "role": "neutral",
-        "displayName": "Worn Granite",
-        "canonical": "#54514C",
+        "displayName": "Hairline",
+        "canonical": "#E5E7EB",
         "tonalRamp": [
-          "#282724",
-          "#43413D",
-          "#5E5A55",
-          "#78746D",
-          "#99958F",
-          "#B6B3AF",
-          "#D3D2CF",
-          "#F3F2F2"
+          "#393A3B",
+          "#5C5C5E",
+          "#7E7F81",
+          "#A0A2A4",
+          "#ECEDF0",
+          "#F2F3F5",
+          "#F8F9FA",
+          "#FDFDFD"
         ]
       },
-      "joint-rule": {
-        "role": "neutral",
-        "displayName": "Tile Joint",
-        "canonical": "#D6D0C4",
-        "tonalRamp": [
-          "#2D291F",
-          "#4B4434",
-          "#695F49",
-          "#877A5E",
-          "#A79A81",
-          "#C0B7A5",
-          "#D9D4C9",
-          "#F5F3F0"
-        ]
-      },
-      "plaque-granite": {
-        "role": "neutral",
-        "displayName": "Enamel Plaque",
-        "canonical": "#1F1F22",
-        "tonalRamp": [
-          "#242428",
-          "#3D3D43",
-          "#55555D",
-          "#6D6D78",
-          "#8F8F99",
-          "#AFAFB6",
-          "#CFCFD3",
-          "#F2F2F3"
-        ]
-      },
-      "plaque-ink": {
-        "role": "neutral",
-        "displayName": "Plaque Lettering",
-        "canonical": "#F4F1EB",
-        "tonalRamp": [
-          "#312A1B",
-          "#52462D",
-          "#73623F",
-          "#947E51",
-          "#B39E75",
-          "#C9BA9C",
-          "#DED6C4",
-          "#F6F3EF"
-        ]
-      },
-      "brass": {
-        "role": "tertiary",
-        "displayName": "Chandelier Brass",
-        "canonical": "#A98648",
-        "tonalRamp": [
-          "#362B17",
-          "#594726",
-          "#7D6335",
-          "#A18045",
-          "#BFA069",
-          "#D1BB94",
-          "#E4D6BF",
-          "#F7F4ED"
-        ]
-      },
-      "line-red": {
+      "accent": {
         "role": "primary",
-        "displayName": "Dublyaj Line Red",
-        "canonical": "#C8202B",
+        "displayName": "Logo Blue",
+        "canonical": "#2B5CF0",
         "tonalRamp": [
-          "#420B0E",
-          "#6E1218",
-          "#9A1921",
-          "#C6202B",
-          "#E14651",
-          "#EA7B82",
-          "#F2B0B4",
-          "#FBE9EA"
+          "#0B173C",
+          "#112560",
+          "#183384",
+          "#1E40A8",
+          "#6085F4",
+          "#95AEF8",
+          "#CAD6FB",
+          "#EEF2FE"
         ]
       },
-      "line-blue": {
-        "role": "secondary",
-        "displayName": "Subtitr Line Blue",
-        "canonical": "#1D5BA8",
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Logo Blue Text",
+        "canonical": "#204CD6",
         "tonalRamp": [
-          "#0B2341",
-          "#133B6D",
-          "#1A5298",
-          "#226AC4",
-          "#488CDF",
-          "#7DADE8",
-          "#B1CEF1",
-          "#E9F1FB"
+          "#081336",
+          "#0D1E56",
+          "#122A76",
+          "#163596",
+          "#5879E0",
+          "#90A6EA",
+          "#C7D2F5",
+          "#EDF1FC"
         ]
       },
-      "line-green": {
-        "role": "tertiary",
-        "displayName": "Tahlil Line Green",
-        "canonical": "#18804A",
+      "red": {
+        "role": "error",
+        "displayName": "Error",
+        "canonical": "#DC2626",
         "tonalRamp": [
-          "#0C4025",
-          "#146B3E",
-          "#1C9657",
-          "#24C170",
-          "#4BDD91",
-          "#7EE7B0",
-          "#B2F1D0",
-          "#EAFBF2"
+          "#370A0A",
+          "#580F0F",
+          "#791515",
+          "#9A1B1B",
+          "#E55C5C",
+          "#EE9292",
+          "#F6C9C9",
+          "#FCEEEE"
+        ]
+      },
+      "red-ink": {
+        "role": "error",
+        "displayName": "Error Text",
+        "canonical": "#B91C1C",
+        "tonalRamp": [
+          "#2E0707",
+          "#4A0B0B",
+          "#660F0F",
+          "#821414",
+          "#CA5555",
+          "#DC8E8E",
+          "#EEC6C6",
+          "#F9EDED"
+        ]
+      },
+      "green": {
+        "role": "success",
+        "displayName": "Success",
+        "canonical": "#16A34A",
+        "tonalRamp": [
+          "#062912",
+          "#09411E",
+          "#0C5A29",
+          "#0F7234",
+          "#50BA77",
+          "#8AD1A4",
+          "#C5E8D2",
+          "#ECF8F1"
+        ]
+      },
+      "green-ink": {
+        "role": "success",
+        "displayName": "Success Text",
+        "canonical": "#15803D",
+        "tonalRamp": [
+          "#05200F",
+          "#083318",
+          "#0C4622",
+          "#0F5A2B",
+          "#50A06E",
+          "#8AC09E",
+          "#C4DFCE",
+          "#ECF5EF"
+        ]
+      },
+      "night-ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "canonical": "#121215",
+        "tonalRamp": [
+          "#040405",
+          "#070708",
+          "#0A0A0C",
+          "#0D0D0F",
+          "#4D4D50",
+          "#88888A",
+          "#C4C4C4",
+          "#ECECEC"
+        ]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Night Surface",
+        "canonical": "#0B0B0D",
+        "tonalRamp": [
+          "#030303",
+          "#040405",
+          "#060607",
+          "#080809",
+          "#48484A",
+          "#858586",
+          "#C2C2C2",
+          "#EBEBEC"
+        ]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "#F4F5F7",
+        "tonalRamp": [
+          "#3D3D3E",
+          "#626263",
+          "#868788",
+          "#ABACAD",
+          "#F7F8F9",
+          "#FAFAFB",
+          "#FCFCFD",
+          "#FEFEFE"
+        ]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "Night Muted",
+        "canonical": "#A0A5B0",
+        "tonalRamp": [
+          "#28292C",
+          "#404246",
+          "#585B61",
+          "#70737B",
+          "#B8BCC4",
+          "#D0D2D8",
+          "#E7E8EB",
+          "#F7F8F9"
+        ]
+      },
+      "night-rule": {
+        "role": "neutral",
+        "displayName": "Night Hairline",
+        "canonical": "#27282E",
+        "tonalRamp": [
+          "#0A0A0C",
+          "#101012",
+          "#151619",
+          "#1B1C20",
+          "#5D5E62",
+          "#939496",
+          "#C9C9CB",
+          "#EEEEEE"
+        ]
+      },
+      "night-accent": {
+        "role": "primary",
+        "displayName": "Night Blue",
+        "canonical": "#567CFF",
+        "tonalRamp": [
+          "#161F40",
+          "#223266",
+          "#2F448C",
+          "#3C57B2",
+          "#809DFF",
+          "#AABEFF",
+          "#D5DEFF",
+          "#F1F5FF"
+        ]
+      },
+      "night-accent-ink": {
+        "role": "primary",
+        "displayName": "Night Blue Text",
+        "canonical": "#85A3FF",
+        "tonalRamp": [
+          "#212940",
+          "#354166",
+          "#495A8C",
+          "#5D72B2",
+          "#A4BAFF",
+          "#C2D1FF",
+          "#E0E8FF",
+          "#F5F8FF"
         ]
       }
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Station Plaque",
-        "purpose": "Hero H1 on the granite plaque only."
+        "displayName": "Display",
+        "purpose": "Page H1 only."
       },
       "headline": {
-        "displayName": "Stop Headline",
-        "purpose": "Section stops on the spine; pricing titles."
+        "displayName": "Headline",
+        "purpose": "Section titles."
       },
       "title": {
-        "displayName": "Station Name",
-        "purpose": "Station, plan and line names."
+        "displayName": "Title",
+        "purpose": "Card titles and plan names."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Leads and descriptions, 60-70ch."
+        "purpose": "Leads and descriptions, max 60ch, in Muted."
       },
       "label": {
-        "displayName": "Sign Label",
-        "purpose": "Field and board labels, uppercase."
+        "displayName": "Label",
+        "purpose": "Field labels, tabs, buttons; sentence case."
       }
     },
     "shadows": [
       {
-        "name": "train",
-        "value": "drop-shadow(0 3px 4px rgb(0 0 0 / .25))",
-        "purpose": "The SVG train on the line map."
+        "name": "form-card",
+        "value": "0 1px 2px rgb(0 0 0 / .04), 0 12px 40px -12px rgb(0 0 0 / .12)",
+        "purpose": "Hero form card only (none in dark)."
+      },
+      {
+        "name": "segment",
+        "value": "0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px rgb(var(--ui-rule))",
+        "purpose": "Selected segmented tab."
       },
       {
         "name": "floating",
-        "value": "0 12px 32px rgb(0 0 0 / .18)",
-        "purpose": "Menus and the floating feedback button only."
+        "value": "0 12px 32px rgb(0 0 0 / .12)",
+        "purpose": "Menus and the floating feedback button."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 64px rgb(0 0 0 / .25)",
+        "purpose": "Modal dialogs."
       }
     ],
     "motion": [
       {
-        "name": "train-run",
-        "value": "left 1600ms cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "Train runs the line once on load and moves to the job stage; none under prefers-reduced-motion."
-      },
-      {
         "name": "state",
         "value": "150ms ease",
-        "purpose": "Button brightness, border colour."
+        "purpose": "Hover, border and fill changes."
+      },
+      {
+        "name": "panel",
+        "value": "framer-motion fade + 8px rise",
+        "purpose": "Hero card phase changes (idle/processing/done/error)."
       }
     ],
     "breakpoints": [
-      {
-        "name": "xs",
-        "value": "420px"
-      },
       {
         "name": "sm",
         "value": "640px"
@@ -241,104 +352,86 @@
   },
   "components": [
     {
-      "name": "Ink Button",
+      "name": "Primary Button",
       "kind": "button",
-      "refersTo": "button-ink",
-      "description": "Default action: pay, sign up, buy, open bot.",
-      "html": "<button class=\"ds-btn\">Sotib olish</button>",
-      "css": ".ds-btn{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;display:inline-flex;align-items:center;min-height:48px;padding:0 20px;border:0;border-radius:6px;background:#1F1F22;color:#fff;font-size:17px;cursor:pointer;transition:filter .15s ease,transform .1s ease}.ds-btn:hover{filter:brightness(.9)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #1D5BA8;outline-offset:2px}"
+      "refersTo": "button-primary",
+      "description": "Main action: Dublaj qilish, Bepul boshlash, pay.",
+      "html": "<button class=\"ds-btn ds-primary\">Dublaj qilish</button>",
+      "css": ".ds-btn{font-family:Geist,system-ui,sans-serif;font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:0;border-radius:10px;cursor:pointer;transition:opacity .15s ease,transform .1s ease}.ds-btn:hover{opacity:.88}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #2B5CF0;outline-offset:2px}.ds-primary{background:#0B0D12;color:#fff}"
     },
     {
-      "name": "Line Button (Dublyaj)",
+      "name": "Secondary Button",
       "kind": "button",
-      "refersTo": "button-line-red",
-      "description": "Only the selected service's start action.",
-      "html": "<button class=\"ds-btn-red\">Dublaj qilish</button>",
-      "css": ".ds-btn-red{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;min-height:56px;padding:0 24px;border:0;border-radius:6px;background:#C8202B;color:#fff;font-size:17px;cursor:pointer}.ds-btn-red:hover{filter:brightness(.9)}.ds-btn-red:disabled{background:#D6D0C4;color:#54514C;cursor:not-allowed}.ds-btn-red:focus-visible{outline:2px solid #1D5BA8;outline-offset:2px}"
+      "refersTo": "button-secondary",
+      "description": "Alternative actions: Kirish, Sotib olish, free plan.",
+      "html": "<button class=\"ds-btn ds-secondary\">Kirish</button>",
+      "css": ".ds-btn{font-family:Geist,system-ui,sans-serif;font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:0;border-radius:10px;cursor:pointer;transition:opacity .15s ease,transform .1s ease}.ds-btn:hover{opacity:.88}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid #2B5CF0;outline-offset:2px}.ds-secondary{background:#fff;color:#0B0D12;box-shadow:inset 0 0 0 1px #E5E7EB}.ds-secondary:hover{background:#F6F7F9;opacity:1}"
     },
     {
-      "name": "Ghost Button",
-      "kind": "button",
-      "refersTo": "button-ghost",
-      "description": "Secondary action, other services.",
-      "html": "<button class=\"ds-btn-ghost\"><span class=\"ds-dot\"></span>Subtitr yaratish</button>",
-      "css": ".ds-btn-ghost{font-family: 'Barlow Condensed', Barlow, system-ui, sans-serif; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 20px;border:0;border-radius:6px;background:transparent;color:#1B1B1D;box-shadow:inset 0 0 0 2px #D6D0C4;font-size:17px;cursor:pointer}.ds-btn-ghost:hover{box-shadow:inset 0 0 0 2px #1B1B1D}.ds-dot{width:10px;height:10px;border-radius:50%;background:#1D5BA8}"
-    },
-    {
-      "name": "URL Gate",
+      "name": "Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "The real first action: link field with paste, start button beside it.",
-      "html": "<label class=\"ds-label\" for=\"ds-u\">YouTube havolasi</label><div class=\"ds-input\"><input id=\"ds-u\" placeholder=\"youtube.com/watch?v=...\"></div>",
-      "css": ".ds-label{font-family:'Barlow Condensed',Barlow,sans-serif;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#54514C;display:block;margin-bottom:8px}.ds-input{display:flex;align-items:center;min-height:56px;padding:0 16px;background:#FBFAF7;border:2px solid #D6D0C4;border-radius:6px}.ds-input:hover{border-color:#8f8a82}.ds-input:focus-within{border-color:#1B1B1D}.ds-input input{flex:1;border:0;background:transparent;font:500 16px Barlow,sans-serif;color:#1B1B1D;outline:none}"
+      "description": "URL field with leading icon and paste action.",
+      "html": "<input class=\"ds-input\" placeholder=\"youtube.com/watch?v=...\">",
+      "css": ".ds-input{font:400 16px Geist,system-ui,sans-serif;min-height:48px;padding:0 12px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;color:#0B0D12;outline:none}.ds-input:focus{border-color:#2B5CF0;box-shadow:0 0 0 3px rgb(43 92 240 / .15)}"
     },
     {
-      "name": "Station Plaque",
-      "kind": "custom",
-      "refersTo": "plaque",
-      "description": "Hero H1 and headed boards.",
-      "html": "<div class=\"ds-plaque\"><h1>Dunyo bilimlari oʻzbek tilida</h1></div>",
-      "css": ".ds-plaque{background:#1F1F22;color:#fff;border-radius:6px;border-bottom:10px solid #C8202B;padding:24px 32px}.ds-plaque h1{margin:0;font:800 64px/0.9 'Barlow Condensed',Barlow,sans-serif;text-transform:uppercase;letter-spacing:-.015em}"
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Services, plans, feedback, packs list.",
+      "html": "<div class=\"ds-card\"><h3>Standart</h3><p>Muntazam ko'radiganlar uchun</p></div>",
+      "css": ".ds-card{font-family:Geist,system-ui,sans-serif;background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:24px;color:#0B0D12}.ds-card p{color:#585E6A;margin:4px 0 0;font-size:14px}.ds-card h3{margin:0;font-size:18px;font-weight:600}"
     },
     {
-      "name": "Line Map",
-      "kind": "custom",
-      "description": "Signature: five stations, train stops at the job stage.",
-      "html": "<div class=\"ds-line\"><i></i><b style=\"left:0\"></b><b style=\"left:25%\"></b><b style=\"left:50%\"></b><b class=\"on\" style=\"left:75%\"></b><b style=\"left:100%\"></b></div>",
-      "css": ".ds-line{position:relative;height:48px;margin:0 12px}.ds-line i{position:absolute;left:0;right:0;top:20px;height:8px;border-radius:9999px;background:#C8202B}.ds-line b{position:absolute;top:12px;width:24px;height:24px;margin-left:-12px;border-radius:50%;border:5px solid #C8202B;background:#FBFAF7}.ds-line b.on{background:#C8202B}"
+      "name": "Segmented Control",
+      "kind": "tabs",
+      "refersTo": "segmented",
+      "description": "Service and billing-period switch.",
+      "html": "<div class=\"ds-seg\"><button aria-selected=\"true\">Dublyaj</button><button>Subtitr</button><button>Tahlil</button></div>",
+      "css": ".ds-seg{display:inline-flex;gap:4px;padding:4px;background:#F6F7F9;border-radius:10px;font:500 14px Geist,system-ui,sans-serif}.ds-seg button{border:0;background:none;color:#585E6A;min-height:40px;padding:0 16px;border-radius:8px;cursor:pointer}.ds-seg [aria-selected=true]{background:#fff;color:#0B0D12;box-shadow:0 1px 2px rgb(0 0 0/.08),0 0 0 1px #E5E7EB}"
     },
     {
-      "name": "Station Board",
-      "kind": "custom",
-      "description": "Dated real numbers.",
-      "html": "<dl class=\"ds-board\"><div><dt>Tayyor dublajlar</dt><dd>1 030</dd></div><p>24.10.2026 holatiga.</p></dl>",
-      "css": ".ds-board{margin:0;background:#1F1F22;color:#F4F1EB;border-radius:6px;outline:1px solid #A98648;outline-offset:2px}.ds-board div{display:flex;justify-content:space-between;align-items:baseline;padding:16px 24px}.ds-board dt{font:700 18px 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.04em;opacity:.8}.ds-board dd{margin:0;font:800 36px 'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums;color:#fff}.ds-board p{margin:0;padding:10px 24px;border-top:6px solid #C8202B;font:400 14px Barlow,sans-serif;opacity:.8}"
+      "name": "Selectable Tile",
+      "kind": "radio",
+      "refersTo": "card",
+      "description": "Voice, sample, language and provider choices.",
+      "html": "<button class=\"ds-tile\" aria-checked=\"true\">Avtomatik<small>Spikerga qarab</small></button>",
+      "css": ".ds-tile{display:flex;flex-direction:column;align-items:flex-start;font:500 15px Geist,system-ui,sans-serif;padding:10px 12px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;color:#0B0D12}.ds-tile small{font-size:13px;color:#585E6A;font-weight:400}.ds-tile[aria-checked=true]{border-color:#2B5CF0;box-shadow:0 0 0 1px #2B5CF0;background:rgb(43 92 240/.06)}"
     }
   ],
   "narrative": {
-    "northStar": "The Tashkent Metro Line",
-    "overview": "A video travels from its own language to Uzbek the way a train runs a metro line: Havola, Nutq, Tarjima, Ovoz, Tayyor. Marble walls (light) or night-station granite (dark), enamel plaques with a thick base rule, round station markers on one continuous line, and line colours that mean something. Proof is concrete: the real form is the ticket machine, numbers sit on a dated station board, the train stops at the job's real stage.",
+    "northStar": "The standard, played straight",
+    "overview": "A clean, international AI-product look at the ElevenLabs/HeyGen/Rask/Linear bar: white or near-black ground, neutral greys, hairline borders, one accent from the logo blue, Geist. The hero is the working form; every number is real and dated.",
     "keyCharacteristics": [
-      "One continuous red spine with ring stops",
-      "Granite plaques with line-colour base rules",
-      "Semantic line colours, one active at a time",
-      "One family: Barlow + Barlow Condensed",
-      "Flat surfaces, 6px plates, brass hairline frames"
+      "Centered hero with the real form card",
+      "One accent (logo blue) for state and links",
+      "Ink primary buttons",
+      "Hairline borders, 16px cards, 10px controls",
+      "Geist 400/500/600, tabular numerals"
     ],
     "rules": [
       {
-        "name": "The One Active Line Rule",
-        "body": "At most one line colour is filled at a time; other services show a coloured dot on ink/ghost controls.",
+        "name": "The One Accent Rule",
+        "body": "Blue marks state and links, never decoration or large fills; primary CTAs are ink.",
         "section": "colors"
       },
       {
-        "name": "The Meaning-Only Rule",
-        "body": "Red, blue and green never decorate; generic actions are ink.",
-        "section": "colors"
-      },
-      {
-        "name": "The Signage Rule",
-        "body": "Condensed caps for names and headings only; never body sentences.",
+        "name": "The No-Shouting Rule",
+        "body": "No uppercase labels, no eyebrows, no weight above 600.",
         "section": "typography"
-      },
-      {
-        "name": "The Flat Wall Rule",
-        "body": "No glass, blur or glow; depth comes from material.",
-        "section": "elevation"
       }
     ],
     "dos": [
-      "Do put long pages on the Spine",
-      "Do use *-ink variants for coloured text (>=4.5:1)",
-      "Do date every statistic and source it from production",
-      "Do keep the URL field and start button in the first viewport"
+      "Keep the working form in the first viewport",
+      "Date every statistic",
+      "Use *-ink variants for coloured text"
     ],
     "donts": [
-      "Don't fill more than one line colour at a time",
-      "Don't use gradients, glass, blur or glows",
-      "Don't put eyebrow labels above headings",
-      "Don't use brass as text or add a second typeface",
-      "Don't interrupt the first viewport with a modal"
+      "Gradients, glow, glass, extra accent hues",
+      "Condensed display type or themed metaphors",
+      "Unsupported badges or claims",
+      "Modals in the first viewport"
     ]
   }
 }

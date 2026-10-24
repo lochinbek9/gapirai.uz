@@ -17,7 +17,7 @@ interface Props {
  * ←/→ (yoki ↑/↓) bahoni o'zgartiradi, Tab faqat tanlangan yulduzga tushadi. */
 export default function StarRating({
   value, onChange, label, allowClear = false,
-  starClassName = 'w-5 h-5', emptyClassName = 'text-metro-muted',
+  starClassName = 'w-5 h-5', emptyClassName = 'text-ui-muted',
 }: Props) {
   const [hover, setHover] = useState(0)
   const refs = useRef<(HTMLButtonElement | null)[]>([])
@@ -51,11 +51,11 @@ export default function StarRating({
           onClick={() => onChange(allowClear && value === star ? 0 : star)}
           onMouseEnter={() => setHover(star)}
           onKeyDown={(e) => onKeyDown(e, star)}
-          className="p-1.5 rounded-lg transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-metro-blue"
+          className="p-1.5 rounded-lg transition hover:scale-110"
         >
           <Star
             aria-hidden="true"
-            className={`${starClassName} transition-colors ${star <= shown ? 'fill-current text-metro-ink' : emptyClassName}`}
+            className={`${starClassName} transition-colors ${star <= shown ? 'fill-current text-amber-500' : emptyClassName}`}
           />
         </button>
       ))}
