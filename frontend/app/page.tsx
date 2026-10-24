@@ -77,7 +77,7 @@ function Logo() {
       className="flex flex-col items-center gap-3 sm:gap-5 text-center mb-7 sm:mb-12 px-2"
     >
       <h1 className="text-[2.15rem] leading-[1.06] sm:text-6xl md:text-7xl font-black tracking-[-0.03em] text-slate-900 dark:text-white max-w-4xl [text-wrap:balance]">
-        Dunyodagi bilimlarni <span className="text-violet-600 dark:text-violet-400">oʻzbek tilida</span>
+        Dunyo bilimlari <span className="text-violet-600 dark:text-violet-400">oʻzbek tilida</span>
       </h1>
       <p className="text-sm sm:text-lg text-slate-600 dark:text-slate-300 font-medium max-w-xl leading-relaxed [text-wrap:pretty]">
         <strong className="font-bold text-slate-900 dark:text-white">GapirAI.uz</strong> — YouTube havolasi yoki video faylingizni
@@ -100,7 +100,7 @@ function Logo() {
       </ul>
 
       <h2 className="sr-only">
-        Dunyodagi bilimlarni o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
+        Dunyo bilimlari o'zbek tilida — YouTube, kurslar va ta'limiy videolarni o'zbek tiliga avtomatik dublyaj qiluvchi va o'rganish materiallariga aylantiruvchi platforma, GapirAI.uz
       </h2>
     </motion.div>
   );
