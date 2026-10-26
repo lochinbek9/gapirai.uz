@@ -661,6 +661,49 @@ def list_public_videos(
     }
 
 
+# Bosh sahifadagi raqamlar har kirishda bazadan olinadi; ko'p tashrifda bazani
+# qiynamaslik uchun natija qisqa muddat jarayon xotirasida saqlanadi.
+_PUBLIC_STATS_TTL = 30.0
+_public_stats_cache: dict = {"at": 0.0, "data": None}
+
+
+@router.get("/public-stats", dependencies=[Depends(rate_limit("public_stats", 120, 60))])
+def public_stats(db: Session = Depends(get_db)):
+    """Bosh sahifa uchun jonli raqamlar (auth kerak emas). Ichki/test hisoblar
+    (User.is_internal) chiqarib tashlanadi:
+    - dubs: tayyor dublajlar (subtitr rejimi hisobga kirmaydi);
+    - minutes: shu dublajlar davomiyligi, kesh nusxalarisiz (bitta video bir marta);
+    - users: tasdiqlangan foydalanuvchilar."""
+    import time
+    from sqlalchemy import func, or_
+
+    now = time.monotonic()
+    cached = _public_stats_cache["data"]
+    if cached is not None and now - _public_stats_cache["at"] < _PUBLIC_STATS_TTL:
+        return cached
+
+    real_jobs = (
+        db.query(DubbingJob)
+        .outerjoin(User, User.id == DubbingJob.user_id)
+        .filter(
+            DubbingJob.status == JobStatus.COMPLETED,
+            DubbingJob.subtitle_only.is_(False),
+            or_(DubbingJob.user_id.is_(None), User.is_internal.is_(False)),
+        )
+    )
+    dubs = real_jobs.count()
+    seconds = (
+        real_jobs.filter(DubbingJob.source_job_id.is_(None))
+        .with_entities(func.coalesce(func.sum(DubbingJob.video_duration), 0))
+        .scalar()
+    )
+    users = db.query(User).filter(User.is_verified.is_(True), User.is_internal.is_(False)).count()
+
+    data = {"dubs": int(dubs), "minutes": int(round(float(seconds or 0) / 60)), "users": int(users)}
+    _public_stats_cache.update(at=now, data=data)
+    return data
+
+
 @router.get("/jobs/{job_id}")
 def get_job(
     job_id: uuid.UUID,
