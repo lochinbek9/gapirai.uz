@@ -207,6 +207,18 @@ export interface PublicVideo {
   published_at: string | null
 }
 
+export interface PublicStats {
+  dubs: number
+  minutes: number
+  users: number
+}
+
+/** Bosh sahifadagi jonli raqamlar (ichki/test hisoblarsiz). */
+export async function getPublicStats(): Promise<PublicStats> {
+  const res = await apiClient.get('/api/public-stats')
+  return res.data
+}
+
 export async function listPublicVideos(page: number, pageSize = 24): Promise<{ videos: PublicVideo[]; page: number; has_more: boolean }> {
   const res = await apiClient.get('/api/public-videos', { params: { page, page_size: pageSize } })
   return res.data
