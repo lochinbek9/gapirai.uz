@@ -132,6 +132,14 @@ def delete_job(db: Session, job: DubbingJob) -> DeleteImpact:
     if impact.is_copy:
         storage_id = str(job.source_job_id)
         try:
+            # Eski "nusxaning nusxasi" zanjirlari (2026-08-21 gacha yaratilgan):
+            # bu nusxaga ishora qiluvchilarni to'g'ridan-to'g'ri aslga ulaymiz --
+            # aks holda FK o'chirishga yo'l qo'ymaydi.
+            for child in db.query(DubbingJob).filter(DubbingJob.source_job_id == job.id).all():
+                child.source_job_id = job.source_job_id
+                for field in _PATH_FIELDS:
+                    setattr(child, field, _replace_id(getattr(child, field), job_id, storage_id))
+            db.flush()
             _detach_payments(db, job.id)
             db.delete(job)
             db.commit()
