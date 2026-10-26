@@ -161,6 +161,22 @@ class JobDeletionTest(unittest.TestCase):
         self.assertEqual(str(variant.job_id), hid)
         self.assertEqual(variant.s3_key, f"dubber/{hid}/dubbed_360p.mp4")
 
+    def test_copy_with_chained_copy_relinks_to_original(self):
+        root = self.make_root()
+        copy = self.make_copy(root, 30)
+        # eski zanjir: nusxaga ishora qiluvchi nusxa
+        chained = self.make_copy(root, 10)
+        chained.source_job_id = copy.id
+        self.db.commit()
+
+        job_deletion.delete_job(self.db, copy)
+        self.db.expire_all()
+        self.assertIsNone(self.db.get(DubbingJob, copy.id))
+        survivor = self.db.get(DubbingJob, chained.id)
+        self.assertEqual(survivor.source_job_id, root.id)
+        self.assertEqual(survivor.storage_id, str(root.id))
+        self.assertTrue((self.out / str(root.id) / "video" / "dubbed_final.mp4").exists())
+
     def test_failed_s3_copy_rolls_back_everything(self):
         root = self.make_root()
         copy = self.make_copy(root, 10)
