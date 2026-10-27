@@ -11,13 +11,13 @@ const DURATION_MS = 1600
 const easeOutExpo = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t))
 
 const ITEMS: { key: keyof PublicStats; label: string }[] = [
-  { key: 'dubs', label: 'video oʻzbek tiliga dublaj qilindi' },
+  { key: 'dubs', label: 'video oʻzbek tiliga oʻgirildi' },
   { key: 'minutes', label: 'daqiqa oʻzbekcha ovozga aylantirildi' },
   { key: 'users', label: 'foydalanuvchi roʻyxatdan oʻtgan' },
 ]
 
-/** Jonli raqamlar: har kirishda /api/public-stats dan olinadi (ichki/test
- *  hisoblarsiz). Bo'lim ekranga kirganda 0 dan sanaladi; harakat
+/** Jonli raqamlar: har kirishda /api/public-stats dan olinadi.
+ *  Bo'lim ekranga kirganda 0 dan sanaladi; harakat
  *  kamaytirilgan rejimda darhol yakuniy qiymat. API javob bermasa bo'lim
  *  ko'rsatilmaydi -- eskirgan yoki taxminiy raqam chiqarmaymiz. */
 export default function StatsStrip() {
