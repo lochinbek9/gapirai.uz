@@ -258,12 +258,21 @@ def _detect_gender(transcript_text: str, title: str = "") -> str:
         config = types.GenerateContentConfig(
             system_instruction=_GENDER_SYSTEM_PROMPT, temperature=0, max_output_tokens=5,
         )
-        keys = get_all_gemini_api_keys() or [None]
+        from backend.services.gemini_quota_manager import is_model_available
+
+        model = _gemini_text_model()
+        # Kutishdagi (402/429/503 olgan) kalitlar o'tkazib yuboriladi va ko'pi bilan
+        # 3 ta kalit sinaladi: 2026-10-27 kredit tugaganda barcha 35+ kalitni ketma-ket
+        # urinish bu bosqichni ~20 daqiqaga cho'zgan edi. Bu shunchaki jins taxmini --
+        # tez OpenAI'ga yoki "male"ga o'tish videoni kutib qolishdan yaxshi.
+        keys = [k for k in (get_all_gemini_api_keys() or []) if is_model_available(k, model)[0]][:3]
+        if not keys:
+            raise RuntimeError("Barcha Gemini kalitlari kutishda")
         last_e = None
         for k in keys:
             try:
                 response = _get_gemini_client(api_key=k).models.generate_content(
-                    model=_gemini_text_model(), contents=prompt_text, config=config,
+                    model=model, contents=prompt_text, config=config,
                 )
                 result = (response.text or "").strip().lower()
                 return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
