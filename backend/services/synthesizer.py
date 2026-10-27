@@ -123,6 +123,12 @@ def group_segments_into_sentences(segments: list[dict]) -> list[dict]:
     return groups
 
 
+def _free_tts() -> bool:
+    """FREE_MODE'da ovoz bepul Edge'da -- lekin TTS_PROVIDER_OVERRIDE berilgan
+    bo'lsa (masalan Gemini krediti tugaganda "azure"), o'sha provayder ishlaydi."""
+    return settings.FREE_MODE and not (settings.TTS_PROVIDER_OVERRIDE or "").strip()
+
+
 def _synthesize_text(
     text: str,
     output_path: str,
@@ -152,7 +158,7 @@ def _synthesize_text(
     # O'SHA yaroqsiz audio qaytib kelardi — qayta urinish ma'nosiz bo'lardi.
     from backend.services.tts_cache import get_cached
 
-    if settings.FREE_MODE:
+    if _free_tts():
         logger.info("FREE_MODE: Edge TTS (bepul) ishlatilmoqda...")
         fallback = get_fallback_provider()
         if fallback.synthesize(text, output_path, voice_name=voice_name):
@@ -325,7 +331,7 @@ def synthesize_segments(
     # kamaytiradi. Oldindan tayyorlab qo'yamiz; muvaffaqiyatsiz bo'lgan
     # segmentlar pastdagi oddiy bir-bir yo'lga avtomatik qaytadi.
     pre_synthesized: dict[int, str] = {}
-    if not settings.FREE_MODE:
+    if not _free_tts():
         primary_provider = get_provider(provider_name)
         try:
             pre_synthesized = primary_provider.synthesize_batch(segments, str(output_path), voice_name=voice_name)
@@ -433,7 +439,7 @@ def synthesize_segments(
     # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit: 5).
     # Edge TTS va Azure esa yuqori parallellikni muammosiz ko'tara oladi,
     # shu sababli 8 ta oqim orqali sintez qilish vaqti 40-50% ga qisqaradi.
-    synth_workers = 8 if (provider_name in ("edge", "azure") or settings.FREE_MODE) else 5
+    synth_workers = 8 if (provider_name in ("edge", "azure") or _free_tts()) else 5
     with ThreadPoolExecutor(max_workers=synth_workers) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
@@ -471,7 +477,7 @@ def synthesize_segments(
     # boshqa TTS provayderiga tushib qolgan bo'lsa, ular ko'pchilik
     # ishlatgan provayder bilan ketma-ket (shoshilmasdan) qayta sintez
     # qilinadi — aks holda dublyajda bir necha xil ovoz aralashib qolardi.
-    if not settings.FREE_MODE:
+    if not _free_tts():
         engine_counts: dict[str, int] = {}
         for item in seg_data:
             engine_counts[item["engine"]] = engine_counts.get(item["engine"], 0) + 1

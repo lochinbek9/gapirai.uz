@@ -303,6 +303,10 @@ class Settings(BaseSettings):
     # Barcha tariflar uchun asosiy TTS: "gemini"
     # Qiymatlar: "gemini" | "azure" | "edge" | "elevenlabs" | "openai" | "uzbekvoice"
     TTS_PROVIDER: str = "gemini"
+    # Bo'sh bo'lmasa (masalan "azure"), BARCHA yangi job'lar shu TTS provayderida
+    # ovozlanadi -- job/tarif tanlovi va FREE_MODE'ning majburiy Edge'idan ustun.
+    # Gemini krediti tugaganda vaqtincha boshqa provayderga o'tish uchun (2026-10-27).
+    TTS_PROVIDER_OVERRIDE: str = ""
     # Premium tarif (Pro / Pro Yearly) uchun yuqori sifatli ovoz provayderi:
     TTS_PREMIUM_PROVIDER: str = "gemini"
     # Asosiy provider muvaqqat xatolik bilan (timeout/429/5xx) ishlamasa shu

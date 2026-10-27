@@ -376,10 +376,16 @@ def is_legacy_paid_customer(db, user_id) -> bool:
 
 def get_tts_provider_for_job(db, job) -> str:
     """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi:
+    0. settings.TTS_PROVIDER_OVERRIDE berilgan bo'lsa -- hamma uchun o'sha (vaqtinchalik o'tish).
     1. Agar job.tts_provider qo'lda (admin yoki API orqali) ko'rsatilgan bo'lsa — o'sha ishlatiladi.
     2. Agar foydalanuvchi 2026-10-22 gacha xarid qilgan eski mijoz bo'lsa — 'edge' (Variant A: Edge -> Azure).
     3. Qolgan barcha holatlar (yangi xaridlar, yangi ro'yxatdan o'tganlar, preview bepul foydalanuvchilar) — 'gemini' (Pullik Gemini TTS).
     """
+    from backend.config import get_settings
+    override = (get_settings().TTS_PROVIDER_OVERRIDE or "").lower().strip()
+    if override:
+        return override
+
     tts = getattr(job, "tts_provider", None)
     if isinstance(tts, str) and tts.strip():
         return tts.lower().strip()
