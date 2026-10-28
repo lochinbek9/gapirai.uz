@@ -20,7 +20,9 @@ from backend.services.email_service import (
     CODE_TTL_MINUTES,
 )
 from backend.services.rate_limiter import rate_limit
+from backend.config import get_settings
 from backend.services.google_auth import verify_google_token, GoogleTokenError
+from backend.services.telegram_login import verify_login as verify_telegram_login, TelegramLoginError, bot_id_from_token
 from backend.services.sms_service import send_otp_sms
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -338,6 +340,61 @@ def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)) -> AuthRe
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    token = create_access_token(str(user.id), user.email)
+    return AuthResponse(
+        access_token=token,
+        user={"id": str(user.id), "name": user.name, "email": user.email, "role": user.role},
+    )
+
+
+class TelegramLoginRequest(BaseModel):
+    id: int
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+    photo_url: str | None = None
+    auth_date: int
+    hash: str
+
+
+@router.get("/telegram/config")
+def telegram_login_config() -> dict:
+    """Telegram Login tugmasi uchun ochiq sozlama: bot ID (token boshidagi raqam,
+    sir emas) va bot nomi. Bot sozlanmagan bo'lsa -- tugma ko'rsatilmaydi."""
+    settings = get_settings()
+    bot_id = bot_id_from_token(settings.TELEGRAM_BOT_TOKEN)
+    if not bot_id:
+        return {"enabled": False}
+    return {"enabled": True, "bot_id": bot_id, "bot_username": settings.TELEGRAM_BOT_USERNAME}
+
+
+@router.post("/telegram", dependencies=[Depends(rate_limit("telegram_auth", 20, 600))])
+def telegram_auth(req: TelegramLoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
+    """Telegram orqali kirish/ro'yxatdan o'tish (Login Widget). Hisob Telegram user
+    ID bo'yicha topiladi -- bot yoki Mini App (tma_routes.py) orqali avval kirgan
+    foydalanuvchi o'sha hisobiga tushadi, ikkinchi hisob ochilmaydi."""
+    try:
+        verify_telegram_login(req.model_dump())
+    except TelegramLoginError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+    chat_id = str(req.id)
+    user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
+    if not user:
+        name = " ".join(p for p in ((req.first_name or "").strip(), (req.last_name or "").strip()) if p)
+        user = User(
+            name=name or (f"@{req.username}" if req.username else f"Telegram {req.id}"),
+            telegram_chat_id=chat_id,
+            password_hash=None,
+            auth_provider="telegram",
+            is_verified=True,  # bot tokeni bilan imzolangan -- Telegram hisobi tasdiqlangan
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Hisob faol emas.")
 
     token = create_access_token(str(user.id), user.email)
     return AuthResponse(

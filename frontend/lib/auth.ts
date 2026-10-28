@@ -130,6 +130,27 @@ export async function apiGoogleAuth(credential: string): Promise<AuthResult> {
   return res.data
 }
 
+// Telegram Login Widget qaytaradigan (bot tokeni bilan imzolangan) ma'lumot
+export interface TelegramLoginData {
+  id: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+export async function apiTelegramConfig(): Promise<{ enabled: boolean; bot_id?: number; bot_username?: string }> {
+  const res = await axios.get(`${API_URL}/auth/telegram/config`)
+  return res.data
+}
+
+export async function apiTelegramAuth(data: TelegramLoginData): Promise<AuthResult> {
+  const res = await axios.post(`${API_URL}/auth/telegram`, data)
+  return res.data
+}
+
 export interface PhonePendingVerification {
   pending_verification: true
   phone: string

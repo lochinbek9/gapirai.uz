@@ -190,6 +190,9 @@ class Settings(BaseSettings):
     # jarayoni ishga tushmaydi va bildirishnomalar jimgina o'tkazib
     # yuboriladi (backend/services/telegram_notify.py: fail-open).
     TELEGRAM_BOT_TOKEN: str = ""
+    # Saytga Telegram orqali kirish (Login Widget) shu bot nomidan; BotFather'da
+    # /setdomain -> gapirai.uz qilingan bo'lishi shart (aks holda "Bot domain invalid").
+    TELEGRAM_BOT_USERNAME: str = "gapirai_uz_bot"
 
     # Self-hosted local Telegram Bot API server (docker-compose.yml:
     # telegram-bot-api, aiogram/telegram-bot-api image) -- rasmiy

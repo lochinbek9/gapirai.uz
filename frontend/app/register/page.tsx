@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import TelegramSignInButton from '@/components/TelegramSignInButton'
+import type { TelegramLoginData } from '@/lib/auth'
 import { Eye, EyeOff, Loader2, Youtube, ArrowLeft } from 'lucide-react'
 
 
@@ -19,7 +21,7 @@ export default function RegisterPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
   const [returnUrl, setReturnUrl] = useState('')
-  const { register, verifyCode, resendCode, googleAuth } = useAuth()
+  const { register, verifyCode, resendCode, googleAuth, telegramAuth } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -46,6 +48,19 @@ export default function RegisterPage() {
       router.push(getDestination())
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Google orqali kirishda xatolik yuz berdi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTelegramAuth = async (data: TelegramLoginData) => {
+    setError('')
+    setLoading(true)
+    try {
+      await telegramAuth(data)
+      router.push(getDestination())
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Telegram orqali roʻyxatdan oʻtishda xatolik yuz berdi.')
     } finally {
       setLoading(false)
     }
@@ -112,6 +127,7 @@ export default function RegisterPage() {
           {step === 'form' && (
             <div className="mb-6 space-y-5">
               <GoogleSignInButton onCredential={handleGoogleCredential} text="signup_with" />
+              <TelegramSignInButton onAuth={handleTelegramAuth} text="signup_with" />
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-ui-rule" />
                 <span className="text-xs text-ui-muted">yoki</span>
