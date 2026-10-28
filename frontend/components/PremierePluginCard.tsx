@@ -4,9 +4,10 @@ import { Check, Copy, Download, KeyRound, Loader2, Plus } from 'lucide-react'
 import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyInfo } from '@/lib/api'
 import { formatTashkentDate } from '@/lib/timestamp'
 
-const ZIP_URL = '/downloads/gapirai-premiere.zip'
+const PREMIERE_ZIP = '/downloads/gapirai-premiere.zip'
+const RESOLVE_ZIP = '/downloads/gapirai-resolve.zip'
 
-// Dashboard'da: Premiere Pro plaginini yuklab olish va uning API kalitlarini boshqarish.
+// Dashboard'da: Premiere Pro va DaVinci Resolve plaginlarini yuklab olish hamda ularning (umumiy) API kalitlarini boshqarish.
 // Kalit faqat yaratilgan zahoti bir marta ko'rsatiladi (serverda saqlanmaydi).
 export default function PremierePluginCard() {
   const [keys, setKeys] = useState<ApiKeyInfo[] | null>(null)
@@ -62,14 +63,17 @@ export default function PremierePluginCard() {
     <section id="premiere" aria-labelledby="premiere-title" className="mb-6 scroll-mt-24 rounded-card border border-ui-rule p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 id="premiere-title" className="text-base font-semibold text-ui-ink">Premiere Pro plagini</h2>
+          <h2 id="premiere-title" className="text-base font-semibold text-ui-ink">Montaj dasturlari uchun plaginlar</h2>
           <p className="mt-1 max-w-xl text-sm text-ui-muted">
-            Timeline'dagi klipni toʻgʻridan-toʻgʻri GapirAI'ga yuboring: oʻzbekcha ovoz va subtitr oʻsha joyga alohida trek boʻlib qaytadi. Premiere Pro 2020 va yangilari, macOS va Windows.
+            Timeline'dagi klipni toʻgʻridan-toʻgʻri GapirAI'ga yuboring: oʻzbekcha ovoz va subtitr oʻsha joyga alohida trek boʻlib qaytadi. Premiere Pro 2020+ va DaVinci Resolve 18.5+ (bepul va Studio), macOS va Windows. Ikkalasi uchun bitta kalit.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <a href={ZIP_URL} download className="ui-btn ui-btn-secondary">
-            <Download aria-hidden="true" className="h-4 w-4" /> Plaginni yuklab olish
+          <a href={PREMIERE_ZIP} download className="ui-btn ui-btn-secondary">
+            <Download aria-hidden="true" className="h-4 w-4" /> Premiere Pro
+          </a>
+          <a href={RESOLVE_ZIP} download className="ui-btn ui-btn-secondary">
+            <Download aria-hidden="true" className="h-4 w-4" /> DaVinci Resolve
           </a>
           <button type="button" onClick={create} disabled={busy} className="ui-btn ui-btn-primary">
             {busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Plus aria-hidden="true" className="h-4 w-4" />}
@@ -94,7 +98,7 @@ export default function PremierePluginCard() {
               {copied ? 'Nusxalandi' : 'Nusxalash'}
             </button>
           </div>
-          <p className="mt-2 text-xs text-ui-muted">Premiere'da: Window → Extensions → GapirAI → kalitni joylab „Saqlash“.</p>
+          <p className="mt-2 text-xs text-ui-muted">Premiere: Window → Extensions → GapirAI. DaVinci Resolve: Workspace → Scripts → GapirAI. Kalitni joylab „Saqlash“ni bosing.</p>
         </div>
       )}
 

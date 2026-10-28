@@ -43,6 +43,7 @@ ai-dubber-backup/
 *.tar.gz
 *.zip
 !frontend/public/downloads/gapirai-premiere.zip
+!frontend/public/downloads/gapirai-resolve.zip
 auto_recovery_pipeline.py
 RECOVERY_PIPELINE_STATUS.json
 KELDIK_*.txt

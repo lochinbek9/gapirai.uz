@@ -11,7 +11,7 @@ Premiere Pro 2020 (14.0) va undan yangi versiyalarda ishlaydi (macOS va Windows)
 
 ## O'rnatish
 
-1. gapirai.uz → **Mening videolarim** → **Premiere Pro plagini** → **Kalit yaratish**. Kalitni nusxalab oling — u faqat bir marta ko'rsatiladi.
+1. gapirai.uz → **Mening videolarim** → **Montaj dasturlari uchun plaginlar** → **Kalit yaratish**. Kalitni nusxalab oling — u faqat bir marta ko'rsatiladi.
 2. Arxivni oching va o'rnatuvchini ishga tushiring:
    - **macOS:** `install-mac.command` ustida o'ng tugma → **Open** (birinchi marta macOS ruxsat so'raydi).
    - **Windows:** `install-windows.bat` ni ikki marta bosing.
@@ -35,7 +35,7 @@ Daqiqalar saytdagi hisobingizdan yechiladi (saytdagi bilan bir xil narx). Manba 
 
 ## Kalitni bekor qilish
 
-gapirai.uz → **Mening videolarim** → **Premiere Pro plagini** → kalit yonidagi **Bekor qilish**. Kalit bilan admin paneliga kirib yoki yangi kalit yaratib bo'lmaydi.
+gapirai.uz → **Mening videolarim** → **Montaj dasturlari uchun plaginlar** → kalit yonidagi **Bekor qilish**. Kalit bilan admin paneliga kirib yoki yangi kalit yaratib bo'lmaydi.
 
 ## Dasturchilar uchun
 
