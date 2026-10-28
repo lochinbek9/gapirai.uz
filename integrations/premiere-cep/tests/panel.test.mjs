@@ -10,8 +10,8 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const dir = path.join(path.dirname(new URL(import.meta.url).pathname), '..')
 globalThis.window = { require }
-for (const f of ['js/srt.js', 'js/wav.js', 'js/api.js']) eval(fs.readFileSync(path.join(dir, f), 'utf8'))
-const { GapirSrt, GapirWav, GapirApi } = window
+for (const f of ['js/cep.js', 'js/srt.js', 'js/wav.js', 'js/api.js']) eval(fs.readFileSync(path.join(dir, f), 'utf8'))
+const { GapirSrt, GapirWav, GapirApi, GapirCep } = window
 
 function wav(seconds, rate = 8000, channels = 1, streamed = false) {
   const data = Buffer.alloc(seconds * rate * channels * 2)
@@ -28,6 +28,17 @@ test('SRT klipning [in, out] qismiga kesiladi va timeline vaqtiga suriladi', () 
   const src = '1\n00:00:00,000 --> 00:00:04,000\nBir\n\n2\n00:00:04,000 --> 00:00:08,640\nIkki\nqator\n\n3\n00:00:14,000 --> 00:00:16,480\nUch\n'
   assert.equal(GapirSrt.shiftSrt(src, 20, 3, 12.5),
     '1\n00:00:20,000 --> 00:00:21,000\nBir\n\n2\n00:00:21,000 --> 00:00:25,640\nIkki\nqator\n')
+})
+
+test('SRT -> kuelar (After Effects matn qatlamlari uchun)', () => {
+  const list = GapirSrt.cues('1\n00:00:08,000 --> 00:00:09,000\nBir\n\n2\n00:00:09,000 --> 00:00:13,640\nIkki\nqator\n')
+  assert.deepEqual(list, [{ s: 8, e: 9, t: 'Bir' }, { s: 9, e: 13.64, t: 'Ikki\nqator' }])
+})
+
+test('ExtendScript literali: ASCII dan tashqari belgilar \\u bilan', () => {
+  const lit = GapirCep.jsxLiteral([{ t: 'oʻzbek\u2028"q"' }])
+  assert.ok(/^[\x00-\x7f]*$/.test(lit))
+  assert.deepEqual(eval(lit), [{ t: 'oʻzbek\u2028"q"' }])
 })
 
 test('WAV kesimi aynan [from, to) namunalari, oqimli (0xFFFFFFFF) sarlavha ham', () => {
