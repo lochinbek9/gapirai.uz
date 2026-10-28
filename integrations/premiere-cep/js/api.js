@@ -3,6 +3,7 @@
 (function () {
   var req = (window.cep_node && window.cep_node.require) || window.require;
   var fs = req('fs'), path = req('path'), https = req('https'), http = req('http'), URL = req('url');
+  var Buffer = req('buffer').Buffer;   // CEP kontekstida global Buffer kafolatlanmagan
 
   var CONTENT_TYPES = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.webm': 'video/webm' };
   var MAX_BYTES = 1024 * 1024 * 1024;
@@ -41,6 +42,8 @@
       if (opts.auth !== false && url.indexOf(self.base) === 0) headers.Authorization = 'Bearer ' + self.key;
       var lib = u.protocol === 'http:' ? http : https;
       var r = lib.request({ method: opts.method || 'GET', hostname: u.hostname, port: u.port, path: u.path, headers: headers }, function (res) {
+        // Server javob berdi (masalan, 402 "daqiqa yo'q") -- qolgan faylni yuborishni to'xtatamiz
+        if (opts.stream) { opts.stream.unpipe(r); opts.stream.destroy(); }
         if ([301, 302, 303, 307, 308].indexOf(res.statusCode) !== -1 && res.headers.location && redirects < 5) {
           res.resume();
           var next = URL.resolve(url, res.headers.location);
@@ -68,7 +71,12 @@
         });
         res.on('error', reject);
       });
-      r.on('error', function (e) { reject(new Error('Tarmoq xatosi: ' + e.message)); });
+      r.on('error', function (e) {
+        var offline = /ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENETUNREACH/.test(String(e.code || e.message));
+        reject(new Error(offline
+          ? "GapirAI serveriga ulanib boʻlmadi. Internet aloqasini tekshirib, qayta urinib koʻring."
+          : 'Tarmoq xatosi: ' + (e.message || e.code || 'nomaʼlum')));
+      });
       r.setTimeout(opts.stream ? 0 : 60000, function () { r.destroy(new Error("Server javob bermadi (vaqt tugadi).")); });
 
       if (opts.stream) {

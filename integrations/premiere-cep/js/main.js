@@ -15,7 +15,7 @@
     set: function (k, v) { try { v == null ? localStorage.removeItem('gapirai.' + k) : localStorage.setItem('gapirai.' + k, v); } catch (e) { /* yo'q */ } },
   };
 
-  var selection = null, busy = false;
+  var selection = null, busy = false, authed = false;
 
   function client() { return new GapirApi.Client(API_BASE, store.get('key') || ''); }
 
@@ -33,7 +33,7 @@
 
   function setBusy(b) {
     busy = b;
-    $('start').disabled = b || !selection || !store.get('key');
+    $('start').disabled = b || !selection || !authed;
     $('pick').disabled = b;
   }
 
@@ -52,6 +52,7 @@
 
   function refreshAuth() {
     var key = store.get('key');
+    authed = false;
     if (!key) {
       $('auth-status').textContent = 'Kalit kiritilmagan.';
       setBusy(busy);
@@ -63,6 +64,7 @@
       var ok = document.createElement('span');
       ok.className = 'ok';
       ok.textContent = 'Ulangan: ' + (u.email || u.name);
+      authed = true;
       $('auth-status').appendChild(ok);
       $('api-key').value = '';
       $('api-key').placeholder = 'Kalit saqlangan. Almashtirish uchun yangisini kiriting.';
@@ -85,6 +87,7 @@
 
   $('pick').addEventListener('click', function () {
     showError('');
+    if (!authed && store.get('key')) refreshAuth();   // panel ochilganda internet yo'q bo'lgan bo'lsa
     GapirCep.evalScript('gapirai_getSelection()').then(function (r) {
       if (!r.ok) throw new Error(r.error);
       client().checkFile(r.path);
@@ -93,6 +96,9 @@
       $('clip-file').textContent = GapirApi.path.basename(r.path);
       $('clip-dur').textContent = fmt(r.outPoint - r.inPoint) + ' (manbada ' + fmt(r.inPoint) + '–' + fmt(r.outPoint) + ')';
       $('clip-info').hidden = false;
+      if (Math.abs((r.end - r.start) - (r.outPoint - r.inPoint)) > 0.1) {
+        showError("Diqqat: bu klipning tezligi oʻzgartirilgan. Ovoz va subtitr asl tezlikda qoʻyiladi va klipga toʻliq mos kelmasligi mumkin.");
+      }
     }).catch(function (e) {
       selection = null;
       $('clip-info').hidden = true;
@@ -122,11 +128,11 @@
 
   function poll(id) {
     return client().job(id).then(function (j) {
-      var pct = j.progress || 0;
-      setProgress(STAGES[j.status] || j.status, pct, j.status_message || '');
-      if (j.status === 'COMPLETED') return j;
-      if (j.status === 'FAILED') throw new Error(j.error_message || j.status_message || 'Video qayta ishlanmadi.');
-      if (j.status === 'AWAITING_PAYMENT') throw new Error("Bu video uchun daqiqangiz yetmaydi. Saytda daqiqa sotib oling va qayta yuboring.");
+      var st = String(j.status || '').toUpperCase();   // API kichik harfda qaytaradi ("completed")
+      setProgress(STAGES[st] || st, j.progress || 0, j.status_message || '');
+      if (st === 'COMPLETED') return j;
+      if (st === 'FAILED') throw new Error(j.error_message || j.status_message || 'Video qayta ishlanmadi.');
+      if (st === 'AWAITING_PAYMENT') throw new Error("Bu video uchun daqiqangiz yetmaydi. Saytda daqiqa sotib oling va qayta yuboring.");
       return wait(POLL_MS).then(function () { return poll(id); });
     }, function (e) {
       if (e.status) throw e;                       // API xatosi -- to'xtaymiz
@@ -142,24 +148,40 @@
     var stem = GapirApi.path.basename(sel.path, GapirApi.path.extname(sel.path)) + '.' + id.slice(0, 8);
     var srtFull = GapirApi.path.join(dir, stem + '.full.uz.srt');
     var srtClip = GapirApi.path.join(dir, stem + '.uz.srt');
+    var wavFull = job.mode === 'dub' ? GapirApi.path.join(dir, stem + '.full.uz.wav') : '';
     var wav = job.mode === 'dub' ? GapirApi.path.join(dir, stem + '.uz.wav') : '';
+    var dur = sel.outPoint - sel.inPoint;
+    var warn = '';
 
     setProgress('Natija yuklab olinmoqda', 100, dir);
     var c = client();
     return c.download('/api/jobs/' + id + '/subtitles.srt', srtFull).then(function () {
       var text = GapirApi.fs.readFileSync(srtFull, 'utf8');
       GapirApi.fs.writeFileSync(srtClip, GapirSrt.shiftSrt(text, sel.start, sel.inPoint, sel.outPoint), 'utf8');
-      if (wav) return c.download('/api/outputs/' + id + '/audio', wav);
+      if (!wav) return;
+      return c.download('/api/outputs/' + id + '/audio', wavFull).then(function () {
+        // Butun video uchun audio -> faqat klipning kesilgan qismi
+        var cut = GapirWav.sliceWav(GapirApi.fs.readFileSync(wavFull), sel.inPoint, sel.outPoint);
+        if (cut.seconds < 0.1) {
+          warn = "Dublaj audiosi klipning bu qismiga yetmaydi -- audio qoʻyilmadi (toʻliq fayl: " + GapirApi.path.basename(wavFull) + ").";
+          wav = '';
+          return;
+        }
+        GapirApi.fs.writeFileSync(wav, cut.buffer);
+      });
     }).then(function () {
       setProgress('Timeline\'ga qoʻyilmoqda', 100, '');
-      var call = 'gapirai_place(' + [GapirCep.jsxString(wav), GapirCep.jsxString(srtClip), sel.start, sel.inPoint, sel.outPoint].join(',') + ')';
+      var call = 'gapirai_place(' + [
+        GapirCep.jsxString(wav), GapirCep.jsxString(srtClip), GapirCep.jsxString(sel.startTicks), Number(sel.start) || 0, Number(dur) || 0, GapirCep.jsxString(sel.sequenceId || ''),
+      ].join(',') + ')';
       return GapirCep.evalScript(call);
     }).then(function (r) {
       if (!r.ok) throw new Error(r.error);
       var done = [];
       if (r.audio) done.push('oʻzbekcha ovoz audio trekka');
       if (r.captions) done.push('subtitr caption trekka');
-      setProgress('Tayyor', 100, (done.length ? done.join(' va ') + ' qoʻyildi. ' : '') + (r.note || '') + ' Fayllar: ' + dir);
+      var msg = [done.length ? done.join(' va ') + ' qoʻyildi.' : '', warn, r.note || '', 'Fayllar: ' + dir];
+      setProgress('Tayyor', 100, msg.filter(Boolean).join(' '));
     });
   }
 
