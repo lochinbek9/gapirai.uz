@@ -864,6 +864,38 @@ def list_jobs(
     return [_job_to_response(j) for j in jobs]
 
 
+_YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
+@router.get("/jobs/by-video/{video_id}")
+def get_job_for_youtube_video(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Chrome kengaytmasi uchun (2026-10-28): foydalanuvchining shu YouTube
+    videosi bo'yicha eng mos dublaj jobi -- avval tayyori, bo'lmasa
+    jarayondagisi. Kengaytma u bilan videoni qayta to'lovsiz ijro etadi yoki
+    jarayonni kuzatishda davom etadi. Xato, to'lov kutayotgan, faqat-subtitr
+    va preview joblar hisobga olinmaydi."""
+    if not _YOUTUBE_VIDEO_ID_RE.match(video_id):
+        raise HTTPException(status_code=400, detail="YouTube video ID noto'g'ri.")
+    job = (
+        db.query(DubbingJob)
+        .options(*_JOB_RESPONSE_DEFERRED)
+        .filter(
+            DubbingJob.user_id == current_user.id,
+            DubbingJob.youtube_video_id == video_id,
+            DubbingJob.subtitle_only.is_(False),
+            DubbingJob.is_preview.is_(False),
+            DubbingJob.status.notin_([JobStatus.FAILED, JobStatus.AWAITING_PAYMENT]),
+        )
+        .order_by((DubbingJob.status == JobStatus.COMPLETED).desc(), DubbingJob.created_at.desc())
+        .first()
+    )
+    return {"job": _job_to_response(job) if job else None}
+
+
 # Faqat DOWNLOAD bosqichida haqiqatan ham to'xtagan job'lar uchun mo'ljallangan
 # fallback -- backend/services/downloader.py'ning MAX_DOWNLOAD_SIZE_BYTES bilan
 # bir xil chegara.

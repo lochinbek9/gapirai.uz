@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <title>GapirAI</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="../icons/icon32.png" alt="" width="24" height="24" />
+    <div>
+      <strong>GapirAI</strong>
+      <span class="muted">YouTube oʻzbekcha</span>
+    </div>
+  </header>
+
+  <section id="status" class="card">
+    <p id="who" class="muted">Tekshirilmoqda…</p>
+    <button id="login" class="btn" hidden>gapirai.uz’ga kirish</button>
+  </section>
+
+  <section class="card">
+    <h2>Qanday ishlaydi</h2>
+    <ol>
+      <li>YouTube’da videoni oching.</li>
+      <li>Pleyerning chap yuqori burchagidagi <b>UZ</b> tugmasini bosing.</li>
+      <li>Dublaj tayyor boʻlgach, oʻzbekcha ovoz va subtitr video bilan birga ijro etiladi.</li>
+    </ol>
+    <p class="muted">Siz avval dublaj qilgan videolar qayta toʻlovsiz ochiladi.</p>
+  </section>
+
+  <details>
+    <summary>Dasturchi sozlamalari</summary>
+    <label>Server
+      <select id="server">
+        <option value="prod">gapirai.uz</option>
+        <option value="local">Lokal (localhost:3000 / 8000)</option>
+      </select>
+    </label>
+  </details>
+
+  <footer class="muted" id="version"></footer>
+  <script src="popup.js"></script>
+</body>
+</html>
