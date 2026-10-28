@@ -1,3 +1,4 @@
+import logging
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -11,10 +12,12 @@ from backend.models.database import User, get_db
 from backend.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 kun
+API_KEY_EXPIRE_DAYS = 365
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -71,6 +74,45 @@ def create_access_token(user_id: str | dict, email: str | None = None) -> str:
     )
 
 
+def create_api_key_token(user_id, key_id) -> str:
+    """Shaxsiy API kalit: uzoq muddatli JWT. jti -> api_keys.id (bekor qilish uchun)."""
+    expire = datetime.utcnow() + timedelta(days=API_KEY_EXPIRE_DAYS)
+    return jwt.encode(
+        {"sub": str(user_id), "typ": "api", "jti": str(key_id), "exp": expire},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def _api_key_usable(db: Session, payload: dict) -> bool:
+    """Oddiy token uchun doim True. API kalit uchun: yozuv mavjud, shu
+    foydalanuvchiniki va bekor qilinmagan bo'lishi kerak."""
+    if payload.get("typ") != "api":
+        return True
+    from backend.models.database import ApiKey
+    try:
+        key = db.query(ApiKey).filter(ApiKey.id == uuid.UUID(str(payload.get("jti")))).first()
+    except (ValueError, TypeError):
+        return False
+    if not key or key.revoked_at is not None or str(key.user_id) != str(payload.get("sub")):
+        return False
+    now = datetime.utcnow()
+    if not key.last_used_at or (now - key.last_used_at).total_seconds() > 600:
+        key.last_used_at = now
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+    return True
+
+
+def _subject_id(payload: dict) -> Optional[uuid.UUID]:
+    try:
+        return uuid.UUID(str(payload["sub"]))
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
 def decode_token(token: str) -> Optional[dict]:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -112,9 +154,14 @@ def get_current_user(
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yaroqsiz.")
-    user = db.query(User).filter(User.id == payload["sub"]).first()
+    if not _api_key_usable(db, payload):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API kalit bekor qilingan yoki yaroqsiz.")
+    user_id = _subject_id(payload)
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Foydalanuvchi topilmadi.")
+    # API kalit bilan kelgan so'rovlar admin va kalit boshqaruviga kira olmaydi
+    user._via_api_key = payload.get("typ") == "api"
     if getattr(user, "is_verified", True) is False:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hisob tasdiqlanmagan. Iltimos, emailingizni tasdiqlang.")
     record_user_activity(db, user)
@@ -130,6 +177,8 @@ def get_current_admin_user(
     allowed_emails = {
         e.strip().lower() for e in settings.ADMIN_ALLOWED_EMAILS.split(",") if e.strip()
     }
+    if getattr(current_user, "_via_api_key", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin bo'limiga API kalit bilan kirib bo'lmaydi.")
     user_email = (current_user.email or "").lower()
     if current_user.role != "admin" or (allowed_emails and user_email not in allowed_emails):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu bo'limga faqat administratorlar kira oladi.")
@@ -144,11 +193,13 @@ def get_optional_user(
     if not credentials:
         return None
     payload = decode_token(credentials.credentials)
-    if not payload:
+    if not payload or not _api_key_usable(db, payload):
         return None
-    user = db.query(User).filter(User.id == payload["sub"]).first()
+    user_id = _subject_id(payload)
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
     if not user or not user.is_active or getattr(user, "is_verified", True) is False:
         return None
+    user._via_api_key = payload.get("typ") == "api"
     return user
 
 

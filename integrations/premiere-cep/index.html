@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <title>GapirAI</title>
+  <link rel="stylesheet" href="css/panel.css" />
+</head>
+<body>
+  <header class="top">
+    <strong>GapirAI</strong>
+    <span class="muted">oʻzbekcha dublaj va subtitr</span>
+  </header>
+
+  <!-- 1. API kalit -->
+  <section id="auth" class="card">
+    <h2>Hisob</h2>
+    <p id="auth-status" class="muted">Kalit kiritilmagan.</p>
+    <label for="api-key">API kalit</label>
+    <input id="api-key" type="password" autocomplete="off" placeholder="gapirai.uz → Mening videolarim → Premiere plagini" />
+    <div class="row">
+      <button id="save-key" class="primary">Saqlash</button>
+      <button id="get-key" class="link" type="button">Kalitni olish</button>
+    </div>
+  </section>
+
+  <!-- 2. Klip va sozlamalar -->
+  <section id="clip" class="card">
+    <h2>Klip</h2>
+    <button id="pick" class="secondary wide">Timeline'dagi tanlangan klipni olish</button>
+    <dl id="clip-info" class="info" hidden>
+      <dt>Klip</dt><dd id="clip-name"></dd>
+      <dt>Fayl</dt><dd id="clip-file"></dd>
+      <dt>Davomiylik</dt><dd id="clip-dur"></dd>
+    </dl>
+
+    <fieldset>
+      <legend>Natija</legend>
+      <label class="choice"><input type="radio" name="mode" value="dub" checked /> Dublaj + subtitr</label>
+      <label class="choice"><input type="radio" name="mode" value="subtitle" /> Faqat subtitr</label>
+    </fieldset>
+    <fieldset id="voice-box">
+      <legend>Ovoz</legend>
+      <label class="choice"><input type="radio" name="voice" value="auto" checked /> Avtomatik</label>
+      <label class="choice"><input type="radio" name="voice" value="male" /> Erkak</label>
+      <label class="choice"><input type="radio" name="voice" value="female" /> Ayol</label>
+    </fieldset>
+
+    <button id="start" class="primary wide" disabled>GapirAI'ga yuborish</button>
+    <p class="hint muted">Butun manba fayl yuboriladi (1 GB gacha, MP4/MOV/MKV/WebM). Natija klipning kesilgan qismiga moslab qoʻyiladi.</p>
+  </section>
+
+  <!-- 3. Jarayon -->
+  <section id="progress" class="card" hidden>
+    <h2>Jarayon</h2>
+    <p id="stage"></p>
+    <div class="bar"><div id="bar-fill"></div></div>
+    <p id="detail" class="muted"></p>
+  </section>
+
+  <p id="error" class="error" role="alert" hidden></p>
+
+  <script src="js/cep.js"></script>
+  <script src="js/srt.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -42,6 +42,7 @@ frontend/tsconfig.tsbuildinfo
 ai-dubber-backup/
 *.tar.gz
 *.zip
+!frontend/public/downloads/gapirai-premiere.zip
 auto_recovery_pipeline.py
 RECOVERY_PIPELINE_STATUS.json
 KELDIK_*.txt

@@ -948,3 +948,26 @@ export async function sendTelegramFeedback(payload: TelegramFeedbackPayload): Pr
 }
 
 
+
+// Shaxsiy API kalitlar (Premiere Pro plagini). `token` faqat yaratilganda keladi.
+export interface ApiKeyInfo {
+  id: string
+  name: string
+  created_at: string
+  last_used_at: string | null
+  token?: string
+}
+
+export async function listApiKeys(): Promise<ApiKeyInfo[]> {
+  const res = await apiClient.get('/api/api-keys')
+  return res.data.keys
+}
+
+export async function createApiKey(name = 'Premiere Pro'): Promise<ApiKeyInfo & { token: string }> {
+  const res = await apiClient.post('/api/api-keys', { name })
+  return res.data
+}
+
+export async function revokeApiKey(keyId: string): Promise<void> {
+  await apiClient.delete(`/api/api-keys/${keyId}`)
+}

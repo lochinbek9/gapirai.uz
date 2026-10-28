@@ -11,6 +11,7 @@ import {
 } from '@/lib/api'
 import { extractYouTubeId } from '@/lib/youtube'
 import PushOptIn from '@/components/PushOptIn'
+import PremierePluginCard from '@/components/PremierePluginCard'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
 import {
@@ -791,6 +792,7 @@ export default function DashboardPage() {
 
         <BillingCard />
         <PushOptIn />
+        <PremierePluginCard />
         <DonateCTA className="mb-6" />
 
         {/* Tabs */}

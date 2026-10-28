@@ -1,0 +1,32 @@
+/* Premiere paneli qorong'i -- uning ranglariga yaqin, bitta aksent (GapirAI ko'ki) */
+:root {
+  --bg: #232323; --card: #2b2b2b; --line: #3a3a3a; --ink: #e8e8e8; --muted: #a0a0a0;
+  --accent: #567cff; --danger: #ff7b7b; --ok: #4ade80;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px; background: var(--bg); color: var(--ink); font: 13px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; }
+.top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.top strong { font-size: 15px; }
+.muted { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+label { display: block; margin: 6px 0 4px; color: var(--muted); }
+input[type=password], input[type=text] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: #1d1d1d; color: var(--ink); }
+input:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+button { cursor: pointer; border-radius: 7px; padding: 7px 12px; font: inherit; border: 1px solid var(--line); background: #333; color: var(--ink); }
+button.primary { background: var(--ink); color: #111; border-color: var(--ink); font-weight: 600; }
+button.link { background: none; border: none; color: var(--accent); padding: 0; }
+button.wide { width: 100%; margin-top: 8px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+fieldset { border: 0; padding: 0; margin: 10px 0 0; }
+legend { color: var(--muted); margin-bottom: 4px; }
+.choice { display: inline-flex; align-items: center; gap: 5px; margin: 0 12px 0 0; color: var(--ink); }
+.info { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 10px 0 0; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+.hint { font-size: 12px; margin: 8px 0 0; }
+.bar { height: 6px; background: #1d1d1d; border-radius: 99px; overflow: hidden; margin: 6px 0; }
+#bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+.error { color: var(--danger); background: rgba(255,123,123,.08); border: 1px solid rgba(255,123,123,.3); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
+.ok { color: var(--ok); }
