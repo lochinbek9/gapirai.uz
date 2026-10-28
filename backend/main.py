@@ -43,6 +43,7 @@ from backend.api.billing_routes import router as billing_router
 from backend.api.tma_routes import router as tma_router
 from backend.api.donate_routes import router as donate_router
 from backend.api.feedback_routes import router as feedback_router
+from backend.api.api_key_routes import router as api_key_router
 
 settings = get_settings()
 
@@ -423,6 +424,7 @@ app.include_router(billing_router)
 app.include_router(tma_router)
 app.include_router(donate_router)
 app.include_router(feedback_router)
+app.include_router(api_key_router)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 os.makedirs(settings.OUTPUT_DIR, exist_ok=True)

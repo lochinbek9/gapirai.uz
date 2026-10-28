@@ -525,6 +525,20 @@ class ExcludedEmail(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ApiKey(Base):
+    """Shaxsiy API kalit -- Premiere Pro plagini kabi Google kirishi ishlamaydigan
+    joylar uchun (2026-10-28). Kalitning o'zi bazada saqlanmaydi: u imzolangan JWT
+    (typ="api", jti=shu id), bu yerda faqat bekor qilish va ko'rsatish uchun yozuv."""
+    __tablename__ = "api_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(80), nullable=False, default="Premiere Pro")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+
 
 def get_db():
     db = SessionLocal()
