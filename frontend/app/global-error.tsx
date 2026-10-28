@@ -1,11 +1,21 @@
 'use client'
 
+import { useEffect } from 'react'
+import { errorSummary, isChunkLoadError, reloadOnceForChunkError } from '@/lib/chunkReload'
+
 // Next.js talabi: global-error.tsx ROOT layout'ning o'zida xato yuz bersa
 // ishlaydi (error.tsx buni ushlay olmaydi, chunki u ham shu layout ichida
 // render qilinadi) -- shuning uchun o'z <html>/<body>'sini o'zi belgilashi
 // SHART, va Tailwind/global CSS pipeline'ga tayanmasligi kerak (root layout
 // buzilgan bo'lishi mumkin bo'lgan holatda ishlashi kerak).
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // Deploy'dan keyingi eski chunk xatosi -- reset() yordam bermaydi, sahifani qayta yuklaymiz
+  const chunk = isChunkLoadError(error)
+  useEffect(() => {
+    console.error(error)
+    reloadOnceForChunkError(error)
+  }, [error])
+
   return (
     <html lang="uz">
       <head>
@@ -86,6 +96,13 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
             line-height: 1.6;
             margin: 0 0 1.75rem 0;
           }
+          .code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.7rem;
+            color: var(--text-sub);
+            margin: -1rem 0 1.5rem 0;
+            word-break: break-word;
+          }
           .btn-group {
             display: flex;
             gap: 0.75rem;
@@ -132,12 +149,18 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
               <path d="M12 17h.01" />
             </svg>
           </div>
-          <h1 className="title">Nimadur noto&apos;g&apos;ri ketdi</h1>
+          <h1 className="title">{chunk ? 'Sayt yangilandi' : <>Nimadur noto&apos;g&apos;ri ketdi</>}</h1>
           <p className="desc">
-            Ilovani yuklashda kutilmagan xatolik yuz berdi. Qaytadan urinib ko&apos;ring — muammo davom etsa, bosh sahifaga qayting.
+            {chunk
+              ? 'Sahifaning yangi versiyasi chiqdi — qayta yuklanmoqda. Ochilmasa, «Qaytadan urinish»ni bosing.'
+              : <>Ilovani yuklashda kutilmagan xatolik yuz berdi. Qaytadan urinib ko&apos;ring — muammo davom etsa, bosh sahifaga qayting.</>}
           </p>
+          {!chunk && (
+            <p className="code">{error.digest ? `Xato ID: ${error.digest}` : errorSummary(error)}</p>
+          )}
           <div className="btn-group">
-            <button onClick={reset} className="btn-pri">
+            {/* reset() root layout'ni qayta yuklamaydi -- to'liq qayta yuklash ishonchliroq */}
+            <button onClick={() => window.location.reload()} className="btn-pri">
               Qaytadan urinish
             </button>
             <a href="/" className="btn-sec">
