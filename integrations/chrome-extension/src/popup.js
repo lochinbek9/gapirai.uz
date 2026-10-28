@@ -23,10 +23,14 @@ async function show() {
 }
 
 $('login').addEventListener('click', () => chrome.runtime.sendMessage({ type: 'open', path: '/login' }))
-$('server').addEventListener('change', async (e) => {
-  await chrome.storage.local.set({ server: e.target.value })
-  show()
-})
-chrome.storage.local.get('server').then(({ server }) => { $('server').value = server || 'prod' })
+// Server tanlovi faqat dasturchi nusxasida bor (Web Store arxivida olib tashlangan)
+const serverSelect = $('server')
+if (serverSelect) {
+  serverSelect.addEventListener('change', async (e) => {
+    await chrome.storage.local.set({ server: e.target.value })
+    show()
+  })
+  chrome.storage.local.get('server').then(({ server }) => { serverSelect.value = server || 'prod' })
+}
 $('version').textContent = `v${chrome.runtime.getManifest().version}`
 show()

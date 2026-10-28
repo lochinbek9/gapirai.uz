@@ -6,7 +6,7 @@ export default function PrivacyPage() {
   return (
     <PageShell>
       <div className="mx-auto max-w-3xl px-4 pb-24 pt-12 sm:px-6 sm:pt-20">
-        <PageTitle title="Maxfiylik siyosati" lead={<span className="text-base">Oxirgi yangilanish: 2026-yil 4-avgust</span>} />
+        <PageTitle title="Maxfiylik siyosati" lead={<span className="text-base">Oxirgi yangilanish: 2026-yil 28-oktabr</span>} />
         <div className="ui-prose mt-12 border-t border-ui-rule pt-10">
             <section>
               <h2>1. Biz to'playdigan ma'lumotlar</h2>
@@ -41,6 +41,33 @@ export default function PrivacyPage() {
               <h2>4. Uchinchi shaxslarga ma'lumot uzatish</h2>
               <p>
                 Xizmat ko'rsatish jarayonida matnlarni tarjima qilish uchun OpenAI va nutq sintezi uchun Microsoft Azure xizmatlariga faqatgina videodagi matnli ma'lumotlar uzatiladi. Sizning shaxsiy ma'lumotlaringiz uchinchi shaxslarga sotilmaydi.
+              </p>
+            </section>
+
+            <section id="chrome-extension" className="scroll-mt-24">
+              <h2>5. Chrome kengaytmasi «GapirAI — YouTube oʻzbekcha»</h2>
+              <p>Kengaytma faqat YouTube videolarini oʻzbekcha ovoz va subtitr bilan koʻrsatish uchun ishlaydi va quyidagilardan foydalanadi:</p>
+              <ul>
+                <li>
+                  <strong>Kirish maʼlumoti.</strong> Brauzeringizda gapirai.uz saytiga kirgan boʻlsangiz, kengaytma saytning kirish
+                  cookie&apos;sini (auth_token) oʻqiydi va undan faqat api.gapirai.uz ga soʻrov yuborishda foydalanadi. Parol yoki
+                  boshqa maʼlumot oʻqilmaydi.
+                </li>
+                <li>
+                  <strong>Ochilgan YouTube video identifikatori.</strong> GapirAI hisobingizga kirgan boʻlsangiz, YouTube video sahifasini
+                  ochganingizda shu videoning identifikatori (masalan, dQw4w9WgXcQ) siz uchun tayyor dublaj bor-yoʻqligini tekshirish
+                  uchun serverimizga yuboriladi. «Dublaj qilish» tugmasini bossangizgina video havolasi dublaj uchun yuboriladi.
+                  Boshqa saytlar yoki YouTube&apos;dagi boshqa faoliyatingiz kuzatilmaydi.
+                </li>
+                <li>
+                  <strong>Sozlamalar.</strong> Asl ovoz darajasi, subtitr va ovoz tanlovi faqat brauzeringizning oʻzida
+                  (chrome.storage) saqlanadi.
+                </li>
+              </ul>
+              <p>
+                Kengaytma reklama koʻrsatmaydi, analitika yoki kuzatuv vositalaridan foydalanmaydi, maʼlumotlarni sotmaydi va
+                uchinchi shaxslarga bermaydi. Kengaytma orqali olingan maʼlumotlardan foydalanish Chrome Web Store User Data
+                Policy talablariga, jumladan Limited Use talablariga mos keladi.
               </p>
             </section>
         </div>
