@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode, apiForgotPassword, apiResetPassword, apiGoogleAuth, apiRequestPhoneCode, apiVerifyPhoneCode } from '@/lib/auth'
+import { User, getToken, setToken, setStoredUser, getStoredUser, clearAuth, apiLogin, apiRegister, apiMe, apiVerifyCode, apiResendCode, apiForgotPassword, apiResetPassword, apiGoogleAuth, apiTelegramAuth, apiRequestPhoneCode, apiVerifyPhoneCode, type TelegramLoginData } from '@/lib/auth'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -77,6 +77,14 @@ export function useAuth() {
     return data.user
   }, [])
 
+  const telegramAuth = useCallback(async (payload: TelegramLoginData) => {
+    const data = await apiTelegramAuth(payload)
+    setToken(data.access_token)
+    setStoredUser(data.user)
+    setUser(data.user)
+    return data.user
+  }, [])
+
   const requestPhoneCode = useCallback(async (phone: string) => {
     return apiRequestPhoneCode(phone)
   }, [])
@@ -91,7 +99,7 @@ export function useAuth() {
 
   return {
     user, loading, login, register, verifyCode, resendCode, forgotPassword, resetPassword, logout,
-    googleAuth, requestPhoneCode, verifyPhoneCode,
+    googleAuth, telegramAuth, requestPhoneCode, verifyPhoneCode,
     isLoggedIn: !!user,
   }
 }
