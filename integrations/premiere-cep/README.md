@@ -42,4 +42,7 @@ gapirai.uz → **Mening videolarim** → **Premiere Pro plagini** → kalit yoni
 - `jsx/host.jsx` — Premiere tomoni (ExtendScript): tanlovni o'qish, import, trekka qo'yish.
 - `js/api.js` — Node orqali API: oqim bilan yuklash, natijani diskka yozish.
 - `js/srt.js` — SRT'ni manba vaqtidan sekvensiya vaqtiga surish.
+- `js/wav.js` — dublaj audiosidan klipning in/out qismini kesish (Premiere'ning in/out API'siga tayanmaslik uchun).
+- Testlar: `node --test integrations/premiere-cep/tests/panel.test.mjs`.
+- Arxivni qayta yig'ish: `integrations/premiere-cep/build-zip.sh`.
 - Panelni Chrome'da tekshirish: Premiere ochiq turganda `http://localhost:8098`.

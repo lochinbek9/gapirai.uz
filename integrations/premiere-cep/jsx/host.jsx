@@ -50,10 +50,12 @@ function gapirai_getSelection() {
             name: item.name,
             path: path,
             start: item.start.seconds,
+            startTicks: String(item.start.ticks),
             end: item.end.seconds,
             inPoint: item.inPoint.seconds,
             outPoint: item.outPoint.seconds,
             sequence: seq.name,
+            sequenceId: String(seq.sequenceID),
             projectPath: app.project.path
         });
     } catch (e) {
@@ -93,16 +95,29 @@ function _freeAudioTrack(seq, from, to) {
     return null;
 }
 
+/** Klip tanlangan sekvensiya (panel qayta ochilganda foydalanuvchi boshqasiga o'tgan bo'lishi mumkin). */
+function _sequenceById(id) {
+    if (id) {
+        for (var i = 0; i < app.project.sequences.numSequences; i++) {
+            var s = app.project.sequences[i];
+            if (s && String(s.sequenceID) === String(id)) return s;
+        }
+    }
+    return app.project.activeSequence;
+}
+
 /**
- * Tayyor fayllarni loyihaga import qiladi va klip bilan sinxron qo'yadi.
- * audioPath -- asl manba fayl bilan bir xil vaqt shkalasidagi dublaj audiosi
- *   (bo'sh bo'lsa -- faqat subtitr). start/inPoint/outPoint -- klipniki, soniyada.
+ * Tayyor fayllarni loyihaga import qiladi va klip joyiga qo'yadi.
+ * audioPath -- klipning [inPoint, outPoint] qismiga allaqachon kesilgan dublaj
+ *   audiosi (bo'sh bo'lsa -- faqat subtitr). startTicks -- klipning timeline'dagi
+ *   boshi (Premiere ticks, satr: overwriteClip shuni kutadi); startSec/durSec --
+ *   bo'sh trek qidirish uchun, soniyada.
  * srtPath -- allaqachon sekvensiya vaqtiga siljitilgan SRT (bo'sh bo'lishi mumkin).
  */
-function gapirai_place(audioPath, srtPath, start, inPoint, outPoint) {
+function gapirai_place(audioPath, srtPath, startTicks, startSec, durSec, sequenceId) {
     try {
-        var seq = app.project.activeSequence;
-        if (!seq) return _err("Faol sekvensiya yo'q.");
+        var seq = _sequenceById(sequenceId);
+        if (!seq) return _err("Klip turgan sekvensiya topilmadi.");
         var bin = _findOrCreateBin('GapirAI');
         var files = [];
         if (audioPath) files.push(audioPath);
@@ -113,11 +128,9 @@ function gapirai_place(audioPath, srtPath, start, inPoint, outPoint) {
         if (audioPath) {
             var audioItem = _findByPath(bin, audioPath);
             if (!audioItem) return _err("Audio loyihaga import bo'lmadi.");
-            audioItem.setInPoint(inPoint, 4);
-            audioItem.setOutPoint(outPoint, 4);
-            var track = _freeAudioTrack(seq, start, start + (outPoint - inPoint));
+            var track = _freeAudioTrack(seq, startSec, startSec + durSec);
             if (track) {
-                track.overwriteClip(audioItem, start);
+                track.overwriteClip(audioItem, startTicks);
                 placedAudio = true;
             } else {
                 note = "Bo'sh audio trek topilmadi: audio 'GapirAI' papkasiga import qilindi, uni timeline'ga qo'lda torting.";
@@ -126,10 +139,10 @@ function gapirai_place(audioPath, srtPath, start, inPoint, outPoint) {
         if (srtPath) {
             var capItem = _findByPath(bin, srtPath);
             if (capItem && seq.createCaptionTrack) {
-                seq.createCaptionTrack(capItem, 0);
-                placedCaptions = true;
-            } else if (capItem) {
-                note += (note ? ' ' : '') + "Bu Premiere versiyasi subtitr trekini avtomatik yarata olmaydi: SRT 'GapirAI' papkasida.";
+                placedCaptions = seq.createCaptionTrack(capItem, 0) !== false;
+            }
+            if (capItem && !placedCaptions) {
+                note += (note ? ' ' : '') + "Subtitr trekini avtomatik yaratib bo'lmadi: SRT 'GapirAI' papkasida, uni timeline'ga torting.";
             }
         }
         return _json({ ok: true, audio: placedAudio, captions: placedCaptions, note: note });
