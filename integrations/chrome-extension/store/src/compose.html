@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1280px; height: 800px; overflow: hidden; background: #0e0f12; color: #fff;
+    font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif; }
+  .shot { position: relative; width: 1280px; height: 800px; padding: 56px 64px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; color: #c9cbd1; }
+  .brand img { width: 28px; height: 28px; border-radius: 7px; }
+  h1 { margin-top: 22px; font-size: 46px; line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; max-width: 1000px; }
+  p { margin-top: 12px; font-size: 21px; color: #a9acb5; max-width: 900px; }
+  .frame { position: absolute; left: 64px; right: 64px; bottom: 0; height: 520px; border-radius: 16px 16px 0 0; overflow: hidden;
+    box-shadow: 0 -10px 60px rgba(47,107,255,.18), 0 0 0 1px rgba(255,255,255,.08); background: #000; }
+  .frame img { width: 100%; height: 100%; object-fit: cover; object-position: left top; }
+</style></head>
+<body><div class="shot">
+  <div class="brand"><img src="../../icons/icon128.png" alt=""> GapirAI — YouTube oʻzbekcha</div>
+  <h1 id="h"></h1><p id="p"></p>
+  <div class="frame"><img id="img" alt=""></div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search)
+  document.getElementById('h').textContent = q.get('h')
+  document.getElementById('p').textContent = q.get('p')
+  document.getElementById('img').src = q.get('img')
+</script></body></html>

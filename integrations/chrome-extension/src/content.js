@@ -111,8 +111,10 @@
   const subs = h('div', { class: 'subs' })
   root.append(subs, pill, panel)
 
+  // Server daqiqani kasr bilan yechadi (8 daq 6 s = 8,1) -- shunday ko'rsatamiz
   function minutesOf(seconds) {
-    return Math.max(1, Math.ceil(seconds / 60))
+    const m = Math.max(0.1, seconds / 60)
+    return m < 10 ? (Math.round(m * 10) / 10).toString().replace('.', ',') : String(Math.round(m))
   }
 
   function render() {
