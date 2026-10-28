@@ -30,5 +30,19 @@
     return out.join('\n\n') + '\n';
   }
 
-  window.GapirSrt = { shiftSrt: shiftSrt, toSec: toSec, fromSec: fromSec };
+  // SRT matni -> [{s, e, t}] (soniyada) -- After Effects'da matn qatlamlari uchun
+  function cues(text) {
+    var list = [];
+    String(text).replace(/\r/g, '').split(/\n\s*\n/).forEach(function (b) {
+      var lines = b.trim().split('\n');
+      var idx = lines.findIndex(function (l) { return l.indexOf('-->') !== -1; });
+      if (idx === -1) return;
+      var parts = lines[idx].split('-->');
+      var t = lines.slice(idx + 1).join('\n').trim();
+      if (t) list.push({ s: toSec(parts[0]), e: toSec(parts[1]), t: t });
+    });
+    return list;
+  }
+
+  window.GapirSrt = { shiftSrt: shiftSrt, toSec: toSec, fromSec: fromSec, cues: cues };
 })();

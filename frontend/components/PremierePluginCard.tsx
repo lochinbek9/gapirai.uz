@@ -7,7 +7,7 @@ import { formatTashkentDate } from '@/lib/timestamp'
 const PREMIERE_ZIP = '/downloads/gapirai-premiere.zip'
 const RESOLVE_ZIP = '/downloads/gapirai-resolve.zip'
 
-// Dashboard'da: Premiere Pro va DaVinci Resolve plaginlarini yuklab olish hamda ularning (umumiy) API kalitlarini boshqarish.
+// Dashboard'da: Premiere Pro / After Effects va DaVinci Resolve plaginlarini yuklab olish hamda ularning (umumiy) API kalitlarini boshqarish.
 // Kalit faqat yaratilgan zahoti bir marta ko'rsatiladi (serverda saqlanmaydi).
 export default function PremierePluginCard() {
   const [keys, setKeys] = useState<ApiKeyInfo[] | null>(null)
@@ -65,12 +65,12 @@ export default function PremierePluginCard() {
         <div className="min-w-0">
           <h2 id="premiere-title" className="text-base font-semibold text-ui-ink">Montaj dasturlari uchun plaginlar</h2>
           <p className="mt-1 max-w-xl text-sm text-ui-muted">
-            Timeline'dagi klipni toʻgʻridan-toʻgʻri GapirAI'ga yuboring: oʻzbekcha ovoz va subtitr oʻsha joyga alohida trek boʻlib qaytadi. Premiere Pro 2020+ va DaVinci Resolve 18.5+ (bepul va Studio), macOS va Windows. Ikkalasi uchun bitta kalit.
+            Timeline'dagi klipni toʻgʻridan-toʻgʻri GapirAI'ga yuboring: oʻzbekcha ovoz va subtitr oʻsha joyga alohida trek boʻlib qaytadi. Premiere Pro va After Effects 2020+ (bitta plagin) hamda DaVinci Resolve 18.5+ (bepul va Studio), macOS va Windows. Hammasi uchun bitta kalit.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <a href={PREMIERE_ZIP} download className="ui-btn ui-btn-secondary">
-            <Download aria-hidden="true" className="h-4 w-4" /> Premiere Pro
+            <Download aria-hidden="true" className="h-4 w-4" /> Premiere Pro / After Effects
           </a>
           <a href={RESOLVE_ZIP} download className="ui-btn ui-btn-secondary">
             <Download aria-hidden="true" className="h-4 w-4" /> DaVinci Resolve
@@ -98,7 +98,7 @@ export default function PremierePluginCard() {
               {copied ? 'Nusxalandi' : 'Nusxalash'}
             </button>
           </div>
-          <p className="mt-2 text-xs text-ui-muted">Premiere: Window → Extensions → GapirAI. DaVinci Resolve: Workspace → Scripts → GapirAI. Kalitni joylab „Saqlash“ni bosing.</p>
+          <p className="mt-2 text-xs text-ui-muted">Premiere / After Effects: Window → Extensions → GapirAI. DaVinci Resolve: Workspace → Scripts → GapirAI. Kalitni joylab „Saqlash“ni bosing.</p>
         </div>
       )}
 

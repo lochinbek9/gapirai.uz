@@ -16,6 +16,7 @@
   };
 
   var selection = null, busy = false, authed = false;
+  var IS_AE = GapirCep.hostApp() === 'AEFT';
 
   function client() { return new GapirApi.Client(API_BASE, store.get('key') || ''); }
 
@@ -170,16 +171,26 @@
         GapirApi.fs.writeFileSync(wav, cut.buffer);
       });
     }).then(function () {
-      setProgress('Timeline\'ga qoʻyilmoqda', 100, '');
-      var call = 'gapirai_place(' + [
-        GapirCep.jsxString(wav), GapirCep.jsxString(srtClip), GapirCep.jsxString(sel.startTicks), Number(sel.start) || 0, Number(dur) || 0, GapirCep.jsxString(sel.sequenceId || ''),
-      ].join(',') + ')';
+      var call;
+      if (IS_AE) {
+        // After Effects: har bir kue -- kompozitsiya vaqtidagi alohida matn qatlami
+        setProgress('Kompozitsiyaga qoʻyilmoqda', 100, '');
+        var cues = GapirSrt.cues(GapirApi.fs.readFileSync(srtClip, 'utf8'));
+        call = 'gapirai_placeAE(' + [
+          GapirCep.jsxString(wav), Number(sel.start) || 0, Number(dur) || 0, GapirCep.jsxString(sel.sequenceId || ''), GapirCep.jsxLiteral(cues),
+        ].join(',') + ')';
+      } else {
+        setProgress('Timeline\'ga qoʻyilmoqda', 100, '');
+        call = 'gapirai_place(' + [
+          GapirCep.jsxString(wav), GapirCep.jsxString(srtClip), GapirCep.jsxString(sel.startTicks), Number(sel.start) || 0, Number(dur) || 0, GapirCep.jsxString(sel.sequenceId || ''),
+        ].join(',') + ')';
+      }
       return GapirCep.evalScript(call);
     }).then(function (r) {
       if (!r.ok) throw new Error(r.error);
       var done = [];
-      if (r.audio) done.push('oʻzbekcha ovoz audio trekka');
-      if (r.captions) done.push('subtitr caption trekka');
+      if (r.audio) done.push(IS_AE ? 'oʻzbekcha ovoz audio qatlam boʻlib' : 'oʻzbekcha ovoz audio trekka');
+      if (r.captions) done.push(IS_AE ? r.captionCount + ' ta subtitr matn qatlami boʻlib' : 'subtitr caption trekka');
       var msg = [done.length ? done.join(' va ') + ' qoʻyildi.' : '', warn, r.note || '', 'Fayllar: ' + dir];
       setProgress('Tayyor', 100, msg.filter(Boolean).join(' '));
     });
@@ -219,6 +230,10 @@
 
   /* ---------- Boshlanish ---------- */
 
+  if (IS_AE) {
+    $('pick').textContent = 'Kompozitsiyada tanlangan qatlamni olish';
+    $('hint').textContent = 'Butun manba fayl yuboriladi (1 GB gacha, MP4/MOV/MKV/WebM). Ovoz qatlam boshiga, subtitr esa alohida matn qatlamlari boʻlib qoʻyiladi — ularni bemalol bezash va animatsiya qilish mumkin.';
+  }
   syncVoiceBox();
   refreshAuth();
   var pending = store.get('pending');
