@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -1376,6 +1377,15 @@ def get_subtitles(
     return Response(content=content, media_type="text/vtt", headers=headers)
 
 
+def _srt_text_for(job) -> str:
+    """Yuklab olinadigan SRT matni (subtitles.srt va CapCut paketi uchun bir xil)."""
+    cues = _subtitle_cues_for(job)
+    if cues:
+        return subtitle_cues.cues_to_srt(cues)
+    from backend.workers.tasks import _segments_to_srt
+    return _segments_to_srt(job.translated_segments)
+
+
 @router.get("/jobs/{job_id}/subtitles.srt")
 def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """O'zbekcha subtitrlarni SRT formatida, yuklab olish uchun qaytaradi
@@ -1386,14 +1396,8 @@ def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
     job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
     if not job or not job.translated_segments:
         raise HTTPException(status_code=404, detail="Subtitrlar topilmadi.")
-    cues = _subtitle_cues_for(job)
-    if cues:
-        srt_content = subtitle_cues.cues_to_srt(cues)
-    else:
-        from backend.workers.tasks import _segments_to_srt
-        srt_content = _segments_to_srt(job.translated_segments)
     return Response(
-        content=srt_content,
+        content=_srt_text_for(job),
         media_type="application/x-subrip",
         headers={
             "Access-Control-Allow-Origin": "*",
@@ -1401,6 +1405,78 @@ def get_subtitles_srt(job_id: uuid.UUID, db: Session = Depends(get_db)):
                 subtitle_export.download_filename(job.video_title, job_id, "srt")
             ),
         },
+    )
+
+
+def _dubbed_wav_for(job) -> tuple[str | None, bool]:
+    """Dublaj WAV'ining lokal yo'li va u vaqtinchalikmi (S3'dan olingan) -- yo'q bo'lsa (None, False)."""
+    for candidate in (job.dubbed_audio_path, f"outputs/{job.storage_id}/audio/dubbed_audio.wav"):
+        if candidate and Path(candidate).exists():
+            return candidate, False
+    settings = get_settings()
+    if settings.AWS_BUCKET_NAME:
+        import tempfile
+        from backend.services.storage import download_file_from_s3
+        fd, tmp = tempfile.mkstemp(suffix=".wav", prefix="gapirai-capcut-")
+        os.close(fd)
+        if download_file_from_s3(f"dubber/{job.storage_id}/dubbed_audio.wav", tmp):
+            return tmp, True
+        os.remove(tmp)
+    return None, False
+
+
+def _remove_files(paths: list[str]) -> None:
+    for p in paths:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+
+@router.get("/jobs/{job_id}/capcut.zip")
+def download_capcut_package(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    """CapCut uchun paket (2026-10-28): o'zbekcha ovoz (MP3) + subtitr (SRT) +
+    qo'llanma, bitta zip'da. Faqat-subtitr job'da -- ovozsiz. subtitles.srt va
+    outputs/.../audio kabi job ID bo'yicha (havola bilan yuklab olinadi)."""
+    from backend.services import capcut_export
+    from starlette.background import BackgroundTask
+
+    job = db.query(DubbingJob).filter(DubbingJob.id == job_id).first()
+    if not job or job.status != JobStatus.COMPLETED or not job.translated_segments:
+        raise HTTPException(status_code=404, detail="Tayyor natija topilmadi.")
+    srt_text = _srt_text_for(job)
+
+    temp_files: list[str] = []
+    mp3 = None
+    if not job.subtitle_only:
+        wav, wav_is_temp = _dubbed_wav_for(job)
+        if not wav:
+            raise HTTPException(status_code=410, detail="Dublaj audiosi endi mavjud emas — saqlash muddati tugagan.")
+        if wav_is_temp:
+            temp_files.append(wav)
+            mp3 = capcut_export.cached_mp3(wav)   # vaqtinchalik WAV yonida -- u ham o'chiriladi
+            if mp3:
+                temp_files.append(mp3)
+        else:
+            mp3 = capcut_export.cached_mp3(wav)
+            if mp3 and Path(mp3).parent != Path(wav).parent:
+                temp_files.append(mp3)        # WAV papkasiga yozib bo'lmadi -- vaqtinchalik
+        if not mp3:
+            _remove_files(temp_files)
+            raise HTTPException(status_code=500, detail="Ovozni MP3 ga oʻgirib boʻlmadi. Birozdan soʻng qayta urinib koʻring.")
+
+    try:
+        zip_path = capcut_export.build_zip(srt_text, mp3, job.video_title)
+    except Exception:
+        _remove_files(temp_files)
+        raise
+    temp_files.append(zip_path)
+    filename = subtitle_export.download_filename(job.video_title, job_id, "zip").replace(".uz.zip", " (CapCut).uz.zip")
+    return FileResponse(
+        path=zip_path,
+        media_type="application/zip",
+        headers={"Content-Disposition": subtitle_export.content_disposition(filename)},
+        background=BackgroundTask(_remove_files, temp_files),
     )
 
 

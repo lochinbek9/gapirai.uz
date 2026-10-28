@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Copy, Download, FileText, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
-import { Job, getSubtitleDownloadUrl } from "@/lib/api";
+import { Job, getSubtitleDownloadUrl, getCapcutPackageUrl } from "@/lib/api";
 import { useState } from "react";
 
 interface Props {
@@ -67,7 +67,10 @@ export default function SubtitleResult({ job, onReset }: Props) {
         </a>
       </div>
       <p className="-mt-3 text-xs text-ui-muted text-center">
-        .SRT/.VTT — vaqt kodli subtitr (pleer va montaj dasturlari uchun); .TXT — faqat matn.
+        .SRT/.VTT — vaqt kodli subtitr (pleer va montaj dasturlari uchun); .TXT — faqat matn.{" "}
+        <a href={getCapcutPackageUrl(job.job_id)} download className="font-semibold text-ui-ink underline underline-offset-2">
+          CapCut uchun (qoʻllanma bilan)
+        </a>
       </p>
 
       {job.translated_text && (

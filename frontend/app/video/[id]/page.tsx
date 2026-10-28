@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SiteHeader from '@/components/home/SiteHeader'
 import Footer from '@/components/Footer'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, getCapcutPackageUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import { useAuth } from '@/hooks/useAuth'
@@ -1107,9 +1107,19 @@ export default function VideoPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card border border-ui-rule rounded-2xl p-4 sm:p-5">
                     <div className="space-y-2">
                       <span className="text-xs font-semibold text-ui-muted">
-                        Videoni yuklab olish
+                        Yuklab olish
                       </span>
                       <ResolutionDownloadButtons jobId={id} videoTitle={job.video_title} />
+                      <a
+                        href={getCapcutPackageUrl(id)}
+                        download
+                        className="inline-flex items-center gap-2 rounded-xl border border-ui-rule px-3.5 py-2.5 text-xs font-semibold text-ui-ink transition hover:bg-ui-ground sm:text-sm"
+                        title="Oʻzbekcha ovoz (MP3), subtitr (SRT) va qoʻllanma — CapCut va boshqa montaj dasturlari uchun"
+                      >
+                        <Download aria-hidden="true" className="h-4 w-4" />
+                        CapCut uchun: ovoz + subtitr
+                        <span className="font-normal text-ui-muted">.zip</span>
+                      </a>
                     </div>
 
                     {canManage && (

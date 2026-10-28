@@ -622,6 +622,11 @@ export function getAudioUrl(jobId: string): string {
   return `${API_URL}/api/outputs/${jobId}/audio`
 }
 
+// CapCut uchun paket: o'zbekcha ovoz (MP3) + subtitr (SRT) + qo'llanma, bitta zip
+export function getCapcutPackageUrl(jobId: string): string {
+  return `${API_URL}/api/jobs/${jobId}/capcut.zip`
+}
+
 const JOB_KEY = "dubber_last_job"
 
 export function saveJobId(id: string) {
