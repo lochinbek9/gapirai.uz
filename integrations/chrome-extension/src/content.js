@@ -3,8 +3,13 @@
  * sinxron ijro etadi (YouTube ovozi pasaytiriladi), o'zbekcha subtitrni
  * pleyer ustida ko'rsatadi. Barcha API so'rovlari fon skripti orqali. */
 (() => {
-  if (window.__gapiraiLoaded) return
-  window.__gapiraiLoaded = true
+  // Kengaytma o'rnatilganda/yangilanganda fon skripti ochiq YouTube tablariga shu
+  // skriptni qayta joylaydi. Tabdagi eski nusxa "yetim" bo'lib qoladi (chrome.runtime
+  // uziladi) -- u o'zini to'xtatadi, yangisi uning tugmasini olib tashlaydi.
+  const instance = {}
+  window.__gapiraiInstance = instance
+  document.querySelectorAll('#gapirai-root').forEach((el) => el.remove())
+  const alive = () => window.__gapiraiInstance === instance && !!(chrome.runtime && chrome.runtime.id)
 
   const POLL_MS = 4000
   const DRIFT_S = 0.3
@@ -336,6 +341,7 @@
   }
 
   function tick() {
+    if (!alive()) return shutdown()
     const v = video()
     const a = state.audio
     // Subtitr dublajdan mustaqil ko'rsatilishi mumkin
@@ -377,6 +383,7 @@
   // ---------- Hayot sikli ----------
 
   function attach() {
+    if (!alive()) return shutdown()
     const p = player()
     if (p && !p.contains(host)) p.append(host)
     const id = currentVideoId()
@@ -384,13 +391,26 @@
     if (id !== state.videoId) refresh()
   }
 
-  document.addEventListener('yt-navigate-finish', attach)
-  setInterval(attach, 1000)
-  setInterval(tick, 200)
-  for (const ev of ['play', 'pause', 'seeked', 'ratechange']) {
-    document.addEventListener(ev, (e) => { if (e.target === video()) tick() }, true)
+  const MEDIA_EVENTS = ['play', 'pause', 'seeked', 'ratechange']
+  const onMediaEvent = (e) => { if (e.target === video()) tick() }
+  const onStorage = (ch) => { if (ch.server) refresh() }
+  const timers = [setInterval(attach, 1000), setInterval(tick, 200)]
+
+  let stopped = false
+  function shutdown() {
+    if (stopped) return
+    stopped = true
+    timers.forEach(clearInterval)
+    document.removeEventListener('yt-navigate-finish', attach)
+    for (const ev of MEDIA_EVENTS) document.removeEventListener(ev, onMediaEvent, true)
+    try { chrome.storage.onChanged.removeListener(onStorage) } catch {}
+    teardown()
+    host.remove()
   }
-  chrome.storage.onChanged.addListener((ch) => { if (ch.server) refresh() })
+
+  document.addEventListener('yt-navigate-finish', attach)
+  for (const ev of MEDIA_EVENTS) document.addEventListener(ev, onMediaEvent, true)
+  chrome.storage.onChanged.addListener(onStorage)
 
   loadPrefs().then(attach)
 })()

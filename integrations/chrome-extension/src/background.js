@@ -49,6 +49,16 @@ async function api({ method = 'GET', path, body }) {
   return { ok: true, status: res.status, data }
 }
 
+// O'rnatilganda/yangilanganda allaqachon ochiq YouTube tablarida ham ishlashi uchun
+// (aks holda foydalanuvchi tabni yangilamaguncha "UZ" tugmasi chiqmaydi).
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({ url: 'https://www.youtube.com/*' })
+  await Promise.all(tabs.map((tab) =>
+    chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content.js'] })
+      .catch(() => {}) // yuklanayotgan yoki yopilgan tab -- o'tkazib yuboramiz
+  ))
+})
+
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   const run = async () => {
     const s = await server()

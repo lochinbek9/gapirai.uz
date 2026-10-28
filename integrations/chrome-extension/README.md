@@ -19,11 +19,11 @@ Alohida login yoʻq: brauzerda **gapirai.uz** ga kirgan boʻlsangiz, kengaytma o
 1. Chrome'da `chrome://extensions` ni oching.
 2. Oʻng yuqoridagi **Developer mode** ni yoqing.
 3. **Load unpacked** → shu papkani (`integrations/chrome-extension`) tanlang.
-4. gapirai.uz ga kiring, soʻng istalgan YouTube videosini oching.
+4. gapirai.uz ga kiring, soʻng istalgan YouTube videosini oching. Allaqachon ochiq YouTube tablari ham yangilanmasdan ishlaydi — kengaytma oʻrnatilganda/yangilanganda ularga oʻzi ulanadi.
 
 ## Dasturchilar uchun
 
-- `src/background.js` — API soʻrovlari (CORS'siz, `host_permissions`), sayt cookie'sidan token.
+- `src/background.js` — API soʻrovlari (CORS'siz, `host_permissions`), sayt cookie'sidan token; oʻrnatish/yangilanishda ochiq YouTube tablariga `content.js` ni joylaydi (eski nusxa oʻzini toʻxtatadi).
 - `src/content.js` — YouTube sahifasi: tugma/panel (Shadow DOM), audio sinxroni, subtitr.
 - `src/popup.*` — holat va **Dasturchi sozlamalari → Server** (gapirai.uz yoki lokal `localhost:3000` / `localhost:8000`).
 - Backend: `GET /api/jobs/by-video/{youtube_id}` — foydalanuvchining shu video boʻyicha tayyor yoki jarayondagi dublaji.
