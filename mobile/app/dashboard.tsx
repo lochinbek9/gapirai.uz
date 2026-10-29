@@ -8,6 +8,7 @@ import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native
 import { Youtube } from '../src/components/BrandIcons';
 import { Card } from '../src/components/Card';
 import { PrimaryButton } from '../src/components/PrimaryButton';
+import { RequireAuth } from '../src/components/RequireAuth';
 import { Screen } from '../src/components/Screen';
 import { SegmentedControl } from '../src/components/SegmentedControl';
 import { StatusBadge } from '../src/components/StatusBadge';
@@ -30,7 +31,15 @@ import { formatDate, formatDuration } from '../src/utils/format';
 
 type Tab = 'dubbing' | 'analysis';
 
-export default function DashboardScreen() {
+export default function DashboardScreenRoute() {
+  return (
+    <RequireAuth>
+      <DashboardScreen />
+    </RequireAuth>
+  );
+}
+
+function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();

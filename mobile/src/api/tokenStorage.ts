@@ -7,14 +7,22 @@ import * as SecureStore from 'expo-secure-store';
 // and retrieve whatever token Phase 2 obtains.
 const TOKEN_KEY = 'gapirai_auth_token';
 
-export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+// SecureStore (Android Keystore) o'qish ba'zi qurilmalarda bir necha soniya oladi --
+// har API so'rovida qayta o'qimaslik uchun bir marta o'qib, xotirada saqlaymiz.
+// Bir vaqtdagi so'rovlar bitta o'qishni kutadi.
+let cached: Promise<string | null> | null = null;
+
+export function getStoredToken(): Promise<string | null> {
+  if (!cached) cached = SecureStore.getItemAsync(TOKEN_KEY).catch(() => null);
+  return cached;
 }
 
 export async function setStoredToken(token: string): Promise<void> {
+  cached = Promise.resolve(token);
   await SecureStore.setItemAsync(TOKEN_KEY, token);
 }
 
 export async function clearStoredToken(): Promise<void> {
+  cached = Promise.resolve(null);
   await SecureStore.deleteItemAsync(TOKEN_KEY);
 }

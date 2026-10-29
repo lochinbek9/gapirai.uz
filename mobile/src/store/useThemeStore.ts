@@ -1,30 +1,36 @@
-import * as SecureStore from 'expo-secure-store';
+import { File, Paths } from 'expo-file-system';
 import { create } from 'zustand';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
-const KEY = 'theme_preference';
+// Saytdagidek: standart -- tizim mavzusi; header'dagi tugma bilan tanlansa saqlanadi.
+// Maxfiy emas, shuning uchun SecureStore emas, oddiy fayl: sinxron o'qiladi va
+// birinchi kadrdanoq to'g'ri mavzu chiqadi (SecureStore ba'zi telefonlarda soniyalab kechikadi).
+const file = () => new File(Paths.document, 'theme-preference.txt');
+
+function readSaved(): ThemePreference {
+  try {
+    const f = file();
+    const v = f.exists ? f.textSync().trim() : '';
+    return v === 'light' || v === 'dark' ? v : 'system';
+  } catch {
+    return 'system';
+  }
+}
 
 interface ThemeStoreState {
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => void;
-  hydrate: () => Promise<void>;
 }
 
-// Saytdagidek: standart -- tizim mavzusi; foydalanuvchi header'dagi tugma bilan
-// tanlasa, tanlov saqlanadi (sayt localStorage, ilova SecureStore).
 export const useThemeStore = create<ThemeStoreState>((set) => ({
-  preference: 'system',
+  preference: readSaved(),
   setPreference: (preference) => {
     set({ preference });
-    SecureStore.setItemAsync(KEY, preference).catch(() => {});
-  },
-  hydrate: async () => {
     try {
-      const saved = await SecureStore.getItemAsync(KEY);
-      if (saved === 'light' || saved === 'dark' || saved === 'system') set({ preference: saved });
+      file().write(preference);
     } catch {
-      // saqlangan tanlov yo'q -- tizim mavzusi qoladi
+      // saqlanmasa ham joriy sessiyada ishlaydi
     }
   },
 }));
