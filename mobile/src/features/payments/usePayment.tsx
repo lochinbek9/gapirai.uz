@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
-import * as WebBrowser from 'expo-web-browser';
 import { Check, ChevronRight, Copy } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
@@ -15,19 +14,20 @@ import { formatNumber } from '../../utils/format';
 import { initiatePayment, type PaymentProvider, type PaymentStart, type PaymentTarget } from './api';
 
 const PROVIDERS: { id: PaymentProvider; label: string; hint: string }[] = [
-  { id: 'click', label: 'Click', hint: 'Click sahifasida karta bilan' },
-  { id: 'payme', label: 'Payme', hint: 'Payme sahifasida karta bilan' },
+  { id: 'click', label: 'Click', hint: 'Click ilovasida yoki sahifasida' },
+  { id: 'payme', label: 'Payme', hint: 'Payme ilovasida yoki sahifasida' },
   { id: 'uzum', label: 'Uzum', hint: 'Uzum Bank ilovasida' },
-  { id: 'paynet', label: 'Paynet', hint: 'Paynet ilovasi yoki bankomatda' },
+  { id: 'paynet', label: 'Paynet', hint: 'Paynet ilovasida buyurtma raqami bilan' },
 ];
 
 type Code = Extract<PaymentStart, { kind: 'code' }>;
 
 /**
- * To'lov: provayder tanlanadi (pastdan chiqadigan varaq), so'ng
- * - Click/Payme -- to'lov sahifasi ilova ustida ochiladi;
- * - Uzum -- Uzum Bank ilovasi (universal havola) to'lov formasi bilan ochiladi;
- * - Paynet -- buyurtma raqami ko'rsatiladi, foydalanuvchi uni Paynet'da kiritadi.
+ * To'lov: provayder tanlanadi (pastdan chiqadigan varaq), so'ng havola tizim orqali
+ * ochiladi (Custom Tab emas): my.click.uz, checkout.paycom.uz va uzumbank.uz Android App
+ * Link -- telefonda Click/Payme/Uzum ilovasi bo'lsa to'lov o'sha ilovada ochiladi, bo'lmasa
+ * brauzerda. Paynet'da ochiq havola formati yo'q -- buyurtma raqami nusxalanib, Paynet
+ * ilovasi ochiladi (app.paynet.uz ham App Link), foydalanuvchi raqamni joylashtiradi.
  * Havola ilovadagi sessiya bilan yaratiladi -- saytga qayta kirish shart emas. To'lovdan
  * keyin ilovaga qaytilganda tarif/daqiqa so'rovlari fokusda o'zi yangilanadi.
  * Ishlatish: `const payment = usePayment()` ... `payment.pay(target)` ... `{payment.sheet}`.
@@ -42,9 +42,7 @@ export function usePayment() {
     mutationFn: async ({ target, provider }: { target: PaymentTarget; provider: PaymentProvider }) => {
       const start = await initiatePayment(target, provider);
       if (start.kind === 'url') {
-        // Uzum havolasi Uzum ilovasida ochilishi kerak (Custom Tab emas)
-        if (start.external) await Linking.openURL(start.url);
-        else await WebBrowser.openBrowserAsync(start.url, { showTitle: true });
+        await Linking.openURL(start.url);
       } else if (start.kind === 'code') {
         setCode(start);
       } else {
@@ -116,6 +114,9 @@ function PaymentSheet({ open, onClose, onChoose }: { open: boolean; onClose: () 
   );
 }
 
+// Raqam kiritiladigan ilovalar (App Link -- o'rnatilgan bo'lsa ilova, bo'lmasa sayt ochiladi)
+const APP_URL: Record<Code['provider'], string> = { paynet: 'https://app.paynet.uz/', uzum: 'https://uzumbank.uz/' };
+
 /** Saytdagi PaynetOrderCard / UzumAccountCard bilan bir xil matn */
 function CodeSheet({ code, onClose }: { code: Code | null; onClose: () => void }) {
   const { colors } = useTheme();
@@ -152,7 +153,13 @@ function CodeSheet({ code, onClose }: { code: Code | null; onClose: () => void }
           <ThemedText variant="secondary" style={styles.codeText}>
             Toʻlov tasdiqlangach daqiqalar hisobingizga avtomatik qoʻshiladi.
           </ThemedText>
-          <PrimaryButton label={copied ? 'Nusxalandi' : 'Raqamni nusxalash'} onPress={copy} />
+          <PrimaryButton
+            label={isPaynet ? 'Nusxalash va Paynetʼni ochish' : 'Nusxalash va Uzumʼni ochish'}
+            onPress={async () => {
+              await copy();
+              Linking.openURL(APP_URL[code.provider]).catch(() => {});
+            }}
+          />
           <PrimaryButton label="Yopish" variant="secondary" onPress={onClose} />
         </View>
       )}
