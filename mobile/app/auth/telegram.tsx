@@ -11,7 +11,7 @@ import { useAuthStore } from '../../src/store/useAuthStore';
 import { useTheme } from '../../src/theme/ThemeProvider';
 
 // gapirai://auth/telegram?id=...&hash=... -- gapirai.uz/auth/app qaytargan imzolangan
-// Telegram ma'lumoti. Deep link ham, TelegramSignInButton ham shu yerga olib keladi --
+// Telegram ma'lumoti. Deep link bir necha marta kelishi mumkin (intent + tugma) --
 // bir xil imzo ikki marta yuborilmasin.
 const handled = new Set<string>();
 

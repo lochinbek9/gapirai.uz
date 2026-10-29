@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -11,37 +10,32 @@ import { useTheme } from '../../../theme/ThemeProvider';
 import * as authApi from '../api';
 
 // Telegram orqali kirish (saytdagi TelegramSignInButton bilan bir xil natija):
-// oauth.telegram.org -- bot domeni gapirai.uz bo'lgani uchun origin sayt; tasdiqlangach
+// gapirai.uz/auth/app?start=telegram -> oauth.telegram.org (bot domeni gapirai.uz bo'lgani
+// uchun origin sayt); tasdiqlangach
 // Telegram foydalanuvchini gapirai.uz/auth/app ga qaytaradi, u sahifa imzolangan
 // ma'lumotni gapirai://auth/telegram?... orqali ilovaga beradi (app/auth/telegram.tsx
 // uni /auth/telegram'ga yuborib sessiya ochadi).
-export const TELEGRAM_RETURN_URL = 'gapirai://auth/telegram';
-
+//
+// openAuthSessionAsync ishlatilmaydi (2026-10-29, "tasdiqladim, qaytmadi"): Android'da u
+// ilova har "active" bo'lganda brauzerni yopadi, standart Custom Tab esa NO_HISTORY bilan
+// ochiladi (showInRecents: false) -- foydalanuvchi tasdiqlash uchun Telegram ilovasiga
+// o'tishi bilan Telegram sahifasi yo'q bo'lardi. showInRecents: true -- sahifa alohida
+// task'da tirik qoladi (Telegram'dan "orqaga" bosilsa unga qaytiladi), yakunni deep link
+// (app/auth/telegram.tsx) qiladi. createTask: false sinab ko'rildi -- Chrome tabni darhol yopadi.
 export function TelegramSignInButton({ text = 'continue_with' }: { text?: 'continue_with' | 'signup_with' }) {
   const { colors } = useTheme();
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
   const { data } = useQuery({ queryKey: ['telegram-config'], queryFn: authApi.telegramConfig, staleTime: 60 * 60_000 });
 
   if (!data?.enabled || !data.bot_id) return null;
 
   const press = async () => {
     setBusy(true);
-    setCancelled(false);
     try {
-      const url =
-        `https://oauth.telegram.org/auth?bot_id=${data.bot_id}` +
-        `&origin=${encodeURIComponent(SITE_URL)}&request_access=write` +
-        `&return_to=${encodeURIComponent(`${SITE_URL}/auth/app`)}`;
-      const res = await WebBrowser.openAuthSessionAsync(url, TELEGRAM_RETURN_URL);
-      if (res.type === 'success') {
-        // Odatda deep link o'zi app/auth/telegram'ni ochadi; ochmagan holat uchun -- qo'lda
-        const params = Object.fromEntries(new URL(res.url).searchParams.entries());
-        router.navigate({ pathname: '/auth/telegram', params });
-      } else {
-        setCancelled(true);
-      }
+      // To'g'ridan-to'g'ri oauth.telegram.org emas: tarixsiz tabda Telegram tasdiqdan keyin
+      // oynani yopadi (frontend/app/auth/app/page.tsx sharhiga qarang)
+      const url = `${SITE_URL}/auth/app?start=telegram&bot_id=${data.bot_id}`;
+      await WebBrowser.openBrowserAsync(url, { showInRecents: true, showTitle: true });
     } finally {
       setBusy(false);
     }
@@ -63,11 +57,6 @@ export function TelegramSignInButton({ text = 'continue_with' }: { text?: 'conti
           {text === 'signup_with' ? 'Telegram orqali roʻyxatdan oʻtish' : 'Telegram orqali kirish'}
         </ThemedText>
       </Pressable>
-      {cancelled && (
-        <ThemedText variant="secondary" style={styles.note}>
-          Telegram oynasi yopildi. Qaytadan urinib koʻring.
-        </ThemedText>
-      )}
     </View>
   );
 }
@@ -96,5 +85,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   label: { fontSize: 14, fontWeight: '500' },
-  note: { fontSize: 12, textAlign: 'center', marginTop: 8 },
 });
