@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet } from 'react-native
 import Svg, { Path } from 'react-native-svg';
 import {
   GoogleOneTapSignIn,
+  isCancelledResponse,
   isErrorWithCode,
   isNoSavedCredentialFoundResponse,
   isSuccessResponse,
@@ -54,13 +55,18 @@ export function GoogleSignInButton({ onCredential, onError, loading, text = 'con
         webClientId: GOOGLE_WEB_CLIENT_ID,
       });
       await GoogleOneTapSignIn.checkPlayServices();
+      // Avval ilgari shu ilovaga kirgan akkaunt (UI'siz, tez); bo'lmasa "Sign in with Google"
+      // tugma oqimi -- qurilmadagi barcha akkauntlar + "Akkaunt qo'shish". createAccount()
+      // faqat mavjud akkauntlarni ko'rsatadi, akkaunt yo'q qurilmada jim xato beradi.
       let response = await GoogleOneTapSignIn.signIn();
       if (isNoSavedCredentialFoundResponse(response)) {
-        response = await GoogleOneTapSignIn.createAccount();
+        response = await GoogleOneTapSignIn.presentExplicitSignIn();
       }
       if (isSuccessResponse(response) && response.data.idToken) {
         onCredential(response.data.idToken);
-      } else {
+      } else if (isNoSavedCredentialFoundResponse(response)) {
+        onError?.("Telefoningizda Google akkaunt topilmadi. Sozlamalar → Akkauntlar orqali qo'shing yoki email bilan ro'yxatdan o'ting.");
+      } else if (!isCancelledResponse(response)) {
         onError?.('Google orqali kirishda xatolik yuz berdi.');
       }
     } catch (err: any) {
