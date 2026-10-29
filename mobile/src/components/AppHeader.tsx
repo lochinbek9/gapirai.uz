@@ -43,7 +43,8 @@ export function AppHeader({ back }: { back?: boolean }) {
   const { colors, mode } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const signedIn = useAuthStore((s) => s.status === 'signedIn');
+  const status = useAuthStore((s) => s.status);
+  const signedIn = status === 'signedIn';
   const setPreference = useThemeStore((s) => s.setPreference);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -64,7 +65,7 @@ export function AppHeader({ back }: { back?: boolean }) {
       </Pressable>
 
       <View style={styles.actions}>
-        {signedIn ? (
+        {status === 'idle' || status === 'loading' ? null : signedIn ? (
           <PrimaryButton label="Videolarim" size="sm" fullWidth={false} onPress={() => router.push('/dashboard')} />
         ) : (
           <PrimaryButton label="Bepul boshlash" size="sm" fullWidth={false} onPress={() => router.push('/(auth)/register')} />

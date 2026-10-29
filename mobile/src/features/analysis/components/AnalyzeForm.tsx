@@ -22,7 +22,8 @@ import { ANALYSIS_LANGUAGE_OPTIONS } from '../types';
 export function AnalyzeForm() {
   const router = useRouter();
   const { colors } = useTheme();
-  const isLoggedIn = useAuthStore((s) => s.status === 'signedIn');
+  const authStatus = useAuthStore((s) => s.status);
+  const isLoggedIn = authStatus === 'signedIn';
 
   const {
     control,
@@ -43,6 +44,7 @@ export function AnalyzeForm() {
 
   // Tahlil yaratish uchun kirish shart (saytdagidek) -- 401 olish o'rniga login'ga yuboramiz
   const onSubmit = handleSubmit((values) => {
+    if (authStatus === 'idle' || authStatus === 'loading') return;
     if (!isLoggedIn) return router.push('/(auth)/login');
     mutation.mutate(values);
   });
@@ -80,7 +82,7 @@ export function AnalyzeForm() {
         )}
       />
 
-      {!isLoggedIn && (
+      {authStatus === 'signedOut' && (
         <Notice tone="warning">
           <ThemedText style={styles.noticeText}>
             Video tahlili uchun{' '}

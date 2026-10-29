@@ -9,6 +9,7 @@ import { ChoiceTile } from '../src/components/ChoiceTile';
 import { Notice } from '../src/components/Notice';
 import { PageTitle } from '../src/components/PageTitle';
 import { PrimaryButton } from '../src/components/PrimaryButton';
+import { RequireAuth } from '../src/components/RequireAuth';
 import { Screen } from '../src/components/Screen';
 import { ThemedText } from '../src/components/ThemedText';
 import * as billingApi from '../src/features/billing/api';
@@ -31,7 +32,15 @@ function brand(c: SavedCard) {
   return c.provider === 'payme' ? 'Payme' : 'Click';
 }
 
-export default function BillingScreen() {
+export default function BillingScreenRoute() {
+  return (
+    <RequireAuth>
+      <BillingScreen />
+    </RequireAuth>
+  );
+}
+
+function BillingScreen() {
   const { colors } = useTheme();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);

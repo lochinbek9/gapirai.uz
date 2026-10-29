@@ -1,9 +1,8 @@
-import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold } from '@expo-google-fonts/geist';
 import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 
-// Saytdagi kabi Geist 400/500/600. Android'da maxsus shriftning fontWeight'i
-// ishlamaydi -- har vazn alohida oila, shuning uchun weight -> family almashtiriladi.
-export const fontAssets = { Geist_400Regular, Geist_500Medium, Geist_600SemiBold };
+// Saytdagi kabi Geist 400/500/600 -- app.json'dagi expo-font plugini ilovaga joylaydi
+// (ishga tushishda yuklash kutilmaydi). Android'da maxsus shriftning fontWeight'i
+// ishlamaydi -- har vazn alohida oila (fayl nomi), shuning uchun weight -> family almashtiriladi.
 
 const FAMILY = {
   regular: 'Geist_400Regular',

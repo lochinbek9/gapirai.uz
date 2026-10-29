@@ -66,7 +66,10 @@ function checkVideo(video: LocalVideo): string | null {
 export function DubForm({ mode = 'dub' }: { mode?: 'dub' | 'subtitle' }) {
   const router = useRouter();
   const { colors } = useTheme();
-  const signedIn = useAuthStore((s) => s.status === 'signedIn');
+  const authStatus = useAuthStore((s) => s.status);
+  const signedIn = authStatus === 'signedIn';
+  // Sessiya hali aniqlanmagan (ilova endi ochildi) -- kirish sahifasiga noto'g'ri yubormaylik
+  const authPending = authStatus === 'idle' || authStatus === 'loading';
   const { pendingUrl, pendingFile, clear: clearShared } = useShareStore();
   const subtitleOnly = mode === 'subtitle';
 
@@ -158,6 +161,7 @@ export function DubForm({ mode = 'dub' }: { mode?: 'dub' | 'subtitle' }) {
   };
 
   const submitFile = (g: VoiceGender) => {
+    if (authPending) return;
     if (!signedIn) return router.push('/(auth)/login');
     if (!video) return setVideoError('Avval videoni tanlang.');
     if (!videoError) uploadMutation.mutate({ file: video, voiceGender: g });
@@ -166,6 +170,7 @@ export function DubForm({ mode = 'dub' }: { mode?: 'dub' | 'subtitle' }) {
   const onSubmit = handleSubmit(
     (values) => {
       if (source === 'file') return submitFile(values.voiceGender);
+      if (authPending) return;
       if (!signedIn) return router.push('/(auth)/login');
       youtubeMutation.mutate(values);
     },
