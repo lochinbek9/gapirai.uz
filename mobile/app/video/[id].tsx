@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import * as Sharing from 'expo-sharing';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet } from 'react-native';
@@ -52,6 +53,15 @@ export default function VideoJobScreen() {
     mutationFn: () => dubbingApi.cancelJob(id),
   });
 
+  // SRT'ni Telegram / Fayllar / CapCut ... ga ulashish (faqat subtitr va dublaj job'larida)
+  const shareSrtMutation = useMutation({
+    mutationFn: async () => {
+      const uri = await dubbingApi.downloadSubtitleFile(id, job?.video_title);
+      if (!(await Sharing.isAvailableAsync())) throw new Error('Bu qurilmada ulashish mavjud emas.');
+      await Sharing.shareAsync(uri, { mimeType: 'application/x-subrip', dialogTitle: 'Oʻzbekcha subtitr' });
+    },
+  });
+
   return (
     <>
       <Stack.Screen
@@ -74,7 +84,7 @@ export default function VideoJobScreen() {
 
             {job && (
               <>
-                {job.status === 'completed' && (
+                {job.status === 'completed' && !job.subtitle_only && (
                   <DubbedVideoPlayer uri={dubbingApi.getVideoUrl(id)} title={job.video_title} />
                 )}
 
@@ -148,6 +158,28 @@ export default function VideoJobScreen() {
                       onPress={() => cancelMutation.mutate()}
                       loading={cancelMutation.isPending}
                     />
+                  </ThemedView>
+                )}
+
+                {job.status === 'completed' && (
+                  <ThemedView style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                    <ThemedText style={styles.cardTitle}>
+                      {job.subtitle_only ? 'Oʻzbekcha subtitr tayyor' : 'Oʻzbekcha subtitr'}
+                    </ThemedText>
+                    <ThemedText variant="secondary" style={styles.cardText}>
+                      SRT fayl — Telegram, Fayllar yoki CapCut kabi montaj ilovalariga yuboring.
+                    </ThemedText>
+                    <PrimaryButton
+                      label="Subtitrni ulashish (SRT)"
+                      variant={job.subtitle_only ? 'primary' : 'secondary'}
+                      onPress={() => shareSrtMutation.mutate()}
+                      loading={shareSrtMutation.isPending}
+                    />
+                    {shareSrtMutation.isError && (
+                      <ThemedText style={[styles.note, { color: colors.danger }]}>
+                        {(shareSrtMutation.error as Error).message || 'Subtitrni ulashib boʻlmadi.'}
+                      </ThemedText>
+                    )}
                   </ThemedView>
                 )}
 

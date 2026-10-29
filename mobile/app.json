@@ -21,11 +21,18 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.INTERNET"],
+      "permissions": [
+        "android.permission.INTERNET"
+      ],
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -39,6 +46,24 @@
         "react-native-nitro-google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.000000000000-ios-not-configured"
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "text/*",
+            "video/*"
+          ],
+          "disableIOS": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GapirAI dublaj qilish uchun tanlagan videongizni oʻqiydi.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],

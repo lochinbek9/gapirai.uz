@@ -9,8 +9,10 @@ export async function register(name: string, email: string, password: string): P
   return res.data;
 }
 
-export async function login(email: string, password: string): Promise<PendingVerification> {
-  const res = await apiClient.post<PendingVerification>('/auth/login', { email, password });
+// Hozirgi backend /auth/login darhol token qaytaradi (AuthResponse); eski versiya email
+// kodi so'rardi (PendingVerification) -- ikkalasini ham qo'llaymiz.
+export async function login(email: string, password: string): Promise<AuthResponse | PendingVerification> {
+  const res = await apiClient.post<AuthResponse | PendingVerification>('/auth/login', { email, password });
   return res.data;
 }
 

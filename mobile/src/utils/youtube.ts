@@ -19,3 +19,13 @@ export function extractYouTubeId(url: string): string | null {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\/)([\w-]{11})/);
   return match ? match[1] : null;
 }
+
+// Ulashilgan matndan (YouTube ilovasi: "Mana bu videoni koʻring https://youtu.be/xyz?si=...")
+// birinchi YouTube havolasini ajratib oladi.
+export function findYoutubeUrl(text: string | null | undefined): string | null {
+  for (const candidate of String(text || '').match(/https?:\/\/\S+/g) || []) {
+    const url = candidate.replace(/[)\]}>.,!?'"]+$/, '');
+    if (isValidYoutubeUrl(url)) return url;
+  }
+  return null;
+}

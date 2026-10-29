@@ -1,5 +1,6 @@
 import { focusManager, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
+import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, AppState, type AppStateStatus, Platform } from 'react-native';
@@ -8,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { queryClient } from '../src/api/queryClient';
 import { ThemedView } from '../src/components/ThemedView';
+import { ShareIntentHandler } from '../src/features/share/ShareIntentHandler';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 
@@ -41,6 +43,7 @@ function RootStack() {
         }}
       />
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <ShareIntentHandler />
     </>
   );
 }
@@ -62,6 +65,8 @@ export default function RootLayout() {
   }, []);
 
   return (
+    // expo-share-intent: provider eng yuqorida bo'lishi kerak (README)
+    <ShareIntentProvider>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
@@ -71,5 +76,6 @@ export default function RootLayout() {
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ShareIntentProvider>
   );
 }
