@@ -249,6 +249,7 @@ export default function VideoJobScreen() {
           {job.uzbek_srt_content ? <InfoRow label="Subtitr" value="Mavjud" /> : null}
         </Card>
       </View>
+      {payment.sheet}
     </Screen>
   );
 }

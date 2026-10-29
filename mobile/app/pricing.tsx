@@ -289,6 +289,7 @@ function PricingScreen() {
         </View>
       </View>
       <Footer />
+      {payment.sheet}
     </Screen>
   );
 }
