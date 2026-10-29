@@ -27,3 +27,13 @@ export const SITE_URL = 'https://gapirai.uz';
 // auditoriyali ID token qaytaradi, backend /auth/google uni qabul qiladi.
 export const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '235172384103-60v6m8mvikofqioqroeeubtir7dpdt4q.apps.googleusercontent.com';
+
+// Ikki xil build (2026-10-29): Google Play versiyasida ilova ichida hech qanday to'lov
+// yo'q -- tugma ham, saytga havola ham (Play Payments siyosati, "consumption-only"):
+// foydalanuvchi saytda/botda sotib olgan daqiqalarini ilovada ishlatadi. gapirai.uz'dan
+// yuklanadigan APK'da esa Click/Payme ilova ichidan ochiladi. Play build:
+// EXPO_PUBLIC_DISTRIBUTION=play (eas.json "production" profili). Bu farq HAMMA
+// foydalanuvchi uchun bir xil -- ma'lum akkauntga qarab yashirish (tekshiruvchini
+// aldash) Play qoidalariga zid va akkaunt bloklanishiga olib keladi.
+export const IS_PLAY_BUILD = process.env.EXPO_PUBLIC_DISTRIBUTION === 'play';
+export const PAYMENTS_ENABLED = !IS_PLAY_BUILD;

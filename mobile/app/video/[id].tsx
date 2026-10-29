@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, Check, Clock, Mic2, Share2, ShieldAlert } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { getErrorMessage } from '../../src/api/errors';
 import { Card } from '../../src/components/Card';
@@ -11,10 +11,12 @@ import { Notice } from '../../src/components/Notice';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { Screen } from '../../src/components/Screen';
 import { ThemedText } from '../../src/components/ThemedText';
+import { PAYMENTS_ENABLED } from '../../src/config/env';
 import * as dubbingApi from '../../src/features/dubbing/api';
 import { DubbedVideoPlayer } from '../../src/features/dubbing/components/VideoPlayer';
 import { useDubbingJob } from '../../src/features/dubbing/hooks/useDubbingJob';
 import { JOB_STATUS_LABELS, type Job } from '../../src/features/dubbing/types';
+import { usePayment } from '../../src/features/payments/usePayment';
 import { alpha, radius } from '../../src/theme/colors';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { formatDateTime, formatDuration, formatNumber, formatRemainingTime } from '../../src/utils/format';
@@ -95,21 +97,13 @@ export default function VideoJobScreen() {
   const { data: job, isLoading, error } = useDubbingJob(id);
   const [now, setNow] = useState(Date.now());
   const sessionStart = useRef(Date.now()).current;
-  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const paymentMutation = useMutation({
-    mutationFn: () => dubbingApi.initiateClickPayment(id),
-    onSuccess: async (data) => {
-      setPaymentError(null);
-      if (data.payment_url) await Linking.openURL(data.payment_url);
-    },
-    onError: (err) => setPaymentError(getErrorMessage(err, 'Toʻlov havolasini yaratishda xatolik yuz berdi.')),
-  });
+  const payment = usePayment();
 
   const cancelMutation = useMutation({ mutationFn: () => dubbingApi.cancelJob(id) });
 
@@ -163,13 +157,19 @@ export default function VideoJobScreen() {
           </ThemedText>
           <View style={styles.infoBox}>
             <InfoRow label="Davomiylik" value={job.video_duration ? formatDuration(job.video_duration) : 'Nomaʼlum'} />
-            <InfoRow
-              label="Xizmat haqi"
-              value={job.video_duration ? `${formatNumber(estimateAmount(job.video_duration / 60))} soʻm` : 'Nomaʼlum'}
-            />
+            {PAYMENTS_ENABLED && (
+              <InfoRow
+                label="Xizmat haqi"
+                value={job.video_duration ? `${formatNumber(estimateAmount(job.video_duration / 60))} soʻm` : 'Nomaʼlum'}
+              />
+            )}
           </View>
-          {paymentError && <Notice>{paymentError}</Notice>}
-          <PrimaryButton label="Click orqali toʻlov qilish" onPress={() => paymentMutation.mutate()} loading={paymentMutation.isPending} />
+          {PAYMENTS_ENABLED && (
+            <>
+              {payment.error && <Notice>{payment.error}</Notice>}
+              <PrimaryButton label="Toʻlov qilish" onPress={() => payment.pay({ kind: 'job', jobId: id })} loading={payment.pending} />
+            </>
+          )}
         </Card>
       )}
 

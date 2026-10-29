@@ -24,7 +24,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SITE_URL } from '../config/env';
+import { PAYMENTS_ENABLED, SITE_URL } from '../config/env';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { radius } from '../theme/colors';
@@ -115,10 +115,15 @@ function NavSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const signedIn = useAuthStore((s) => s.status === 'signedIn');
   const signOut = useAuthStore((s) => s.signOut);
 
+  // Play build'da to'lovga olib boruvchi bandlar (tariflar, donat, hisob) yo'q -- config/env.ts
   const main: MenuLink[] = [
     { label: 'Ommaviy videolar', icon: PlaySquare, url: `${SITE_URL}/videos` },
-    { label: 'Tariflar', icon: CreditCard, href: '/pricing' },
-    { label: 'Donat', icon: Heart, url: `${SITE_URL}/donate` },
+    ...(PAYMENTS_ENABLED
+      ? [
+          { label: 'Tariflar', icon: CreditCard, href: '/pricing' as const },
+          { label: 'Donat', icon: Heart, url: `${SITE_URL}/donate` },
+        ]
+      : []),
     { label: 'Loyiha haqida', icon: Info, href: '/about' },
     { label: 'Yordam va savollar', icon: HelpCircle, href: '/faq' },
     { label: 'Telegram bot', icon: Send, url: 'https://t.me/gapirai_uz_bot' },
@@ -126,7 +131,7 @@ function NavSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const account: MenuLink[] = signedIn
     ? [
         { label: 'Mening videolarim', icon: Video, href: '/dashboard' },
-        { label: 'Hisob va toʻlovlar', icon: Wallet, href: '/billing' },
+        ...(PAYMENTS_ENABLED ? [{ label: 'Hisob va toʻlovlar', icon: Wallet, href: '/billing' as const }] : []),
       ]
     : [
         { label: 'Kirish', icon: LogIn, href: '/(auth)/login' },

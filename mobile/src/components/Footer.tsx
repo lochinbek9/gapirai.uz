@@ -5,7 +5,7 @@ import { Mail, Send } from 'lucide-react-native';
 import type { ComponentType } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
-import { SITE_URL } from '../config/env';
+import { PAYMENTS_ENABLED, SITE_URL } from '../config/env';
 import { radius } from '../theme/colors';
 import { useTheme } from '../theme/ThemeProvider';
 import { Instagram, Youtube } from './BrandIcons';
@@ -16,8 +16,13 @@ type Link = { label: string } & ({ href: Href } | { url: string });
 const PROJECT: Link[] = [
   { label: 'Loyiha haqida', href: '/about' },
   { label: 'Ommaviy videolar', url: `${SITE_URL}/videos` },
-  { label: 'Tariflar', href: '/pricing' },
-  { label: 'Loyihani qoʻllab-quvvatlash', url: `${SITE_URL}/donate` },
+  // Play build'da to'lovga olib boruvchi havolalar yo'q (config/env.ts PAYMENTS_ENABLED)
+  ...(PAYMENTS_ENABLED
+    ? ([
+        { label: 'Tariflar', href: '/pricing' },
+        { label: 'Loyihani qoʻllab-quvvatlash', url: `${SITE_URL}/donate` },
+      ] as Link[])
+    : []),
 ];
 
 const COMMUNITY: Link[] = [

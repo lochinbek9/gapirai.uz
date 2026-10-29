@@ -80,12 +80,6 @@ export interface Job {
   feedback_comment?: string;
 }
 
-export interface InitiatePaymentResponse {
-  success: boolean;
-  payment_url: string;
-  payment_id?: string;
-  amount: number;
-}
 
 export interface CancelJobResponse {
   success: boolean;

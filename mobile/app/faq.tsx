@@ -2,9 +2,10 @@ import { StyleSheet } from 'react-native';
 
 import { Accordion } from '../src/components/Accordion';
 import { InfoScreenLayout } from '../src/components/InfoScreenLayout';
+import { PAYMENTS_ENABLED } from '../src/config/env';
 
 // frontend/app/faq/faqs.ts bilan bir xil -- saytdagi savollar o'zgarsa, bu yerni ham yangilang.
-const FAQS = [
+const ALL_FAQS = [
   {
     "q": "GapirAI.uz qanday ishlaydi?",
     "a": "YouTube havolasini yoki video faylni yuborasiz. Tizim videodagi nutqni matnga aylantiradi, uni sun'iy intellekt yordamida tabiiy o'zbek tiliga tarjima qiladi, spikerning jinsiga mos o'zbekcha ovoz bilan qayta yozadi va videoga qo'shadi. Xohlasangiz, ovozsiz faqat subtitr (.srt / .vtt) yoki qisqa tahlil (xulosa, konspekt, test) olishingiz mumkin."
@@ -26,6 +27,13 @@ const FAQS = [
     "a": "Tizim avval jarayonni avtomatik qayta urinib ko'radi. Baribir muvaffaqiyatsiz bo'lsa, xatolik sababi ekranda ko'rsatiladi va daqiqalar balansingizga qaytadi. YouTube videoni yuklashga ruxsat bermasa, videoni fayl sifatida yuklab dublyaj qilishingiz mumkin."
   }
 ];
+
+// Play build'da xarid/narxga undovchi matn yo'q (config/env.ts PAYMENTS_ENABLED)
+const PLAY_FREE_ANSWER =
+  "Ha. Har 30 kunda 5 daqiqa bepul beriladi. Sarf videoning haqiqiy davomiyligi bo'yicha hisoblanadi. Hisobingizdagi barcha daqiqalar ilovada ham ishlaydi. Bitta video — 120 daqiqagacha. Tezkor tahlil daqiqa sarflamaydi.";
+const FAQS = PAYMENTS_ENABLED
+  ? ALL_FAQS
+  : ALL_FAQS.map((f) => (f.q === 'Platformadan foydalanish bepulmi?' ? { ...f, a: PLAY_FREE_ANSWER } : f));
 
 export default function FaqScreen() {
   return (

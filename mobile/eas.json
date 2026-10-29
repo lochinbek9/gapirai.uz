@@ -23,7 +23,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "235172384103-60v6m8mvikofqioqroeeubtir7dpdt4q.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "235172384103-60v6m8mvikofqioqroeeubtir7dpdt4q.apps.googleusercontent.com",
+        "EXPO_PUBLIC_DISTRIBUTION": "play"
       }
     }
   },
