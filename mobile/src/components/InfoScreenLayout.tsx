@@ -1,70 +1,102 @@
-import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Linking, StyleSheet, View } from 'react-native';
 
+import type { LegalDoc, Run } from '../content/legal';
 import { useTheme } from '../theme/ThemeProvider';
+import { Footer } from './Footer';
+import { PageTitle } from './PageTitle';
+import { Screen } from './Screen';
 import { ThemedText } from './ThemedText';
-import { ThemedView } from './ThemedView';
 
-// Shared shell for the static content screens (about/faq/privacy/terms) —
-// header with a back link + scrollable content area, matching the
-// glass-card-on-gradient look the rest of the app already uses.
-export function InfoScreenLayout({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  const { colors } = useTheme();
-  const router = useRouter();
-
+/** Saytdagi PageShell + PageTitle: matnli ichki sahifalar (shartlar, maxfiylik, savollar). */
+export function InfoScreenLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex}>
-        <ThemedView style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <ThemedText style={[styles.headerAction, { color: colors.accent }]}>{'< Orqaga'}</ThemedText>
-          </Pressable>
-        </ThemedView>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedText style={styles.title}>{title}</ThemedText>
-          {subtitle ? (
-            <ThemedText variant="secondary" style={styles.subtitle}>
-              {subtitle}
-            </ThemedText>
-          ) : null}
-
-          <ThemedView style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {children}
-          </ThemedView>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+    <Screen>
+      <View style={styles.page}>
+        <PageTitle title={title} lead={subtitle} />
+        {children}
+      </View>
+      <Footer />
+    </Screen>
   );
 }
 
+/** .ui-prose bo'limi: H2 (18/600) + muted matn (15, 1.7) */
 export function InfoSection({ heading, children }: { heading: string; children: ReactNode }) {
   return (
-    <ThemedView style={styles.section}>
-      <ThemedText style={styles.sectionHeading}>{heading}</ThemedText>
+    <View style={styles.section}>
+      <ThemedText accessibilityRole="header" style={styles.h2}>
+        {heading}
+      </ThemedText>
       {children}
-    </ThemedView>
+    </View>
+  );
+}
+
+function Runs({ runs }: { runs: Run[] }) {
+  const { colors } = useTheme();
+  return (
+    <ThemedText variant="secondary" style={styles.p}>
+      {runs.map((r, i) =>
+        r.href ? (
+          <ThemedText
+            key={i}
+            style={[styles.p, { color: colors.accentInk, textDecorationLine: 'underline' }]}
+            onPress={() => Linking.openURL(r.href!.startsWith('/') ? `https://gapirai.uz${r.href}` : r.href!).catch(() => {})}
+            suppressHighlighting
+          >
+            {r.t}
+          </ThemedText>
+        ) : r.b ? (
+          <ThemedText key={i} style={[styles.p, { fontWeight: '500' }]}>
+            {r.t}
+          </ThemedText>
+        ) : (
+          r.t
+        ),
+      )}
+    </ThemedText>
+  );
+}
+
+/** Sayt sahifasidan avtomatik ko'chirilgan huquqiy matn (src/content/legal.ts) */
+export function LegalDocument({ doc }: { doc: LegalDoc }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.prose, { borderTopColor: colors.rule }]}>
+      {doc.sections.map((s) => (
+        <InfoSection key={s.heading} heading={s.heading}>
+          {s.blocks.map((b, i) =>
+            'p' in b ? (
+              <Runs key={i} runs={b.p} />
+            ) : (
+              <View key={i} style={styles.list}>
+                {b.list.map((li, j) => (
+                  <View key={j} style={styles.li}>
+                    <ThemedText variant="secondary" style={styles.p}>
+                      •
+                    </ThemedText>
+                    <View style={styles.flex}>
+                      <Runs runs={li} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ),
+          )}
+        </InfoSection>
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingVertical: 12 },
-  headerAction: { fontSize: 14, fontWeight: '700' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, gap: 16 },
-  title: { fontSize: 22, fontWeight: '900' },
-  subtitle: { fontSize: 12 },
-  card: { borderWidth: 1, borderRadius: 24, padding: 20, gap: 18 },
-  section: { gap: 8 },
-  sectionHeading: { fontSize: 15, fontWeight: '800' },
+  page: { paddingHorizontal: 16, paddingTop: 48, paddingBottom: 96 },
+  prose: { marginTop: 48, borderTopWidth: 1, paddingTop: 40, gap: 32 },
+  section: { gap: 10 },
+  h2: { fontSize: 18, lineHeight: 25, fontWeight: '600', letterSpacing: -0.18 },
+  p: { fontSize: 15, lineHeight: 25.5 },
+  list: { gap: 6 },
+  li: { flexDirection: 'row', gap: 10 },
 });

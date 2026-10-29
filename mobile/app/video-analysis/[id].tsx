@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getErrorMessage } from '../../src/api/errors';
+import { AppHeader } from '../../src/components/AppHeader';
 import { ThemedText } from '../../src/components/ThemedText';
 import { ThemedView } from '../../src/components/ThemedView';
 import * as analysisApi from '../../src/features/analysis/api';
@@ -144,19 +145,12 @@ export default function VideoAnalysisScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: '',
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.textPrimary,
-        }}
-      />
       <ThemedView style={styles.flex}>
-        <SafeAreaView style={styles.flex}>
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.flex}>
+          <AppHeader />
           {isLoading && (
             <ThemedView style={styles.center}>
-              <ActivityIndicator color={colors.accent} />
+              <ActivityIndicator color={colors.muted} />
             </ThemedView>
           )}
           {error && (
@@ -226,15 +220,15 @@ export default function VideoAnalysisScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.tabsScroll}
-                contentContainerStyle={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                contentContainerStyle={[styles.tabs, { backgroundColor: colors.ground, borderColor: colors.rule }]}
               >
                 {TABS.map((t) => (
                   <Pressable
                     key={t.key}
                     onPress={() => setTab(t.key)}
-                    style={[styles.tab, tab === t.key && { backgroundColor: colors.background }]}
+                    style={[styles.tab, tab === t.key && { backgroundColor: colors.surface, borderColor: colors.rule }]}
                   >
-                    <ThemedText style={[styles.tabLabel, tab === t.key && { color: colors.accent }]}>{t.label}</ThemedText>
+                    <ThemedText style={[styles.tabLabel, { color: tab === t.key ? colors.ink : colors.muted }]}>{t.label}</ThemedText>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -297,7 +291,7 @@ export default function VideoAnalysisScreen() {
                 transcriptView === 'bilingual' ? (
                   bilingualLoading ? (
                     <ThemedView style={styles.center}>
-                      <ActivityIndicator color={colors.accent} />
+                      <ActivityIndicator color={colors.muted} />
                       <ThemedText variant="secondary" style={{ marginTop: 10 }}>
                         Bilingual ko&apos;rinish tayyorlanmoqda...
                       </ThemedText>
@@ -366,16 +360,16 @@ export default function VideoAnalysisScreen() {
                           />
                           <Pressable
                             onPress={handleSearch}
-                            style={[styles.searchButton, { backgroundColor: colors.accentGlow }]}
+                            style={[styles.searchButton, { backgroundColor: colors.dark }]}
                           >
-                            <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>Qidirish</ThemedText>
+                            <ThemedText style={{ color: colors.darkInk, fontWeight: '500', fontSize: 15 }}>Qidirish</ThemedText>
                           </Pressable>
                         </ThemedView>
                       </ThemedView>
                     }
                     ListEmptyComponent={
                       transcriptQuery.isLoading ? (
-                        <ActivityIndicator color={colors.accent} />
+                        <ActivityIndicator color={colors.muted} />
                       ) : (
                         <ThemedText variant="secondary">
                           {searchResults ? 'Hech narsa topilmadi.' : 'Transkript topilmadi.'}
@@ -400,10 +394,10 @@ export default function VideoAnalysisScreen() {
                     <Pressable
                       onPress={handleGenerateNotes}
                       disabled={notesLoading}
-                      style={[styles.generateButton, { backgroundColor: colors.accentGlow, opacity: notesLoading ? 0.6 : 1 }]}
+                      style={[styles.generateButton, { backgroundColor: colors.dark, opacity: notesLoading ? 0.6 : 1 }]}
                     >
-                      {notesLoading && <ActivityIndicator color={colors.accent} style={{ marginRight: 8 }} />}
-                      <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                      {notesLoading && <ActivityIndicator color={colors.darkInk} style={{ marginRight: 8 }} />}
+                      <ThemedText style={{ color: colors.darkInk, fontWeight: '500', fontSize: 15 }}>
                         {notesLoading ? 'Yaratilmoqda...' : 'Konspekt tuzish'}
                       </ThemedText>
                     </Pressable>
@@ -417,10 +411,10 @@ export default function VideoAnalysisScreen() {
                     <Pressable
                       onPress={handleGenerateQuiz}
                       disabled={quizLoading}
-                      style={[styles.generateButton, { backgroundColor: colors.accentGlow, opacity: quizLoading ? 0.6 : 1 }]}
+                      style={[styles.generateButton, { backgroundColor: colors.dark, opacity: quizLoading ? 0.6 : 1 }]}
                     >
-                      {quizLoading && <ActivityIndicator color={colors.accent} style={{ marginRight: 8 }} />}
-                      <ThemedText style={{ color: colors.accent, fontWeight: '700', fontSize: 13 }}>
+                      {quizLoading && <ActivityIndicator color={colors.darkInk} style={{ marginRight: 8 }} />}
+                      <ThemedText style={{ color: colors.darkInk, fontWeight: '500', fontSize: 15 }}>
                         {quizLoading ? 'Yaratilmoqda...' : 'Test tuzish'}
                       </ThemedText>
                     </Pressable>
@@ -533,13 +527,13 @@ export default function VideoAnalysisScreen() {
                       disabled={asking || !question.trim()}
                       style={[
                         styles.sendButton,
-                        { backgroundColor: colors.accentGlow, opacity: asking || !question.trim() ? 0.5 : 1 },
+                        { backgroundColor: colors.dark, opacity: asking || !question.trim() ? 0.5 : 1 },
                       ]}
                     >
                       {asking ? (
-                        <ActivityIndicator color={colors.accent} />
+                        <ActivityIndicator color={colors.muted} />
                       ) : (
-                        <ThemedText style={{ color: colors.accent, fontWeight: '800', fontSize: 16 }}>➤</ThemedText>
+                        <ThemedText style={{ color: colors.accent, fontWeight: '600', fontSize: 16 }}>➤</ThemedText>
                       )}
                     </Pressable>
                   </ThemedView>
@@ -565,18 +559,18 @@ function TranscriptViewToggle({
   colors: ReturnType<typeof useTheme>['colors'];
 }) {
   return (
-    <ThemedView style={[styles.viewToggle, { backgroundColor: colors.background, borderColor: colors.border }]}>
+    <ThemedView style={[styles.viewToggle, { backgroundColor: colors.ground, borderColor: colors.rule }]}>
       <Pressable
         onPress={onNormal}
         style={[styles.viewToggleOption, transcriptView === 'normal' && { backgroundColor: colors.surface }]}
       >
-        <ThemedText style={[styles.tabLabel, transcriptView === 'normal' && { color: colors.accent }]}>Oddiy</ThemedText>
+        <ThemedText style={[styles.tabLabel, { color: transcriptView === 'normal' ? colors.ink : colors.muted }]}>Oddiy</ThemedText>
       </Pressable>
       <Pressable
         onPress={onBilingual}
         style={[styles.viewToggleOption, transcriptView === 'bilingual' && { backgroundColor: colors.surface }]}
       >
-        <ThemedText style={[styles.tabLabel, transcriptView === 'bilingual' && { color: colors.accent }]}>
+        <ThemedText style={[styles.tabLabel, { color: transcriptView === 'bilingual' ? colors.ink : colors.muted }]}>
           Bilingual
         </ThemedText>
       </Pressable>
@@ -596,56 +590,51 @@ function SummaryBlock({ label, text }: { label: string; text: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  statusTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
-  statusMessage: { fontSize: 13, fontWeight: '500', textAlign: 'center', marginBottom: 16 },
-  progressTrack: { width: '100%', maxWidth: 280, height: 6, borderRadius: 3, overflow: 'hidden' },
+  statusTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 6 },
+  statusMessage: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 16 },
+  progressTrack: { width: '100%', maxWidth: 320, height: 8, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  playerWrap: { paddingHorizontal: 20, paddingTop: 16 },
+  playerWrap: { paddingHorizontal: 16, paddingTop: 16 },
   playerFallback: { aspectRatio: 16 / 9, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: '800', paddingHorizontal: 20, paddingTop: 14 },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingTop: 10 },
-  badge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  tabsScroll: { marginHorizontal: 20, marginTop: 14, flexGrow: 0 },
-  tabs: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, gap: 4 },
-  tab: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center' },
-  tabLabel: { fontSize: 12, fontWeight: '700' },
-  tabContent: { padding: 20, gap: 10 },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryText: { fontSize: 14, fontWeight: '500', lineHeight: 21 },
-  row: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 14, padding: 12, alignItems: 'flex-start' },
-  rowTitle: { fontSize: 14, fontWeight: '700' },
-  rowDescription: { fontSize: 12, fontWeight: '500' },
+  title: { fontSize: 20, lineHeight: 27, fontWeight: '600', paddingHorizontal: 16, paddingTop: 16 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
+  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+  badgeText: { fontSize: 13, fontWeight: '500' },
+  tabsScroll: { marginHorizontal: 16, marginTop: 16, flexGrow: 0 },
+  tabs: { flexDirection: 'row', borderRadius: 16, borderWidth: 1, padding: 4, gap: 4 },
+  tab: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', alignItems: 'center' },
+  tabLabel: { fontSize: 14, fontWeight: '500' },
+  tabContent: { padding: 16, gap: 12 },
+  sectionLabel: { fontSize: 16, fontWeight: '600' },
+  summaryText: { fontSize: 16, lineHeight: 26 },
+  row: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 10, padding: 12, alignItems: 'flex-start' },
+  rowTitle: { fontSize: 15, fontWeight: '500' },
+  rowDescription: { fontSize: 14, lineHeight: 20 },
   chapterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 10,
     padding: 14,
   },
   transcriptRow: { flexDirection: 'row', gap: 10, paddingVertical: 8 },
-  timestamp: { fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
-  transcriptText: { flex: 1, fontSize: 13, fontWeight: '500', lineHeight: 19 },
-  bilingualRow: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
-  viewToggle: { flexDirection: 'row', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, padding: 3, gap: 3 },
-  viewToggleOption: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
-  textInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, fontWeight: '500' },
-  searchButton: { paddingHorizontal: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sendButton: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  timestamp: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+  transcriptText: { flex: 1, fontSize: 15, lineHeight: 22 },
+  bilingualRow: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 8 },
+  viewToggle: { flexDirection: 'row', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 10, padding: 4, gap: 4 },
+  viewToggleOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 48, fontSize: 16, fontFamily: 'Geist_400Regular' },
+  searchButton: { paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sendButton: { width: 48, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   generateButton: {
     flexDirection: 'row',
     alignSelf: 'flex-start',
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 12,
+    minHeight: 44,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  quizCard: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
-  quizOption: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  quizCard: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },
+  quizOption: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
 });

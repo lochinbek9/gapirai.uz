@@ -4,17 +4,16 @@ import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 
 import { getErrorMessage } from '../../src/api/errors';
+import { Notice } from '../../src/components/Notice';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ThemedText } from '../../src/components/ThemedText';
 import { ThemedTextInput } from '../../src/components/ThemedTextInput';
 import * as authApi from '../../src/features/auth/api';
 import { AuthScreenLayout } from '../../src/features/auth/components/AuthScreenLayout';
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../../src/features/auth/schemas';
-import { useTheme } from '../../src/theme/ThemeProvider';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const {
     control,
     handleSubmit,
@@ -35,6 +34,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScreenLayout
+      backTo={{ label: 'Kirish', onPress: () => router.back() }}
       title="Parolni tiklash"
       subtitle="Emailingizni kiriting — tiklash kodi shu manzilga yuboriladi"
     >
@@ -49,18 +49,16 @@ export default function ForgotPasswordScreen() {
             onBlur={onBlur}
             keyboardType="email-address"
             error={errors.email?.message}
-            placeholder="siz@example.com"
+            placeholder="email@example.com"
           />
         )}
       />
 
       {mutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(mutation.error, 'Kod yuborishda xatolik yuz berdi.')}
-        </ThemedText>
+        <Notice>{getErrorMessage(mutation.error, 'Kod yuborishda xatolik yuz berdi.')}</Notice>
       )}
 
-      <PrimaryButton label="Kod yuborish" onPress={onSubmit} loading={mutation.isPending} />
+      <PrimaryButton label={mutation.isPending ? 'Yuborilmoqda...' : 'Tiklash kodini yuborish'} onPress={onSubmit} loading={mutation.isPending} />
     </AuthScreenLayout>
   );
 }

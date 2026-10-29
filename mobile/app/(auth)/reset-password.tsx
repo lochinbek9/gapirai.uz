@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 
 import { getErrorMessage } from '../../src/api/errors';
+import { Notice } from '../../src/components/Notice';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ThemedText } from '../../src/components/ThemedText';
 import { ThemedTextInput } from '../../src/components/ThemedTextInput';
@@ -11,11 +12,12 @@ import * as authApi from '../../src/features/auth/api';
 import { AuthScreenLayout } from '../../src/features/auth/components/AuthScreenLayout';
 import { resetPasswordSchema, type ResetPasswordFormValues } from '../../src/features/auth/schemas';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { useTheme } from '../../src/theme/ThemeProvider';
+
+// Saytdagi kod maydoni: markazda, katta, keng harf oralig'i
+const CODE_STYLE = { textAlign: 'center' as const, fontSize: 24, letterSpacing: 12, fontFamily: 'Geist_600SemiBold' };
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const { email, message } = useLocalSearchParams<{ email: string; message?: string }>();
   const setSession = useAuthStore((s) => s.setSession);
 
@@ -56,6 +58,7 @@ export default function ResetPasswordScreen() {
             maxLength={6}
             error={errors.code?.message}
             placeholder="000000"
+            style={CODE_STYLE}
           />
         )}
       />
@@ -91,9 +94,7 @@ export default function ResetPasswordScreen() {
       />
 
       {mutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(mutation.error, 'Parolni tiklashda xatolik yuz berdi.')}
-        </ThemedText>
+        <Notice>{getErrorMessage(mutation.error, 'Parolni tiklashda xatolik yuz berdi.')}</Notice>
       )}
 
       <PrimaryButton label="Parolni yangilash" onPress={onSubmit} loading={mutation.isPending} />

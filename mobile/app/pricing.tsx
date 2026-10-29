@@ -1,184 +1,322 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
+import { Check, ExternalLink } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { Accordion } from '../src/components/Accordion';
+import { Card } from '../src/components/Card';
+import { Footer } from '../src/components/Footer';
+import { PrimaryButton } from '../src/components/PrimaryButton';
+import { Screen } from '../src/components/Screen';
+import { SegmentedControl } from '../src/components/SegmentedControl';
 import { ThemedText } from '../src/components/ThemedText';
-import { ThemedView } from '../src/components/ThemedView';
+import { SITE_URL } from '../src/config/env';
 import * as plansApi from '../src/features/plans/api';
-import type { PlanDef } from '../src/features/plans/types';
+import type { MinutePack, PlanDef } from '../src/features/plans/types';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { alpha } from '../src/theme/colors';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { formatNumber as som } from '../src/utils/format';
 
-// Variant A: obuna / to'lov mobil ilova ICHIDA amalga oshirilmaydi (Google
-// Play Payments siyosati). Bu ekran tariflarni KO'RSATADI; obuna bo'lish
-// gapirai.uz saytida (Linking.openURL). To'liq oqim: frontend/app/pricing/page.tsx.
+// frontend/app/pricing/page.tsx bilan bir xil tuzilish. Farqi bitta: obuna va paket
+// to'lovi ilova ICHIDA emas (Google Play Payments siyosati) -- tugmalar gapirai.uz'ni ochadi,
+// to'langan tarif ilovada darhol faollashadi.
 
-const WEB_PRICING_URL = 'https://gapirai.uz/pricing';
-
+// API javob bermasa -- backend/services/plans.py PLANS bilan bir xil
 const DEFAULT_PLANS: PlanDef[] = [
-  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'edge' },
-  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 350, priority: false, tts_tier: 'edge' },
-  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 600, priority: true, tts_tier: 'premium' },
+  { id: 'free', name: 'Bepul', price: 0, monthly_minutes: 5, priority: false, tts_tier: 'gemini', tier: 'free', period_days: 30, max_resolution: '360p' },
+  { id: 'standard', name: 'Standart', price: 49000, monthly_minutes: 350, priority: true, tts_tier: 'gemini', tier: 'standard', period_days: 30, max_resolution: '720p' },
+  { id: 'standard_yearly', name: 'Standart (yillik)', price: 490000, monthly_minutes: 350, priority: true, tts_tier: 'gemini', tier: 'standard', period_days: 365, max_resolution: '720p' },
+  { id: 'pro', name: 'Pro', price: 199000, monthly_minutes: 600, priority: true, tts_tier: 'gemini', tier: 'pro', period_days: 30, max_resolution: '1080p' },
+  { id: 'pro_yearly', name: 'Pro (yillik)', price: 1990000, monthly_minutes: 600, priority: true, tts_tier: 'gemini', tier: 'pro', period_days: 365, max_resolution: '1080p' },
 ];
 
-function PlanCard({ plan, isCurrent }: { plan: PlanDef; isCurrent: boolean }) {
-  const { colors } = useTheme();
-  const isPro = plan.id === 'pro';
+const DEFAULT_PACKS: MinutePack[] = [
+  { minutes: 15, price: 4900, one_time: true },
+  { minutes: 35, price: 15000 },
+  { minutes: 70, price: 25000 },
+  { minutes: 140, price: 45000 },
+  { minutes: 350, price: 100000 },
+];
 
-  return (
-    <ThemedView
-      style={[
-        styles.card,
-        { backgroundColor: colors.surface, borderColor: isPro ? colors.accent : colors.border },
-        isPro && styles.cardPro,
-      ]}
-    >
-      {isPro && (
-        <ThemedView style={[styles.recommendedBadge, { backgroundColor: colors.accent }]}>
-          <ThemedText style={styles.recommendedText}>Tavsiya etiladi</ThemedText>
-        </ThemedView>
-      )}
-      <ThemedText style={styles.planName}>{plan.name}</ThemedText>
-      {isCurrent && (
-        <ThemedText style={[styles.currentLabel, { color: colors.success }]}>Joriy tarif</ThemedText>
-      )}
-      <ThemedText style={styles.price}>
-        {plan.price === 0 ? 'Bepul' : plan.price.toLocaleString('uz-UZ')}
-        {plan.price > 0 && (
-          <ThemedText variant="secondary" style={styles.priceSuffix}>
-            {' '}
-            so&apos;m/oy
-          </ThemedText>
-        )}
-      </ThemedText>
+const PLAN_NOTE: Record<string, string> = {
+  free: 'Xizmatni sinab koʻrish uchun',
+  standard: 'Muntazam koʻradigan va oʻrganadiganlar uchun',
+  pro: 'Koʻp video bilan ishlaydigan blogerlar va jamoalar uchun',
+};
 
-      <ThemedView style={styles.features}>
-        <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} Oyiga {plan.monthly_minutes} daqiqa dublyaj (1 video — maks. 120 daqiqa)
-        </ThemedText>
-        <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} {plan.priority ? 'Ustuvor navbat' : 'Standart navbat'}
-        </ThemedText>
-        <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} {plan.tts_tier === 'premium' ? 'Premium ovoz (Gemini / ElevenLabs AI)' : 'Standart ovoz (Edge)'}
-        </ThemedText>
-        <ThemedText variant="secondary" style={styles.featureRow}>
-          {'✓'} Video tahlil — cheklovsiz
-        </ThemedText>
-      </ThemedView>
-    </ThemedView>
-  );
-}
+const RULES: [string, string][] = [
+  ['Haqiqiy davomiylik', '12 daqiqa 40 soniyalik video — 12,7 daqiqa. Yaxlitlash yoki yashirin toʻlov yoʻq.'],
+  ['Avval obuna, keyin paket', 'Avval obunaning 30 kunlik daqiqalari ishlatiladi, ular tugasa — sotib olingan, kuymaydigan daqiqalar.'],
+  ['30 kunda yangilanadi', 'Obuna daqiqalari har 30 kunda yangilanadi; ishlatilmagan qoldiq keyingi davrga oʻtmaydi.'],
+  ['Nosozlikda qaytariladi', 'Video texnik sabab bilan tayyor boʻlmasa, sarflangan daqiqa balansingizga avtomatik qaytadi.'],
+];
+
+const FAQ: { q: string; a: string }[] = [
+  { q: 'Obunani bekor qilish yoki boshqa tarifga oʻtish mumkinmi?', a: 'Ha, istalgan vaqtda tarifni oʻzgartirishingiz yoki toʻxtatishingiz mumkin. Majburiy muddat yoki jarima yoʻq.' },
+  { q: 'Qaysi kartalar bilan toʻlash mumkin?', a: 'Click, Payme, Uzum yoki Paynet orqali — Uzcard, Humo yoki Visa kartangiz bilan.' },
+  { q: 'Subtitr ham daqiqa sarflaydimi?', a: 'Ha, subtitr ham dublaj kabi video davomiyligicha daqiqa sarflaydi. Tezkor tahlil (xulosa, konspekt, test) daqiqa sarflamaydi.' },
+  { q: 'Bepul tarifda nima bor?', a: 'Har 30 kunda 5 daqiqa dublaj yoki subtitr, 360p sifatda yuklab olish. Uzunroq videolar uchun bir martalik paket yoki obuna oling.' },
+];
+
+const openSite = (hash = '') => WebBrowser.openBrowserAsync(`${SITE_URL}/pricing${hash}`).catch(() => {});
 
 export default function PricingScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const status = useAuthStore((s) => s.status);
-  const isLoggedIn = status === 'signedIn';
+  const isLoggedIn = useAuthStore((s) => s.status === 'signedIn');
+  const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['plans'],
-    queryFn: plansApi.getPlans,
-    enabled: isLoggedIn,
-  });
+  const { data, isLoading } = useQuery({ queryKey: ['plans'], queryFn: plansApi.getPlans });
+  const current = data?.current;
+  const plans = (data?.plans?.length ? data.plans : DEFAULT_PLANS).filter(
+    (p) => (p.tier ?? p.id) === 'free' || (p.period_days ?? 30) === (cycle === 'yearly' ? 365 : 30),
+  );
+  const packs = data?.minute_packs?.length ? data.minute_packs : DEFAULT_PACKS;
 
-  const plans = data?.plans?.length ? data.plans : DEFAULT_PLANS;
-  const currentPlan = data?.current?.plan;
+  const perMinute = (p: PlanDef) => {
+    if (!(p.price > 0 && p.monthly_minutes > 0)) return 0;
+    const price = p.discounted_price && cycle === 'monthly' ? p.discounted_price : p.price;
+    return Math.round(price / (p.period_days === 365 ? p.monthly_minutes * 12 : p.monthly_minutes));
+  };
+
+  const rows: [string, (p: PlanDef) => string][] = [
+    ['Har 30 kunda', (p) => `${p.monthly_minutes} daqiqa`],
+    ['1 daqiqa narxi', (p) => (perMinute(p) ? `~${som(perMinute(p))} soʻm` : '—')],
+    ['Video sifati', (p) => `${p.max_resolution ?? '—'} gacha`],
+    ['Navbat', (p) => (p.priority ? 'Ustuvor' : 'Umumiy')],
+    ['Ovoz variantlari', (p) => ((p.tier ?? p.id) === 'pro' ? 'Tanlash mumkin' : 'Avtomatik')],
+    ['Bitta video', () => '120 daqiqagacha'],
+    ['Tezkor tahlil', () => 'Daqiqa sarflamaydi'],
+  ];
 
   return (
-    <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex}>
-        <ThemedView style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <ThemedText style={[styles.headerAction, { color: colors.accent }]}>{'< Orqaga'}</ThemedText>
-          </Pressable>
-        </ThemedView>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedText style={styles.title}>Tarif rejalari</ThemedText>
-          <ThemedText variant="secondary" style={styles.subtitle}>
-            Har tarif oyiga ma&apos;lum daqiqa dublyaj beradi (haqiqiy video davomiyligi bo&apos;yicha).
-            Byudjet tugasa, qo&apos;shimcha daqiqa paketi sotib olasiz — ular tugamaydi.
+    <Screen>
+      <View style={styles.page}>
+        <View style={styles.hero}>
+          <ThemedText accessibilityRole="header" style={styles.h1}>
+            Tariflar
           </ThemedText>
-
-          {isLoading ? (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
-          ) : (
-            <ThemedView style={styles.cardsContainer}>
-              {plans.map((plan) => (
-                <PlanCard key={plan.id} plan={plan} isCurrent={currentPlan === plan.id} />
-              ))}
-            </ThemedView>
+          <ThemedText variant="secondary" style={styles.lead}>
+            Hisob daqiqada yuritiladi: dublaj ham, subtitr ham videoning haqiqiy davomiyligicha daqiqa sarflaydi. Tezkor tahlil daqiqa
+            sarflamaydi.
+          </ThemedText>
+          {isLoggedIn && current && (
+            <View style={[styles.balance, { borderColor: colors.rule, backgroundColor: colors.ground }]}>
+              <ThemedText variant="secondary" style={styles.body15}>
+                Balansingiz:{' '}
+                <ThemedText style={[styles.body15, styles.tabular, { fontWeight: '600' }]}>{current.minutes.total_available} daqiqa</ThemedText>
+                {current.minutes.purchased > 0 ? ` · shundan ${current.minutes.purchased} tasi kuymaydi` : ''}
+              </ThemedText>
+            </View>
           )}
+        </View>
 
-          <ThemedView
-            style={[styles.webNotice, { backgroundColor: colors.accentGlow, borderColor: colors.accent }]}
-          >
-            <ThemedText
-              style={{ color: colors.accent, fontSize: 13, textAlign: 'center', fontWeight: '700' }}
-            >
-              Obuna bo&apos;lish va daqiqa paketlarini sotib olish
+        {!isLoggedIn && (
+          <View style={[styles.note, { borderColor: colors.rule, backgroundColor: colors.ground }]}>
+            <ThemedText variant="secondary" style={[styles.body15, styles.center]}>
+              Obuna boʻlish yoki paket olish uchun{' '}
+              <ThemedText onPress={() => router.push('/(auth)/login')} suppressHighlighting style={[styles.body15, styles.link, { color: colors.ink }]}>
+                kiring
+              </ThemedText>{' '}
+              yoki{' '}
+              <ThemedText onPress={() => router.push('/(auth)/register')} suppressHighlighting style={[styles.body15, styles.link, { color: colors.ink }]}>
+                bepul roʻyxatdan oʻting
+              </ThemedText>
+              .
             </ThemedText>
-            <ThemedText variant="secondary" style={styles.webNoticeText}>
-              To&apos;lov gapirai.uz saytida amalga oshiriladi. Obuna bo&apos;lgach, tarif shu ilovada ham
-              darhol faollashadi.
-            </ThemedText>
-            <Pressable
-              onPress={() => Linking.openURL(WEB_PRICING_URL).catch(() => {})}
-              style={[styles.webButton, { backgroundColor: colors.accent }]}
-            >
-              <ThemedText style={styles.webButtonText}>Saytda obuna bo&apos;lish</ThemedText>
-            </Pressable>
-          </ThemedView>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+          </View>
+        )}
+
+        <View style={styles.cycle}>
+          <SegmentedControl
+            options={[
+              { value: 'monthly', label: 'Oylik' },
+              { value: 'yearly', label: 'Yillik · 2 oy tekin' },
+            ]}
+            value={cycle}
+            onChange={setCycle}
+          />
+        </View>
+
+        {isLoading ? (
+          <ActivityIndicator color={colors.muted} style={styles.loader} />
+        ) : (
+          <View style={styles.plans}>
+            {plans.map((plan) => {
+              const tier = plan.tier ?? plan.id;
+              const isCurrent = current?.plan === tier;
+              const yearly = plan.period_days === 365;
+              const shown = plan.discounted_price && cycle === 'monthly' ? plan.discounted_price : yearly ? Math.round(plan.price / 12) : plan.price;
+              return (
+                <Card key={plan.id} style={[styles.planCard, isCurrent && { borderColor: colors.accent, borderWidth: 2, padding: 23 }]}>
+                  <View style={styles.planHead}>
+                    <ThemedText accessibilityRole="header" style={styles.planName}>
+                      {plan.name.replace(' (yillik)', '')}
+                    </ThemedText>
+                    {isCurrent && (
+                      <View style={[styles.currentTag, { backgroundColor: alpha(colors.accent, 0.1) }]}>
+                        <ThemedText style={[styles.xs, { color: colors.accentInk, fontWeight: '500' }]}>Joriy</ThemedText>
+                      </View>
+                    )}
+                  </View>
+                  <ThemedText variant="secondary" style={styles.small}>
+                    {PLAN_NOTE[tier] ?? ''}
+                  </ThemedText>
+
+                  <View style={styles.mt24}>
+                    <ThemedText style={styles.price}>
+                      {som(shown)}{' '}
+                      <ThemedText variant="secondary" style={styles.priceUnit}>
+                        {plan.price === 0 ? 'soʻm' : plan.discounted_price && cycle === 'monthly' ? 'soʻm / oy · −10%' : 'soʻm / oy'}
+                      </ThemedText>
+                    </ThemedText>
+                    {yearly && plan.price > 0 && (
+                      <ThemedText variant="secondary" style={[styles.small, styles.tabular, { marginTop: 6 }]}>
+                        Yiliga {som(plan.price)} soʻm
+                      </ThemedText>
+                    )}
+                  </View>
+
+                  <View style={styles.mt24}>
+                    {isCurrent ? (
+                      <PrimaryButton label="Joriy tarifingiz" variant="secondary" onPress={() => {}} />
+                    ) : tier === 'free' ? (
+                      <PrimaryButton
+                        label={isLoggedIn ? 'Video yuborish' : 'Bepul roʻyxatdan oʻtish'}
+                        variant="secondary"
+                        onPress={() => (isLoggedIn ? router.navigate('/') : router.push('/(auth)/register'))}
+                      />
+                    ) : (
+                      <PrimaryButton label="Saytda obuna boʻlish" icon={ExternalLink} onPress={() => openSite('#plans')} />
+                    )}
+                  </View>
+
+                  <View style={[styles.rows, { borderTopColor: colors.rule }]}>
+                    {rows.map(([label, value], i) => (
+                      <View key={label} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: colors.rule }]}>
+                        <ThemedText variant="secondary" style={styles.small}>
+                          {label}
+                        </ThemedText>
+                        <ThemedText style={[styles.small, styles.tabular, styles.right]}>{value(plan)}</ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                </Card>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <ThemedText accessibilityRole="header" style={styles.h2}>
+            Bir martalik daqiqalar
+          </ThemedText>
+          <ThemedText variant="secondary" style={styles.body16}>
+            Obunasiz yoki obunaga qoʻshimcha. Sotib olingan daqiqalar hech qachon kuymaydi va obuna tugasa ham saqlanadi.
+          </ThemedText>
+          <Card style={styles.packs}>
+            {packs.map((p, i) => {
+              const price = p.discounted_price ?? p.price;
+              const bought = !!(p.one_time && p.already_purchased);
+              return (
+                <View key={p.minutes} style={[styles.pack, i > 0 && { borderTopWidth: 1, borderTopColor: colors.rule }]}>
+                  <View style={styles.packTop}>
+                    <ThemedText style={[styles.packMinutes, styles.tabular]}>
+                      +{p.minutes}{' '}
+                      <ThemedText variant="secondary" style={styles.body15}>
+                        daqiqa
+                      </ThemedText>
+                    </ThemedText>
+                    <View style={styles.packPrice}>
+                      <ThemedText style={[styles.body15, styles.tabular, { fontWeight: '500' }]}>{som(price)} soʻm</ThemedText>
+                      <ThemedText variant="secondary" style={[styles.xs13, styles.tabular]}>
+                        ~{som(Math.round(price / p.minutes))} soʻm / daqiqa{p.one_time ? ' · faqat bir marta' : ''}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <PrimaryButton
+                    label={bought ? 'Olingan' : 'Sotib olish'}
+                    variant="secondary"
+                    size="sm"
+                    disabled={bought}
+                    onPress={() => openSite('#minute-packs')}
+                  />
+                </View>
+              );
+            })}
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText accessibilityRole="header" style={styles.h2}>
+            Daqiqa qanday sarflanadi
+          </ThemedText>
+          <View style={styles.rules}>
+            {RULES.map(([t, d]) => (
+              <View key={t} style={styles.rule}>
+                <Check size={16} color={colors.accentInk} strokeWidth={2} style={styles.ruleIcon} />
+                <ThemedText variant="secondary" style={[styles.body16, styles.flex]}>
+                  <ThemedText style={[styles.body16, { fontWeight: '500' }]}>{t}.</ThemedText> {d}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.section, styles.lastSection]}>
+          <ThemedText accessibilityRole="header" style={styles.h2}>
+            Savollar
+          </ThemedText>
+          <Accordion items={FAQ} style={styles.mt28} />
+        </View>
+      </View>
+      <Footer />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingVertical: 12 },
-  headerAction: { fontSize: 14, fontWeight: '700' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, gap: 14, alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  subtitle: { fontSize: 13, textAlign: 'center', maxWidth: 320 },
-  cardsContainer: { width: '100%', gap: 14, marginTop: 8 },
-  card: { borderWidth: 1, borderRadius: 24, padding: 20, gap: 10, position: 'relative' },
-  cardPro: { borderWidth: 2 },
-  recommendedBadge: {
-    position: 'absolute',
-    top: -12,
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  recommendedText: { color: '#ffffff', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  planName: { fontSize: 18, fontWeight: '900', marginTop: 6 },
-  currentLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  price: { fontSize: 28, fontWeight: '900' },
-  priceSuffix: { fontSize: 13, fontWeight: '500' },
-  features: { gap: 8 },
-  featureRow: { fontSize: 13 },
-  webNotice: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    width: '100%',
-    maxWidth: 400,
-    gap: 10,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  webNoticeText: { fontSize: 12, textAlign: 'center', lineHeight: 17 },
-  webButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    alignItems: 'center',
-    width: '100%',
-  },
-  webButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  page: { paddingHorizontal: 16, paddingTop: 48 },
+  hero: { alignItems: 'center' },
+  h1: { fontSize: 40, lineHeight: 42, fontWeight: '600', letterSpacing: -1.4, textAlign: 'center' },
+  lead: { fontSize: 18, lineHeight: 29, textAlign: 'center', marginTop: 20 },
+  balance: { marginTop: 32, borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  note: { marginTop: 32, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  center: { textAlign: 'center' },
+  link: { fontWeight: '500', textDecorationLine: 'underline' },
+  cycle: { marginTop: 40 },
+  loader: { marginVertical: 80 },
+  plans: { marginTop: 40, gap: 16 },
+  planCard: { padding: 24 },
+  planHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  planName: { fontSize: 18, fontWeight: '600' },
+  currentTag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  mt24: { marginTop: 24 },
+  mt28: { marginTop: 28 },
+  price: { fontSize: 40, lineHeight: 44, fontWeight: '600', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+  priceUnit: { fontSize: 15, letterSpacing: 0, fontWeight: '400' },
+  rows: { marginTop: 24, borderTopWidth: 1 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, paddingVertical: 10 },
+  right: { textAlign: 'right', flexShrink: 1 },
+  section: { paddingTop: 96, gap: 12 },
+  lastSection: { paddingBottom: 96 },
+  h2: { fontSize: 24, lineHeight: 30, fontWeight: '600', letterSpacing: -0.6 },
+  body15: { fontSize: 15, lineHeight: 22 },
+  body16: { fontSize: 16, lineHeight: 26 },
+  small: { fontSize: 14, lineHeight: 20 },
+  xs: { fontSize: 12 },
+  xs13: { fontSize: 13 },
+  tabular: { fontVariant: ['tabular-nums'] },
+  packs: { padding: 0, marginTop: 28 },
+  pack: { paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
+  packTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16 },
+  packMinutes: { fontSize: 18, fontWeight: '600' },
+  packPrice: { alignItems: 'flex-end' },
+  rules: { marginTop: 20, gap: 24 },
+  rule: { flexDirection: 'row', gap: 12 },
+  ruleIcon: { marginTop: 5 },
 });
