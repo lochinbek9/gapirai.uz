@@ -121,12 +121,13 @@ class TestProcessVideoRetrySessionResilience(unittest.TestCase):
         every subsequent call returns a genuinely fresh real session."""
         real_session_local = SessionLocal
 
-        def factory():
+        # **kw: tasks.py SessionLocal(expire_on_commit=False) bilan chaqiradi
+        def factory(**kw):
             if "session" not in poisoned_holder:
-                wrapped = _PoisonableSession(real_session_local())
+                wrapped = _PoisonableSession(real_session_local(**kw))
                 poisoned_holder["session"] = wrapped
                 return wrapped
-            return real_session_local()
+            return real_session_local(**kw)
         return factory
 
     # 1. initial DB OperationalError -- the very first query in the task
@@ -136,13 +137,13 @@ class TestProcessVideoRetrySessionResilience(unittest.TestCase):
         captured = {}
         call_count = {"n": 0}
 
-        def factory():
+        def factory(**kw):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                wrapped = _PoisonableSession(SessionLocal())
+                wrapped = _PoisonableSession(SessionLocal(**kw))
                 wrapped.poison()
                 return wrapped
-            return SessionLocal()
+            return SessionLocal(**kw)
 
         with patch("backend.workers.tasks.SessionLocal", side_effect=factory):
             with patch.object(process_video, "retry", new=_fake_retry(captured)):
@@ -305,12 +306,13 @@ class TestAnalyzeVideoTaskRetrySessionResilience(unittest.TestCase):
     def _patched_session_local(self, poisoned_holder: dict):
         real_session_local = SessionLocal
 
-        def factory():
+        # **kw: tasks.py SessionLocal(expire_on_commit=False) bilan chaqiradi
+        def factory(**kw):
             if "session" not in poisoned_holder:
-                wrapped = _PoisonableSession(real_session_local())
+                wrapped = _PoisonableSession(real_session_local(**kw))
                 poisoned_holder["session"] = wrapped
                 return wrapped
-            return real_session_local()
+            return real_session_local(**kw)
         return factory
 
     # 7. analysis does not remain stuck -- same fix, same proof, for the

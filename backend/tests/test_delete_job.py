@@ -12,7 +12,12 @@ class TestDeleteJob(unittest.TestCase):
         job_id = uuid.uuid4()
         owner = MagicMock(spec=User, id=owner_id)
 
-        job = MagicMock(spec=DubbingJob, id=job_id, user_id=owner_id, output_video_url=None)
+        # Asl job (kesh nusxasi emas): MagicMock'ning o'zi "rost" -- source_job_id
+        # berilmasa delete_job uni nusxa deb str(MagicMock)'ni UUID qilmoqchi bo'ladi.
+        job = MagicMock(
+            spec=DubbingJob, id=job_id, user_id=owner_id, output_video_url=None,
+            source_job_id=None, is_public=False,
+        )
         db = MagicMock()
         
         # Mock query
@@ -20,15 +25,19 @@ class TestDeleteJob(unittest.TestCase):
         db.query.return_value = query_mock
         query_mock.filter.return_value = query_mock
         query_mock.first.return_value = job
+        query_mock.order_by.return_value = query_mock
+        query_mock.count.return_value = 0
+        query_mock.all.return_value = []
 
         with patch("backend.services.plans.is_user_admin", return_value=False), \
              patch("backend.workers.celery_app.celery_app.control.revoke") as mock_revoke, \
-             patch("backend.services.job_checkpoint.delete_checkpoint") as mock_checkpoint:
+             patch("backend.services.storage.delete_s3_prefix") as mock_delete_prefix:
             res = delete_job(job_id=job_id, db=db, current_user=owner)
             self.assertEqual(res.status_code, 204)
             mock_revoke.assert_called_once_with(str(job_id), terminate=True)
-            mock_checkpoint.assert_has_calls(
-                [call(str(job_id), name) for name in ("video.mp4", "audio.wav", "dubbed_audio.wav", "dubbed_final.mp4")],
+            # Fayllar ham, checkpointlar ham butun prefiks bo'yicha tozalanadi (job_deletion.py)
+            mock_delete_prefix.assert_has_calls(
+                [call(f"dubber/{job_id}/"), call(f"dubber-checkpoints/{job_id}/")],
                 any_order=True,
             )
             db.delete.assert_called_once_with(job)
@@ -40,17 +49,25 @@ class TestDeleteJob(unittest.TestCase):
         job_id = uuid.uuid4()
         admin_user = MagicMock(spec=User, id=admin_id)
 
-        job = MagicMock(spec=DubbingJob, id=job_id, user_id=other_user_id, output_video_url=None)
+        # Asl job (kesh nusxasi emas): MagicMock'ning o'zi "rost" -- source_job_id
+        # berilmasa delete_job uni nusxa deb str(MagicMock)'ni UUID qilmoqchi bo'ladi.
+        job = MagicMock(
+            spec=DubbingJob, id=job_id, user_id=other_user_id, output_video_url=None,
+            source_job_id=None, is_public=False,
+        )
         db = MagicMock()
         
         query_mock = MagicMock()
         db.query.return_value = query_mock
         query_mock.filter.return_value = query_mock
         query_mock.first.return_value = job
+        query_mock.order_by.return_value = query_mock
+        query_mock.count.return_value = 0
+        query_mock.all.return_value = []
 
         with patch("backend.services.plans.is_user_admin", return_value=True), \
              patch("backend.workers.celery_app.celery_app.control.revoke"), \
-             patch("backend.services.job_checkpoint.delete_checkpoint"):
+             patch("backend.services.storage.delete_s3_prefix"):
             res = delete_job(job_id=job_id, db=db, current_user=admin_user)
             self.assertEqual(res.status_code, 204)
             db.delete.assert_called_once_with(job)
