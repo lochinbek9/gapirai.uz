@@ -21,13 +21,21 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 // target_language is always "uz" server-side regardless of what's sent
 // (backend/api/routes.py CreateJobRequest defaults it and the web client
 // always sends "uz" too) — no language picker needed for dubbing.
-export async function createJob(youtubeUrl: string, voiceGender: VoiceGender, subtitleOnly = false): Promise<CreateJobResponse> {
+/** 'uz' -- video o'zbekcha nutqli: tarjimasiz STT (backend faqat subtitle_only bilan qabul qiladi). */
+export type SourceLanguage = 'auto' | 'uz';
+
+export async function createJob(
+  youtubeUrl: string,
+  voiceGender: VoiceGender,
+  subtitleOnly = false,
+  sourceLanguage: SourceLanguage = 'auto',
+): Promise<CreateJobResponse> {
   const res = await apiClient.post<CreateJobResponse>('/api/jobs', {
     youtube_url: youtubeUrl,
     target_language: 'uz',
     voice_gender: voiceGender,
     subtitle_only: subtitleOnly,
-    source_language: 'auto',
+    source_language: subtitleOnly ? sourceLanguage : 'auto',
   });
   return res.data;
 }
@@ -74,7 +82,7 @@ function uploadErrorText(status: number, body: string): string {
 // bilan yuboradi; onProgress 0..1.
 export async function uploadVideo(
   video: LocalVideo,
-  opts: { subtitleOnly: boolean; voiceGender: VoiceGender },
+  opts: { subtitleOnly: boolean; voiceGender: VoiceGender; sourceLanguage?: SourceLanguage },
   onProgress?: (fraction: number) => void,
 ): Promise<CreateJobResponse> {
   const contentType = uploadContentType(video);
@@ -83,7 +91,7 @@ export async function uploadVideo(
   const qs = new URLSearchParams({
     subtitle_only: String(opts.subtitleOnly),
     voice_gender: opts.voiceGender,
-    source_language: 'auto',
+    source_language: opts.subtitleOnly ? (opts.sourceLanguage ?? 'auto') : 'auto',
   });
   const task = FileSystem.createUploadTask(
     `${API_URL}/api/jobs/upload?${qs.toString()}`,

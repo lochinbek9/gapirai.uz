@@ -1,81 +1,73 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { radius } from '../theme/colors';
 import { useTheme } from '../theme/ThemeProvider';
 import { ThemedText } from './ThemedText';
+import type { IconComponent } from './BrandIcons';
 
 interface Option<T extends string> {
   value: T;
   label: string;
+  icon?: IconComponent;
 }
 
 interface SegmentedControlProps<T extends string> {
   options: Option<T>[];
   value: T;
   onChange: (value: T) => void;
-  scrollable?: boolean;
 }
 
-export function SegmentedControl<T extends string>({ options, value, onChange, scrollable }: SegmentedControlProps<T>) {
+/** Saytdagi xizmat tablari: ground iz (4px ichki bo'shliq), tanlangani oq + ingichka halqa. */
+export function SegmentedControl<T extends string>({ options, value, onChange }: SegmentedControlProps<T>) {
   const { colors } = useTheme();
 
-  const content = (
-    <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      {options.map((opt) => {
-        const active = opt.value === value;
+  return (
+    <View accessibilityRole="tablist" style={[styles.row, { backgroundColor: colors.ground }]}>
+      {options.map(({ value: v, label, icon: Icon }) => {
+        const active = v === value;
+        const fg = active ? colors.ink : colors.muted;
         return (
           <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
+            key={v}
+            onPress={() => onChange(v)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
             style={[
               styles.segment,
-              scrollable && styles.segmentScrollable,
-              active && { backgroundColor: colors.accent },
+              active && [styles.active, { backgroundColor: colors.surface, borderColor: colors.rule }],
             ]}
           >
-            <ThemedText
-              style={[styles.label, active ? styles.labelActive : { color: colors.textSecondary }]}
-            >
-              {opt.label}
+            {Icon && <Icon size={16} color={fg} strokeWidth={2} />}
+            <ThemedText numberOfLines={1} style={[styles.label, { color: fg }]}>
+              {label}
             </ThemedText>
           </Pressable>
         );
       })}
     </View>
   );
-
-  if (scrollable) {
-    return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {content}
-      </ScrollView>
-    );
-  }
-  return content;
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 4,
-    gap: 4,
-  },
+  row: { flexDirection: 'row', borderRadius: radius.control, padding: 4, gap: 4 },
   segment: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    minHeight: 40,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+    borderRadius: radius.tab,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  segmentScrollable: {
-    flex: 0,
-    paddingHorizontal: 16,
+  active: {
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  labelActive: {
-    color: '#ffffff',
-  },
+  label: { fontSize: 14, fontWeight: '500' },
 });

@@ -7,6 +7,10 @@ export interface PlanDef {
   monthly_minutes: number;
   priority: boolean;
   tts_tier: string;
+  discounted_price?: number | null;
+  tier?: string;
+  period_days?: number;
+  max_resolution?: string;
 }
 
 export interface MinuteBalance {
@@ -20,6 +24,9 @@ export interface MinuteBalance {
 export interface MinutePack {
   minutes: number;
   price: number;
+  discounted_price?: number | null;
+  one_time?: boolean;
+  already_purchased?: boolean;
 }
 
 export interface CurrentSubscription {

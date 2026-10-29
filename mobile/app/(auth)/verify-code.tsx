@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 
 import { getErrorMessage } from '../../src/api/errors';
+import { Notice } from '../../src/components/Notice';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ThemedText } from '../../src/components/ThemedText';
 import { ThemedTextInput } from '../../src/components/ThemedTextInput';
@@ -11,11 +12,12 @@ import * as authApi from '../../src/features/auth/api';
 import { AuthScreenLayout } from '../../src/features/auth/components/AuthScreenLayout';
 import { verifyCodeSchema, type VerifyCodeFormValues } from '../../src/features/auth/schemas';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { useTheme } from '../../src/theme/ThemeProvider';
+
+// Saytdagi kod maydoni: markazda, katta, keng harf oralig'i
+const CODE_STYLE = { textAlign: 'center' as const, fontSize: 24, letterSpacing: 12, fontFamily: 'Geist_600SemiBold' };
 
 export default function VerifyCodeScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const { email, message } = useLocalSearchParams<{ email: string; message?: string }>();
   const setSession = useAuthStore((s) => s.setSession);
 
@@ -60,24 +62,19 @@ export default function VerifyCodeScreen() {
             maxLength={6}
             error={errors.code?.message}
             placeholder="000000"
+            style={CODE_STYLE}
           />
         )}
       />
 
       {verifyMutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(verifyMutation.error, 'Kod tasdiqlanmadi.')}
-        </ThemedText>
+        <Notice>{getErrorMessage(verifyMutation.error, 'Kod tasdiqlanmadi.')}</Notice>
       )}
       {resendMutation.isSuccess && (
-        <ThemedText style={{ color: colors.success, fontSize: 13, fontWeight: '600' }}>
-          Kod qayta yuborildi.
-        </ThemedText>
+        <Notice tone="success">Kod qayta yuborildi.</Notice>
       )}
       {resendMutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(resendMutation.error, 'Kodni qayta yuborishda xatolik yuz berdi.')}
-        </ThemedText>
+        <Notice>{getErrorMessage(resendMutation.error, 'Kodni qayta yuborishda xatolik yuz berdi.')}</Notice>
       )}
 
       <PrimaryButton label="Tasdiqlash" onPress={onSubmit} loading={verifyMutation.isPending} />

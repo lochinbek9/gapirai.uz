@@ -4,5 +4,5 @@ import { useTheme } from '../theme/ThemeProvider';
 
 export function ThemedView({ style, ...rest }: ViewProps) {
   const { colors } = useTheme();
-  return <View style={[{ backgroundColor: colors.background }, style]} {...rest} />;
+  return <View style={[{ backgroundColor: colors.surface }, style]} {...rest} />;
 }

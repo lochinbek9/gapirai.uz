@@ -1,15 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { CreditCard, Trash2 } from 'lucide-react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { getErrorMessage } from '../src/api/errors';
+import { Card } from '../src/components/Card';
+import { ChoiceTile } from '../src/components/ChoiceTile';
+import { Notice } from '../src/components/Notice';
+import { PageTitle } from '../src/components/PageTitle';
 import { PrimaryButton } from '../src/components/PrimaryButton';
+import { Screen } from '../src/components/Screen';
 import { ThemedText } from '../src/components/ThemedText';
-import { ThemedView } from '../src/components/ThemedView';
 import * as billingApi from '../src/features/billing/api';
 import type { SavedCard } from '../src/features/plans/types';
+import { alpha, radius } from '../src/theme/colors';
 import { useTheme } from '../src/theme/ThemeProvider';
 
 // Variant A: mobil ilovada karta MA'LUMOTLARI kiritilmaydi (App Store 3.1.1).
@@ -29,7 +33,6 @@ function brand(c: SavedCard) {
 
 export default function BillingScreen() {
   const { colors } = useTheme();
-  const router = useRouter();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -80,162 +83,101 @@ export default function BillingScreen() {
   const busy = renewMut.isPending || topupMut.isPending;
 
   return (
-    <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex}>
-        <ThemedView style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <ThemedText style={[styles.headerAction, { color: colors.accent }]}>{'< Orqaga'}</ThemedText>
-          </Pressable>
-          <ThemedText style={styles.headerTitle}>Avtomatik to&apos;lov</ThemedText>
-          <ThemedView style={{ width: 60, backgroundColor: 'transparent' }} />
-        </ThemedView>
+    <Screen contentStyle={styles.content}>
+      <PageTitle
+        title="Avtomatik toʻlov"
+        lead="Kartani bogʻlash va yoqish gapirai.uz saytida. Bu yerda holatini koʻrish, kartani oʻchirish va avtomatik toʻlovni oʻchirish mumkin."
+      />
 
-        <ScrollView contentContainerStyle={styles.content}>
-          {isLoading ? (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
-          ) : !ov || !enabledProviders ? (
-            <ThemedView
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            >
-              <ThemedText variant="secondary" style={styles.p}>
-                Avtomatik to&apos;lov hozircha mavjud emas. Tez orada kartani bog&apos;lab, obunani va
-                daqiqani avtomatik to&apos;ldirish imkoni qo&apos;shiladi.
-              </ThemedText>
-            </ThemedView>
-          ) : (
-            <>
-              <ThemedText variant="secondary" style={styles.intro}>
-                Avtomatik to&apos;lovni gapirai.uz saytida sozlaysiz (karta bog&apos;lash, yoqish). Bu yerda
-                holatini ko&apos;rish, kartani o&apos;chirish va avtomatik to&apos;lovni o&apos;chirish
-                mumkin.
-              </ThemedText>
-
-              {prefs?.in_grace && (
-                <ThemedView
-                  style={[
-                    styles.banner,
-                    { borderColor: colors.danger, backgroundColor: colors.danger + '18' },
-                  ]}
-                >
-                  <ThemedText style={{ color: colors.danger, fontSize: 12 }}>
-                    Obunani uzaytirib bo&apos;lmadi. Kartangizni tekshiring — yaqin kunlarda qayta urinib
-                    ko&apos;ramiz, shu vaqt davomida tarif ishlaydi.
-                  </ThemedText>
-                </ThemedView>
-              )}
-
-              {error && (
-                <ThemedView
-                  style={[
-                    styles.banner,
-                    { borderColor: colors.danger, backgroundColor: colors.danger + '18' },
-                  ]}
-                >
-                  <ThemedText style={{ color: colors.danger, fontSize: 12 }}>{error}</ThemedText>
-                </ThemedView>
-              )}
-
-              {/* Kartalar */}
-              <ThemedView
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <ThemedText style={styles.cardTitle}>Kartalar</ThemedText>
-                {ov.cards.length === 0 ? (
-                  <ThemedText variant="secondary" style={styles.p}>
-                    Hali karta bog&apos;lanmagan.
-                  </ThemedText>
-                ) : (
-                  ov.cards.map((c) => (
-                    <ThemedView key={c.id} style={[styles.cardRow, { borderColor: colors.border }]}>
-                      <ThemedView style={{ flex: 1, backgroundColor: 'transparent' }}>
-                        <ThemedText style={styles.cardMask}>
-                          {brand(c)} · {c.card_mask || '••••'}
-                        </ThemedText>
-                        <ThemedText variant="secondary" style={styles.cardSub}>
-                          {c.is_active
-                            ? c.is_default
-                              ? 'asosiy karta'
-                              : c.expire || 'faol'
-                            : 'tasdiqlanmagan'}
-                        </ThemedText>
-                      </ThemedView>
-                      <Pressable onPress={() => removeCard(c)} hitSlop={6}>
-                        <ThemedText style={[styles.rowAction, { color: colors.danger }]}>
-                          o&apos;chirish
-                        </ThemedText>
-                      </Pressable>
-                    </ThemedView>
-                  ))
-                )}
-                <PrimaryButton
-                  label={hasActiveCard ? 'Saytda boshqarish' : 'Saytda karta bog‘lash'}
-                  variant="secondary"
-                  onPress={openWeb}
-                />
-              </ThemedView>
-
-              {/* Sozlamalar */}
-              <ThemedView
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <ThemedText style={styles.cardTitle}>Sozlamalar</ThemedText>
-
-                <SettingRow
-                  label="Obunani avtomatik uzaytirish"
-                  on={!!prefs?.auto_renew}
-                  busy={busy}
-                  onDisable={() => renewMut.mutate()}
-                  onEnableWeb={openWeb}
-                  colors={colors}
-                />
-                <SettingRow
-                  label="Daqiqani avtomatik to‘ldirish"
-                  on={!!prefs?.auto_topup_enabled}
-                  busy={busy}
-                  onDisable={() => topupMut.mutate({ enabled: false })}
-                  onEnableWeb={openWeb}
-                  colors={colors}
-                />
-
-                {prefs?.auto_topup_enabled && (
-                  <ThemedView style={{ gap: 8, backgroundColor: 'transparent' }}>
-                    <ThemedText variant="secondary" style={styles.toggleHint}>
-                      Paket hajmi:
-                    </ThemedText>
-                    <ThemedView style={styles.chipRow}>
-                      {PACKS.map((pk) => (
-                        <Pressable
-                          key={pk ?? 'auto'}
-                          onPress={() => topupMut.mutate({ enabled: true, pack: pk })}
-                          disabled={busy}
-                          style={[
-                            styles.chip,
-                            { borderColor: colors.border },
-                            (prefs.auto_topup_pack ?? null) === pk && {
-                              backgroundColor: colors.accent,
-                              borderColor: colors.accent,
-                            },
-                          ]}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.chipText,
-                              (prefs.auto_topup_pack ?? null) === pk && { color: '#fff' },
-                            ]}
-                          >
-                            {PACK_LABEL(pk)}
-                          </ThemedText>
-                        </Pressable>
-                      ))}
-                    </ThemedView>
-                  </ThemedView>
-                )}
-              </ThemedView>
-            </>
+      {isLoading ? (
+        <ActivityIndicator color={colors.muted} style={styles.loader} />
+      ) : !ov || !enabledProviders ? (
+        <Notice tone="neutral">
+          Avtomatik toʻlov hozircha mavjud emas. Tez orada kartani bogʻlab, obunani va daqiqani avtomatik toʻldirish imkoni qoʻshiladi.
+        </Notice>
+      ) : (
+        <>
+          {prefs?.in_grace && (
+            <Notice>
+              Obunani uzaytirib boʻlmadi. Kartangizni tekshiring — yaqin kunlarda qayta urinib koʻramiz, shu vaqt davomida tarif ishlaydi.
+            </Notice>
           )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+          {error && <Notice>{error}</Notice>}
+
+          <Card style={styles.card}>
+            <ThemedText accessibilityRole="header" style={styles.cardTitle}>
+              Kartalar
+            </ThemedText>
+            {ov.cards.length === 0 ? (
+              <ThemedText variant="secondary" style={styles.p}>
+                Hali karta bogʻlanmagan.
+              </ThemedText>
+            ) : (
+              ov.cards.map((c) => (
+                <View key={c.id} style={[styles.cardRow, { borderColor: colors.rule }]}>
+                  <CreditCard size={20} color={colors.muted} strokeWidth={2} />
+                  <View style={styles.flex}>
+                    <ThemedText style={styles.cardMask}>
+                      {brand(c)} · {c.card_mask || '••••'}
+                    </ThemedText>
+                    <ThemedText variant="secondary" style={styles.cardSub}>
+                      {c.is_active ? (c.is_default ? 'asosiy karta' : c.expire || 'faol') : 'tasdiqlanmagan'}
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => removeCard(c)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Kartani oʻchirish"
+                    hitSlop={6}
+                    style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: alpha(colors.red, 0.1) }]}
+                  >
+                    <Trash2 size={16} color={colors.muted} strokeWidth={2} />
+                  </Pressable>
+                </View>
+              ))
+            )}
+            <PrimaryButton label={hasActiveCard ? 'Saytda boshqarish' : 'Saytda karta bogʻlash'} variant="secondary" onPress={openWeb} />
+          </Card>
+
+          <Card style={styles.card}>
+            <ThemedText accessibilityRole="header" style={styles.cardTitle}>
+              Sozlamalar
+            </ThemedText>
+            <SettingRow
+              label="Obunani avtomatik uzaytirish"
+              on={!!prefs?.auto_renew}
+              busy={busy}
+              onDisable={() => renewMut.mutate()}
+              onEnableWeb={openWeb}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.rule }]} />
+            <SettingRow
+              label="Daqiqani avtomatik toʻldirish"
+              on={!!prefs?.auto_topup_enabled}
+              busy={busy}
+              onDisable={() => topupMut.mutate({ enabled: false })}
+              onEnableWeb={openWeb}
+            />
+            {prefs?.auto_topup_enabled && (
+              <View style={styles.packs}>
+                <ThemedText style={styles.label}>Paket hajmi</ThemedText>
+                <View style={styles.chipRow}>
+                  {PACKS.map((pk) => (
+                    <ChoiceTile
+                      key={pk ?? 'auto'}
+                      title={PACK_LABEL(pk)}
+                      selected={(prefs.auto_topup_pack ?? null) === pk}
+                      onPress={() => !busy && topupMut.mutate({ enabled: true, pack: pk })}
+                      style={styles.chip}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+          </Card>
+        </>
+      )}
+    </Screen>
   );
 }
 
@@ -245,68 +187,51 @@ function SettingRow({
   busy,
   onDisable,
   onEnableWeb,
-  colors,
 }: {
   label: string;
   on: boolean;
   busy: boolean;
   onDisable: () => void;
   onEnableWeb: () => void;
-  colors: ReturnType<typeof useTheme>['colors'];
 }) {
+  const { colors } = useTheme();
   return (
-    <ThemedView style={styles.toggleRow}>
-      <ThemedView style={{ flex: 1, backgroundColor: 'transparent' }}>
+    <View style={styles.toggleRow}>
+      <View style={styles.flex}>
         <ThemedText style={styles.toggleLabel}>{label}</ThemedText>
-        {!on && (
-          <Pressable onPress={onEnableWeb} hitSlop={4}>
-            <ThemedText style={[styles.toggleHint, { color: colors.accent }]}>
-              O&apos;chiq · saytda yoqish
-            </ThemedText>
-          </Pressable>
-        )}
-      </ThemedView>
-      {on ? (
-        <Switch value={true} disabled={busy} onValueChange={() => onDisable()} />
-      ) : (
-        <Switch value={false} disabled={busy} onValueChange={() => onEnableWeb()} />
-      )}
-    </ThemedView>
+        <ThemedText variant="secondary" style={styles.toggleHint}>
+          {on ? 'Yoqilgan' : 'Oʻchiq · saytda yoqish mumkin'}
+        </ThemedText>
+      </View>
+      <Switch
+        value={on}
+        disabled={busy}
+        onValueChange={() => (on ? onDisable() : onEnableWeb())}
+        trackColor={{ false: colors.rule, true: colors.accent }}
+        thumbColor="#FFFFFF"
+        accessibilityLabel={label}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  headerAction: { fontSize: 14, fontWeight: '700' },
-  headerTitle: { fontSize: 16, fontWeight: '800' },
-  content: { paddingHorizontal: 20, paddingBottom: 40, gap: 14 },
-  intro: { fontSize: 12, lineHeight: 18 },
-  banner: { borderWidth: 1, borderRadius: 14, padding: 12 },
-  card: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 12 },
-  cardTitle: { fontSize: 14, fontWeight: '800' },
-  p: { fontSize: 12, lineHeight: 18 },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  cardMask: { fontSize: 13, fontWeight: '700' },
-  cardSub: { fontSize: 11, marginTop: 2 },
-  rowAction: { fontSize: 12, fontWeight: '700' },
+  content: { paddingHorizontal: 16, paddingTop: 48, paddingBottom: 96, gap: 16 },
+  loader: { marginTop: 40 },
+  card: { gap: 14 },
+  cardTitle: { fontSize: 16, fontWeight: '600' },
+  p: { fontSize: 14, lineHeight: 20 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radius.control, paddingLeft: 14, paddingRight: 6, paddingVertical: 10 },
+  cardMask: { fontSize: 15, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  cardSub: { fontSize: 13, marginTop: 2 },
+  iconBtn: { padding: 8, borderRadius: radius.tab },
+  divider: { height: 1 },
+  packs: { gap: 8 },
+  label: { fontSize: 14, fontWeight: '500' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  chipText: { fontSize: 12, fontWeight: '700' },
+  chip: { minHeight: 0, paddingVertical: 8, paddingHorizontal: 12 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  toggleLabel: { fontSize: 13, fontWeight: '700' },
-  toggleHint: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  toggleLabel: { fontSize: 15, fontWeight: '500' },
+  toggleHint: { fontSize: 13, marginTop: 2 },
 });

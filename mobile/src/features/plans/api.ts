@@ -1,7 +1,7 @@
 import { apiClient } from '../../api/client';
-import type { CurrentSubscription, PlanDef } from './types';
+import type { CurrentSubscription, MinutePack, PlanDef } from './types';
 
-export async function getPlans(): Promise<{ plans: PlanDef[]; current: CurrentSubscription | null }> {
+export async function getPlans(): Promise<{ plans: PlanDef[]; current: CurrentSubscription | null; minute_packs?: MinutePack[] }> {
   const res = await apiClient.get('/api/plans');
   return res.data;
 }

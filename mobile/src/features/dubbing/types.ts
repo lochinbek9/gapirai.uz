@@ -67,8 +67,13 @@ export interface Job {
   error_code?: string;
   subtitle_only?: boolean;
   created_at?: string;
+  updated_at?: string;
   speaker_gender?: string;
   voice_gender_setting?: string;
+  tts_provider?: string;
+  voice_name?: string;
+  youtube_url?: string;
+  content_flagged?: boolean;
   uzbek_srt_content?: string;
   expected_end_time?: string;
   rating?: number;

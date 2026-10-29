@@ -3,24 +3,21 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { StyleSheet } from 'react-native';
 
 import { getErrorMessage } from '../../src/api/errors';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
-import { ThemedText } from '../../src/components/ThemedText';
+import { Notice } from '../../src/components/Notice';
 import { ThemedTextInput } from '../../src/components/ThemedTextInput';
-import { ThemedView } from '../../src/components/ThemedView';
 import * as authApi from '../../src/features/auth/api';
 import { AuthLink } from '../../src/features/auth/components/AuthLink';
-import { AuthScreenLayout } from '../../src/features/auth/components/AuthScreenLayout';
+import { AuthScreenLayout, OrDivider } from '../../src/features/auth/components/AuthScreenLayout';
 import { GoogleSignInButton } from '../../src/features/auth/components/GoogleSignInButton';
+import { TelegramSignInButton } from '../../src/features/auth/components/TelegramSignInButton';
 import { registerSchema, type RegisterFormValues } from '../../src/features/auth/schemas';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { useTheme } from '../../src/theme/ThemeProvider';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const setSession = useAuthStore((s) => s.setSession);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const {
@@ -52,18 +49,32 @@ export default function RegisterScreen() {
   const onSubmit = handleSubmit((values) => mutation.mutate(values));
 
   return (
-    <AuthScreenLayout title="Ro'yxatdan o'tish" subtitle="Bepul hisob oching va videolaringizni saqlang">
+    <AuthScreenLayout
+      title="Yangi hisob yarating"
+      subtitle="Har 30 kunda 5 daqiqa bepul. Videolaringiz hisobingizda saqlanadi."
+      footer={<AuthLink label="Hisobingiz bormi?" actionLabel="Kirish" onPress={() => router.push('/(auth)/login')} />}
+    >
+      <GoogleSignInButton
+        onCredential={(credential) => googleMutation.mutate(credential)}
+        onError={setGoogleError}
+        loading={googleMutation.isPending}
+        text="signup_with"
+      />
+      <TelegramSignInButton text="signup_with" />
+      {googleError && <Notice>{googleError}</Notice>}
+      <OrDivider />
+
       <Controller
         control={control}
         name="name"
         render={({ field: { onChange, onBlur, value } }) => (
           <ThemedTextInput
-            label="Ism"
+            label="Ismingiz"
             value={value}
             onChangeText={onChange}
             onBlur={onBlur}
             error={errors.name?.message}
-            placeholder="Ismingiz"
+            placeholder="Ism Familiya"
           />
         )}
       />
@@ -78,7 +89,7 @@ export default function RegisterScreen() {
             onBlur={onBlur}
             keyboardType="email-address"
             error={errors.email?.message}
-            placeholder="siz@example.com"
+            placeholder="email@example.com"
           />
         )}
       />
@@ -98,32 +109,9 @@ export default function RegisterScreen() {
         )}
       />
 
-      {mutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(mutation.error, "Ro'yxatdan o'tishda xatolik yuz berdi.")}
-        </ThemedText>
-      )}
+      {mutation.isError && <Notice>{getErrorMessage(mutation.error, "Ro'yxatdan o'tishda xatolik yuz berdi.")}</Notice>}
 
-      <PrimaryButton label="Ro'yxatdan o'tish" onPress={onSubmit} loading={mutation.isPending} />
-
-      <ThemedView style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <ThemedView style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
-        <ThemedText variant="secondary" style={{ fontSize: 12, fontWeight: '600' }}>
-          yoki
-        </ThemedText>
-        <ThemedView style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
-      </ThemedView>
-
-      {googleError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>{googleError}</ThemedText>
-      )}
-      <GoogleSignInButton
-        onCredential={(credential) => googleMutation.mutate(credential)}
-        onError={setGoogleError}
-        loading={googleMutation.isPending}
-      />
-
-      <AuthLink label="Hisobingiz bormi?" actionLabel="Kirish" onPress={() => router.push('/(auth)/login')} />
+      <PrimaryButton label={mutation.isPending ? 'Yaratilmoqda...' : 'Hisob yaratish'} onPress={onSubmit} loading={mutation.isPending} />
     </AuthScreenLayout>
   );
 }

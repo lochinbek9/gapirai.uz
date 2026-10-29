@@ -1,48 +1,86 @@
-// Mirrors the web app's design tokens (frontend/app/globals.css :root / .dark)
-// so the mobile app reads as the same product, not a reskin. Update both
-// together if the web palette changes.
+// Saytning dizayn tokenlari (frontend/app/globals.css: --ui-* :root va .dark) bilan
+// bir xil -- ilova sayt bilan bitta mahsulot bo'lib ko'rinsin. Sayt palitrasi
+// o'zgarsa, ikkalasini birga yangilang.
 
 export interface ThemeColors {
-  background: string;
+  /** Sahifa foni (sayt: main bg-ui-surface) */
   surface: string;
+  /** Ikkinchi darajali fon: statistika qatori, segment izi, auth sahifalari */
+  ground: string;
+  ink: string;
+  muted: string;
+  /** Ingichka chiziqlar va chegaralar */
+  rule: string;
+  accent: string;
+  accentInk: string;
+  /** Asosiy tugma foni (sayt: ui-dark -- siyoh rang, ko'k emas) va uning matni */
+  dark: string;
+  darkInk: string;
+  red: string;
+  redInk: string;
+  green: string;
+  greenInk: string;
+
+  // Eski nomlar -- hali ko'chirilmagan ekranlar uchun (yangi kodda yuqoridagilarni ishlating)
+  background: string;
   border: string;
   textPrimary: string;
   textSecondary: string;
-  accent: string;
   accentGlow: string;
-  gradientStart: string;
-  gradientMid: string;
-  gradientEnd: string;
   danger: string;
   success: string;
 }
 
-export const lightColors: ThemeColors = {
-  background: '#f8fafc',
-  surface: 'rgba(255, 255, 255, 0.88)',
-  border: 'rgba(226, 232, 240, 0.9)',
-  textPrimary: '#0f172a',
-  textSecondary: '#475569',
-  accent: '#7c3aed',
-  accentGlow: 'rgba(124, 58, 237, 0.15)',
-  gradientStart: '#8b5cf6',
-  gradientMid: '#6366f1',
-  gradientEnd: '#0ea5e9',
-  danger: '#dc2626',
-  success: '#059669',
-};
+function withAliases(c: Omit<ThemeColors, 'background' | 'border' | 'textPrimary' | 'textSecondary' | 'accentGlow' | 'danger' | 'success'>): ThemeColors {
+  return {
+    ...c,
+    background: c.surface,
+    border: c.rule,
+    textPrimary: c.ink,
+    textSecondary: c.muted,
+    accentGlow: alpha(c.accent, 0.1),
+    danger: c.red,
+    success: c.green,
+  };
+}
 
-export const darkColors: ThemeColors = {
-  background: '#090d16',
-  surface: 'rgba(15, 23, 42, 0.75)',
-  border: 'rgba(255, 255, 255, 0.08)',
-  textPrimary: '#f8fafc',
-  textSecondary: '#94a3b8',
-  accent: '#8b5cf6',
-  accentGlow: 'rgba(139, 92, 246, 0.25)',
-  gradientStart: '#8b5cf6',
-  gradientMid: '#6366f1',
-  gradientEnd: '#0ea5e9',
-  danger: '#f87171',
-  success: '#34d399',
-};
+/** #RRGGBB + shaffoflik -> rgba(); saytdagi `bg-ui-accent/[0.06]` kabi yozuvlar uchun */
+export function alpha(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+export const lightColors: ThemeColors = withAliases({
+  surface: '#FFFFFF',
+  ground: '#F6F7F9',
+  ink: '#0B0D12',
+  muted: '#585E6A',
+  rule: '#E5E7EB',
+  accent: '#2B5CF0',
+  accentInk: '#204CD6',
+  dark: '#0B0D12',
+  darkInk: '#FFFFFF',
+  red: '#DC2626',
+  redInk: '#B91C1C',
+  green: '#16A34A',
+  greenInk: '#15803D',
+});
+
+export const darkColors: ThemeColors = withAliases({
+  surface: '#0B0B0D',
+  ground: '#121215',
+  ink: '#F4F5F7',
+  muted: '#A0A5B0',
+  rule: '#27282E',
+  accent: '#567CFF',
+  accentInk: '#85A3FF',
+  dark: '#F4F5F7',
+  darkInk: '#0B0D12',
+  red: '#EF4444',
+  redInk: '#FC8181',
+  green: '#22C55E',
+  greenInk: '#4ADE80',
+});
+
+/** Saytdagi radiuslar: kartalar 16, boshqaruv elementlari (input, tugma, plitka) 10, tablar 8 */
+export const radius = { card: 16, control: 10, tab: 8 } as const;

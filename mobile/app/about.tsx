@@ -1,31 +1,25 @@
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
+import { AudioLines, Captions, Languages, Mic, Send, Sparkles } from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Footer } from '../src/components/Footer';
+import { PageTitle, SectionTitle } from '../src/components/PageTitle';
 import { PrimaryButton } from '../src/components/PrimaryButton';
+import { Screen } from '../src/components/Screen';
 import { ThemedText } from '../src/components/ThemedText';
-import { ThemedView } from '../src/components/ThemedView';
+import { SITE_URL } from '../src/config/env';
+import { HowItWorks, StatsStrip } from '../src/features/home/sections';
 import { useTheme } from '../src/theme/ThemeProvider';
 
-// Content mirrors frontend/app/about/AboutClient.tsx (condensed for mobile —
-// no motion/animation, no icon library dependency, same copy).
-const FEATURES = [
-  {
-    title: 'Avtomatik va Tezkor',
-    body: "Hech qanday qo'lda ishlov berish talab etilmaydi. YouTube havolasini kiritasiz va platformamiz avtomatik ravishda videoni yuklaydi, ovozini ajratadi va o'zbek tiliga dublyaj qiladi.",
-  },
-  {
-    title: 'Whisper + GPT-4o Texnologiyasi',
-    body: "OpenAI Whisper orqali nutq aniq matnga o'tkaziladi. GPT-4o esa o'zbek tilining boy va oqilona grammatikasiga mos holda matnni yuqori aniqlikda tarjima qiladi.",
-  },
-  {
-    title: 'Tabiiy Ovozlar (TTS)',
-    body: "Azure Speech Neural texnologiyasi asosida erkak va ayol ovozlari tanlanadi yoki AI avtomatik tarzda so'zlovchining jinsini aniqlab unga mos tabiiy ovoz beradi.",
-  },
-  {
-    title: 'Xavfsiz va Qulay Boshqaruv',
-    body: "Tayyorlangan barcha dublyaj qilingan videolaringiz shaxsiy panelingizda tartibli saqlanadi. Istalgan vaqtda ko'rishingiz va yuklab olishingiz mumkin.",
-  },
+// frontend/app/about/AboutClient.tsx bilan bir xil tuzilish va matn.
+const FACTS = [
+  { icon: Mic, title: 'Nutqni aniqlash', text: 'Videodagi gaplar vaqt kodlari bilan matnga aylantiriladi.' },
+  { icon: Languages, title: 'Tabiiy tarjima', text: 'Matn sunʼiy intellekt yordamida tabiiy oʻzbek tiliga oʻgiriladi.' },
+  { icon: AudioLines, title: 'Mos ovoz', text: 'Spikerning jinsi aniqlanib, unga mos oʻzbekcha ovoz tanlanadi.' },
+  { icon: Captions, title: 'Subtitr', text: 'Ovozsiz variant: .srt va .vtt fayllar, oʻzbekcha videolar uchun ham.' },
+  { icon: Sparkles, title: 'Tezkor tahlil', text: 'Xulosa, asosiy fikrlar, konspekt va test savollari — daqiqa sarflamaydi.' },
+  { icon: Send, title: 'Telegram', text: 'Bot havola yoki videoning oʻzini qabul qiladi, natijani chatga yuboradi.' },
 ];
 
 export default function AboutScreen() {
@@ -33,79 +27,60 @@ export default function AboutScreen() {
   const router = useRouter();
 
   return (
-    <ThemedView style={styles.flex}>
-      <SafeAreaView style={styles.flex}>
-        <ThemedView style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <ThemedText style={[styles.headerAction, { color: colors.accent }]}>{'< Orqaga'}</ThemedText>
-          </Pressable>
-        </ThemedView>
+    <Screen>
+      <View style={styles.page}>
+        <PageTitle
+          title="GapirAI.uz haqida"
+          lead="GapirAI.uz (Gapir AI) — ingliz tilidagi va boshqa xorijiy videolarni oʻzbek tiliga dublyaj (dublaj) qiluvchi onlayn dastur. Maqsadimiz — dunyo bilimlarini har bir oʻzbekzabon uchun ona tilida ochiq qilish."
+        >
+          <View style={styles.actions}>
+            <PrimaryButton label="Video yuborish" fullWidth={false} onPress={() => router.navigate('/')} />
+            <PrimaryButton
+              label="Ommaviy videolar"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => WebBrowser.openBrowserAsync(`${SITE_URL}/videos`).catch(() => {})}
+            />
+          </View>
+        </PageTitle>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ThemedView style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedView style={[styles.eyebrow, { backgroundColor: colors.accentGlow }]}>
-              <ThemedText style={[styles.eyebrowText, { color: colors.accent }]}>Innovatsion Platforma</ThemedText>
-            </ThemedView>
-            <ThemedText style={styles.heroTitle}>
-              GapirAI<ThemedText style={[styles.heroTitle, { color: colors.accent }]}>.uz</ThemedText> haqida
-            </ThemedText>
-            <ThemedText variant="secondary" style={styles.heroBody}>
-              GapirAI.uz (Gapir AI) — bu YouTube va turli manbalardagi videolarni Sun&apos;iy Intellekt (AI)
-              texnologiyalari yordamida soniyalar ichida avtomatik tarzda o&apos;zbek tiliga dublyaj va
-              tarjima qilib beruvchi eng ilg&apos;or milliy dublyaj platformasidir.
-            </ThemedText>
-            <PrimaryButton label="Dublyajni sinab ko'rish" onPress={() => router.push('/')} />
-          </ThemedView>
-
-          {FEATURES.map((f) => (
-            <ThemedView
-              key={f.title}
-              style={[styles.featureCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            >
-              <ThemedText style={styles.featureTitle}>{f.title}</ThemedText>
-              <ThemedText variant="secondary" style={styles.featureBody}>
-                {f.body}
+        <View style={styles.facts}>
+          {FACTS.map(({ icon: Icon, title, text }) => (
+            <View key={title}>
+              <Icon size={20} color={colors.accentInk} strokeWidth={2} />
+              <ThemedText accessibilityRole="header" style={styles.factTitle}>
+                {title}
               </ThemedText>
-            </ThemedView>
+              <ThemedText variant="secondary" style={styles.factText}>
+                {text}
+              </ThemedText>
+            </View>
           ))}
+        </View>
+      </View>
 
-          <ThemedView style={[styles.missionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedText style={styles.featureTitle}>Bizning Maqsadimiz</ThemedText>
-            <ThemedText variant="secondary" style={styles.featureBody}>
-              Jahon ilmiy-ma&apos;rifiy va ko&apos;ngilochar video kontentlarini har bir o&apos;zbekzabon
-              foydalanuvchi uchun o&apos;z ona tilida qulay va tushunarli qilishdir. Sun&apos;iy intellekt
-              kuchi bilan til to&apos;siqlarini olib tashlash va bilimlarni o&apos;zbek tilida keng yoyish
-              loyihamizning bosh g&apos;oyasidir.
-            </ThemedText>
-            <ThemedView style={styles.badgeRow}>
-              {['100% Avtomatik', 'Aniq Tarjima', 'HD Ovoz va Video'].map((b) => (
-                <ThemedText key={b} style={[styles.badge, { color: colors.accent }]}>
-                  {'✓ '}
-                  {b}
-                </ThemedText>
-              ))}
-            </ThemedView>
-          </ThemedView>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      <StatsStrip />
+      <HowItWorks />
+
+      <View style={[styles.mission, { borderTopColor: colors.rule }]}>
+        <SectionTitle>Nima uchun</SectionTitle>
+        <ThemedText variant="secondary" style={styles.missionText}>
+          Eng yaxshi maʼruzalar, kurslar va ilmiy-ommabop videolar asosan ingliz va boshqa tillarda. GapirAI.uz ularni brauzerda yoki
+          Telegramʼda, hech narsa oʻrnatmasdan, mahalliy toʻlov tizimlari orqali oʻzbek tilida koʻrish imkonini beradi. Natija avtomatik
+          tayyorlanadi, shuning uchun tarjima va ovozda kichik xatolar boʻlishi mumkin — fikringizni yozsangiz, tuzatamiz.
+        </ThemedText>
+      </View>
+      <Footer />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingVertical: 12 },
-  headerAction: { fontSize: 14, fontWeight: '700' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40, gap: 14 },
-  hero: { borderWidth: 1, borderRadius: 24, padding: 22, gap: 12, alignItems: 'center' },
-  eyebrow: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
-  eyebrowText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  heroTitle: { fontSize: 26, fontWeight: '900', textAlign: 'center' },
-  heroBody: { fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  featureCard: { borderWidth: 1, borderRadius: 20, padding: 18, gap: 6 },
-  featureTitle: { fontSize: 15, fontWeight: '800' },
-  featureBody: { fontSize: 12, lineHeight: 18 },
-  missionCard: { borderWidth: 1, borderRadius: 24, padding: 20, gap: 12 },
-  badgeRow: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
-  badge: { fontSize: 12, fontWeight: '700' },
+  page: { paddingHorizontal: 16, paddingTop: 48, paddingBottom: 64 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 32 },
+  facts: { marginTop: 64, gap: 40 },
+  factTitle: { fontSize: 18, fontWeight: '600', marginTop: 12 },
+  factText: { fontSize: 16, lineHeight: 26, marginTop: 6 },
+  mission: { borderTopWidth: 1, paddingHorizontal: 16, paddingVertical: 96, gap: 20 },
+  missionText: { fontSize: 18, lineHeight: 29 },
 });

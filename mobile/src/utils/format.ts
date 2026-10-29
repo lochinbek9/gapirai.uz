@@ -25,3 +25,28 @@ export function formatRemainingTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   return m > 0 ? `${m} daqiqa ${s} soniya` : `${s} soniya`;
 }
+
+// Hermes'da uz-UZ lokali yo'q (toLocaleString inglizcha chiqaradi) -- saytdagi
+// formatTashkentDate/DateTime kabi qo'lda: 29.10.2026 va 29.10.2026, 09:17 (Toshkent vaqti).
+function tashkentParts(iso: string) {
+  const d = new Date(new Date(iso).getTime() + 5 * 60 * 60 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`,
+    time: `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`,
+  };
+}
+
+export function formatDate(iso: string): string {
+  return tashkentParts(iso).date;
+}
+
+export function formatDateTime(iso: string): string {
+  const { date, time } = tashkentParts(iso);
+  return `${date}, ${time}`;
+}
+
+/** 1 234 567 -- saytdagidek bo'sh joy bilan guruhlash (Hermes toLocaleString'ga tayanmaymiz) */
+export function formatNumber(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}

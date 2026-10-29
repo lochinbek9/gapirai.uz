@@ -18,3 +18,12 @@ export function getApiUrl(): string {
 }
 
 export const API_URL = getApiUrl();
+
+// Ilovada hali yo'q sahifalar (ommaviy videolar, donat) saytda brauzerda ochiladi.
+export const SITE_URL = 'https://gapirai.uz';
+
+// Google'ning WEB OAuth client id (ochiq qiymat, sir emas) -- sayt bilan bir xil
+// (frontend/components/GoogleSignInButton.tsx DEFAULT_CLIENT_ID). Credential Manager shu
+// auditoriyali ID token qaytaradi, backend /auth/google uni qabul qiladi.
+export const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '235172384103-60v6m8mvikofqioqroeeubtir7dpdt4q.apps.googleusercontent.com';

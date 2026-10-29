@@ -9,14 +9,13 @@ interface AuthLinkProps {
   onPress: () => void;
 }
 
-// RN's <Text> only accepts other <Text> as children (not Pressable/View), so
-// the tappable word is a nested <Text onPress> rather than a wrapped Pressable.
+// RN'da <Text> ichida faqat <Text> bo'la oladi -- bosiladigan so'z ichma-ich <Text onPress>.
 export function AuthLink({ label, actionLabel, onPress }: AuthLinkProps) {
   const { colors } = useTheme();
   return (
     <ThemedText variant="secondary" style={styles.row}>
       {label}{' '}
-      <ThemedText onPress={onPress} suppressHighlighting style={[styles.action, { color: colors.accent }]}>
+      <ThemedText onPress={onPress} suppressHighlighting accessibilityRole="link" style={[styles.row, styles.action, { color: colors.accentInk }]}>
         {actionLabel}
       </ThemedText>
     </ThemedText>
@@ -24,13 +23,6 @@ export function AuthLink({ label, actionLabel, onPress }: AuthLinkProps) {
 }
 
 const styles = StyleSheet.create({
-  row: {
-    textAlign: 'center',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  action: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  row: { textAlign: 'center', fontSize: 14, lineHeight: 20 },
+  action: { fontWeight: '500' },
 });

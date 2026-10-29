@@ -49,3 +49,24 @@ export async function me(): Promise<User> {
   const res = await apiClient.get<User>('/auth/me');
   return res.data;
 }
+
+// Telegram Login Widget ma'lumoti (imzolangan) -- backend/services/telegram_login.py tekshiradi
+export interface TelegramLoginData {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+export async function telegramAuth(data: TelegramLoginData): Promise<AuthResponse> {
+  const res = await apiClient.post<AuthResponse>('/auth/telegram', data);
+  return res.data;
+}
+
+export async function telegramConfig(): Promise<{ enabled: boolean; bot_id?: number; bot_username?: string }> {
+  const res = await apiClient.get('/auth/telegram/config');
+  return res.data;
+}

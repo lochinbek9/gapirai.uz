@@ -1,30 +1,33 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Sparkles } from 'lucide-react-native';
 import { Controller, useForm } from 'react-hook-form';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { getErrorMessage } from '../../../api/errors';
+import { FeatureDots } from '../../../components/FeatureDots';
+import { Notice } from '../../../components/Notice';
 import { PrimaryButton } from '../../../components/PrimaryButton';
-import { SegmentedControl } from '../../../components/SegmentedControl';
+import { SelectField } from '../../../components/SelectField';
 import { ThemedText } from '../../../components/ThemedText';
-import { ThemedTextInput } from '../../../components/ThemedTextInput';
-import { ThemedView } from '../../../components/ThemedView';
+import { UrlField } from '../../../components/UrlField';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useTheme } from '../../../theme/ThemeProvider';
 import * as analysisApi from '../api';
 import { analyzeFormSchema, type AnalyzeFormValues } from '../schemas';
 import { ANALYSIS_LANGUAGE_OPTIONS } from '../types';
 
+/** Bosh sahifadagi "Tahlil" tabi -- saytdagi AnalysisUrlForm. */
 export function AnalyzeForm() {
   const router = useRouter();
   const { colors } = useTheme();
-  const status = useAuthStore((s) => s.status);
-  const isLoggedIn = status === 'signedIn';
+  const isLoggedIn = useAuthStore((s) => s.status === 'signedIn');
 
   const {
     control,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<AnalyzeFormValues>({
     resolver: zodResolver(analyzeFormSchema),
@@ -38,98 +41,87 @@ export function AnalyzeForm() {
     },
   });
 
-  // Backend requires auth for analysis creation (unlike dubbing, which is
-  // anonymous) — matches frontend/components/AnalysisUrlForm.tsx exactly:
-  // redirect to login instead of calling an endpoint that would 401.
+  // Tahlil yaratish uchun kirish shart (saytdagidek) -- 401 olish o'rniga login'ga yuboramiz
   const onSubmit = handleSubmit((values) => {
-    if (!isLoggedIn) {
-      router.push('/(auth)/login');
-      return;
-    }
+    if (!isLoggedIn) return router.push('/(auth)/login');
     mutation.mutate(values);
   });
 
+  const link = { color: colors.ink, textDecorationLine: 'underline' as const, fontWeight: '500' as const };
+
   return (
-    <ThemedView style={styles.form}>
+    <View style={styles.form}>
       <Controller
         control={control}
         name="youtubeUrl"
         render={({ field: { onChange, onBlur, value } }) => (
-          <ThemedTextInput
-            label="YouTube havolasi"
+          <UrlField
             value={value}
             onChangeText={onChange}
             onBlur={onBlur}
-            keyboardType="url"
             error={errors.youtubeUrl?.message}
-            placeholder="https://youtube.com/watch?v=..."
+            placeholder="YouTube havolasini kiriting..."
+            onSubmitEditing={onSubmit}
           />
         )}
       />
 
-      <ThemedView style={styles.field}>
-        <ThemedText variant="secondary" style={styles.label}>
-          Tahlil tili
-        </ThemedText>
-        <Controller
-          control={control}
-          name="language"
-          render={({ field: { onChange, value } }) => (
-            <SegmentedControl
-              scrollable
-              options={ANALYSIS_LANGUAGE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              value={value}
-              onChange={onChange}
-            />
-          )}
-        />
-        <ThemedText variant="secondary" style={styles.hint}>
-          Transkript video&apos;ning original tilida qoladi — bu faqat xulosa, konspekt va test qaysi tilda
-          chiqishini belgilaydi.
-        </ThemedText>
-      </ThemedView>
+      <Controller
+        control={control}
+        name="language"
+        render={({ field: { onChange, value } }) => (
+          <SelectField
+            label="Tahlil tili"
+            value={value}
+            options={ANALYSIS_LANGUAGE_OPTIONS}
+            onChange={onChange}
+            hint="Transkript doim videoning original tilida qoladi — bu faqat xulosa, boblar, konspekt va test qaysi tilda chiqishini belgilaydi."
+          />
+        )}
+      />
 
       {!isLoggedIn && (
-        <ThemedView style={[styles.notice, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <Notice tone="warning">
           <ThemedText style={styles.noticeText}>
             Video tahlili uchun{' '}
-            <ThemedText onPress={() => router.push('/(auth)/login')} suppressHighlighting style={{ color: colors.accent, fontWeight: '700' }}>
+            <ThemedText onPress={() => router.push('/(auth)/login')} suppressHighlighting style={[styles.noticeText, link]}>
               kiring
             </ThemedText>{' '}
             yoki{' '}
-            <ThemedText onPress={() => router.push('/(auth)/register')} suppressHighlighting style={{ color: colors.accent, fontWeight: '700' }}>
-              ro&apos;yxatdan o&apos;ting
+            <ThemedText onPress={() => router.push('/(auth)/register')} suppressHighlighting style={[styles.noticeText, link]}>
+              roʻyxatdan oʻting
             </ThemedText>
             .
           </ThemedText>
-        </ThemedView>
+        </Notice>
       )}
 
-      {mutation.isError && (
-        <ThemedText style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
-          {getErrorMessage(mutation.error, 'Tahlil yaratishda xatolik yuz berdi.')}
+      {mutation.isError && <Notice>{getErrorMessage(mutation.error, 'Tahlil yaratishda xatolik yuz berdi.')}</Notice>}
+
+      <View style={[styles.teaser, { borderTopColor: colors.rule }]}>
+        <ThemedText variant="secondary" style={styles.teaserText}>
+          <ThemedText style={[styles.teaserText, { fontWeight: '600', color: colors.muted }]}>Tezkor rejim:</ThemedText> 15-20
+          soniyada butun videoning qisqa konspekti, asosiy xulosalari va testini oling.
         </ThemedText>
-      )}
+      </View>
 
-      <PrimaryButton label="Video tahlil qilish" onPress={onSubmit} loading={mutation.isPending} />
-    </ThemedView>
+      <PrimaryButton
+        label={mutation.isPending ? 'Tahlil boshlanmoqda...' : 'Tezkor tahlil qilish'}
+        icon={Sparkles}
+        size="lg"
+        onPress={onSubmit}
+        loading={mutation.isPending}
+        disabled={!watch('youtubeUrl').trim()}
+      />
+
+      <FeatureDots items={['AI Xulosa', 'Asosiy fikrlar', 'Transkript', 'Konspekt', 'Test']} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  form: { width: '100%', gap: 16 },
-  field: { gap: 6 },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  hint: { fontSize: 11, fontWeight: '500', lineHeight: 16 },
-  notice: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
-  },
-  noticeText: { fontSize: 13, fontWeight: '500', lineHeight: 19 },
+  form: { gap: 24 },
+  noticeText: { fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  teaser: { borderTopWidth: 1, paddingTop: 16 },
+  teaserText: { fontSize: 16, lineHeight: 24 },
 });

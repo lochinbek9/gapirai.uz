@@ -55,3 +55,12 @@ export async function searchTranscript(analysisId: string, query: string): Promi
   });
   return res.data;
 }
+
+export async function listAnalyses(): Promise<VideoAnalysis[]> {
+  const res = await apiClient.get<VideoAnalysis[]>('/api/video-analysis');
+  return res.data;
+}
+
+export async function deleteAnalysis(analysisId: string): Promise<void> {
+  await apiClient.delete(`/api/video-analysis/${analysisId}`);
+}
