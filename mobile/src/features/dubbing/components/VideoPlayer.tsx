@@ -32,7 +32,7 @@ export function DubbedVideoPlayer({ uri, title }: VideoPlayerProps) {
         player={player}
         style={styles.video}
         nativeControls
-        allowsFullscreen
+        fullscreenOptions={{ enable: true }}
         contentFit="contain"
       />
       {status === 'loading' && (

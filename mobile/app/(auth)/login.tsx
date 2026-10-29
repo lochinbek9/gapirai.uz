@@ -34,7 +34,12 @@ export default function LoginScreen() {
 
   const mutation = useMutation({
     mutationFn: (values: LoginFormValues) => authApi.login(values.email, values.password),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      if ('access_token' in data) {
+        await setSession(data.user, data.access_token);
+        router.replace('/');
+        return;
+      }
       router.push({ pathname: '/(auth)/verify-code', params: { email: data.email, message: data.message } });
     },
   });

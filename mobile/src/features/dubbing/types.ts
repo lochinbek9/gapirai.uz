@@ -36,6 +36,15 @@ export interface VideoInfo {
   uploader: string;
 }
 
+// Telefondagi video (galereyadan tanlangan yoki boshqa ilovadan ulashilgan)
+export interface LocalVideo {
+  uri: string;
+  name: string;
+  size: number | null;
+  mimeType: string | null;
+  durationMs: number | null;
+}
+
 export interface CreateJobResponse {
   job_id: string;
   status: string;
@@ -56,6 +65,7 @@ export interface Job {
   translated_text?: string;
   error_message?: string;
   error_code?: string;
+  subtitle_only?: boolean;
   created_at?: string;
   speaker_gender?: string;
   voice_gender_setting?: string;
