@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { CreditCard, Trash2 } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -12,6 +13,7 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { RequireAuth } from '../src/components/RequireAuth';
 import { Screen } from '../src/components/Screen';
 import { ThemedText } from '../src/components/ThemedText';
+import { PAYMENTS_ENABLED } from '../src/config/env';
 import * as billingApi from '../src/features/billing/api';
 import type { SavedCard } from '../src/features/plans/types';
 import { alpha, radius } from '../src/theme/colors';
@@ -33,6 +35,8 @@ function brand(c: SavedCard) {
 }
 
 export default function BillingScreenRoute() {
+  // Google Play build'da ilova ichida to'lov sozlamalari yo'q (config/env.ts PAYMENTS_ENABLED)
+  if (!PAYMENTS_ENABLED) return <Redirect href="/" />;
   return (
     <RequireAuth>
       <BillingScreen />

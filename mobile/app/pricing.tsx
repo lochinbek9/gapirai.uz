@@ -1,18 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { Check, ExternalLink } from 'lucide-react-native';
+import { Redirect, useRouter } from 'expo-router';
+import { Check } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Accordion } from '../src/components/Accordion';
 import { Card } from '../src/components/Card';
 import { Footer } from '../src/components/Footer';
+import { Notice } from '../src/components/Notice';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { Screen } from '../src/components/Screen';
 import { SegmentedControl } from '../src/components/SegmentedControl';
 import { ThemedText } from '../src/components/ThemedText';
-import { SITE_URL } from '../src/config/env';
+import { PAYMENTS_ENABLED } from '../src/config/env';
+import { usePayment } from '../src/features/payments/usePayment';
 import * as plansApi from '../src/features/plans/api';
 import type { MinutePack, PlanDef } from '../src/features/plans/types';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -20,9 +21,9 @@ import { alpha } from '../src/theme/colors';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { formatNumber as som } from '../src/utils/format';
 
-// frontend/app/pricing/page.tsx bilan bir xil tuzilish. Farqi bitta: obuna va paket
-// to'lovi ilova ICHIDA emas (Google Play Payments siyosati) -- tugmalar gapirai.uz'ni ochadi,
-// to'langan tarif ilovada darhol faollashadi.
+// frontend/app/pricing/page.tsx bilan bir xil tuzilish. To'lov: Click/Payme sahifasi ilova
+// ustida ochiladi (usePayment). Google Play build'da (PAYMENTS_ENABLED=false) bu sahifa
+// umuman yo'q -- menyudan ham olib tashlangan, to'g'ridan-to'g'ri ochilsa bosh sahifaga qaytadi.
 
 // API javob bermasa -- backend/services/plans.py PLANS bilan bir xil
 const DEFAULT_PLANS: PlanDef[] = [
@@ -61,13 +62,16 @@ const FAQ: { q: string; a: string }[] = [
   { q: 'Bepul tarifda nima bor?', a: 'Har 30 kunda 5 daqiqa dublaj yoki subtitr, 360p sifatda yuklab olish. Uzunroq videolar uchun bir martalik paket yoki obuna oling.' },
 ];
 
-const openSite = (hash = '') => WebBrowser.openBrowserAsync(`${SITE_URL}/pricing${hash}`).catch(() => {});
+export default function PricingRoute() {
+  return PAYMENTS_ENABLED ? <PricingScreen /> : <Redirect href="/" />;
+}
 
-export default function PricingScreen() {
+function PricingScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const isLoggedIn = useAuthStore((s) => s.status === 'signedIn');
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const payment = usePayment();
 
   const { data, isLoading } = useQuery({ queryKey: ['plans'], queryFn: plansApi.getPlans });
   const current = data?.current;
@@ -141,6 +145,12 @@ export default function PricingScreen() {
           />
         </View>
 
+        {payment.error && (
+          <View style={styles.payError}>
+            <Notice>{payment.error}</Notice>
+          </View>
+        )}
+
         {isLoading ? (
           <ActivityIndicator color={colors.muted} style={styles.loader} />
         ) : (
@@ -190,7 +200,11 @@ export default function PricingScreen() {
                         onPress={() => (isLoggedIn ? router.navigate('/') : router.push('/(auth)/register'))}
                       />
                     ) : (
-                      <PrimaryButton label="Saytda obuna boʻlish" icon={ExternalLink} onPress={() => openSite('#plans')} />
+                      <PrimaryButton
+                        label="Obuna boʻlish"
+                        loading={payment.pending}
+                        onPress={() => (isLoggedIn ? payment.pay({ kind: 'plan', plan: plan.id }) : router.push('/(auth)/login'))}
+                      />
                     )}
                   </View>
 
@@ -242,7 +256,8 @@ export default function PricingScreen() {
                     variant="secondary"
                     size="sm"
                     disabled={bought}
-                    onPress={() => openSite('#minute-packs')}
+                    loading={payment.pending}
+                    onPress={() => (isLoggedIn ? payment.pay({ kind: 'pack', minutes: p.minutes }) : router.push('/(auth)/login'))}
                   />
                 </View>
               );
@@ -289,6 +304,7 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   link: { fontWeight: '500', textDecorationLine: 'underline' },
   cycle: { marginTop: 40 },
+  payError: { marginTop: 16 },
   loader: { marginVertical: 80 },
   plans: { marginTop: 40, gap: 16 },
   planCard: { padding: 24 },

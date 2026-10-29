@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { apiClient } from '../../api/client';
 import { getStoredToken } from '../../api/tokenStorage';
 import { API_URL } from '../../config/env';
-import type { CancelJobResponse, CreateJobResponse, InitiatePaymentResponse, Job, LocalVideo, VideoInfo, VoiceGender } from './types';
+import type { CancelJobResponse, CreateJobResponse, Job, LocalVideo, VideoInfo, VoiceGender } from './types';
 
 // GET /api/outputs/{job_id}/video — 307-redirects to an S3 presigned URL
 // (1hr expiry) or streams the local file. No auth required. The player
@@ -132,12 +132,5 @@ export async function getJob(jobId: string): Promise<Job> {
 
 export async function cancelJob(jobId: string): Promise<CancelJobResponse> {
   const res = await apiClient.post<CancelJobResponse>(`/api/jobs/${jobId}/cancel`);
-  return res.data;
-}
-
-// Click.uz's own hosted checkout page — opened externally (Linking.openURL),
-// never rendered as native UI (see MOBILE_INTEGRATION_AUDIT.md §6 Payments).
-export async function initiateClickPayment(jobId: string): Promise<InitiatePaymentResponse> {
-  const res = await apiClient.post<InitiatePaymentResponse>('/api/payments/click/initiate', { job_id: jobId });
   return res.data;
 }

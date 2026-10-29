@@ -13,6 +13,7 @@ import { Screen } from '../src/components/Screen';
 import { SegmentedControl } from '../src/components/SegmentedControl';
 import { StatusBadge } from '../src/components/StatusBadge';
 import { ThemedText } from '../src/components/ThemedText';
+import { PAYMENTS_ENABLED } from '../src/config/env';
 import * as analysisApi from '../src/features/analysis/api';
 import type { VideoAnalysis } from '../src/features/analysis/types';
 import * as billingApi from '../src/features/billing/api';
@@ -136,7 +137,7 @@ function DashboardScreen() {
       </View>
 
       <PlanCard />
-      <BillingLink />
+      {PAYMENTS_ENABLED && <BillingLink />}
 
       <View style={styles.tabs}>
         <SegmentedControl<Tab>
@@ -226,11 +227,13 @@ function PlanCard() {
           )}
         </View>
       )}
-      <PrimaryButton
-        label={sub.plan === 'free' ? 'Tarifni oshirish' : expiresSoon ? 'Yangilash' : 'Tariflarni koʻrish'}
-        icon={Crown}
-        onPress={() => router.push('/pricing')}
-      />
+      {PAYMENTS_ENABLED && (
+        <PrimaryButton
+          label={sub.plan === 'free' ? 'Tarifni oshirish' : expiresSoon ? 'Yangilash' : 'Tariflarni koʻrish'}
+          icon={Crown}
+          onPress={() => router.push('/pricing')}
+        />
+      )}
     </Card>
   );
 }
