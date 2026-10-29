@@ -7,13 +7,14 @@ export type PaymentTarget = { kind: 'plan'; plan: string } | { kind: 'pack'; min
 
 /**
  * Provayder javobi bitta shaklga keltiriladi:
- * - `url`: Click/Payme to'lov sahifasi yoki Uzum ilovasini ochuvchi universal havola;
+ * - `url`: Click/Payme to'lov sahifasi yoki Uzum ilovasini ochuvchi havola (uchalasi ham
+ *   App Link -- telefonda provayder ilovasi bo'lsa to'g'ridan-to'g'ri o'shanda ochiladi);
  * - `code`: Paynet buyurtma raqami (checkout havolasi yo'q -- Paynet ilovasi/bankomatda
  *   kiritiladi) yoki Uzum havolasi kelmagan holatdagi account raqami;
  * - `none`: to'lov kerak emas (video kvota bilan qoplangan yoki allaqachon to'langan).
  */
 export type PaymentStart =
-  | { kind: 'url'; url: string; external: boolean }
+  | { kind: 'url'; url: string }
   | { kind: 'code'; code: string; amount: number; provider: 'uzum' | 'paynet' }
   | { kind: 'none'; message: string };
 
@@ -58,7 +59,7 @@ function body(target: PaymentTarget, provider: PaymentProvider) {
 
 export async function initiatePayment(target: PaymentTarget, provider: PaymentProvider): Promise<PaymentStart> {
   const { data } = await apiClient.post<InitiateResponse>(ENDPOINTS[target.kind][provider], body(target, provider));
-  if (data.payment_url) return { kind: 'url', url: data.payment_url, external: provider === 'uzum' };
+  if (data.payment_url) return { kind: 'url', url: data.payment_url };
   if (provider === 'paynet' && data.order_id) return { kind: 'code', code: data.order_id, amount: data.amount, provider };
   if (provider === 'uzum' && data.account) return { kind: 'code', code: String(data.account), amount: data.amount, provider };
   if (data.amount === 0) return { kind: 'none', message: data.message || 'Toʻlov talab qilinmaydi.' };
