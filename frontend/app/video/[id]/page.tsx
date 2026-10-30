@@ -17,6 +17,7 @@ import VideoPlayer from '@/components/VideoPlayer'
 import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
+import ShareButton from '@/components/ShareButton'
 import ConfirmModal from '@/components/ConfirmModal'
 import FirstVideoDiscountModal from '@/components/FirstVideoDiscountModal'
 import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
@@ -1020,9 +1021,12 @@ export default function VideoPage() {
             {/* Title & info (below player, padded in theater mode) */}
             <div className={theaterMode ? 'max-w-6xl mx-auto px-6 pt-6 space-y-4' : 'space-y-4'}>
               <div>
-                <h1 className="text-lg sm:text-xl font-semibold text-ui-ink mb-2 leading-snug">
-                  {job.video_title || "Noma'lum video"}
-                </h1>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h1 className="text-lg sm:text-xl font-semibold text-ui-ink leading-snug">
+                    {job.video_title || "Noma'lum video"}
+                  </h1>
+                  {job.status === 'completed' && <ShareButton jobId={id} title={job.video_title} />}
+                </div>
                 <div className="flex items-center gap-4 text-ui-muted text-sm">
                   {job.video_duration && (
                     <span className="flex items-center gap-1">

@@ -705,10 +705,12 @@ def get_job(
 ) -> JobResponse:
     """Job ma'lumotlarini olish.
     - Egasi (authenticated) -> to'liq javob.
-    - Authenticated, lekin egasi emas -> 404 (IDOR/enumeratsiyani yashiradi).
-    - Anonim -> FAQAT tugallangan job, va faqat ulashsa bo'ladigan maydonlar
+    - Boshqa har kim (anonim YOKI boshqa akkaunt) -> "havola orqali" (YouTube
+      Unlisted kabi): FAQAT tugallangan job, va faqat ulashsa bo'ladigan maydonlar
       (transkript / xato matni / baho-fikr yashiriladi). Jarayondagi / xato
-      bo'lgan job anonimga umuman ko'rinmaydi.
+      bo'lgan job ularga umuman ko'rinmaydi. ID tasodifiy UUID -- ro'yxat yo'q.
+      (2026-10-30 gacha boshqa akkauntga 404 berilardi -- ulashilgan havola
+      tizimga kirgan do'stda ochilmasdi.)
 
     Bu endpoint har kutayotgan foydalanuvchidan davriy so'raladi, shuning
     uchun User qatorini yuklamaymiz -- egalikni faqat token'dagi id bilan
@@ -720,10 +722,6 @@ def get_job(
     from backend.services.plans import is_user_admin
     is_admin = is_user_admin(db, current_user_id)
     is_owner = current_user_id is not None and job.user_id == current_user_id
-    # Ommaviy video har kimga (tizimga kirgan boshqa foydalanuvchiga ham)
-    # ochiq -- pastda redact=True bilan qaytadi.
-    if current_user_id is not None and not is_owner and not is_admin and not job.is_public:
-        raise HTTPException(status_code=404, detail="Job topilmadi.")
 
     # On-demand video recovery tekshiruvi:
     # Agar job ilgari tugallangan bo'lsa va video fayli diskda yo'q bo'lsa, avtomatik qayta tiklaymiz

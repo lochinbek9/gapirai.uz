@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, Check, Clock, Mic2, Share2, ShieldAlert } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
 
 import { getErrorMessage } from '../../src/api/errors';
 import { Card } from '../../src/components/Card';
@@ -11,7 +11,7 @@ import { Notice } from '../../src/components/Notice';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { Screen } from '../../src/components/Screen';
 import { ThemedText } from '../../src/components/ThemedText';
-import { PAYMENTS_ENABLED } from '../../src/config/env';
+import { PAYMENTS_ENABLED, SITE_URL } from '../../src/config/env';
 import * as dubbingApi from '../../src/features/dubbing/api';
 import { DubbedVideoPlayer } from '../../src/features/dubbing/components/VideoPlayer';
 import { useDubbingJob } from '../../src/features/dubbing/hooks/useDubbingJob';
@@ -201,6 +201,22 @@ export default function VideoJobScreen() {
             </View>
           )}
         </View>
+        {job.status === 'completed' && (
+          <View style={styles.shareRow}>
+            <PrimaryButton
+              label="Ulashish"
+              icon={Share2}
+              variant="secondary"
+              size="sm"
+              fullWidth={false}
+              // Havola "Unlisted": havolasi bor har kim ko'radi, ro'yxatlarda chiqmaydi
+              onPress={() => {
+                const url = `${SITE_URL}/video/${id}`;
+                Share.share({ message: `${job.video_title || 'Video'} — oʻzbekcha dublyaj\n${url}`, url }).catch(() => {});
+              }}
+            />
+          </View>
+        )}
       </View>
 
       {job.status === 'completed' && job.content_flagged && (
@@ -426,6 +442,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 16, rowGap: 6, marginTop: 8 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   meta: { fontSize: 14 },
+  shareRow: { flexDirection: 'row', marginTop: 12 },
   cardTitle: { fontSize: 18, fontWeight: '600' },
   body: { fontSize: 15, lineHeight: 22 },
   small: { fontSize: 14, lineHeight: 20 },
