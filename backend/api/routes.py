@@ -1627,7 +1627,7 @@ def download_audio(job_id: uuid.UUID, db: Session = Depends(get_db)):
 def download_video(
     request: Request,
     job_id: uuid.UUID,
-    resolution: Optional[str] = Query(None, description="Video rezolyutsiyasi: 360p, 720p, 1080p"),
+    resolution: Optional[str] = Query(None, description="Video rezolyutsiyasi: 360p, 480p, 720p, 1080p"),
     download: bool = Query(False, description="True bo'lsa yuklab olish uchun attachment, aks holda inline ko'rish"),
     db: Session = Depends(get_db),
 ):
@@ -1635,8 +1635,9 @@ def download_video(
     if not job:
         raise HTTPException(status_code=404, detail="Video topilmadi.")
 
-    suffix = "_360p" if resolution == "360p" else "_1080p" if resolution == "1080p" else "_final"
-    variant_name = f"dubbed{suffix}.mp4"
+    # 720p (yoki noma'lum) -- master fayl; qolganlari dubbed_<res>.mp4 (resolution_variants.py)
+    is_variant = resolution in ("360p", "480p", "1080p")
+    variant_name = f"dubbed_{resolution}.mp4" if is_variant else "dubbed_final.mp4"
 
     settings = get_settings()
     # S3 faqat bucket VA kalitlar sozlangan bo'lsa ishlaydi (storage._get_s3_client
@@ -1659,7 +1660,7 @@ def download_video(
             s3_missing = True
 
     video_path = None
-    if resolution in ("360p", "1080p"):
+    if is_variant:
         candidate = Path(f"outputs/{job.storage_id}/video/{variant_name}")
         if candidate.exists():
             video_path = str(candidate)
@@ -1686,7 +1687,7 @@ def download_video(
             # S3 lifecycle (3 kun) bo'yicha o'chirilgan -- avvalgidek 410, qayta
             # tiklash (to'liq qayta dublyaj) bu yerda ishga tushirilmaydi.
             raise HTTPException(status_code=410, detail="Video fayl endi mavjud emas — saqlash muddati tugagan.")
-        if resolution not in ("360p", "1080p"):
+        if not is_variant:
             from backend.services.job_recovery import can_recover_job, trigger_ondemand_recovery
             if can_recover_job(job):
                 trigger_ondemand_recovery(db, job)
@@ -1698,7 +1699,7 @@ def download_video(
         raise HTTPException(status_code=404, detail="Video fayl topilmadi.")
 
     safe_title = re.sub(r'[^\w\s-]', '', job.video_title or str(job_id))[:50].strip()
-    res_label = resolution if resolution in ("360p", "720p", "1080p") else "720p"
+    res_label = resolution if is_variant else "720p"
     filename = f"{safe_title or job_id} - {res_label}.mp4"
     disp_type = "attachment" if download else "inline"
     return FileResponse(

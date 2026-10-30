@@ -27,6 +27,12 @@ function parseVTT(vtt: string): Cue[] {
   return out;
 }
 
+/* ── Tezlik va sifat ──────────────────────────────── */
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const QUALITY_LABEL: Record<string, string> = {
+  "1080p": "Full HD", "720p": "HD", "480p": "SD", "360p": "Tejamkor",
+};
+
 /* ── Subtitle settings ────────────────────────────── */
 interface SubSettings {
   fontSize: number;     // rem: 0.75 / 0.95 / 1.15 / 1.4
@@ -272,6 +278,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const [showSubs,         setShowSubs]         = useState(true);
   const [showPanel,        setShowPanel]        = useState(false);
   const [subSettings,      setSubSettings]      = useState<SubSettings>(loadSubSettings);
+  const [rate,             setRate]             = useState(1);
+  const [showSpeedMenu,    setShowSpeedMenu]    = useState(false);
+  const [hoverTime,        setHoverTime]        = useState<number | null>(null);
 
   /* ── Resolution / Quality State ──────────────── */
   const [currentQuality,   setCurrentQuality]   = useState<string>(initialQuality || "720p");
@@ -337,8 +346,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     }
     setCurrentQuality(targetRes);
     setShowQualityMenu(false);
-    const label = targetRes === "1080p" ? "1080p (Full HD)" : targetRes === "720p" ? "720p (HD)" : "360p (SD)";
-    showToast(`${label} ga o'tkazildi`);
+    showToast(`${targetRes} (${QUALITY_LABEL[targetRes] ?? ""}) ga o'tkazildi`);
   }, [showToast]);
 
   const handleSelectQuality = useCallback(async (targetRes: string) => {
@@ -420,6 +428,21 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     }
     return src;
   }, [jobId, currentQuality, src, resolutions]);
+
+  // Manba (sifat) almashganda brauzer playbackRate'ni defaultPlaybackRate'ga qaytaradi
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.defaultPlaybackRate = rate;
+    v.playbackRate = rate;
+  }, [rate, effectiveSrc]);
+
+  const stepRate = (dir: 1 | -1) => {
+    const i = SPEEDS.indexOf(rate);
+    const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, (i < 0 ? 2 : i) + dir))];
+    setRate(next);
+    showToast(`Tezlik: ${next}x`);
+  };
 
   /* ── Cues ─────────────────────────────────────── */
   const cues = useMemo<Cue[]>(() => {
@@ -535,6 +558,12 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   };
 
   const onBarPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const bar = barRef.current;
+    const dur = videoRef.current?.duration || duration;
+    if (bar && dur && isFinite(dur)) {
+      const rr = bar.getBoundingClientRect();
+      setHoverTime(Math.min(1, Math.max(0, (e.clientX - rr.left) / rr.width)) * dur);
+    }
     if (!scrubbing) return;
     seekToClientX(e.clientX);
     resetHideTimer();
@@ -644,6 +673,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         if (e.code === "ArrowRight") { if (videoRef.current) videoRef.current.currentTime += 5; }
         if (e.code === "ArrowLeft")  { if (videoRef.current) videoRef.current.currentTime -= 5; }
         if (e.key === "l" || e.key === "L") { skipAhead(); }
+        if (e.key === "f" || e.key === "F") { toggleFS(); }
+        if (e.key === "m" || e.key === "M") { toggleMute(); }
+        if (e.key === ">") { stepRate(1); }
+        if (e.key === "<") { stepRate(-1); }
       }}
       tabIndex={0}
     >
@@ -657,6 +690,28 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         playsInline
         preload="metadata"
       />
+
+      {/* Sarlavha (YouTube kabi yuqorida) -- telefonda faqat to'liq ekranda. Suv belgisi
+          pleyerda yo'q: u har bir videoga merger.py'da allaqachon qo'yilgan. */}
+      {(resolvedTitle || resolvedChannel) && (
+        <div
+          className={`${fullscreen ? "flex" : "hidden sm:flex"} absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent ${
+            fullscreen ? "px-8 pt-6 pb-16" : "px-4 sm:px-6 pt-3 pb-10"
+          } transition-opacity duration-300 pointer-events-none select-none`}
+          style={{ opacity: ctrlVisible ? 1 : 0 }}
+        >
+          <div className="min-w-0">
+            {resolvedTitle && (
+              <h3 className={`text-white font-semibold leading-snug line-clamp-1 drop-shadow-md tracking-tight ${fullscreen ? "text-xl" : "text-sm sm:text-base"}`} title={resolvedTitle}>
+                {resolvedTitle}
+              </h3>
+            )}
+            {resolvedChannel && (
+              <p className={`text-white/70 font-medium mt-0.5 line-clamp-1 drop-shadow ${fullscreen ? "text-sm" : "text-xs sm:text-sm"}`}>{resolvedChannel}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Floating quality change toast */}
       {qualityToast && (
@@ -720,33 +775,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         className="absolute bottom-0 left-0 right-0 z-30 transition-opacity duration-300"
         style={{ opacity: ctrlVisible ? 1 : 0, pointerEvents: ctrlVisible ? "auto" : "none" }}
       >
-        <div className="absolute inset-0 from-black/95 via-black/60 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
         <div ref={ctrlBarRef} className="relative px-3 sm:px-6 pb-2 sm:pb-4 pt-8 sm:pt-14">
-          {/* Video Title, Channel Name & Watermark (YouTube style) -- telefonda
-              faqat to'liq ekranda: kichik pleerda u videoning yarmini yopardi. */}
-          {(resolvedTitle || resolvedChannel) && (
-            <div className={`${fullscreen ? "flex" : "hidden sm:flex"} items-end justify-between gap-4 mb-2.5 sm:mb-3 select-none`}>
-              <div className="min-w-0 flex-1">
-                {resolvedTitle && (
-                  <h3
-                    className="text-white font-semibold text-sm sm:text-base md:text-lg leading-snug line-clamp-1 drop-shadow-md tracking-tight"
-                    title={resolvedTitle}
-                  >
-                    {resolvedTitle}
-                  </h3>
-                )}
-                {resolvedChannel && (
-                  <p className="text-white/70 text-xs sm:text-sm font-medium mt-0.5 line-clamp-1 drop-shadow">
-                    {resolvedChannel}
-                  </p>
-                )}
-              </div>
-              <div className="flex-shrink-0 text-white/50 hover:text-white/80 transition-colors text-xs sm:text-sm font-semibold tracking-wide drop-shadow pb-0.5">
-                Gapirai.uz
-              </div>
-            </div>
-          )}
-
           {/* YouTube-style Red Progress Bar -- pointer events: sichqoncha bilan
               bosish/surish VA telefonda barmoq bilan surish. touch-none sahifa
               scroll bo'lib ketmasligi uchun; py-3 barmoq uchun kattaroq maydon. */}
@@ -757,6 +787,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             onPointerMove={onBarPointerMove}
             onPointerUp={onBarPointerUp}
             onPointerCancel={onBarPointerUp}
+            onPointerLeave={() => setHoverTime(null)}
             role="slider"
             aria-label="Video vaqti"
             aria-valuemin={0}
@@ -764,6 +795,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             aria-valuenow={Math.round(progress)}
           >
             <div className={`${scrubbing ? "h-1.5" : "h-1"} group-hover/bar:h-1.5 bg-white/25 rounded-full relative transition-all duration-100`}>
+              {/* Kursor/barmoq turgan nuqtaning vaqti */}
+              {(hoverTime !== null || scrubbing) && duration > 0 && (
+                <div
+                  className="absolute bottom-3 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/85 text-white text-xs font-medium tabular-nums whitespace-nowrap pointer-events-none"
+                  style={{ left: `${((scrubbing ? progress : hoverTime ?? 0) / duration) * 100}%` }}
+                >
+                  {fmt(scrubbing ? progress : hoverTime ?? 0)}
+                </div>
+              )}
               <div className="absolute inset-y-0 left-0 bg-white/40 rounded-full" style={{ width: `${bufferedPct}%` }} />
               <div className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-none" style={{ width: `${progressPct}%` }} />
               <div
@@ -816,8 +856,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             </div>
 
             {/* Time */}
-            <span className="text-white/80 text-xs sm:text-sm font-mono ml-auto sm:ml-2 flex-shrink-0 whitespace-nowrap">
-              {fmt(progress)} / {fmt(duration)}
+            <span className={`text-white ${fullscreen ? "text-sm" : "text-xs sm:text-sm"} font-medium tabular-nums ml-auto sm:ml-2 flex-shrink-0 whitespace-nowrap`}>
+              {fmt(progress)} <span className="text-white/60">/ {fmt(duration)}</span>
             </span>
 
             {/* CC */}
@@ -834,13 +874,58 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             {/* Subtitle settings gear */}
             {hasSubs && (
               <button
-                onClick={() => { setShowPanel(p => !p); setShowQualityMenu(false); }}
+                onClick={() => { setShowPanel(p => !p); setShowQualityMenu(false); setShowSpeedMenu(false); }}
                 title="Subtitr sozlamalari"
                 className={`flex-shrink-0 transition ${showPanel ? "text-blue-400" : "text-white/50 hover:text-white"}`}
               >
                 <Settings className="w-4 h-4" />
               </button>
             )}
+
+            {/* Tezlik */}
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSpeedMenu(m => !m);
+                  setShowQualityMenu(false);
+                  setShowPanel(false);
+                }}
+                title="Ijro tezligi (< >)"
+                aria-label={`Ijro tezligi: ${rate}x`}
+                className={`h-7 min-w-[2.75rem] px-2 rounded-lg text-xs font-semibold tabular-nums border transition select-none ${
+                  showSpeedMenu
+                    ? "bg-blue-600 text-white border-blue-400 shadow-sm"
+                    : rate !== 1
+                    ? "bg-white/20 text-white border-white/30"
+                    : "bg-white/10 hover:bg-white/20 text-white/90 border-white/20"
+                }`}
+              >
+                {rate}x
+              </button>
+              {showSpeedMenu && (
+                <div
+                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 border border-white/15 rounded-xl p-2 w-36 shadow-2xl text-white text-xs"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="px-2 py-1 mb-1 border-b border-white/10 font-semibold text-white/50">Tezlik</div>
+                  <div className="space-y-0.5">
+                    {SPEEDS.map(sp => (
+                      <button
+                        key={sp}
+                        onClick={() => { setRate(sp); setShowSpeedMenu(false); }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left tabular-nums transition ${
+                          rate === sp ? "bg-blue-600/30 text-blue-300 font-semibold" : "hover:bg-white/10 text-white/80"
+                        }`}
+                      >
+                        <span>{sp === 1 ? "Oddiy (1x)" : `${sp}x`}</span>
+                        {rate === sp && <Check className="w-4 h-4 text-blue-400" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Quality selector */}
             <div className="relative flex-shrink-0">
@@ -849,8 +934,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                   e.stopPropagation();
                   setShowQualityMenu(q => !q);
                   setShowPanel(false);
+                  setShowSpeedMenu(false);
                 }}
-                title="Video sifati (360p, 720p, 1080p)"
+                title="Video sifati (360p, 480p, 720p, 1080p)"
                 className={`h-7 px-2.5 rounded-lg text-xs font-semibold border transition flex items-center gap-1.5 select-none ${
                   showQualityMenu
                     ? "bg-blue-600 text-white border-blue-400 shadow-sm"
@@ -866,7 +952,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               {/* Quality popover */}
               {showQualityMenu && (
                 <div
-                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 border border-white/15 rounded-xl p-2 w-48 shadow-2xl text-white text-xs"
+                  className="absolute bottom-9 right-0 z-50 bg-slate-950/95 border border-white/15 rounded-xl p-2 w-56 shadow-2xl text-white text-xs"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-white/10">
@@ -882,19 +968,21 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                     {(resolutions.length > 0
                       ? resolutions
                       : [
-                          { resolution: "1080p", available: true, status: "ready" },
+                          { resolution: "360p", available: true, status: "not_requested" },
+                          { resolution: "480p", available: true, status: "not_requested" },
                           { resolution: "720p", available: true, status: "ready" },
-                          { resolution: "360p", available: true, status: "ready" },
+                          { resolution: "1080p", available: true, status: "not_requested" },
                         ]
                     ).map(opt => {
                       const isCurrent = currentQuality === opt.resolution;
                       const isBusy = requestingRes === opt.resolution;
+                      // Tayyor bo'lmagan sifat birinchi bosilganda serverda yasaladi (bir necha daqiqa)
                       const label =
-                        opt.resolution === "1080p"
-                          ? "Full HD"
-                          : opt.resolution === "720p"
-                          ? "HD (Standart)"
-                          : "SD (Tejamkor)";
+                        isBusy || opt.status === "processing"
+                          ? "Tayyorlanmoqda…"
+                          : opt.available && opt.status !== "ready"
+                          ? `${QUALITY_LABEL[opt.resolution] ?? ""} · bosilsa tayyorlanadi`
+                          : QUALITY_LABEL[opt.resolution] ?? "";
                       return (
                         <button
                           key={opt.resolution}
@@ -912,10 +1000,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                           <div className="flex items-center gap-1">
                             {isBusy ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
-                            ) : !opt.available ? (
-                              <Lock className="w-3.5 h-3.5 text-white/40" />
                             ) : isCurrent ? (
                               <Check className="w-4 h-4 text-blue-400" />
+                            ) : !opt.available ? (
+                              <Lock className="w-3.5 h-3.5 text-white/40" />
                             ) : null}
                           </div>
                         </button>
@@ -953,8 +1041,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             )}
 
             {/* Fullscreen */}
-            <button onClick={toggleFS} title="To'liq ekran" className="text-white hover:text-blue-400 transition flex-shrink-0 p-0.5">
-              {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            <button
+              onClick={toggleFS}
+              title={fullscreen ? "To'liq ekrandan chiqish (f)" : "To'liq ekran (f)"}
+              aria-label={fullscreen ? "To'liq ekrandan chiqish" : "To'liq ekran"}
+              className="text-white hover:text-blue-400 transition flex-shrink-0 p-1 rounded-md hover:bg-white/10"
+            >
+              {fullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
         </div>

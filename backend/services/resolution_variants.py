@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def generate_360p(job) -> str:
+def generate_downscaled(job, resolution: str) -> str:
+    """360p/480p -- masterdan kichraytirish (audio nusxalanadi, qayta kodlanmaydi)."""
+    height = int(resolution.rstrip("p"))
     job_id = job.storage_id
     master_key = f"dubber/{job_id}/dubbed_final.mp4"
     if settings.AWS_BUCKET_NAME:
@@ -50,12 +52,12 @@ def generate_360p(job) -> str:
 
     out_dir = Path(settings.OUTPUT_DIR) / job_id / "video"
     out_dir.mkdir(parents=True, exist_ok=True)
-    local_out = str(out_dir / "dubbed_360p.mp4")
+    local_out = str(out_dir / f"dubbed_{resolution}.mp4")
 
     cmd = [
         "ffmpeg", "-y",
         "-i", master_url,
-        "-vf", "scale=-2:360",
+        "-vf", f"scale=-2:{height}",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", "-preset", "fast",
         "-c:a", "copy",
         "-movflags", "+faststart",
@@ -63,22 +65,22 @@ def generate_360p(job) -> str:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
     if result.returncode != 0:
-        raise RuntimeError(f"360p kichraytirishda ffmpeg xatoligi:\n{result.stderr[-1500:]}")
+        raise RuntimeError(f"{resolution} kichraytirishda ffmpeg xatoligi:\n{result.stderr[-1500:]}")
 
     if not Path(local_out).exists() or not Path(local_out).is_file() or Path(local_out).stat().st_size == 0:
-        raise RuntimeError(f"360p video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
+        raise RuntimeError(f"{resolution} video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
 
-    s3_key = f"dubber/{job_id}/dubbed_360p.mp4"
+    s3_key = f"dubber/{job_id}/dubbed_{resolution}.mp4"
     if settings.AWS_BUCKET_NAME:
         if not upload_file_to_s3(local_out, s3_key):
-            raise RuntimeError("360p versiyani S3'ga yuklab bo'lmadi.")
+            raise RuntimeError(f"{resolution} versiyani S3'ga yuklab bo'lmadi.")
         try:
             os.remove(local_out)
         except Exception:
             pass
         return s3_key
     else:
-        return f"/outputs/{job_id}/video/dubbed_360p.mp4"
+        return f"/outputs/{job_id}/video/dubbed_{resolution}.mp4"
 
 
 def generate_1080p(job) -> str:
@@ -191,8 +193,8 @@ def generate_1080p(job) -> str:
 
 
 def generate_variant(job, resolution: str) -> str:
-    if resolution == "360p":
-        return generate_360p(job)
+    if resolution in ("360p", "480p"):
+        return generate_downscaled(job, resolution)
     if resolution == "1080p":
         return generate_1080p(job)
     raise ValueError(f"Qo'llab-quvvatlanmaydigan rezolyutsiya: {resolution}")

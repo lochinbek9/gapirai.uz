@@ -330,7 +330,7 @@ PLANS: dict[str, PlanDef] = {
     "pro_yearly":      PlanDef(id="pro_yearly",      name="Pro (yillik)",      price=1_990_000, monthly_minutes=600, priority=True,  tts_tier="gemini",  tier=PlanTier.PRO,      max_resolution="1080p", period_days=365),
 }
 
-RESOLUTION_ORDER = ["360p", "720p", "1080p"]
+RESOLUTION_ORDER = ["360p", "480p", "720p", "1080p"]
 
 
 def get_max_resolution_for_job(db, job) -> str:
