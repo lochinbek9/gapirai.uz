@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { AudioLines, Captions, Languages, Mic, Send, Sparkles } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
@@ -8,7 +7,6 @@ import { PageTitle, SectionTitle } from '../src/components/PageTitle';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { Screen } from '../src/components/Screen';
 import { ThemedText } from '../src/components/ThemedText';
-import { SITE_URL } from '../src/config/env';
 import { HowItWorks, StatsStrip } from '../src/features/home/sections';
 import { useTheme } from '../src/theme/ThemeProvider';
 
@@ -39,7 +37,7 @@ export default function AboutScreen() {
               label="Ommaviy videolar"
               variant="secondary"
               fullWidth={false}
-              onPress={() => WebBrowser.openBrowserAsync(`${SITE_URL}/videos`).catch(() => {})}
+              onPress={() => router.push('/videos')}
             />
           </View>
         </PageTitle>

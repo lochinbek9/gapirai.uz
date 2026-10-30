@@ -50,3 +50,17 @@ export function formatDateTime(iso: string): string {
 export function formatNumber(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
+
+/** Saytdagi getTashkentRelativeTime: "3 kun oldin"; 30 kundan eskisi uchun bo'sh. */
+export function formatRelativeTime(iso?: string | null): string {
+  if (!iso) return '';
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (Number.isNaN(sec)) return '';
+  if (sec < 60) return 'Hozirgina';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} daq oldin`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} soat oldin`;
+  const days = Math.floor(hours / 24);
+  return days < 30 ? `${days} kun oldin` : '';
+}

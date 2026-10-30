@@ -19,7 +19,7 @@ export function getApiUrl(): string {
 
 export const API_URL = getApiUrl();
 
-// Ilovada hali yo'q sahifalar (ommaviy videolar, donat) saytda brauzerda ochiladi.
+// Ilovada hali yo'q sahifalar (donat) va ulashish havolalari saytga olib boradi.
 export const SITE_URL = 'https://gapirai.uz';
 
 // Google'ning WEB OAuth client id (ochiq qiymat, sir emas) -- sayt bilan bir xil

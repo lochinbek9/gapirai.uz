@@ -15,7 +15,7 @@ type Link = { label: string } & ({ href: Href } | { url: string });
 
 const PROJECT: Link[] = [
   { label: 'Loyiha haqida', href: '/about' },
-  { label: 'Ommaviy videolar', url: `${SITE_URL}/videos` },
+  { label: 'Ommaviy videolar', href: '/videos' },
   // Play build'da to'lovga olib boruvchi havolalar yo'q (config/env.ts PAYMENTS_ENABLED)
   ...(PAYMENTS_ENABLED
     ? ([
