@@ -128,7 +128,7 @@ class TestResolutionVariantsCheck(unittest.TestCase):
                 # The local_out will be outputs/job-123/video/dubbed_360p.mp4
                 # Since ffmpeg is mocked and creates nothing (or empty), it raises RuntimeError
                 with self.assertRaises(RuntimeError) as ctx:
-                    resolution_variants.generate_360p(job)
+                    resolution_variants.generate_downscaled(job, "360p")
                 self.assertIn("360p video fayli", str(ctx.exception))
 
     @patch("subprocess.run")
@@ -148,10 +148,28 @@ class TestResolutionVariantsCheck(unittest.TestCase):
 
             mock_run.side_effect = create_360p
             with patch("backend.services.resolution_variants.settings", SimpleNamespace(AWS_BUCKET_NAME="", OUTPUT_DIR=tmpdir)):
-                out = resolution_variants.generate_360p(job)
+                out = resolution_variants.generate_downscaled(job, "360p")
                 self.assertEqual(out, f"/outputs/{job.storage_id}/video/dubbed_360p.mp4")
                 self.assertTrue(os.path.exists(local_out))
                 self.assertGreater(os.path.getsize(local_out), 0)
+
+    @patch("subprocess.run")
+    def test_generate_480p_scales_to_480_and_names_file(self, mock_run):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            job = SimpleNamespace(storage_id="job-480", output_video_path=os.path.join(tmpdir, "master.mp4"))
+            Path(job.output_video_path).write_bytes(b"master video")
+            local_out = os.path.join(tmpdir, "job-480", "video", "dubbed_480p.mp4")
+
+            def create_480p(*args, **kwargs):
+                Path(local_out).parent.mkdir(parents=True, exist_ok=True)
+                Path(local_out).write_bytes(b"480p video bytes")
+                return MagicMock(returncode=0)
+
+            mock_run.side_effect = create_480p
+            with patch("backend.services.resolution_variants.settings", SimpleNamespace(AWS_BUCKET_NAME="", OUTPUT_DIR=tmpdir)):
+                out = resolution_variants.generate_variant(job, "480p")
+            self.assertEqual(out, "/outputs/job-480/video/dubbed_480p.mp4")
+            self.assertIn("scale=-2:480", mock_run.call_args.args[0])
 
 
 if __name__ == "__main__":
