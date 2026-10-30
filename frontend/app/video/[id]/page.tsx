@@ -218,10 +218,7 @@ export default function VideoPage() {
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
-  const [showTranscript, setShowTranscript] = useState(false)
-  const [expandSourceText, setExpandSourceText] = useState(false)
-  const [showSrt, setShowSrt] = useState(false)
-  const [isSrtCopied, setIsSrtCopied] = useState(false)
+  const [textPanel, setTextPanel] = useState<'srt' | 'uz' | 'src' | null>(null)
   const [showSrtModal, setShowSrtModal] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -235,7 +232,6 @@ export default function VideoPage() {
   const [currentTime, setCurrentTime] = useState(Date.now())
   const sessionStartRef = useRef<number>(Date.now())
   const [isCopied, setIsCopied] = useState(false)
-  const [isEnCopied, setIsEnCopied] = useState(false)
   const prevStatusRef = useRef<string | undefined>(undefined)
   const paidAmountRef = useRef<number | null>(null)
   const paymentIdRef = useRef<string | null>(null)
@@ -1148,90 +1144,71 @@ export default function VideoPage() {
                 </div>
               )}
 
-              {/* Translation accordion */}
-              {job.translated_text && (
-                <div className="glass-card border border-ui-rule rounded-2xl overflow-hidden">
-                  <button
-                    onClick={() => setShowTranscript(!showTranscript)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-ui-ink font-semibold hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition"
-                  >
-                    <span>O&apos;zbek tilidagi matn</span>
-                    <div className="flex items-center gap-3">
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigator.clipboard.writeText(job.translated_text || '')
-                          setIsCopied(true)
-                          setTimeout(() => setIsCopied(false), 2000)
-                        }}
-                        className="p-1.5 text-ui-muted hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
-                        title="Nusxa olish"
-                      >
-                        {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                      </div>
-                      {showTranscript ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </div>
-                  </button>
-                  {showTranscript && (
-                    <div className="px-5 pb-5">
-                      <p className="text-ui-muted text-sm leading-relaxed">{job.translated_text}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Subtitles accordion */}
-              {job.uzbek_srt_content && (
-                <div className="glass-card border border-ui-rule rounded-2xl overflow-hidden">
-                  <div
-                    onClick={() => setShowSrt(!showSrt)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-ui-ink font-semibold hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>O&apos;zbekcha subtitrlar</span>
-                      <span className="rounded-full border border-ui-rule px-2 py-0.5 font-mono text-xs font-medium text-ui-muted">SRT</span>
-                    </div>
-                    <div className="flex items-center gap-3">
+              {/* Matnlar -- doim ochiq turmaydi, kerak bo'lganda tugma bilan ochiladi.
+                  Ular dublajning o'zidan chiqadi (STT/tarjima), alohida yasalmaydi. */}
+              {(job.uzbek_srt_content || job.translated_text || job.transcript_text) && (
+                <div className="glass-card border border-ui-rule rounded-2xl p-4 sm:p-5">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['srt', "O'zbekcha subtitr", job.uzbek_srt_content],
+                      ['uz', 'Tarjima matni', job.translated_text],
+                      ['src', getSourceLangLabel(job.source_language), job.transcript_text],
+                    ] as const).filter(([, , text]) => !!text).map(([key, label]) => (
                       <button
+                        key={key}
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const blob = new Blob([job.uzbek_srt_content || ''], { type: 'text/plain;charset=utf-8' })
-                          const url = URL.createObjectURL(blob)
-                          const a = document.createElement('a')
-                          a.href = url
-                          a.download = `subtitles_${id.slice(0, 8)}.srt`
-                          a.click()
-                          URL.revokeObjectURL(url)
-                        }}
-                        className="p-1.5 text-ui-muted hover:text-ui-green-ink dark:hover:text-emerald-400 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs cursor-pointer font-semibold"
-                        title="SRT faylini yuklab olish"
+                        onClick={() => setTextPanel(textPanel === key ? null : key)}
+                        aria-expanded={textPanel === key}
+                        className={`ui-btn ${textPanel === key ? 'ui-btn-primary' : 'ui-btn-secondary'} h-9 px-3.5 text-sm`}
                       >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Yuklab olish</span>
+                        {label}
                       </button>
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigator.clipboard.writeText(job.uzbek_srt_content || '')
-                          setIsSrtCopied(true)
-                          setTimeout(() => setIsSrtCopied(false), 2000)
-                        }}
-                        className="p-1.5 text-ui-muted hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center cursor-pointer"
-                        title="Nusxa olish"
-                      >
-                        {isSrtCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </div>
-                      {showSrt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </div>
+                    ))}
                   </div>
-                  {showSrt && (
-                    <div className="px-5 pb-5">
-                      <div className="bg-gray-100 dark:bg-black/40 border border-ui-rule rounded-2xl p-4 max-h-80 overflow-y-auto font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                        {job.uzbek_srt_content}
+                  {textPanel && (() => {
+                    const text = (textPanel === 'srt' ? job.uzbek_srt_content : textPanel === 'uz' ? job.translated_text : job.transcript_text) || ''
+                    return (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-end gap-1 mb-2">
+                          {textPanel === 'srt' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+                                const url = URL.createObjectURL(blob)
+                                const a = document.createElement('a')
+                                a.href = url
+                                a.download = `subtitles_${id.slice(0, 8)}.srt`
+                                a.click()
+                                URL.revokeObjectURL(url)
+                              }}
+                              className="p-1.5 text-ui-muted hover:text-ui-ink rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs font-semibold"
+                              title="SRT faylini yuklab olish"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Yuklab olish</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(text)
+                              setIsCopied(true)
+                              setTimeout(() => setIsCopied(false), 2000)
+                            }}
+                            className="p-1.5 text-ui-muted hover:text-ui-ink rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs font-semibold"
+                            title="Nusxa olish"
+                          >
+                            {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                            <span>{isCopied ? 'Nusxalandi' : 'Nusxa olish'}</span>
+                          </button>
+                        </div>
+                        <div className={`max-h-80 overflow-y-auto rounded-xl border border-ui-rule bg-black/[0.02] dark:bg-white/[0.03] p-4 text-sm leading-relaxed whitespace-pre-wrap ${textPanel === 'srt' ? 'font-mono text-xs text-ui-ink' : 'text-ui-muted'}`}>
+                          {text}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               )}
 
@@ -1259,47 +1236,8 @@ export default function VideoPage() {
                     {job.created_at && (
                       <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                     )}
-                    {job.uzbek_srt_content && <InfoRow label="Subtitr" value="Mavjud (To'liq matn pastda)" />}
+                    {job.uzbek_srt_content && <InfoRow label="Subtitr" value="Mavjud" />}
                   </div>
-                  {job.transcript_text && (
-                    <div className="glass-card border border-ui-rule rounded-2xl p-5">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-ui-muted text-xs font-semibold">{getSourceLangLabel(job.source_language)}</p>
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            navigator.clipboard.writeText(job.transcript_text || '')
-                            setIsEnCopied(true)
-                            setTimeout(() => setIsEnCopied(false), 2000)
-                          }}
-                          className="p-1 text-ui-muted hover:text-gray-900 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
-                          title="Nusxa olish"
-                        >
-                          {isEnCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        </div>
-                      </div>
-                      <p className={`text-ui-muted text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
-                      {job.transcript_text.length > 240 && (
-                        <button
-                          type="button"
-                          onClick={() => setExpandSourceText(!expandSourceText)}
-                          className="mt-2 text-xs text-ui-accent-ink hover:underline font-semibold flex items-center gap-1 cursor-pointer transition"
-                        >
-                          {expandSourceText ? (
-                            <>
-                              <ChevronUp className="w-3.5 h-3.5" />
-                              <span>Qisqartirish</span>
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3.5 h-3.5" />
-                              <span>To&apos;liq matnni ko&apos;rish</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1325,7 +1263,7 @@ export default function VideoPage() {
                   <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
                 )}
                 {job.uzbek_srt_content && (
-                  <InfoRow label="Subtitr" value="Mavjud (To'liq matn pastda)" />
+                  <InfoRow label="Subtitr" value="Mavjud" />
                 )}
 
               </div>
@@ -1454,45 +1392,6 @@ export default function VideoPage() {
                 </div>
               )}
 
-              {job.transcript_text && (
-                <div className="glass-card border border-ui-rule rounded-2xl p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-ui-muted text-xs font-semibold">{getSourceLangLabel(job.source_language)}</p>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigator.clipboard.writeText(job.transcript_text || '')
-                        setIsEnCopied(true)
-                        setTimeout(() => setIsEnCopied(false), 2000)
-                      }}
-                      className="p-1 text-ui-muted hover:text-gray-900 dark:hover:text-white rounded hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
-                      title="Nusxa olish"
-                    >
-                      {isEnCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    </div>
-                  </div>
-                  <p className={`text-ui-muted text-sm leading-relaxed ${expandSourceText ? '' : 'line-clamp-6'}`}>{job.transcript_text}</p>
-                  {job.transcript_text.length > 240 && (
-                    <button
-                      type="button"
-                      onClick={() => setExpandSourceText(!expandSourceText)}
-                      className="mt-2 text-xs text-ui-accent-ink hover:underline font-semibold flex items-center gap-1 cursor-pointer transition"
-                    >
-                      {expandSourceText ? (
-                        <>
-                          <ChevronUp className="w-3.5 h-3.5" />
-                          <span>Qisqartirish</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="w-3.5 h-3.5" />
-                          <span>To&apos;liq matnni ko&apos;rish</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
