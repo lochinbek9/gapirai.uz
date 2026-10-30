@@ -4,11 +4,11 @@ Denis's 416a0ba added get_optional_user + an owner check, but an anonymous
 caller could still read ANY job by UUID -- including in-progress / failed ones
 -- and _job_to_response leaks transcript_text / error_message / feedback.
 
-Contract now:
-  owner (authenticated)     -> full response
-  authenticated non-owner   -> 404
-  anonymous + COMPLETED     -> redacted response (no transcript/error/feedback)
-  anonymous + not COMPLETED -> 404
+Contract now (2026-10-30: shared links are "unlisted", like YouTube):
+  owner (authenticated)                 -> full response
+  non-owner (anonymous OR other account) + COMPLETED     -> redacted response
+                                                            (no transcript/error/feedback)
+  non-owner (anonymous OR other account) + not COMPLETED -> 404
 """
 import unittest
 import uuid
@@ -60,8 +60,17 @@ class TestGetJobAccess(unittest.TestCase):
         self.assertEqual(r.json()["error_message"], "internal ffmpeg blew up")
         self.assertEqual(r.json()["rating"], 5)
 
-    def test_authenticated_non_owner_404(self):
+    def test_authenticated_non_owner_sees_shared_completed_redacted(self):
+        # Ulashilgan havola tizimga kirgan boshqa foydalanuvchida ham ochilishi kerak
         jid = self._job(JobStatus.COMPLETED)
+        r = self.client.get(f"/api/jobs/{jid}", headers={"Authorization": f"Bearer {self.other_tok}"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.json()["transcript_text"])
+        self.assertIsNone(r.json()["rating"])
+        self.assertFalse(r.json().get("viewer_is_owner"))
+
+    def test_authenticated_non_owner_in_progress_404(self):
+        jid = self._job(JobStatus.TRANSCRIBING)
         r = self.client.get(f"/api/jobs/{jid}", headers={"Authorization": f"Bearer {self.other_tok}"})
         self.assertEqual(r.status_code, 404)
 

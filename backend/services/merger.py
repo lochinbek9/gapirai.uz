@@ -213,7 +213,7 @@ def merge_video_audio(
     aralashtirilgan (original musiqa/SFX/ambient saqlanadi, faqat dub
     gapirayotgan joyda moslashuvchan pasayadi — backend/config.py: DUCKING_*).
 
-    Barcha tariflar uchun pastki o'ng burchakda rasmiy gapirai.uz suv belgisi
+    Barcha tariflar uchun yuqori o'ng burchakda rasmiy GapirAI.uz suv belgisi
     (logo + domen) joylashtiriladi.
 
     Agar o'zbekcha dublyaj video dan uzunroq bo'lsa:
@@ -263,15 +263,13 @@ def merge_video_audio(
     def _build_cmd(with_watermark: bool) -> list[str]:
         if with_watermark:
             w, h = _get_video_dimensions(video_path)
-            if w >= h:
-                wm_h = max(48, min(160, round(h * 0.11)))
-                wm_scale = f"scale=-1:{wm_h}:flags=lanczos"
-            else:
-                wm_w = max(50, min(160, round(w * 0.18)))
-                wm_scale = f"scale={wm_w}:-1:flags=lanczos"
+            # Gorizontal logo (ikonka + "GapirAI.uz", soyasi rasmning o'zida) -- kalta
+            # tomonga nisbatan: 720p -> ~68px, vertikal 1080x1920 -> ~103px balandlik.
+            wm_h = max(40, min(130, round(min(w, h) * 0.095)))
+            wm_scale = f"scale=-1:{wm_h}:flags=lanczos"
 
-            pad_x = max(16, round(w * 0.025))
-            pad_y = max(16, round(h * 0.035))
+            pad_x = max(10, round(w * 0.02))
+            pad_y = max(10, round(h * 0.025))
 
             if extra > 0:
                 v_prep = f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.3f}[v_base];"
@@ -281,7 +279,7 @@ def merge_video_audio(
             fc = (
                 f"{v_prep}"
                 f"[2:v]{wm_scale}[wm];"
-                f"[v_base][wm]overlay=W-w-{pad_x}:H-h-{pad_y}[v_out];"
+                f"[v_base][wm]overlay=W-w-{pad_x}:{pad_y}[v_out];"
                 f"{audio_filter}"
             )
 
