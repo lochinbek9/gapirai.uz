@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { AudioLines, Captions, Languages, Mic, Send, Sparkles } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
-import { Footer } from '../src/components/Footer';
 import { PageTitle, SectionTitle } from '../src/components/PageTitle';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { Screen } from '../src/components/Screen';
@@ -68,7 +67,6 @@ export default function AboutScreen() {
           tayyorlanadi, shuning uchun tarjima va ovozda kichik xatolar boʻlishi mumkin — fikringizni yozsangiz, tuzatamiz.
         </ThemedText>
       </View>
-      <Footer />
     </Screen>
   );
 }

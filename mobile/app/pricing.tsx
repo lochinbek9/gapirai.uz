@@ -6,7 +6,6 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Accordion } from '../src/components/Accordion';
 import { Card } from '../src/components/Card';
-import { Footer } from '../src/components/Footer';
 import { Notice } from '../src/components/Notice';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { Screen } from '../src/components/Screen';
@@ -288,7 +287,6 @@ function PricingScreen() {
           <Accordion items={FAQ} style={styles.mt28} />
         </View>
       </View>
-      <Footer />
       {payment.sheet}
     </Screen>
   );

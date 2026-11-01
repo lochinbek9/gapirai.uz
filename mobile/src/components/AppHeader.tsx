@@ -9,6 +9,7 @@ import {
   Info,
   LogIn,
   LogOut,
+  Mail,
   Menu,
   Moon,
   PlaySquare,
@@ -21,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PAYMENTS_ENABLED, SITE_URL } from '../config/env';
@@ -29,6 +30,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { radius } from '../theme/colors';
 import { useTheme } from '../theme/ThemeProvider';
+import { Instagram, type IconComponent } from './BrandIcons';
 import { PrimaryButton } from './PrimaryButton';
 import { ThemedText } from './ThemedText';
 
@@ -175,8 +177,56 @@ function NavSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             }}
           />
         )}
+        <SheetFooter onNavigate={go} />
       </View>
     </Modal>
+  );
+}
+
+// Saytda footer'dagi qoidalar va ijtimoiy havolalar; ilovada footer yo'q, shuning uchun menyu ostida
+const SMALL_LINKS: { label: string; href?: Href; url?: string }[] = [
+  { label: 'Foydalanish shartlari', href: '/terms' },
+  { label: 'Maxfiylik siyosati', href: '/privacy' },
+  { label: 'Hamjamiyat', url: 'https://t.me/gapir_uz_muhokama' },
+];
+const SOCIAL: { label: string; url: string; icon: IconComponent }[] = [
+  { label: 'Telegram kanalimiz', url: 'https://t.me/gapirai_uz', icon: Send },
+  { label: 'Instagram sahifamiz', url: 'https://www.instagram.com/gapirai_uz/', icon: Instagram },
+  { label: 'Bizga email yozing', url: 'mailto:lodexgroups@gmail.com', icon: Mail },
+];
+
+function SheetFooter({ onNavigate }: { onNavigate: (link: MenuLink) => void }) {
+  const { colors } = useTheme();
+  const open = (l: { label: string; href?: Href; url?: string }) => {
+    if (l.href) return onNavigate({ label: l.label, icon: Info, href: l.href });
+    if (l.url?.startsWith('mailto:')) return Linking.openURL(l.url).catch(() => {});
+    if (l.url) onNavigate({ label: l.label, icon: Info, url: l.url });
+  };
+  return (
+    <View style={[styles.sheetFoot, { borderTopColor: colors.rule }]}>
+      <View style={styles.smallLinks}>
+        {SMALL_LINKS.map((l) => (
+          <Pressable key={l.label} onPress={() => open(l)} accessibilityRole="link" hitSlop={6}>
+            {({ pressed }) => (
+              <ThemedText style={[styles.smallLink, { color: pressed ? colors.ink : colors.muted }]}>{l.label}</ThemedText>
+            )}
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.socialRow}>
+        {SOCIAL.map(({ label, url, icon: Icon }) => (
+          <Pressable
+            key={label}
+            onPress={() => open({ label, url })}
+            accessibilityRole="link"
+            accessibilityLabel={label}
+            style={({ pressed }) => [styles.social, pressed && { backgroundColor: colors.ground }]}
+          >
+            <Icon size={18} color={colors.muted} strokeWidth={2} />
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -226,4 +276,18 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 12, borderRadius: radius.tab },
   rowLabel: { fontSize: 15, fontWeight: '500' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 6, marginHorizontal: 12 },
+  sheetFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 6,
+    marginHorizontal: 12,
+    paddingTop: 12,
+  },
+  smallLinks: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 6 },
+  smallLink: { fontSize: 13 },
+  socialRow: { flexDirection: 'row', gap: 2, marginRight: -10 },
+  social: { width: 40, height: 40, borderRadius: radius.tab, alignItems: 'center', justifyContent: 'center' },
 });
