@@ -117,7 +117,7 @@ function NavSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   // Play build'da to'lovga olib boruvchi bandlar (tariflar, donat, hisob) yo'q -- config/env.ts
   const main: MenuLink[] = [
-    { label: 'Ommaviy videolar', icon: PlaySquare, url: `${SITE_URL}/videos` },
+    { label: 'Ommaviy videolar', icon: PlaySquare, href: '/videos' },
     ...(PAYMENTS_ENABLED
       ? [
           { label: 'Tariflar', icon: CreditCard, href: '/pricing' as const },
