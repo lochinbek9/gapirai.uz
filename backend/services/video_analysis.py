@@ -110,36 +110,129 @@ def _format_timestamp(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
-def _format_transcript(segments: list[dict], max_chars: int = 24000) -> str:
+def _is_document(segments: list[dict]) -> bool:
+    return bool(segments) and "page" in segments[0]
+
+
+def _seg_label(seg: dict) -> str:
+    """Video: "12:35"; hujjat (backend/services/document_extract.py): "5-bet" / "3-slayd" / "2-qism"."""
+    if "page" in seg:
+        return f"{int(seg.get('page') or 0)}-{seg.get('unit') or 'bet'}"
+    return _format_timestamp(seg.get("start", 0))
+
+
+def _format_lines(segments: list[dict]) -> list[str]:
     lines = []
     for seg in segments:
-        ts = _format_timestamp(seg.get("start", 0))
         text = (seg.get("text") or "").strip()
         if text:
-            lines.append(f"[{ts}] {text}")
+            lines.append(f"[{_seg_label(seg)}] {text}")
+    return lines
 
-    total_len = sum(len(l) for l in lines)
-    if total_len > max_chars and len(lines) > 20:
-        # Katta hajmdagi video transkripti (masalan 1-2 soatlik podkastlar).
-        # Groq TPM (Tokens Per Minute) limitiga urilmasligi uchun butun video
-        # xronometraji bo'ylab teng taqsimlangan holda qisqartiriladi,
-        # vaqt belgilari (timestamps) to'liq saqlanadi.
-        step = max(1.0, len(lines) * 1.0 / (max_chars / 65))
-        sampled = []
-        curr = 0.0
-        while int(curr) < len(lines):
-            sampled.append(lines[int(curr)])
-            curr += step
-        if lines and lines[-1] not in sampled:
-            sampled.append(lines[-1])
-        lines = sampled
 
-    body = "\n".join(lines)
+def _wrap(body: str) -> str:
     # <video_transcript> teglari -- _UNTRUSTED_TRANSCRIPT_RULE shu teglarga
     # ishora qiladi. Bu yerda o'raladi (chaqiruvchi joylarda emas) -- shunda
-    # HAR BIR _format_transcript() chaqiruvi avtomatik himoyalangan bo'ladi,
-    # kimdir yangi generate_* metod qo'shganda buni unutib qo'ymaydi.
+    # HAR BIR material uzatish avtomatik himoyalangan bo'ladi.
     return f"<video_transcript>\n{body}\n</video_transcript>"
+
+
+def _sampled(lines: list[str], max_chars: int) -> list[str]:
+    """Butun material bo'ylab teng taqsimlangan qatorlar (vaqt belgilari saqlanadi).
+    Faqat digest (pastda) yo'q bo'lgandagi oxirgi chora -- qatorlarning bir
+    qismi tashlab yuboriladi."""
+    step = max(1.0, len(lines) * 1.0 / (max_chars / 65))
+    sampled = []
+    curr = 0.0
+    while int(curr) < len(lines):
+        sampled.append(lines[int(curr)])
+        curr += step
+    if lines and lines[-1] not in sampled:
+        sampled.append(lines[-1])
+    return sampled
+
+
+def _format_transcript(segments: list[dict], max_chars: int = 24000, digests: list[dict] | None = None) -> str:
+    """LLM'ga beriladigan material. Sig'sa -- to'liq matn. Sig'masa -- bo'laklar
+    konspekti (digests, build_digests) -- hech narsa tashlab yuborilmaydi.
+    Digest ham bo'lmasa (eski tahlillar) -- teng taqsimlangan namuna.
+
+    2026-11-01 gacha uzun material (~25-30 daqiqadan uzun video) doim namuna
+    bilan qisqartirilardi: xulosa va savol-javob materialning bir qismini
+    umuman ko'rmasdi."""
+    lines = _format_lines(segments)
+    if sum(len(l) for l in lines) <= max_chars or len(lines) <= 20:
+        return _wrap("\n".join(lines))
+    if digests:
+        return _wrap(_digests_text(digests))
+    return _wrap("\n".join(_sampled(lines, max_chars)))
+
+
+def _digests_text(digests: list[dict]) -> str:
+    return "\n\n".join(f"=== {d.get('label', '')} ===\n{d.get('digest', '')}" for d in digests)
+
+
+def needs_digests(segments: list[dict], max_chars: int = 24000) -> bool:
+    return sum(len(l) for l in _format_lines(segments)) > max_chars
+
+
+def _source_rule(segments: list[dict]) -> str:
+    if not _is_document(segments):
+        return ""
+    unit = segments[0].get("unit") or "bet"
+    return f"""MUHIM (manba turi): Bu material video emas, HUJJAT (PDF/Word/taqdimot/kitob).
+Matndagi [N-{unit}] belgilari -- {unit} raqamlari. Javobdagi "timestamp", "start",
+"end" maydonlariga SONIYA emas, {unit.upper()} RAQAMINI yozing. Matnda "video",
+"videoda", "transkript" o'rniga "hujjat", "hujjatda", "matn" so'zlarini ishlating."""
+
+
+_QA_STOPWORDS = {
+    "va", "bu", "u", "bir", "ham", "nima", "qanday", "qaysi", "nega", "uchun", "bilan", "haqida", "edi",
+    "the", "a", "an", "is", "are", "was", "what", "how", "why", "which", "of", "in", "on", "to", "and", "about",
+    "что", "как", "это", "в", "на", "и", "о", "про", "почему",
+}
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[ʻʼ’‘`']", "'", text.lower())
+
+
+def _stems(text: str) -> set[str]:
+    # O'zbekcha qo'shimchalar (kitob-lar-imiz) uchun so'z boshining 5 harfi yetarli
+    words = re.findall(r"[\w']+", _norm(text))
+    return {w[:5] for w in words if len(w) >= 3 and w not in _QA_STOPWORDS}
+
+
+def _relevant_lines(segments: list[dict], question: str, max_chars: int) -> list[str]:
+    """Savolga eng mos qatorlar (+ ikki tomondan qo'shni qatorlar), xronologik tartibda.
+    Hech qaysi qator mos kelmasa -- bo'sh ro'yxat."""
+    lines = _format_lines(segments)
+    q = _stems(question)
+    if not q:
+        return []
+    # Kam uchraydigan so'z mos kelishi qimmatroq (idf'ga o'xshash)
+    line_stems = [_stems(l) for l in lines]
+    df = {st: sum(st in ls for ls in line_stems) for st in q}
+    scores = [sum(1.0 / df[st] for st in q if st in ls and df[st]) for ls in line_stems]
+    ranked = sorted((i for i, sc in enumerate(scores) if sc > 0), key=lambda i: -scores[i])
+    if not ranked:
+        return []
+    picked: set[int] = set()
+    total = 0
+    for i in ranked:
+        for j in range(max(0, i - 2), min(len(lines), i + 3)):
+            if j not in picked:
+                picked.add(j)
+                total += len(lines[j])
+        if total >= max_chars:
+            break
+    out, prev = [], None
+    for j in sorted(picked):
+        if prev is not None and j != prev + 1:
+            out.append("...")
+        out.append(lines[j])
+        prev = j
+    return out
 
 
 def _safe_float(value, default: float = 0.0) -> float:
@@ -181,11 +274,12 @@ class VideoAnalysisService:
     def _get_paid(self, is_paid: bool | None = None) -> bool:
         return self.is_paid if is_paid is None else is_paid
 
-    def generate_summary(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> dict:
+    def generate_summary(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> dict:
         """Returns {"short": str, "medium": str, "detailed": str}."""
         system = f"""Siz video transkriptlarini xulosalovchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 Uchta xulosa formatida javob bering:
@@ -194,18 +288,19 @@ Uchta xulosa formatida javob bering:
 - "detailed": videodagi barcha muhim fikrlarni tartibli tushuntiruvchi batafsil xulosa
 
 JSON formatida qaytaring: {{"short": "...", "medium": "...", "detailed": "..."}}"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
         return {
             "short": str(result.get("short", "")).strip(),
             "medium": str(result.get("medium", "")).strip(),
             "detailed": str(result.get("detailed", "")).strip(),
         }
 
-    def generate_key_points(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> list[dict]:
+    def generate_key_points(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> list[dict]:
         """Returns [{"title","description","timestamp"}]."""
         system = f"""Siz video transkriptidan asosiy fikrlarni ajratib oluvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 Videodagi eng muhim 5-10 ta fikrni aniqlang. Har biri uchun qisqa sarlavha,
@@ -213,7 +308,7 @@ tushuntirish va transkriptdagi eng yaqin soniya (timestamp, raqam) bering.
 
 JSON formatida qaytaring:
 {{"key_points": [{{"title": "...", "description": "...", "timestamp": 125}}, ...]}}"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         points = []
         for item in result.get("key_points", []) if isinstance(result, dict) else []:
@@ -227,11 +322,12 @@ JSON formatida qaytaring:
             })
         return points
 
-    def generate_chapters(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> list[dict]:
+    def generate_chapters(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> list[dict]:
         """Returns [{"title","start","end"}]."""
         system = f"""Siz video mazmunini mantiqiy chapterlarga ajratuvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 Video davomiyligi: {video_duration:.0f} soniya. Videoni 3-12 ta chapterga ajrating,
@@ -240,7 +336,7 @@ har biri qisqa sarlavha va boshlanish/tugash vaqti (soniyada) bilan. Chapterlar
 
 JSON formatida qaytaring:
 {{"chapters": [{{"title": "...", "start": 0, "end": 120}}, ...]}}"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
         chapters = []
         for item in result.get("chapters", []) if isinstance(result, dict) else []:
             if not isinstance(item, dict) or not item.get("title"):
@@ -251,7 +347,7 @@ JSON formatida qaytaring:
         chapters.sort(key=lambda c: c["start"])
         return chapters
 
-    def generate_five_minute_summary(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> dict:
+    def generate_five_minute_summary(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> dict:
         """"5 daqiqada" — video davomiyligidan qat'i nazar, taxminan 5 daqiqalik
         o'qish/o'rganish tajribasiga siqilgan, o'quv-yo'naltirilgan xulosa
         (oddiy generate_summary'dagi qisqa/o'rta/batafsil variantlardan farqli
@@ -262,6 +358,7 @@ JSON formatida qaytaring:
 ta'lim mutaxassisisiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 Video davomiyligi: {video_duration:.0f} soniya. Bu ODDIY xulosa emas -- o'quvchi
@@ -280,7 +377,7 @@ JSON formatida qaytaring:
 {{"title": "...", "why_it_matters": "...", "core_ideas": ["...", ...],
 "examples": ["...", ...], "takeaways": ["...", ...],
 "key_terms": [{{"term": "...", "explanation": "..."}}, ...], "remember": "..."}}"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
         if not isinstance(result, dict):
             result = {}
 
@@ -308,12 +405,13 @@ JSON formatida qaytaring:
             "remember": str(result.get("remember", "")).strip(),
         }
 
-    def generate_base_analysis(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None) -> dict:
+    def generate_base_analysis(self, segments: list[dict], video_duration: float, language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> dict:
         """Barcha asosiy bo'limlarni (summary, key_points, chapters, five_minute_summary)
         BITTA tezkor LLM so'rovi bilan yaratadi. 4 ta alohida chaqiruvga nisbatan 4x tezroq va barqaror!"""
         system = f"""Siz professional video tahlilchi va ta'lim mutaxassisiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 Videoning berilgan transkriptidan foydalanib, quyidagi barcha bo'limlarni BIR VAQTDA to'liq JSON formatida shakllantiring:
@@ -346,7 +444,7 @@ Faqat JSON qaytaring:
   "five_minute_summary": {{...}}
 }}"""
         try:
-            result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+            result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
             if isinstance(result, dict) and "summary" in result and "chapters" in result:
                 max_ts = max((_safe_float(s.get("end")) for s in segments), default=float(video_duration or 0.0))
                 # Validate key points
@@ -365,6 +463,10 @@ Faqat JSON qaytaring:
                     if isinstance(item, dict) and item.get("title"):
                         st = _safe_float(item.get("start"))
                         en = _safe_float(item.get("end"), default=video_duration)
+                        if _is_document(segments):
+                            # Bet raqamlari: bitta betlik bob (start == end) -- to'g'ri holat
+                            ch.append({"title": str(item["title"]).strip(), "start": max(0.0, st), "end": max(st, en)})
+                            continue
                         if en <= st:
                             en = st + 30.0
                         ch.append({
@@ -406,17 +508,18 @@ Faqat JSON qaytaring:
             logger.warning(f"Bitta chaqiruvda tahlil qilishda xatolik ({e}), alohida metodlarga o'tilmoqda.")
 
         return {
-            "summary": self.generate_summary(segments, language, is_paid=is_paid),
-            "key_points": self.generate_key_points(segments, language, is_paid=is_paid),
-            "chapters": self.generate_chapters(segments, video_duration, language, is_paid=is_paid),
-            "five_minute_summary": self.generate_five_minute_summary(segments, video_duration, language, is_paid=is_paid),
+            "summary": self.generate_summary(segments, language, is_paid=is_paid, digests=digests),
+            "key_points": self.generate_key_points(segments, language, is_paid=is_paid, digests=digests),
+            "chapters": self.generate_chapters(segments, video_duration, language, is_paid=is_paid, digests=digests),
+            "five_minute_summary": self.generate_five_minute_summary(segments, video_duration, language, is_paid=is_paid, digests=digests),
         }
 
-    def generate_notes(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None) -> str:
+    def generate_notes(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None, digests: list[dict] | None = None) -> str:
         """Returns a deep, structured, professional markdown study conspectus."""
         system = f"""Siz ta'lim va biznes videolari bo'yicha professional konspekt tuzuvchi yetakchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 VAZIFA:
@@ -445,16 +548,17 @@ Oxirgi bo'lim doimo:
 
 JSON FORMATIDA QAYTARING:
 {{"notes": "## Sarlavha\\n\\n### 1. Bo'lim...\\n- **Mavzu:** izoh..."}}"""
-        result = _call_json(system, _format_transcript(segments, max_chars=32000), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, max_chars=32000, digests=digests), is_paid=self._get_paid(is_paid))
         raw = str(result.get("notes", "")).strip()
         raw = raw.replace("\\n", "\n")
         return raw
 
-    def generate_quiz(self, segments: list[dict], language: str = "uz", num_questions: int = 10, is_paid: bool | None = None) -> list[dict]:
+    def generate_quiz(self, segments: list[dict], language: str = "uz", num_questions: int = 10, is_paid: bool | None = None, digests: list[dict] | None = None) -> list[dict]:
         """Returns [{"question","options","correct_answer","explanation","timestamp"}]."""
         system = f"""Siz video mazmuniga asoslangan test tuzuvchi mutaxassissiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 {_language_rule(language)}
 
 {num_questions} ta ko'p tanlovli savol tuzing (har birida 4 ta variant). Savollar
@@ -465,7 +569,7 @@ JSON formatida qaytaring:
 {{"questions": [{{"question": "...", "options": ["...", "...", "...", "..."],
 "correct_answer": 0, "explanation": "...", "timestamp": 125}}, ...]}}
 ("correct_answer" — to'g'ri javobning options ro'yxatidagi indeksi, 0 dan boshlab.)"""
-        result = _call_json(system, _format_transcript(segments), is_paid=self._get_paid(is_paid))
+        result = _call_json(system, _format_transcript(segments, digests=digests), is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         questions = []
         for item in result.get("questions", []) if isinstance(result, dict) else []:
@@ -487,12 +591,77 @@ JSON formatida qaytaring:
             })
         return questions
 
+    def build_digests(self, segments: list[dict], language: str = "uz", is_paid: bool | None = None, chunk_chars: int = 18000) -> list[dict]:
+        """Uzun material uchun "map" bosqichi: matn ketma-ket bo'laklarga bo'linadi va
+        har biridan zich konspekt olinadi. Keyingi bosqichlar (xulosa, boblar,
+        konspekt, test) to'liq matn sig'magan joyda shu konspektlar ustida ishlaydi --
+        hech bir qism tashlab yuborilmaydi. Returns [{"label","start","end","digest"}].
+        Bitta bo'lak xato bersa -- o'sha bo'lakning qisqartirilgan xom matni olinadi."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        chunks: list[list[dict]] = []
+        cur: list[dict] = []
+        size = 0
+        for seg in segments:
+            n = len((seg.get("text") or "")) + 12
+            if cur and size + n > chunk_chars:
+                chunks.append(cur)
+                cur, size = [], 0
+            cur.append(seg)
+            size += n
+        if cur:
+            chunks.append(cur)
+
+        system = f"""Siz uzun material bo'lagidan zich, to'liq konspekt tuzuvchi mutaxassissiz.
+{_NO_HALLUCINATION_RULE}
+{_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
+{_language_rule(language)}
+
+Bu butun materialning BIR BO'LAGI. Bo'lakdagi barcha muhim fikrlar, ta'riflar,
+faktlar, raqamlar, nomlar va misollarni saqlab qoling -- keyin shu konspektlardan
+butun material xulosasi, boblari, testi tuziladi. Har bir fikr oldidan uning
+[...] belgisini (vaqt yoki bet) aynan matndagidek qoldiring. Hajmi: 1500-3000 belgi.
+
+JSON formatida qaytaring: {{"digest": "[12:30] ...\\n[14:05] ..."}}"""
+
+        def one(chunk: list[dict]) -> dict:
+            label = f"{_seg_label(chunk[0])} – {_seg_label(chunk[-1])}"
+            try:
+                res = _call_json(system, _wrap("\n".join(_format_lines(chunk))), is_paid=self._get_paid(is_paid))
+                digest = str(res.get("digest", "")).replace("\\n", "\n").strip() if isinstance(res, dict) else ""
+            except Exception as e:
+                logger.warning(f"Digest xatosi ({label}): {e}")
+                digest = ""
+            if not digest:
+                digest = "\n".join(_sampled(_format_lines(chunk), 3000))
+            return {"label": label, "start": _safe_float(chunk[0].get("start")), "end": _safe_float(chunk[-1].get("end")), "digest": digest}
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            return list(pool.map(one, chunks))
+
+    def _qa_material(self, segments: list[dict], question: str, digests: list[dict] | None) -> str:
+        """Savol-javob materiali: sig'sa -- to'liq matn; aks holda savolga mos
+        qatorlar (aniq iqtibos va vaqt/bet uchun) + umumiy kontekst uchun konspekt."""
+        lines = _format_lines(segments)
+        if sum(len(l) for l in lines) <= 24000:
+            return _wrap("\n".join(lines))
+        relevant = _relevant_lines(segments, question, max_chars=16000)
+        overview = _digests_text(digests)[:10000] if digests else ""
+        if not relevant:
+            return _format_transcript(segments, digests=digests)
+        body = "\n".join(relevant)
+        if overview:
+            body = f"UMUMIY KONSPEKT (butun material):\n{overview}\n\nSAVOLGA MOS PARCHALAR (aynan matn):\n{body}"
+        return _wrap(body)
+
     def answer_question(
         self,
         segments: list[dict],
         question: str,
         qa_history: list[dict] | None = None,
         is_paid: bool | None = None,
+        digests: list[dict] | None = None,
     ) -> dict:
         """Returns {"answer": str, "timestamps": [float, ...]}.
 
@@ -511,6 +680,7 @@ JSON formatida qaytaring:
         system = f"""Siz video haqida savollarga javob beruvchi yordamchisiz.
 {_NO_HALLUCINATION_RULE}
 {_UNTRUSTED_TRANSCRIPT_RULE}
+{_source_rule(segments)}
 
 MUHIM (til): Javobni foydalanuvchi SAVOLNI yozgan tilda bering — savol qaysi
 tilda yozilgan bo'lsa, javob ham o'sha tilda bo'lsin (masalan savol inglizcha
@@ -526,7 +696,7 @@ Javobingiz bilan birga, javobga asos bo'lgan transkript qismlarining
 soniyalardagi vaqtlarini (timestamps) ham bering.
 
 JSON formatida qaytaring: {{"answer": "...", "timestamps": [125, 340]}}"""
-        user_message = f"Transkript:\n{_format_transcript(segments)}{history_text}\n\nSavol: {question}"
+        user_message = f"Transkript:\n{self._qa_material(segments, question, digests)}{history_text}\n\nSavol: {question}"
         result = _call_json(system, user_message, is_paid=self._get_paid(is_paid))
         max_ts = max((_safe_float(s.get("end")) for s in segments), default=0.0)
         timestamps = []

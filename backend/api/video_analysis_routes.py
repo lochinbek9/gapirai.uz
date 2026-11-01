@@ -1,8 +1,9 @@
 import asyncio
 import logging
+import re
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -125,6 +126,12 @@ def _analysis_to_dict(analysis: VideoAnalysis, db: Optional[Session] = None) -> 
         "error_message": analysis.error_message,
         "error_code": analysis.error_code,
         "created_at": to_tashkent_iso(analysis.created_at),
+        # Hujjat tahlili: belgilar "5-bet" / "3-slayd" / "2-qism" (soniya emas)
+        "source_type": getattr(analysis, "source_type", None) or "video",
+        "document_name": getattr(analysis, "document_name", None),
+        "document_pages": getattr(analysis, "document_pages", None),
+        "document_unit": ((analysis.transcript_segments or [{}])[0].get("unit") or "bet")
+        if getattr(analysis, "source_type", None) == "document" else None,
         "linked_job_id": str(linked_job.id) if linked_job else None,
         "linked_job_status": (linked_job.status.value if hasattr(linked_job.status, "value") else str(linked_job.status).lower()) if linked_job else None,
         "linked_job_is_preview": bool(linked_job.is_preview) if linked_job else False,
@@ -163,6 +170,9 @@ def delete_analysis(
         )
         db.delete(analysis)
         db.commit()
+        if getattr(analysis, "source_type", None) == "document":
+            from backend.workers.analysis_tasks import document_path
+            document_path(analysis_id, analysis.document_name or "").unlink(missing_ok=True)
     except Exception as e:
         db.rollback()
         logger.exception(f"Tahlilni o'chirishda xatolik ({analysis_id}): {e}")
@@ -289,6 +299,76 @@ async def create_analysis(
     return {"analysis_id": str(analysis.id), "status": "pending"}
 
 
+@router.post("/document", status_code=201, dependencies=[Depends(rate_limit("document_analysis_create", 8, 600))])
+async def create_document_analysis(
+    file: UploadFile = File(...),
+    language: str = Form("uz"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Hujjat tahlili (PDF/DOCX/TXT/PPTX/EPUB). Matn shu yerda (OCR'siz, tez)
+    ajratiladi -- bet limiti darhol tekshiriladi; skanerlangan PDF betlari va
+    tahlilning o'zi worker'da (analyze_video_task)."""
+    from pathlib import Path
+    from backend.services import document_extract
+    from backend.workers.analysis_tasks import document_path
+
+    if language not in ALLOWED_ANALYSIS_LANGUAGES:
+        raise HTTPException(status_code=400, detail="Noto'g'ri tahlil tili.")
+    filename = Path(file.filename or "hujjat").name[:200]
+    if Path(filename.lower()).suffix not in document_extract.SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Bu format qo'llab-quvvatlanmaydi. PDF, DOCX, TXT, PPTX yoki EPUB yuklang.")
+
+    data = await file.read(document_extract.MAX_DOCUMENT_BYTES + 1)
+    if len(data) > document_extract.MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta. Eng ko'pi 20 MB.")
+
+    try:
+        extracted = await asyncio.to_thread(document_extract.extract_document, data, filename)
+    except document_extract.DocumentError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    pages = extracted["pages"]
+    limit = document_extract.page_limit(db, current_user)
+    if len(pages) > limit:
+        unit = extracted["unit"]
+        hint = " Pullik tarifda 300 tagacha." if limit < document_extract.PAID_PAGE_LIMIT else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"Hujjat juda katta: {len(pages)} {unit}. Tarifingizda eng ko'pi {limit} {unit}.{hint}",
+        )
+    if not extracted["ocr_pages"] and not any(p.strip() for p in pages):
+        raise HTTPException(status_code=400, detail="Hujjatdan matn topilmadi.")
+
+    is_paid = limit == document_extract.PAID_PAGE_LIMIT
+    analysis = VideoAnalysis(
+        user_id=current_user.id,
+        youtube_url=f"document://{filename}"[:500],
+        video_title=Path(filename).stem[:500] or "Hujjat",
+        language=language,
+        source_type="document",
+        document_name=filename,
+        document_pages=len(pages),
+        status=AnalysisStatus.PENDING,
+        progress=0.0,
+        status_message="Navbatga qo'shildi",
+        # Skanerlangan betlar bo'lsa -- segmentlar worker'da (OCR'dan keyin) yoziladi
+        transcript_segments=None if extracted["ocr_pages"] else document_extract.pages_to_segments(pages, extracted["unit"]),
+        gemini_key_tier="paid" if is_paid else "free",
+    )
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
+
+    if extracted["ocr_pages"]:
+        path = document_path(str(analysis.id), filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    analyze_video_task.apply_async(args=[str(analysis.id)], task_id=str(analysis.id))
+    return {"analysis_id": str(analysis.id), "status": "pending"}
+
+
 @router.get("/{analysis_id}")
 def get_analysis(
     analysis_id: str,
@@ -399,7 +479,8 @@ def ask_question(
     is_paid = _is_paid_user(db, current_user_id)
     qa_history = analysis.qa_history or []
     result = _service.answer_question(
-        analysis.transcript_segments, request.question.strip(), qa_history, is_paid=is_paid
+        analysis.transcript_segments, request.question.strip(), qa_history, is_paid=is_paid,
+        digests=analysis.material_digests,
     )
     entry = {
         "question": request.question.strip(),
@@ -423,7 +504,7 @@ def get_or_generate_quiz(
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.quiz:
         is_paid = _is_paid_user(db, current_user_id)
-        analysis.quiz = _service.generate_quiz(analysis.transcript_segments, analysis.language, is_paid=is_paid)
+        analysis.quiz = _service.generate_quiz(analysis.transcript_segments, analysis.language, is_paid=is_paid, digests=analysis.material_digests)
         db.commit()
     return {"quiz": analysis.quiz}
 
@@ -464,7 +545,7 @@ def get_or_generate_notes(
         raise HTTPException(status_code=400, detail="Tahlil hali tayyor emas.")
     if not analysis.notes or force:
         is_paid = _is_paid_user(db, current_user_id)
-        analysis.notes = _service.generate_notes(analysis.transcript_segments, analysis.language, is_paid=is_paid)
+        analysis.notes = _service.generate_notes(analysis.transcript_segments, analysis.language, is_paid=is_paid, digests=analysis.material_digests)
         db.commit()
     return {"notes": analysis.notes}
 
@@ -477,11 +558,15 @@ def search_transcript(
     current_user_id: Optional[uuid.UUID] = Depends(get_optional_user_id),
 ) -> dict:
     analysis = _get_accessible_analysis(analysis_id, db, current_user_id)
-    query = q.strip().lower()
+    # Katta-kichik harf, apostrof turlari (o' / oʻ / o’) va ortiqcha bo'shliqlarga sezgir emas
+    def norm(text: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"[ʻʼ’‘`']", "'", text.lower())).strip()
+
+    query = norm(q)
     if not query:
         return {"results": []}
     results = [
         seg for seg in (analysis.transcript_segments or [])
-        if query in (seg.get("text") or "").lower()
+        if query in norm(seg.get("text") or "")
     ]
     return {"results": results}

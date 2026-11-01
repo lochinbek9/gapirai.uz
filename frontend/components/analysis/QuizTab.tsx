@@ -19,6 +19,8 @@ interface QuizTabProps {
   onGenerate: () => void;
   onAnswer: (questionIndex: number, optionIndex: number) => void;
   onSeek: (seconds: number) => void;
+  /** Hujjat tahlilida "5-bet"; berilmasa video vaqti (12:35) */
+  formatMark?: (value: number) => string;
   onQuizStarted?: () => void;
   onQuizCompleted?: (score: number, total: number) => void;
   startTime?: number | null;
@@ -26,7 +28,7 @@ interface QuizTabProps {
 }
 
 export default function QuizTab({
-  quiz, loading, answers, onGenerate, onAnswer, onSeek, onQuizStarted, onQuizCompleted,
+  quiz, loading, answers, onGenerate, onAnswer, onSeek, formatMark = formatTs, onQuizStarted, onQuizCompleted,
   startTime, videoDuration,
 }: QuizTabProps) {
   const [index, setIndex] = useState(0);
@@ -101,7 +103,7 @@ export default function QuizTab({
                   className="w-full text-left flex gap-3 items-start bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                 >
                   <span className="text-xs font-mono text-ui-accent-ink bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
-                    {formatTs(q.timestamp)}
+                    {formatMark(q.timestamp)}
                   </span>
                   <span className="text-sm text-ui-muted">{q.question}</span>
                 </button>
@@ -249,7 +251,7 @@ export default function QuizTab({
                     title="Videodan ushbu daqiqani ko'rish"
                   >
                     <Clock className="w-3 h-3" />
-                    <span>{formatTs(q.timestamp)}</span>
+                    <span>{formatMark(q.timestamp)}</span>
                   </button>
                   <span className="text-xs text-ui-muted font-semibold ">Tushuntirish:</span>
                 </div>

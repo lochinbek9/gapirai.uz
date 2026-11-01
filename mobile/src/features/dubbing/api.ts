@@ -64,7 +64,7 @@ export class UploadError extends Error {
   }
 }
 
-function uploadErrorText(status: number, body: string): string {
+export function uploadErrorText(status: number, body: string): string {
   try {
     const d = JSON.parse(body)?.detail;
     if (typeof d === 'string' && d.trim()) return d;

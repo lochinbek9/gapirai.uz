@@ -3,14 +3,16 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { FileVideo, Info, UploadCloud, X } from 'lucide-react-native';
+import { AudioLines, FileVideo, Info, Sparkles, UploadCloud, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { getErrorMessage } from '../../../api/errors';
 import { Youtube } from '../../../components/BrandIcons';
+import type { IconComponent } from '../../../components/BrandIcons';
 import { ChoiceTile } from '../../../components/ChoiceTile';
+import { SegmentedControl } from '../../../components/SegmentedControl';
 import { FeatureDots } from '../../../components/FeatureDots';
 import { Notice } from '../../../components/Notice';
 import { PrimaryButton } from '../../../components/PrimaryButton';
@@ -37,10 +39,10 @@ const SOURCE_OPTIONS = [
 ];
 
 // Saytdagi UrlInput ovoz plitkalari bilan bir xil matn
-const VOICE_OPTIONS: { value: VoiceGender; label: string; desc: string }[] = [
-  { value: 'auto', label: 'Avtomatik', desc: 'Spikerga qarab' },
-  { value: 'male', label: 'Erkak', desc: 'Chuqur, ishonchli' },
-  { value: 'female', label: 'Ayol', desc: 'Yumshoq, aniq' },
+const VOICE_OPTIONS: { value: VoiceGender; label: string; desc: string; icon: IconComponent }[] = [
+  { value: 'auto', label: 'Avtomatik', desc: 'Ovoz spikerning jinsiga qarab tanlanadi', icon: Sparkles },
+  { value: 'male', label: 'Erkak', desc: 'Chuqur, ishonchli erkak ovozi', icon: AudioLines },
+  { value: 'female', label: 'Ayol', desc: 'Yumshoq, aniq ayol ovozi', icon: AudioLines },
 ];
 
 const LANGUAGE_OPTIONS: { value: dubbingApi.SourceLanguage; label: string }[] = [
@@ -330,18 +332,11 @@ export function DubForm({ mode = 'dub' }: { mode?: 'dub' | 'subtitle' }) {
       {!subtitleOnly && (
         <View style={styles.field}>
           <ThemedText style={styles.label}>{source === 'file' ? 'Ovoz jinsi' : 'Ovoz'}</ThemedText>
-          <View accessibilityRole="radiogroup" style={styles.grid3}>
-            {VOICE_OPTIONS.map((o) => (
-              <ChoiceTile
-                key={o.value}
-                title={o.label}
-                description={o.desc}
-                selected={voiceGender === o.value}
-                onPress={() => setValue('voiceGender', o.value)}
-                style={styles.cell3}
-              />
-            ))}
-          </View>
+          {/* Uchta baland plitka o'rniga ixcham tanlov + tanlanganining izohi (saytdagidek) */}
+          <SegmentedControl options={VOICE_OPTIONS} value={voiceGender} onChange={(v) => setValue('voiceGender', v)} />
+          <ThemedText variant="secondary" style={styles.hint}>
+            {VOICE_OPTIONS.find((o) => o.value === voiceGender)?.desc}
+          </ThemedText>
         </View>
       )}
 
@@ -421,8 +416,6 @@ const styles = StyleSheet.create({
   },
   thumbnail: { width: 96, height: 56, borderRadius: 8 },
   previewTitle: { fontSize: 15, fontWeight: '500', lineHeight: 20 },
-  grid3: { flexDirection: 'row', gap: 8 },
-  cell3: { flex: 1 },
   bar: { height: 6, borderRadius: 3, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 3 },
   rules: { flexDirection: 'row', gap: 8, borderTopWidth: 1, paddingTop: 16 },

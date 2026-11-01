@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { FileText } from 'lucide-react-native';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -71,9 +72,29 @@ export default function VideoAnalysisScreen() {
     if (analysis?.qa_history) setQaHistory(analysis.qa_history);
   }, [analysis]);
 
-  const seek = (seconds: number) => playerRef.current?.seekTo(seconds);
+  // Hujjat tahlili (2026-11-01): belgilar soniya emas -- bet/slayd/qism raqami, pleyer yo'q;
+  // "o'tish" Matn bo'limida shu betga aylantiradi.
+  const isDoc = analysis?.source_type === 'document';
+  const mark = (value: number) => (isDoc ? `${Math.round(value)}-${analysis?.document_unit || 'bet'}` : formatTimestamp(value));
+  const transcriptListRef = useRef<FlatList<TranscriptSegment>>(null);
+  const [jumpTo, setJumpTo] = useState<number | null>(null);
+  const seek = (value: number) => {
+    if (!isDoc) return playerRef.current?.seekTo(value);
+    setTranscriptView('normal');
+    setSearchResults(null);
+    setTab('transcript');
+    setJumpTo(Math.round(value));
+  };
   const videoId = analysis ? extractYouTubeId(analysis.youtube_url) : null;
-  const showBilingualToggle = !!(analysis?.video_language && analysis.video_language !== analysis.language);
+  const showBilingualToggle = !isDoc && !!(analysis?.video_language && analysis.video_language !== analysis.language);
+
+  const segments = transcriptQuery.data?.segments;
+  useEffect(() => {
+    if (jumpTo === null || tab !== 'transcript' || !segments) return;
+    const index = segments.findIndex((sg) => Math.round(sg.start) >= jumpTo);
+    if (index >= 0) setTimeout(() => transcriptListRef.current?.scrollToIndex({ index, animated: true }), 120);
+    setJumpTo(null);
+  }, [jumpTo, tab, segments]);
 
   const handleGenerateNotes = async () => {
     if (!id) return;
@@ -189,7 +210,23 @@ export default function VideoAnalysisScreen() {
 
           {analysis && isDone && (
             <ThemedView style={styles.flex}>
-              {videoId ? (
+              {isDoc ? (
+                <ThemedView style={[styles.docCard, { borderColor: colors.rule }]}>
+                  <ThemedView style={[styles.docIcon, { backgroundColor: colors.ground }]}>
+                    <FileText size={22} color={colors.muted} strokeWidth={2} />
+                  </ThemedView>
+                  <ThemedView style={styles.flex}>
+                    <ThemedText numberOfLines={1} style={styles.docName}>
+                      {analysis.document_name || analysis.video_title}
+                    </ThemedText>
+                    {analysis.document_pages ? (
+                      <ThemedText variant="secondary" style={styles.docMeta}>
+                        {analysis.document_pages} {analysis.document_unit || 'bet'}
+                      </ThemedText>
+                    ) : null}
+                  </ThemedView>
+                </ThemedView>
+              ) : videoId ? (
                 <ThemedView style={styles.playerWrap}>
                   <AnalysisVideoPlayer ref={playerRef} videoId={videoId} />
                 </ThemedView>
@@ -222,7 +259,7 @@ export default function VideoAnalysisScreen() {
                 style={styles.tabsScroll}
                 contentContainerStyle={[styles.tabs, { backgroundColor: colors.ground, borderColor: colors.rule }]}
               >
-                {TABS.map((t) => (
+                {TABS.map((t) => (isDoc && t.key === 'transcript' ? { ...t, label: 'Matn' } : t)).map((t) => (
                   <Pressable
                     key={t.key}
                     onPress={() => setTab(t.key)}
@@ -253,7 +290,7 @@ export default function VideoAnalysisScreen() {
                             style={[styles.row, { borderColor: colors.border, backgroundColor: colors.surface }]}
                           >
                             <ThemedText style={[styles.timestamp, { color: colors.accent, backgroundColor: colors.accentGlow }]}>
-                              {formatTimestamp(kp.timestamp)}
+                              {mark(kp.timestamp)}
                             </ThemedText>
                             <ThemedView style={{ flex: 1, gap: 2 }}>
                               <ThemedText style={styles.rowTitle}>{kp.title}</ThemedText>
@@ -281,7 +318,7 @@ export default function VideoAnalysisScreen() {
                       style={[styles.chapterRow, { borderColor: colors.border, backgroundColor: colors.surface }]}
                     >
                       <ThemedText style={styles.rowTitle}>{item.title}</ThemedText>
-                      <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{formatTimestamp(item.start)}</ThemedText>
+                      <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{mark(item.start)}</ThemedText>
                     </Pressable>
                   )}
                 />
@@ -317,7 +354,7 @@ export default function VideoAnalysisScreen() {
                           style={[styles.bilingualRow, { borderColor: colors.border }]}
                         >
                           <ThemedText style={[styles.timestamp, { color: colors.accent }]}>
-                            {formatTimestamp(item.start)}
+                            {mark(item.start)}
                           </ThemedText>
                           <ThemedView style={{ flex: 1, gap: 4 }}>
                             <ThemedText style={styles.transcriptText}>{item.original}</ThemedText>
@@ -331,6 +368,11 @@ export default function VideoAnalysisScreen() {
                   )
                 ) : (
                   <FlatList<TranscriptSegment>
+                    ref={transcriptListRef}
+                    onScrollToIndexFailed={(info) => {
+                      transcriptListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+                      setTimeout(() => transcriptListRef.current?.scrollToIndex({ index: info.index, animated: true }), 150);
+                    }}
                     data={searchResults ?? transcriptQuery.data?.segments ?? []}
                     keyExtractor={(_, i) => `segment-${i}`}
                     contentContainerStyle={styles.tabContent}
@@ -351,7 +393,7 @@ export default function VideoAnalysisScreen() {
                             onChangeText={setSearchQuery}
                             onSubmitEditing={handleSearch}
                             returnKeyType="search"
-                            placeholder="Transkript ichidan qidirish..."
+                            placeholder={isDoc ? 'Matn ichidan qidirish...' : 'Transkript ichidan qidirish...'}
                             placeholderTextColor={colors.textSecondary}
                             style={[
                               styles.textInput,
@@ -378,7 +420,7 @@ export default function VideoAnalysisScreen() {
                     }
                     renderItem={({ item }) => (
                       <Pressable onPress={() => seek(item.start)} style={styles.transcriptRow}>
-                        <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{formatTimestamp(item.start)}</ThemedText>
+                        <ThemedText style={[styles.timestamp, { color: colors.accent }]}>{mark(item.start)}</ThemedText>
                         <ThemedText style={styles.transcriptText}>{item.text}</ThemedText>
                       </Pressable>
                     )}
@@ -468,7 +510,7 @@ export default function VideoAnalysisScreen() {
                             <ThemedView style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
                               <Pressable onPress={() => seek(q.timestamp)}>
                                 <ThemedText style={[styles.timestamp, { color: colors.accent }]}>
-                                  {formatTimestamp(q.timestamp)}
+                                  {mark(q.timestamp)}
                                 </ThemedText>
                               </Pressable>
                               <ThemedText variant="secondary" style={[styles.rowDescription, { flex: 1 }]}>
@@ -500,7 +542,7 @@ export default function VideoAnalysisScreen() {
                             {qa.timestamps.map((ts, ti) => (
                               <Pressable key={ti} onPress={() => seek(ts)}>
                                 <ThemedText style={[styles.timestamp, { color: colors.accent, backgroundColor: colors.accentGlow }]}>
-                                  {formatTimestamp(ts)}
+                                  {mark(ts)}
                                 </ThemedText>
                               </Pressable>
                             ))}
@@ -588,6 +630,10 @@ function SummaryBlock({ label, text }: { label: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  docCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 16, padding: 16, marginHorizontal: 16, marginTop: 16 },
+  docIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  docName: { fontSize: 15, fontWeight: '500' },
+  docMeta: { fontSize: 13, marginTop: 2, fontVariant: ['tabular-nums'] },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   statusTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 6 },

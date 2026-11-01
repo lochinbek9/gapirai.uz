@@ -94,6 +94,33 @@ def _mark_analysis_failed(analysis_id: str, error_code: str, error_message: str)
     )
 
 
+def document_path(analysis_id: str, filename: str) -> Path:
+    """Yuklangan hujjat (backend/api/video_analysis_routes.py create_document_analysis).
+    uploads/<id>/ emas -- u har urinish oxirida tozalanadi, hujjat esa OCR
+    xato bersa "Qayta urinish" uchun kerak; muvaffaqiyatdan keyin o'chiriladi."""
+    return Path(settings.UPLOAD_DIR) / "documents" / f"{analysis_id}{Path(filename).suffix.lower()}"
+
+
+def _ocr_document(db, analysis: VideoAnalysis, is_paid: bool) -> None:
+    """Skanerlangan PDF betlarini OCR qiladi va transcript_segments'ni to'ldiradi.
+    Route OCR'siz matnni allaqachon segmentlarga yozgan; bu yerda faqat
+    bo'sh qolgan betlar (status_message'da emas, segmentlarda yo'qligi bo'yicha)."""
+    from backend.services import document_extract
+
+    path = document_path(str(analysis.id), analysis.document_name or ".pdf")
+    if not path.exists():
+        return
+    data = path.read_bytes()
+    extracted = document_extract.extract_document(data, analysis.document_name or path.name)
+    pages = extracted["pages"]
+    if extracted["ocr_pages"]:
+        _update_analysis(db, analysis, AnalysisStatus.TRANSCRIBING, 25.0, f"Skanerlangan {len(extracted['ocr_pages'])} bet o'qilmoqda...")
+        for n, text in document_extract.ocr_pdf_pages(data, extracted["ocr_pages"], is_paid=is_paid).items():
+            pages[n - 1] = text
+    analysis.transcript_segments = document_extract.pages_to_segments(pages, extracted["unit"])
+    db.commit()
+
+
 def _cleanup_analysis_dirs(analysis_id: str) -> None:
     _cleanup_upload_dir(analysis_id)
     out_dir = Path(settings.OUTPUT_DIR) / analysis_id
@@ -160,7 +187,17 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
         audio_path_upload = Path(settings.UPLOAD_DIR) / analysis_id / "audio.wav"
         audio_path_output = Path(settings.OUTPUT_DIR) / analysis_id / "audio.wav"
         audio_path = str(audio_path_output if audio_path_output.exists() else audio_path_upload)
-        if analysis.transcript_segments:
+        if analysis.source_type == "document":
+            if not analysis.transcript_segments:
+                _ocr_document(db, analysis, is_paid_analysis)
+            if not analysis.transcript_segments:
+                raise PermanentError("Hujjatdan matn topilmadi. Fayl ichida o'qiladigan matn borligini tekshiring.", code="DOCUMENT_EMPTY")
+            if analysis.language == "original" and not analysis.video_language:
+                from backend.services.document_extract import guess_language
+                analysis.video_language = guess_language(" ".join(s.get("text", "") for s in analysis.transcript_segments[:40]))
+                db.commit()
+            _record_stage(stage_timings, analysis_id, "DOWNLOAD", stage_t0, "skipped (document)")
+        elif analysis.transcript_segments:
             # Transkript allaqachon boshqa manbadan ko'chirilgan (bog'langan
             # dublyaj job'idan, backend/api/learn_routes.py) -- audio fayl
             # UMUMAN kerak emas, chunki TRANSCRIBE bosqichi (pastda) baribir
@@ -224,6 +261,21 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
 
         segments = analysis.transcript_segments
 
+        # BOSQICH 2.5: Uzun material konspekti (2026-11-01). To'liq matn LLM'ga
+        # sig'masa, bo'laklar alohida konspektlanadi -- keyingi bosqichlar hech
+        # bir qismni tashlab yubormasdan shular ustida ishlaydi. Checkpoint:
+        # saqlangan bo'lsa qayta hisoblanmaydi.
+        current_stage = "DIGEST"
+        stage_t0 = time.monotonic()
+        from backend.services.video_analysis import needs_digests
+        if analysis.material_digests or not needs_digests(segments):
+            _record_stage(stage_timings, analysis_id, "DIGEST", stage_t0, "skipped")
+        else:
+            _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 55.0, "Uzun material bo'limlarga bo'lib o'qilmoqda...")
+            analysis.material_digests = _service.build_digests(segments, analysis.language, is_paid=is_paid_analysis)
+            db.commit()
+            _record_stage(stage_timings, analysis_id, "DIGEST", stage_t0, "ok")
+
         # BOSQICH 3: Bazaviy tahlil (xulosa, asosiy fikrlar, chapterlar, 5
         # daqiqada). Checkpoint: to'rttasi ham allaqachon mavjud bo'lsa qayta
         # hisoblanmaydi. notes/quiz BU YERDA generatsiya qilinmaydi — ular
@@ -240,7 +292,13 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
             _record_stage(stage_timings, analysis_id, "ANALYZE", stage_t0, "skipped")
         else:
             _update_analysis(db, analysis, AnalysisStatus.ANALYZING, 75.0, "AI xulosasi, boblari va konspekti tayyorlanmoqda...")
-            base_res = _service.generate_base_analysis(segments, analysis.video_duration or 0.0, analysis.language, is_paid=is_paid_analysis)
+            base_res = _service.generate_base_analysis(
+                segments,
+                analysis.video_duration or float(analysis.document_pages or 0),
+                analysis.language,
+                is_paid=is_paid_analysis,
+                digests=analysis.material_digests,
+            )
             analysis.summary = base_res["summary"]
             analysis.key_points = base_res["key_points"]
             analysis.chapters = base_res["chapters"]
@@ -273,6 +331,8 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
                 logger.warning(f"Tahlil tayyor email yuborilmadi (analysis {analysis_id}): {email_err}")
 
         _cleanup_analysis_dirs(analysis_id)
+        if analysis.source_type == "document":
+            document_path(analysis_id, analysis.document_name or "").unlink(missing_ok=True)
         _log_pipeline_summary(analysis_id, stage_timings, pipeline_start, "COMPLETED")
 
         return {"analysis_id": analysis_id, "status": "completed"}
@@ -287,7 +347,9 @@ def analyze_video_task(self: Task, analysis_id: str) -> dict:
 
     except PermanentError as exc:
         try:
-            if getattr(exc, "code", None) not in ("CONTENT_BLOCKED", "NO_SPEECH_FOUND"):
+            code = str(getattr(exc, "code", None) or "")
+            # Foydalanuvchi xatolari (hujjatda matn yo'q, formati buzuq ...) -- tizim nosozligi emas
+            if code not in ("CONTENT_BLOCKED", "NO_SPEECH_FOUND") and not code.startswith("DOCUMENT_"):
                 from backend.services.telegram_notify import send_error_to_admins
                 u = getattr(analysis, "user", None) if analysis else None
                 send_error_to_admins(

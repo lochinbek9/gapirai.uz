@@ -812,6 +812,37 @@ export interface VideoAnalysis {
   error_code?: string
   created_at?: string
   linked_job_id?: string | null
+  // Hujjat tahlili: chapters/key_points/quiz'dagi start/timestamp -- soniya emas, bet (slayd/qism) raqami
+  source_type?: 'video' | 'document'
+  document_name?: string | null
+  document_pages?: number | null
+  document_unit?: 'bet' | 'slayd' | 'qism' | null
+}
+
+// backend/services/document_extract.py bilan bir xil
+export const DOCUMENT_ACCEPT = '.pdf,.docx,.txt,.md,.pptx,.epub'
+export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+
+export async function createDocumentAnalysis(
+  file: File,
+  language: string,
+  onProgress?: (percent: number) => void,
+): Promise<{ analysis_id: string; status: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('language', language)
+  const res = await apiClient.post('/api/video-analysis/document', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+  })
+  return res.data
+}
+
+/** "12:35" (video) yoki "5-bet" (hujjat) -- tahlil sahifasidagi barcha vaqt belgilari uchun */
+export function analysisMark(analysis: Pick<VideoAnalysis, 'source_type' | 'document_unit'>, value: number, formatTime: (s: number) => string): string {
+  return analysis.source_type === 'document' ? `${Math.round(value)}-${analysis.document_unit || 'bet'}` : formatTime(value)
 }
 
 export async function createAnalysis(

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Crown, LogOut, Plus, Sparkles, Trash2, User2 } from 'lucide-react-native';
+import { ChevronRight, Crown, FileText, LogOut, Plus, Sparkles, Trash2, User2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -269,7 +269,7 @@ function BillingLink() {
   );
 }
 
-function Thumb({ uri, duration, progress, badge }: { uri?: string; duration?: number; progress?: number; badge?: string }) {
+function Thumb({ uri, duration, progress, badge, corner, document }: { uri?: string; duration?: number; progress?: number; badge?: string; corner?: string; document?: boolean }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.thumb, { backgroundColor: colors.ground }]}>
@@ -277,7 +277,7 @@ function Thumb({ uri, duration, progress, badge }: { uri?: string; duration?: nu
         <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
       ) : (
         <View style={styles.thumbEmpty}>
-          <Youtube size={48} color={colors.muted} strokeWidth={1.5} />
+          {document ? <FileText size={44} color={colors.muted} strokeWidth={1.5} /> : <Youtube size={48} color={colors.muted} strokeWidth={1.5} />}
         </View>
       )}
       {badge && (
@@ -285,9 +285,9 @@ function Thumb({ uri, duration, progress, badge }: { uri?: string; duration?: nu
           <ThemedText style={styles.overlayText}>{badge}</ThemedText>
         </View>
       )}
-      {duration ? (
+      {corner || duration ? (
         <View style={[styles.overlayBadge, styles.bottomRight]}>
-          <ThemedText style={[styles.overlayText, styles.tabular]}>{formatDuration(duration)}</ThemedText>
+          <ThemedText style={[styles.overlayText, styles.tabular]}>{corner || formatDuration(duration!)}</ThemedText>
         </View>
       ) : null}
       {progress !== undefined && (
@@ -370,6 +370,8 @@ function AnalysisCard({ analysis, onDelete }: { analysis: VideoAnalysis; onDelet
         <Thumb
           uri={analysis.video_thumbnail}
           duration={analysis.video_duration}
+          document={analysis.source_type === 'document'}
+          corner={analysis.document_pages ? `${analysis.document_pages} ${analysis.document_unit || 'bet'}` : undefined}
           progress={inProgress ? analysis.progress : undefined}
           badge={`AI Tahlil · ${analysis.language.toUpperCase()}`}
         />

@@ -10,7 +10,7 @@ import {
   CheckCircle2, Clock, Brain, FileText, Video as VideoIcon, X, ChevronDown, ChevronUp, Copy, Check, XCircle,
 } from "lucide-react";
 import {
-  ANALYSIS_STATUS_LABELS, askQuestion, generateQuiz, generateNotes, generateBilingual,
+  ANALYSIS_STATUS_LABELS, analysisMark, askQuestion, generateQuiz, generateNotes, generateBilingual,
   searchTranscript, getTranscript, clearAnalysisId, displayLanguage, retryAnalysis, cancelAnalysis, TranscriptSegment, QuizQuestion, QAEntry, BilingualSegment,
   getPlans, PlanDef, MinutePack, CurrentSubscription,
 } from "@/lib/api";
@@ -349,6 +349,17 @@ export default function VideoAnalysisPage() {
   const videoId = extractYouTubeId(analysis.youtube_url);
   const isDone = analysis.status === "completed";
   const isFailed = analysis.status === "failed";
+  // Hujjat tahlili: belgilar soniya emas, bet/slayd/qism raqami; pleyer yo'q
+  const isDoc = analysis.source_type === "document";
+  const mark = (value: number) => analysisMark(analysis, value, formatTs);
+  const seekOrPage = (value: number) => {
+    if (!isDoc) return seek(value);
+    // Hujjatda "o'tish" -- Matn bo'limida shu betga aylantirish
+    setTranscriptView("normal");
+    setSearchResults(null);
+    setTab("transcript");
+    setTimeout(() => document.getElementById(`seg-${Math.round(value)}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+  };
 
   return (
     <>
@@ -407,7 +418,7 @@ export default function VideoAnalysisPage() {
                   </div>
                 ) : (
                   <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-ui-rule flex items-center justify-center flex-shrink-0">
-                    <VideoIcon className="w-7 h-7 text-ui-accent-ink" />
+                    {isDoc ? <FileText className="w-7 h-7 text-ui-accent-ink" /> : <VideoIcon className="w-7 h-7 text-ui-accent-ink" />}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
@@ -470,14 +481,14 @@ export default function VideoAnalysisPage() {
               {[
                 {
                   idx: 0,
-                  title: "1. Media & Audio",
-                  desc: "Yuklab olish va tayyorlash",
-                  icon: VideoIcon,
+                  title: isDoc ? "1. Hujjat" : "1. Media & Audio",
+                  desc: isDoc ? "Fayl qabul qilindi" : "Yuklab olish va tayyorlash",
+                  icon: isDoc ? FileText : VideoIcon,
                 },
                 {
                   idx: 1,
-                  title: "2. Nutq Transkripti",
-                  desc: "Groq Whisper (so'zma-so'z)",
+                  title: isDoc ? "2. Matnni o'qish" : "2. Nutq Transkripti",
+                  desc: isDoc ? "Skanerlangan betlar — OCR" : "Groq Whisper (so'zma-so'z)",
                   icon: FileText,
                 },
                 {
@@ -620,8 +631,12 @@ export default function VideoAnalysisPage() {
                 Tahlil jarayonida to'xtalish yuz berdi
               </h2>
               <p className="text-sm text-ui-muted leading-relaxed">
-                Video hajmi katta bo'lgani yoki sun'iy intellekt serverlarida vaqtinchalik yuklama yuqori bo'lgani sababli jarayon to'xtab qoldi.
-                Balansingizdagi daqiqalar saqlab qolingan.
+                {analysis.error_code?.startsWith("DOCUMENT_") ? analysis.error_message : (
+                  <>
+                    Video hajmi katta bo'lgani yoki sun'iy intellekt serverlarida vaqtinchalik yuklama yuqori bo'lgani sababli jarayon to'xtab qoldi.
+                    Balansingizdagi daqiqalar saqlab qolingan.
+                  </>
+                )}
               </p>
             </div>
 
@@ -720,7 +735,19 @@ export default function VideoAnalysisPage() {
 
         {isDone && (
           <>
-            {videoId ? (
+            {isDoc ? (
+              <div className="flex items-center gap-4 rounded-2xl border border-ui-rule bg-ui-surface p-5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-ui-ground">
+                  <FileText aria-hidden="true" className="h-6 w-6 text-ui-muted" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-medium text-ui-ink">{analysis.document_name || analysis.video_title}</p>
+                  {analysis.document_pages ? (
+                    <p className="text-sm text-ui-muted tabular-nums">{analysis.document_pages} {analysis.document_unit || "bet"}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : videoId ? (
               <YouTubePlayer ref={playerRef} videoId={videoId} />
             ) : analysis?.video_url ? (
               <video
@@ -748,7 +775,7 @@ export default function VideoAnalysisPage() {
             </div>
 
             {/* ── Dubbing Lead Magnet Banner (Faqat chet tildagi videolar uchun) ── */}
-            {Boolean(analysis.video_language && !analysis.video_language.toLowerCase().startsWith("uz")) && (() => {
+            {Boolean(!isDoc && analysis.video_language && !analysis.video_language.toLowerCase().startsWith("uz")) && (() => {
               const durationSec = analysis.video_duration || 0;
               const videoMinutes = Math.max(1, Math.ceil(durationSec / 60));
               const availableMinutes = currentSub?.minutes?.total_available ?? 5;
@@ -874,7 +901,7 @@ export default function VideoAnalysisPage() {
             })()}
 
             <div role="tablist" aria-label="Tahlil bo'limlari" className="flex gap-1 p-1 rounded-2xl bg-ui-ground border border-ui-rule overflow-x-auto">
-              {TABS.map((t) => (
+              {TABS.map((t) => (isDoc && t.key === "transcript" ? { ...t, label: "Matn" } : t)).map((t) => (
                 <button
                   key={t.key}
                   role="tab"
@@ -913,11 +940,11 @@ export default function VideoAnalysisPage() {
                         {analysis.key_points.map((kp, i) => (
                           <button
                             key={i}
-                            onClick={() => seek(kp.timestamp)}
+                            onClick={() => seekOrPage(kp.timestamp)}
                             className="w-full text-left flex gap-3 items-start bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                           >
                             <span className="text-xs font-mono text-ui-accent-ink bg-blue-500/10 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
-                              {formatTs(kp.timestamp)}
+                              {mark(kp.timestamp)}
                             </span>
                             <div>
                               <p className="text-sm font-semibold text-ui-ink">{kp.title}</p>
@@ -936,11 +963,11 @@ export default function VideoAnalysisPage() {
                   {(analysis.chapters || []).map((c, i) => (
                     <button
                       key={i}
-                      onClick={() => seek(c.start)}
+                      onClick={() => seekOrPage(c.start)}
                       className="w-full text-left flex justify-between items-center bg-ui-ground hover:bg-ui-ground border border-ui-rule rounded-xl p-3 transition"
                     >
                       <span className="text-sm font-semibold text-ui-ink">{c.title}</span>
-                      <span className="text-xs font-mono text-ui-accent-ink">{formatTs(c.start)}</span>
+                      <span className="text-xs font-mono text-ui-accent-ink">{mark(c.start)}</span>
                     </button>
                   ))}
                   {(!analysis.chapters || analysis.chapters.length === 0) && (
@@ -951,7 +978,7 @@ export default function VideoAnalysisPage() {
 
               {tab === "transcript" && (
                 <div className="space-y-4">
-                  {analysis.video_language && analysis.video_language !== analysis.language && (
+                  {!isDoc && analysis.video_language && analysis.video_language !== analysis.language && (
                     <div className="flex gap-1 p-1 rounded-xl bg-ui-ground border border-ui-rule w-fit">
                       <button
                         onClick={() => setTranscriptView("normal")}
@@ -985,13 +1012,14 @@ export default function VideoAnalysisPage() {
                         </button>
                       </form>
                       <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
-                        {(searchResults ?? transcript).map((seg, i) => (
+                        {(searchResults ?? transcript).map((seg, i, list) => (
                           <button
                             key={i}
-                            onClick={() => seek(seg.start)}
+                            id={isDoc && (i === 0 || list[i - 1].start !== seg.start) ? `seg-${Math.round(seg.start)}` : undefined}
+                            onClick={() => seekOrPage(seg.start)}
                             className="w-full text-left flex gap-3 items-start hover:bg-ui-ground rounded-lg p-2 transition"
                           >
-                            <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                            <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{mark(seg.start)}</span>
                             <span className="text-sm text-ui-muted">{seg.text}</span>
                           </button>
                         ))}
@@ -1009,10 +1037,10 @@ export default function VideoAnalysisPage() {
                       {(bilingual ?? []).map((seg, i) => (
                         <button
                           key={i}
-                          onClick={() => seek(seg.start)}
+                          onClick={() => seekOrPage(seg.start)}
                           className="w-full text-left flex gap-3 items-start hover:bg-ui-ground rounded-lg p-2.5 transition border border-ui-rule"
                         >
-                          <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{formatTs(seg.start)}</span>
+                          <span className="text-xs font-mono text-ui-accent-ink shrink-0 mt-0.5">{mark(seg.start)}</span>
                           <div className="space-y-1">
                             <p className="text-sm text-ui-ink">{seg.original}</p>
                             <p className="text-sm text-ui-muted">{seg.translated}</p>
@@ -1042,7 +1070,8 @@ export default function VideoAnalysisPage() {
                   answers={quizAnswers}
                   onGenerate={handleGenerateQuiz}
                   onAnswer={(qi, oi) => setQuizAnswers((prev) => ({ ...prev, [qi]: oi }))}
-                  onSeek={seek}
+                  onSeek={seekOrPage}
+                  formatMark={mark}
                   startTime={quizStartTime}
                   videoDuration={analysis?.video_duration}
                 />
@@ -1055,7 +1084,8 @@ export default function VideoAnalysisPage() {
                   asking={asking}
                   onQuestionChange={setQuestion}
                   onAsk={handleAsk}
-                  onSeek={seek}
+                  onSeek={seekOrPage}
+                  formatMark={mark}
                 />
               )}
             </div>

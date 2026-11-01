@@ -282,6 +282,17 @@ class VideoAnalysis(Base):
     quiz = Column(JSONB, nullable=True)            # [{"question","options","correct_answer","explanation","timestamp"}]
     qa_history = Column(JSONB, default=list)       # [{"question","answer","timestamps","asked_at"}]
     bilingual_segments = Column(JSONB, nullable=True)  # [{"start","end","original","translated"}] — lazy
+    # 2026-11-01: uzun material (to'liq matn LLM'ga sig'maydi) bo'laklarining
+    # zich konspekti -- VideoAnalysisService.build_digests. Xulosa/konspekt/test/
+    # savol-javob to'liq matn o'rniga shular ustida ishlaydi (ilgari matnning bir
+    # qismi shunchaki tashlab yuborilardi). [{"label","start","end","digest"}]
+    material_digests = Column(JSONB, nullable=True)
+    # 2026-11-01: hujjat tahlili (PDF/DOCX/TXT/PPTX/EPUB). "video" | "document".
+    # Hujjatda transcript_segments'dagi start/end -- bet raqami, segmentda "page"
+    # va "unit" bor (backend/services/document_extract.py).
+    source_type = Column(String(20), nullable=False, default="video", server_default="video")
+    document_name = Column(String(255), nullable=True)
+    document_pages = Column(Integer, nullable=True)
 
     error_message = Column(Text, nullable=True)
     error_code = Column(String(50), nullable=True)

@@ -456,7 +456,14 @@ def get_gemini_quota_status() -> Dict[str, Any]:
     }
 
 
-def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temperature: float = 0.4, is_paid: bool = False) -> dict:
+def call_gemini_json_with_fallback(
+    system_prompt: str,
+    user_message: str,
+    temperature: float = 0.4,
+    is_paid: bool = False,
+    parts: Optional[List[Any]] = None,
+    timeout_ms: int = 12000,
+) -> dict:
     """
     Barcha berilgan Gemini API kalitlari va modellarini navbatma-navbat sinab ko'radi:
     - is_paid=True bo'lsa: birinchi o'rinda pullik (balansli) kalit(lar), keyin bepul hovuz.
@@ -465,6 +472,10 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
     - 429 xatosi chiqqanda cooldown hisoblaydi va keyingi kalit/modelga o'tadi.
     - Cooldown'da turgan modellar uchun tarmoqqa ortiqcha so'rov yubormasdan sakrab o'tadi.
     - OpenAI UMUMAN chaqirilmaydi.
+    - parts: matndan oldin yuboriladigan qo'shimcha qismlar (masalan
+      types.Part.from_bytes(..., mime_type="application/pdf") -- skanerlangan
+      hujjat OCR'i, backend/services/document_extract.py). Fayl bilan so'rov
+      sekinroq, shuning uchun chaqiruvchi timeout_ms'ni oshiradi.
     """
     from google import genai
     from google.genai import types
@@ -496,14 +507,14 @@ def call_gemini_json_with_fallback(system_prompt: str, user_message: str, temper
 
             record_model_request(api_key, model_name)
             try:
-                client = genai.Client(api_key=api_key, http_options={"timeout": 12000})
+                client = genai.Client(api_key=api_key, http_options={"timeout": timeout_ms})
             except Exception:
                 client = genai.Client(api_key=api_key)
 
             try:
                 response = client.models.generate_content(
                     model=model_name,
-                    contents=user_message,
+                    contents=[*parts, user_message] if parts else user_message,
                     config=config,
                 )
                 text = response.text or ""

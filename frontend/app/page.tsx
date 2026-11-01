@@ -8,7 +8,7 @@ import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
 import DubbingForm from "@/components/DubbingForm";
-import AnalysisUrlForm from "@/components/AnalysisUrlForm";
+import AnalysisForm from "@/components/AnalysisForm";
 import SubtitleForm from "@/components/SubtitleForm";
 import StepProgress from "@/components/StepProgress";
 import VideoResult from "@/components/VideoResult";
@@ -483,7 +483,7 @@ export default function Home() {
                       ) : mode === "subtitle" ? (
                         <SubtitleForm />
                       ) : (
-                        <AnalysisUrlForm />
+                        <AnalysisForm />
                       )}
                     </div>
                   </motion.div>

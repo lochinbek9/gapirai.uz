@@ -132,4 +132,9 @@ export interface VideoAnalysis {
   error_message?: string;
   error_code?: string;
   created_at?: string;
+  // Hujjat tahlili: chapters/key_points/quiz'dagi start/timestamp -- soniya emas, bet (slayd/qism) raqami
+  source_type?: 'video' | 'document';
+  document_name?: string | null;
+  document_pages?: number | null;
+  document_unit?: 'bet' | 'slayd' | 'qism' | null;
 }
