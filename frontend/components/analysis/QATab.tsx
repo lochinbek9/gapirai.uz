@@ -13,6 +13,8 @@ interface QATabProps {
   onQuestionChange: (value: string) => void;
   onAsk: (e: React.FormEvent) => void;
   onSeek: (seconds: number) => void;
+  /** Hujjat tahlilida "5-bet"; berilmasa video vaqti (12:35) */
+  formatMark?: (value: number) => string;
   placeholder?: string;
   emptyText?: string;
 }
@@ -30,6 +32,7 @@ export default function QATab({
   onQuestionChange,
   onAsk,
   onSeek,
+  formatMark = formatTs,
   placeholder = "Video haqida savol bering...",
   emptyText = "Video bo'yicha istalgan savolingizni bering — AI Ustoz videodagi nutqqa tayanib aniq javob beradi.",
 }: QATabProps) {
@@ -139,7 +142,7 @@ export default function QATab({
                           title="Videoni shu daqiqasidan qo'yish"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
-                          <span>{formatTs(ts)}</span>
+                          <span>{formatMark(ts)}</span>
                         </button>
                       ))}
                     </div>

@@ -20,6 +20,9 @@ av==15.1.0
 openai==1.58.1
 google-genai==1.3.0
 
+# Hujjat tahlili: PDF matni (DOCX/PPTX/EPUB -- stdlib, backend/services/document_extract.py)
+pypdf==5.4.0
+
 # Google Sign-In (ID token verification — distinct from google-genai/Gemini SDK above)
 google-auth==2.36.0
 

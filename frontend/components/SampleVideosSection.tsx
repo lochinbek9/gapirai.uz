@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Check, Globe, Mic, Rocket, Zap, type LucideIcon } from "lucide-react";
+import { Brain, Check, Globe, Rocket, Zap, type LucideIcon } from "lucide-react";
 
 // Emoji o'rniga bitta chiziq qalinligidagi ikonka tizimi (lucide).
 const CATEGORY_ICONS = { brain: Brain, rocket: Rocket, globe: Globe, zap: Zap } satisfies Record<string, LucideIcon>;
@@ -69,15 +69,21 @@ interface Props {
   activeUrl?: string;
 }
 
+/** Namunalar: ramkasiz kartalar -- rasm, nom va bitta kulrang qator. Telefonda gorizontal
+ * aylantiriladi (2 ustunli katak formani cho'zib yuborardi), kompyuterda 4 ustun. */
 export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span id="samples-label" className="ui-label">Namunalar</span>
-        <span className="text-sm text-ui-muted">Havola izlamasdan bittasini tanlang</span>
+      <div>
+        <span id="samples-label" className="ui-label block">Namunalar</span>
+        <span className="text-sm text-ui-muted">Havola izlamasdan bittasini tanlab sinab ko&apos;ring</span>
       </div>
 
-      <div role="group" aria-labelledby="samples-label" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div
+        role="group"
+        aria-labelledby="samples-label"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] sm:grid sm:grid-cols-4 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+      >
         {SAMPLE_VIDEOS.map((sample) => {
           const isSelected = activeUrl === sample.url;
           const Icon = CATEGORY_ICONS[sample.categoryIcon];
@@ -87,33 +93,27 @@ export default function SampleVideosSection({ onSelect, activeUrl }: Props) {
               type="button"
               onClick={() => onSelect(sample)}
               aria-pressed={isSelected}
-              className={`group flex flex-col overflow-hidden rounded-control border text-left transition ${
-                isSelected ? "border-ui-accent shadow-[0_0_0_1px_rgb(var(--ui-accent))]" : "border-ui-rule hover:border-ui-muted/60"
-              }`}
+              className="group w-[62%] shrink-0 snap-start rounded-xl text-left sm:w-auto"
             >
-              <span className="relative block aspect-video w-full overflow-hidden bg-ui-ground">
-                <img src={sample.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]" />
-                <span className="absolute bottom-1 right-1 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white tabular-nums">
+              <span
+                className={`relative block aspect-video w-full overflow-hidden rounded-xl bg-ui-ground ring-offset-2 ring-offset-ui-surface transition ${
+                  isSelected ? "ring-2 ring-ui-accent" : "group-hover:opacity-90"
+                }`}
+              >
+                <img src={sample.thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white tabular-nums">
                   {sample.durationText}
                 </span>
                 {isSelected && (
-                  <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-md bg-ui-accent px-1.5 py-0.5 text-xs font-medium text-white">
-                    <Check aria-hidden="true" className="h-3 w-3" /> Tanlangan
+                  <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-ui-accent text-white">
+                    <Check aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={3} />
                   </span>
                 )}
               </span>
-              <span className="flex flex-1 flex-col gap-1.5 p-2.5">
-                <span className="line-clamp-2 text-[13px] font-medium leading-snug text-ui-ink">{sample.title}</span>
-                <span className="mt-auto flex items-center justify-between gap-1 text-xs text-ui-muted">
-                  <span className="inline-flex items-center gap-1">
-                    <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-                    {sample.category}
-                  </span>
-                  <span className="inline-flex items-center gap-0.5">
-                    <Mic aria-hidden="true" className="h-3 w-3" />
-                    {sample.gender === "male" ? "Erkak" : "Ayol"}
-                  </span>
-                </span>
+              <span className="mt-2 line-clamp-2 block text-sm font-medium leading-snug text-ui-ink">{sample.title}</span>
+              <span className="mt-1 flex items-center gap-1 text-xs text-ui-muted">
+                <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{sample.category} · {sample.gender === "male" ? "Erkak" : "Ayol"}</span>
               </span>
             </button>
           );

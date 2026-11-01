@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
-import { Brain, Check, Globe, Mic, Rocket, Zap } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Brain, Check, Globe, Rocket, Zap } from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '../../../components/ThemedText';
-import { radius } from '../../../theme/colors';
 import { useTheme } from '../../../theme/ThemeProvider';
 import type { VoiceGender } from '../types';
 
@@ -64,17 +63,30 @@ export const SAMPLE_VIDEOS: SampleVideo[] = [
   },
 ];
 
+/** Namunalar: gorizontal aylantiriladigan qator (ilovada 2 ustunli katak sahifani
+ *  cho'zib yuborardi). Kartada ramka yo'q -- rasm, nom va bitta kulrang qator;
+ *  tanlangani rasm atrofidagi aksent halqa va belgi bilan ajraladi. */
+/** Namunalar: gorizontal aylantiriladigan qator (2 ustunli katak sahifani cho'zib
+ *  yuborardi). Kartada ramka yo'q -- rasm, nom va bitta kulrang qator; tanlangani
+ *  rasm atrofidagi aksent halqa va belgi bilan ajraladi. */
 export function SampleVideos({ onSelect, activeUrl }: { onSelect: (s: SampleVideo) => void; activeUrl?: string }) {
   const { colors } = useTheme();
   return (
     <View style={styles.wrap}>
-      <View style={styles.head}>
+      <View>
         <ThemedText style={styles.label}>Namunalar</ThemedText>
         <ThemedText variant="secondary" style={styles.sub}>
-          Havola izlamasdan bittasini tanlang
+          Havola izlamasdan bittasini tanlab sinab koʻring
         </ThemedText>
       </View>
-      <View style={styles.grid}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bleed}
+        contentContainerStyle={styles.row}
+        decelerationRate="fast"
+        snapToInterval={CARD_WIDTH + GAP}
+      >
         {SAMPLE_VIDEOS.map((s) => {
           const selected = activeUrl === s.url;
           const Icon = CATEGORY_ICONS[s.categoryIcon];
@@ -85,69 +97,54 @@ export function SampleVideos({ onSelect, activeUrl }: { onSelect: (s: SampleVide
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={`${s.title}, ${s.durationText}`}
-              style={({ pressed }) => [
-                styles.card,
-                { borderColor: selected ? colors.accent : pressed ? colors.muted : colors.rule },
-                selected && styles.cardSelected,
-              ]}
+              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             >
-              <View style={[styles.thumbWrap, { backgroundColor: colors.ground }]}>
+              <View style={[styles.thumbWrap, { backgroundColor: colors.ground, borderColor: selected ? colors.accent : 'transparent' }]}>
                 <Image source={{ uri: s.thumbnail }} style={styles.thumb} contentFit="cover" transition={150} />
                 <View style={styles.duration}>
                   <ThemedText style={styles.durationText}>{s.durationText}</ThemedText>
                 </View>
                 {selected && (
                   <View style={[styles.picked, { backgroundColor: colors.accent }]}>
-                    <Check size={12} color="#FFFFFF" strokeWidth={2.5} />
-                    <ThemedText style={styles.pickedText}>Tanlangan</ThemedText>
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
                   </View>
                 )}
               </View>
-              <View style={styles.body}>
-                <ThemedText numberOfLines={2} style={styles.title}>
-                  {s.title}
+              <ThemedText numberOfLines={2} style={styles.title}>
+                {s.title}
+              </ThemedText>
+              <View style={styles.meta}>
+                <Icon size={13} color={colors.muted} strokeWidth={2} />
+                <ThemedText variant="secondary" numberOfLines={1} style={styles.metaText}>
+                  {s.category} · {s.gender === 'male' ? 'Erkak' : 'Ayol'}
                 </ThemedText>
-                <View style={styles.meta}>
-                  <View style={styles.metaItem}>
-                    <Icon size={14} color={colors.muted} strokeWidth={2} />
-                    <ThemedText variant="secondary" numberOfLines={1} style={styles.metaText}>
-                      {s.category}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Mic size={12} color={colors.muted} strokeWidth={2} />
-                    <ThemedText variant="secondary" style={styles.metaText}>
-                      {s.gender === 'male' ? 'Erkak' : 'Ayol'}
-                    </ThemedText>
-                  </View>
-                </View>
               </View>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
+const CARD_WIDTH = 216;
+const GAP = 12;
+
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
-  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 16, rowGap: 4 },
   label: { fontSize: 14, fontWeight: '500' },
-  sub: { fontSize: 14 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  // 2 ustun: (100% - 8 gap) / 2
-  card: { width: '48.6%', flexGrow: 1, borderWidth: 1, borderRadius: radius.control, overflow: 'hidden' },
-  cardSelected: { borderWidth: 2 },
-  thumbWrap: { aspectRatio: 16 / 9, width: '100%' },
+  sub: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  // Forma ekran chetidan 16px ichkarida -- qator ekran chetigacha chiqadi, birinchi karta forma bilan bir chiziqda
+  bleed: { marginHorizontal: -16 },
+  row: { paddingHorizontal: 16, gap: GAP },
+  card: { width: CARD_WIDTH },
+  pressed: { opacity: 0.8 },
+  thumbWrap: { aspectRatio: 16 / 9, width: '100%', borderRadius: 12, borderWidth: 2, overflow: 'hidden' },
   thumb: { width: '100%', height: '100%' },
-  duration: { position: 'absolute', right: 4, bottom: 4, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  duration: { position: 'absolute', right: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   durationText: { color: '#FFFFFF', fontSize: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  picked: { position: 'absolute', left: 4, top: 4, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  pickedText: { color: '#FFFFFF', fontSize: 12, fontWeight: '500' },
-  body: { flex: 1, padding: 10, gap: 6 },
-  title: { fontSize: 13, fontWeight: '500', lineHeight: 17 },
-  meta: { marginTop: 'auto', flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  metaText: { fontSize: 12 },
+  picked: { position: 'absolute', left: 6, top: 6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 14, fontWeight: '500', lineHeight: 19, marginTop: 8 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  metaText: { fontSize: 12, flexShrink: 1 },
 });

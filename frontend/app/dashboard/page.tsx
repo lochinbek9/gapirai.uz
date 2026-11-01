@@ -373,7 +373,10 @@ function AnalysisCard({
   const thumbnail =
     analysis.video_thumbnail ||
     (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
-  const duration = analysis.video_duration ? formatDuration(analysis.video_duration) : null
+  const isDoc = analysis.source_type === 'document'
+  const duration = isDoc
+    ? (analysis.document_pages ? `${analysis.document_pages} ${analysis.document_unit || 'bet'}` : null)
+    : analysis.video_duration ? formatDuration(analysis.video_duration) : null
   const isReady = analysis.status === 'completed'
   const isFailed = analysis.status === 'failed'
 
@@ -396,7 +399,7 @@ function AnalysisCard({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-ui-ground">
-              <Sparkles className="w-12 h-12 text-blue-400" />
+              {isDoc ? <FileText className="w-12 h-12 text-ui-muted" /> : <Sparkles className="w-12 h-12 text-blue-400" />}
             </div>
           )}
 

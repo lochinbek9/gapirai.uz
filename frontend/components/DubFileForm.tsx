@@ -106,9 +106,9 @@ export default function DubFileForm({
 
   // UrlInput bilan bir xil: emoji/ichki TTS nomi o'rniga ikonka va tushunarli tavsif
   const genderOptions = [
-    { value: "auto",   label: "Avtomatik", icon: Sparkles,   desc: "Spikerga qarab" },
-    { value: "male",   label: "Erkak",     icon: AudioLines, desc: currentMaleVoice.id === "Charon" ? "Chuqur, ishonchli" : currentMaleVoice.desc },
-    { value: "female", label: "Ayol",      icon: AudioLines, desc: currentFemaleVoice.id === "Autonoe" ? "Yumshoq, aniq" : currentFemaleVoice.desc },
+    { value: "auto",   label: "Avtomatik", icon: Sparkles,   desc: "Ovoz spikerning jinsiga qarab tanlanadi" },
+    { value: "male",   label: "Erkak",     icon: AudioLines, desc: currentMaleVoice.id === "Charon" ? "Chuqur, ishonchli erkak ovozi" : currentMaleVoice.desc },
+    { value: "female", label: "Ayol",      icon: AudioLines, desc: currentFemaleVoice.id === "Autonoe" ? "Yumshoq, aniq ayol ovozi" : currentFemaleVoice.desc },
   ];
   const genderRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const onGenderKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -288,7 +288,7 @@ export default function DubFileForm({
         <legend id="dub-file-gender-label" className="ui-label block mb-2">
           Ovoz jinsi
         </legend>
-        <div role="radiogroup" aria-labelledby="dub-file-gender-label" className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div role="radiogroup" aria-labelledby="dub-file-gender-label" className="grid grid-cols-3 gap-1 rounded-control bg-ui-ground p-1">
           {genderOptions.map((opt, index) => {
             const isSelected = gender === opt.value;
             const isFocusable = isSelected || (!genderOptions.some((o) => o.value === gender) && index === 0);
@@ -302,18 +302,17 @@ export default function DubFileForm({
                 tabIndex={isFocusable ? 0 : -1}
                 onKeyDown={(e) => onGenderKeyDown(e, index)}
                 onClick={() => handleGenderChange(opt.value)}
-                className={`flex min-h-[3.75rem] flex-col items-start justify-center rounded-control border px-3 py-2.5 text-left transition ${
-                  isSelected ? "border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]" : "border-ui-rule text-ui-ink hover:border-ui-muted/60"
+                className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition ${
+                  isSelected ? "bg-ui-surface text-ui-ink shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_rgb(var(--ui-rule))]" : "text-ui-muted hover:text-ui-ink"
                 }`}
               >
-                <span className="text-[15px] font-medium leading-tight">
-                  {opt.label}
-                </span>
-                <span className="mt-1 text-[13px] leading-tight text-ui-muted">{opt.desc}</span>
+                <opt.icon aria-hidden="true" className="h-4 w-4" />
+                {opt.label}
               </button>
             );
           })}
         </div>
+        <p className="text-sm text-ui-muted">{genderOptions.find((o) => o.value === gender)?.desc ?? genderOptions[0].desc}</p>
       </fieldset>
 
       {/* Gemini ovoz tanlash (faqat Pro foydalanuvchi Gemini tanlaganda) */}
