@@ -11,6 +11,7 @@ import {
 } from 'react-native-nitro-google-signin';
 
 import { ThemedText } from '../../../components/ThemedText';
+import { radius } from '../../../theme/colors';
 import { GOOGLE_WEB_CLIENT_ID } from '../../../config/env';
 import { useTheme } from '../../../theme/ThemeProvider';
 
@@ -82,7 +83,7 @@ export function GoogleSignInButton({ onCredential, onError, loading, text = 'con
     }
   };
 
-  // Saytdagi ijtimoiy kirish tugmalari kabi: dumaloq (pill), oq yuza, ingichka chiziq
+  // Ilovadagi boshqa tugmalar kabi: 10px burchak, oq yuza, ingichka chiziq
   return (
     <Pressable
       disabled={busy}
@@ -116,10 +117,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    minHeight: 44,
+    minHeight: 48,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: radius.control,
     paddingHorizontal: 16,
   },
-  label: { fontSize: 14, fontWeight: '500' },
+  label: { fontSize: 15, fontWeight: '500' },
 });

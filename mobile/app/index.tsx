@@ -1,91 +1,79 @@
 import { useRouter } from 'expo-router';
-import { LogIn, UserPlus, X } from 'lucide-react-native';
-import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, type ScrollView } from 'react-native';
+import { X } from 'lucide-react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Card } from '../src/components/Card';
-import { Footer } from '../src/components/Footer';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { Screen } from '../src/components/Screen';
 import { SegmentedControl } from '../src/components/SegmentedControl';
 import { ThemedText } from '../src/components/ThemedText';
 import { AnalyzeForm } from '../src/features/analysis/components/AnalyzeForm';
 import { DubForm } from '../src/features/dubbing/components/DubForm';
-import { AboutSection, HowItWorks, SERVICES, Services, StatsStrip, TelegramSection, type ServiceId } from '../src/features/home/sections';
+import { SERVICES, type ServiceId } from '../src/features/home/sections';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { radius } from '../src/theme/colors';
 import { useTheme } from '../src/theme/ThemeProvider';
 
 const SERVICE_OPTIONS = (Object.keys(SERVICES) as ServiceId[]).map((id) => ({ value: id, label: SERVICES[id].name, icon: SERVICES[id].icon }));
 
-/** Saytdagi bosh sahifa (frontend/app/page.tsx) bilan bir xil tuzilish. */
+/** Ilovaning bosh ekrani: saytdagi reklama bo'limlarisiz -- qisqa sarlavha va ishchi forma.
+ *  (Statistika, "Qanday ishlaydi", Telegram, footer saytda qoladi; ilovada chalg'itadi -- egasi 2026-11-01.) */
 export default function HomeScreen() {
   const signedOut = useAuthStore((s) => s.status === 'signedOut');
   const [mode, setMode] = useState<ServiceId>('dub');
-  const [welcomeClosed, setWelcomeClosed] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
-  const heroY = useRef(0);
-  const formY = useRef(0);
-
-  // Xizmatni tanlash: rejim almashadi va forma ko'rinadigan joyga o'tiladi
-  const pickService = (id: ServiceId) => {
-    setMode(id);
-    scrollRef.current?.scrollTo({ y: Math.max(0, heroY.current + formY.current - 16), animated: true });
-  };
+  const [offerClosed, setOfferClosed] = useState(false);
 
   return (
-    <Screen scrollRef={scrollRef} back={false}>
-      {signedOut && !welcomeClosed && <WelcomeStrip onClose={() => setWelcomeClosed(true)} />}
-
-      <View style={styles.hero} onLayout={(e) => (heroY.current = e.nativeEvent.layout.y)}>
+    <Screen back={false} contentStyle={styles.content}>
+      <View>
         <ThemedText accessibilityRole="header" style={styles.h1}>
           Dunyo bilimlari oʻzbek tilida
         </ThemedText>
         <ThemedText variant="secondary" style={styles.lead}>
-          YouTube havolasini yoki videongizni yuboring — u oʻzbekcha ovoz, subtitr yoki qisqa konspekt boʻlib qaytadi. Har 30 kunda 5
-          daqiqa bepul.
+          YouTube havolasi yoki videongizni yuboring — oʻzbekcha ovoz, subtitr yoki konspekt boʻlib qaytadi.
         </ThemedText>
-
-        <View onLayout={(e) => (formY.current = e.nativeEvent.layout.y)} style={styles.formWrap}>
-          <Card raised>
-            <View style={styles.tabs}>
-              <SegmentedControl options={SERVICE_OPTIONS} value={mode} onChange={setMode} />
-            </View>
-            {mode === 'analyze' ? <AnalyzeForm /> : <DubForm key={mode} mode={mode} />}
-          </Card>
-        </View>
       </View>
 
-      <StatsStrip />
-      <Services active={mode} onPick={pickService} />
-      <HowItWorks />
-      <TelegramSection />
-      <AboutSection />
-      <Footer />
+      <View style={styles.form}>
+        <SegmentedControl options={SERVICE_OPTIONS} value={mode} onChange={setMode} />
+        {mode === 'analyze' ? <AnalyzeForm /> : <DubForm key={mode} mode={mode} />}
+      </View>
+
+      {signedOut && !offerClosed && <SignUpOffer onClose={() => setOfferClosed(true)} />}
     </Screen>
   );
 }
 
-/** Birinchi tashrif: ro'yxatdan o'tish taklifi -- ekranni to'smaydigan, yopiladigan qator. */
-function WelcomeStrip({ onClose }: { onClose: () => void }) {
+/** Kirmagan foydalanuvchiga taklif: forma ostida, yopiladigan, bitta asosiy tugma. */
+function SignUpOffer({ onClose }: { onClose: () => void }) {
   const { colors } = useTheme();
   const router = useRouter();
   return (
-    <View style={[styles.welcome, { borderBottomColor: colors.rule }]} accessibilityLabel="Roʻyxatdan oʻtish taklifi">
-      <ThemedText variant="secondary" style={styles.welcomeText}>
-        <ThemedText style={[styles.welcomeText, { fontWeight: '500' }]}>Bepul hisob oching</ThemedText> — videolaringiz saqlanadi va har
-        30 kunda 5 daqiqa bepul.
-      </ThemedText>
-      <View style={styles.welcomeActions}>
-        <PrimaryButton label="Roʻyxatdan oʻtish" icon={UserPlus} onPress={() => router.push('/(auth)/register')} style={styles.flex} />
-        <PrimaryButton label="Kirish" icon={LogIn} variant="secondary" fullWidth={false} onPress={() => router.push('/(auth)/login')} />
+    <View style={[styles.offer, { backgroundColor: colors.ground }]} accessibilityLabel="Roʻyxatdan oʻtish taklifi">
+      <View style={styles.offerHead}>
+        <View style={styles.flex}>
+          <ThemedText style={styles.offerTitle}>Bepul hisob oching</ThemedText>
+          <ThemedText variant="secondary" style={styles.offerText}>
+            Videolaringiz saqlanadi va har 30 kunda 5 daqiqa bepul.
+          </ThemedText>
+        </View>
         <Pressable
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Taklifni yopish"
-          style={({ pressed }) => [styles.close, pressed && { backgroundColor: colors.ground }]}
+          hitSlop={8}
+          style={({ pressed }) => [styles.close, pressed && { backgroundColor: colors.rule }]}
         >
-          <X size={20} color={colors.muted} strokeWidth={2} />
+          <X size={18} color={colors.muted} strokeWidth={2} />
+        </Pressable>
+      </View>
+      <PrimaryButton label="Roʻyxatdan oʻtish" onPress={() => router.push('/(auth)/register')} />
+      <View style={styles.loginRow}>
+        <ThemedText variant="secondary" style={styles.offerText}>
+          Hisobingiz bormi?
+        </ThemedText>
+        <Pressable onPress={() => router.push('/(auth)/login')} accessibilityRole="link" hitSlop={10}>
+          <ThemedText style={[styles.offerText, styles.loginLink, { color: colors.accentInk }]}>Kirish</ThemedText>
         </Pressable>
       </View>
     </View>
@@ -94,13 +82,15 @@ function WelcomeStrip({ onClose }: { onClose: () => void }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  hero: { paddingHorizontal: 16, paddingTop: 48, paddingBottom: 80 },
-  h1: { fontSize: 40, lineHeight: 42, fontWeight: '600', letterSpacing: -1.4, textAlign: 'center' },
-  lead: { fontSize: 18, lineHeight: 29, textAlign: 'center', marginTop: 20 },
-  formWrap: { marginTop: 40 },
-  tabs: { marginBottom: 20 },
-  welcome: { borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  welcomeText: { fontSize: 15, lineHeight: 22 },
-  welcomeActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  close: { width: 40, height: 40, borderRadius: radius.tab, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 40, gap: 24 },
+  h1: { fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.7 },
+  lead: { fontSize: 15, lineHeight: 22, marginTop: 8 },
+  form: { gap: 20 },
+  offer: { borderRadius: radius.card, padding: 16, gap: 16 },
+  offerHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  offerTitle: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  offerText: { fontSize: 14, lineHeight: 20, marginTop: 2 },
+  close: { width: 32, height: 32, borderRadius: radius.tab, alignItems: 'center', justifyContent: 'center', marginTop: -4, marginRight: -4 },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: -4 },
+  loginLink: { fontWeight: '600' },
 });

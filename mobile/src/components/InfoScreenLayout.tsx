@@ -3,7 +3,6 @@ import { Linking, StyleSheet, View } from 'react-native';
 
 import type { LegalDoc, Run } from '../content/legal';
 import { useTheme } from '../theme/ThemeProvider';
-import { Footer } from './Footer';
 import { PageTitle } from './PageTitle';
 import { Screen } from './Screen';
 import { ThemedText } from './ThemedText';
@@ -16,7 +15,6 @@ export function InfoScreenLayout({ title, subtitle, children }: { title: string;
         <PageTitle title={title} lead={subtitle} />
         {children}
       </View>
-      <Footer />
     </Screen>
   );
 }
