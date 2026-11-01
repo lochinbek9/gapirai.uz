@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { ThemedText } from '../../../components/ThemedText';
+import { radius } from '../../../theme/colors';
 import { SITE_URL } from '../../../config/env';
 import { useTheme } from '../../../theme/ThemeProvider';
 import * as authApi from '../api';
@@ -79,10 +80,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    minHeight: 44,
+    minHeight: 48,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: radius.control,
     paddingHorizontal: 16,
   },
-  label: { fontSize: 14, fontWeight: '500' },
+  label: { fontSize: 15, fontWeight: '500' },
 });

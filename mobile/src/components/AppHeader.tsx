@@ -68,7 +68,8 @@ export function AppHeader({ back }: { back?: boolean }) {
         {status === 'idle' || status === 'loading' ? null : signedIn ? (
           <PrimaryButton label="Videolarim" size="sm" fullWidth={false} onPress={() => router.push('/dashboard')} />
         ) : (
-          <PrimaryButton label="Bepul boshlash" size="sm" fullWidth={false} onPress={() => router.push('/(auth)/register')} />
+          // Ilovada reklama chaqirig'i emas, oddiy "Kirish" (ro'yxatdan o'tish taklifi bosh ekranda)
+          <PrimaryButton label="Kirish" variant="secondary" size="sm" fullWidth={false} onPress={() => router.push('/(auth)/login')} />
         )}
         <IconButton
           icon={mode === 'dark' ? Sun : Moon}
