@@ -8,6 +8,7 @@ sababli, gapirai.uz domenida SPF/DKIM tasdiqlangan Resend'ga o'tkazildi.
 """
 import random
 import logging
+import time
 import httpx
 import smtplib
 from email.mime.text import MIMEText
@@ -63,6 +64,13 @@ def _send_smtp_email(
         return False
 
 
+# Resend API: sekundiga 2 ta so'rov (jamoa bo'yicha). 2026-11-02 diagnostikasi: ommaviy
+# xabarnoma sekundiga 10 ta yuborgani uchun xatlarning ~80% i 429 bilan rad etilgan
+# (1041 dan 201 ta, 1332 dan 196 ta yetib borgan). Ommaviy yuboruvchilar orasida shuncha kutadi.
+BULK_SEND_INTERVAL_S = 0.6
+_RATE_LIMIT_RETRIES = 3
+
+
 class DeliveryResult:
     OK = "ok"
     RATE_LIMITED = "rate_limited"  # Resend 429 / kunlik kvota -- keyinroq qayta urinish kerak
@@ -87,20 +95,32 @@ def deliver_email(to_email: str, subject: str, html_body: str, text_body: str, h
     }
     if headers:
         payload["headers"] = headers
-    try:
-        response = httpx.post(
-            RESEND_API_URL,
-            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=15,
-        )
-    except Exception as e:
-        logger.error(f"Email yuborishda xatolik ({to_email}): {e}")
-        return DeliveryResult.FAILED
-    if response.status_code in (200, 201):
-        return DeliveryResult.OK
-    logger.error(f"Resend xatosi ({to_email}): {response.status_code} {response.text[:300]}")
-    return DeliveryResult.RATE_LIMITED if response.status_code == 429 else DeliveryResult.FAILED
+    for attempt in range(_RATE_LIMIT_RETRIES + 1):
+        try:
+            response = httpx.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=15,
+            )
+        except Exception as e:
+            logger.error(f"Email yuborishda xatolik ({to_email}): {e}")
+            return DeliveryResult.FAILED
+        if response.status_code in (200, 201):
+            return DeliveryResult.OK
+        if response.status_code != 429:
+            logger.error(f"Resend xatosi ({to_email}): {response.status_code} {response.text[:300]}")
+            return DeliveryResult.FAILED
+        # 429: sekundlik chegara -- Retry-After qadar kutib, qayta urinamiz. Kunlik/oylik
+        # kvota tugagan bo'lsa urinishlar ham 429 bo'ladi -- RATE_LIMITED qaytadi.
+        if attempt < _RATE_LIMIT_RETRIES:
+            try:
+                wait = float(response.headers.get("retry-after", "1"))
+            except ValueError:
+                wait = 1.0
+            time.sleep(min(max(wait, 1.0), 10.0))
+    logger.error(f"Resend 429 ({to_email}): {response.text[:300]}")
+    return DeliveryResult.RATE_LIMITED
 
 
 # Kirish/ro'yxat/parol tiklash kodlari so'rov ICHIDA yuboriladi (auth_routes.py):
