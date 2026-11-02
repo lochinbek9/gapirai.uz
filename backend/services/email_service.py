@@ -27,6 +27,7 @@ def _send_smtp_email(
     subject: str,
     text_body: str,
     html_body: str,
+    headers: dict | None = None,
 ) -> bool:
     """SMTP (masalan Admin Gmail yoki boshqa SMTP server) orqali email yuborish."""
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
@@ -41,6 +42,8 @@ def _send_smtp_email(
         msg["From"] = f"{from_name} <{from_email}>"
         msg["To"] = to_email
         msg["Subject"] = subject
+        for k, v in (headers or {}).items():
+            msg[k] = v
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
@@ -58,6 +61,46 @@ def _send_smtp_email(
     except Exception as e:
         logger.error(f"SMTP orqali email yuborishda xatolik ({to_email}): {e}")
         return False
+
+
+class DeliveryResult:
+    OK = "ok"
+    RATE_LIMITED = "rate_limited"  # Resend 429 / kunlik kvota -- keyinroq qayta urinish kerak
+    FAILED = "failed"
+
+
+def deliver_email(to_email: str, subject: str, html_body: str, text_body: str, headers: dict | None = None) -> str:
+    """Ommaviy va avtomatik xatlar uchun umumiy yuboruvchi: SMTP sozlangan bo'lsa SMTP,
+    aks holda Resend. headers -- masalan List-Unsubscribe (Gmail/Yahoo ommaviy xatlar
+    uchun talab qiladi, aks holda spamga tushadi). Returns DeliveryResult.*"""
+    if settings.SMTP_ENABLED or (settings.SMTP_USER and settings.SMTP_PASSWORD):
+        return DeliveryResult.OK if _send_smtp_email(to_email, subject, text_body, html_body, headers) else DeliveryResult.FAILED
+    if not settings.RESEND_API_KEY:
+        logger.warning("Na SMTP, na RESEND_API_KEY sozlanmagan — email yuborilmadi.")
+        return DeliveryResult.FAILED
+    payload = {
+        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_body,
+        "text": text_body,
+    }
+    if headers:
+        payload["headers"] = headers
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+    except Exception as e:
+        logger.error(f"Email yuborishda xatolik ({to_email}): {e}")
+        return DeliveryResult.FAILED
+    if response.status_code in (200, 201):
+        return DeliveryResult.OK
+    logger.error(f"Resend xatosi ({to_email}): {response.status_code} {response.text[:300]}")
+    return DeliveryResult.RATE_LIMITED if response.status_code == 429 else DeliveryResult.FAILED
 
 
 # Kirish/ro'yxat/parol tiklash kodlari so'rov ICHIDA yuboriladi (auth_routes.py):
@@ -396,6 +439,7 @@ def send_broadcast_email(
     message_text: str,
     button_text: str | None = None,
     button_url: str | None = None,
+    unsubscribe_url: str | None = None,
 ) -> bool:
     """Admin ommaviy xabarnomalarini (broadcast) foydalanuvchiga yuborish.
     Agar SMTP_ENABLED bo'lsa yoki SMTP_USER va SMTP_PASSWORD berilgan bo'lsa (masalan Admin Gmail),
@@ -404,6 +448,10 @@ def send_broadcast_email(
 
     greeting = f"Assalomu alaykum, {name}!" if name else "Assalomu alaykum!"
     safe_message = html_lib.escape(message_text).replace("\n", "<br/>")
+    unsubscribe_html = (
+        f' <a href="{html_lib.escape(unsubscribe_url)}" style="color:#94a3b8;">Bunday xatlarni olmaslik</a>'
+        if unsubscribe_url else ""
+    )
 
     button_html = ""
     if button_text and button_url:
@@ -424,7 +472,7 @@ def send_broadcast_email(
       </div>
       {button_html}
       <hr style="border:none;border-top:1px solid #f1f5f9;margin:28px 0 16px 0;" />
-      <p style="color:#94a3b8;font-size:11px;margin:0;line-height:1.5;">Ushbu xabar GapirAI.uz platformasi foydalanuvchilariga yuborildi. Savollaringiz bo'lsa, @gapirai_support botiga murojaat qiling.</p>
+      <p style="color:#94a3b8;font-size:11px;margin:0;line-height:1.5;">Ushbu xabar GapirAI.uz platformasi foydalanuvchilariga yuborildi. Savollaringiz bo'lsa, @gapirai_support botiga murojaat qiling.{unsubscribe_html}</p>
     </div>
     """
 
@@ -433,35 +481,10 @@ def send_broadcast_email(
         text_body += f"\n\n{button_text}: {button_url}"
     text_body += "\n\nGapirAI.uz jamoasi"
 
-    # 1. Agar SMTP sozlangan bo'lsa (masalan Admin Gmail)
-    if settings.SMTP_ENABLED or (settings.SMTP_USER and settings.SMTP_PASSWORD):
-        return _send_smtp_email(to_email, subject, text_body, html_body)
+    headers = list_unsubscribe_headers(unsubscribe_url) if unsubscribe_url else None
+    return deliver_email(to_email, subject, html_body, text_body, headers) == DeliveryResult.OK
 
-    # 2. Resend API orqali
-    if not settings.RESEND_API_KEY:
-        logger.warning("Na SMTP, na RESEND_API_KEY sozlanmagan — broadcast email yuborilmadi.")
-        return False
 
-    payload = {
-        "from": f"{settings.RESEND_FROM_NAME} <{settings.RESEND_FROM_EMAIL}>",
-        "to": [to_email],
-        "subject": subject,
-        "html": html_body,
-        "text": text_body,
-    }
-
-    try:
-        response = httpx.post(
-            RESEND_API_URL,
-            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=15,
-        )
-        if response.status_code in (200, 201):
-            return True
-        logger.error(f"Resend broadcast xatosi ({to_email}): {response.status_code} {response.text[:300]}")
-        return False
-    except Exception as e:
-        logger.error(f"Broadcast email yuborishda xatolik ({to_email}): {e}")
-        return False
-
+def list_unsubscribe_headers(unsubscribe_url: str) -> dict:
+    """RFC 8058 bir bosishda obunadan chiqish -- Gmail/Yahoo ommaviy jo'natuvchilardan talab qiladi."""
+    return {"List-Unsubscribe": f"<{unsubscribe_url}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}

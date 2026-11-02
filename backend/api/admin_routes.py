@@ -2529,14 +2529,16 @@ def _process_broadcast_campaign(campaign_id: str):
         elif campaign.target_filter == "email_users":
             q = q.filter(User.email.isnot(None))
         elif campaign.target_filter == "paid_users":
+            # 2026-11-02: ilgari Subscription.tier / .status (bunday ustun yo'q) -- kampaniya
+            # AttributeError bilan to'xtab, bitta ham xat ketmasdi
             q = q.join(Subscription, Subscription.user_id == User.id).filter(
-                Subscription.tier != PlanTier.FREE,
-                Subscription.status == "active"
+                Subscription.plan != PlanTier.FREE,
+                or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
             )
         elif campaign.target_filter == "free_users":
             paid_sub_user_ids = db.query(Subscription.user_id).filter(
-                Subscription.tier != PlanTier.FREE,
-                Subscription.status == "active"
+                Subscription.plan != PlanTier.FREE,
+                or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
             ).subquery()
             q = q.filter(User.id.notin_(paid_sub_user_ids))
         elif campaign.target_filter == "unactivated_users":
@@ -2550,12 +2552,17 @@ def _process_broadcast_campaign(campaign_id: str):
             )
 
         users = q.all()
+        # "Bunday xatlarni olmaslik" ni bosganlarga email yuborilmaydi (Telegram -- yuboriladi)
+        from backend.models.database import EmailOptOut
+        from backend.services.lifecycle_emails import unsubscribe_url
+        opted_out = {r[0] for r in db.query(EmailOptOut.user_id)}
         recipient_data = [
             {
                 "id": str(u.id),
                 "name": u.name or "",
-                "email": (u.email or "").strip().lower(),
+                "email": "" if u.id in opted_out else (u.email or "").strip().lower(),
                 "telegram_chat_id": (u.telegram_chat_id or "").strip(),
+                "unsubscribe_url": unsubscribe_url(u.id),
             }
             for u in users
         ]
@@ -2605,6 +2612,7 @@ def _process_broadcast_campaign(campaign_id: str):
                         message_text=campaign.message,
                         button_text=campaign.button_text,
                         button_url=campaign.button_url,
+                        unsubscribe_url=rec["unsubscribe_url"],
                     )
                     if success:
                         email_sent += 1
@@ -2660,14 +2668,16 @@ def get_broadcast_audience(
         elif target_filter == "email_users":
             q = q.filter(User.email.isnot(None))
         elif target_filter == "paid_users":
+            # 2026-11-02: ilgari Subscription.tier / .status (bunday ustun yo'q) -- kampaniya
+            # AttributeError bilan to'xtab, bitta ham xat ketmasdi
             q = q.join(Subscription, Subscription.user_id == User.id).filter(
-                Subscription.tier != PlanTier.FREE,
-                Subscription.status == "active"
+                Subscription.plan != PlanTier.FREE,
+                or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
             )
         elif target_filter == "free_users":
             paid_sub_user_ids = db.query(Subscription.user_id).filter(
-                Subscription.tier != PlanTier.FREE,
-                Subscription.status == "active"
+                Subscription.plan != PlanTier.FREE,
+                or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
             ).subquery()
             q = q.filter(User.id.notin_(paid_sub_user_ids))
         elif target_filter == "unactivated_users":

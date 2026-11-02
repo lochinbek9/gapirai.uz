@@ -53,6 +53,7 @@ import AdminFunnelManager from '@/components/AdminFunnelManager'
 import AdminCohortsManager from '@/components/AdminCohortsManager'
 import AdminRetentionManager from '@/components/AdminRetentionManager'
 import AdminBroadcastManager from '@/components/AdminBroadcastManager'
+import AdminEmailAutomation from '@/components/AdminEmailAutomation'
 import AdminSystemHealthManager from '@/components/AdminSystemHealthManager'
 import { formatTashkentDateTime } from '@/lib/timestamp'
 
@@ -1248,7 +1249,10 @@ export default function AdminPage() {
         {/* ========================================================= */}
         {activeTab === 'broadcast' && (
           <section>
-            <AdminBroadcastManager token={token} />
+            <div className="space-y-6">
+              <AdminEmailAutomation token={token} />
+              <AdminBroadcastManager token={token} />
+            </div>
           </section>
         )}
       </div>

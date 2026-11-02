@@ -341,6 +341,9 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"
+    # Avtomatik xatlar (backend/services/lifecycle_emails.py) uchun kunlik chegara.
+    # Resend bepul tarifi: kuniga 100, oyiga 3000 ta (barcha xatlar, kirish kodlari ham).
+    EMAIL_DAILY_LIMIT: int = 90
 
     # SMTP sozlamalari (Admin Gmail yoki maxsus SMTP server orqali xat jo'natish uchun)
     SMTP_ENABLED: bool = False
