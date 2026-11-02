@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SiteHeader from '@/components/home/SiteHeader'
 import Footer from '@/components/Footer'
-import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, getCapcutPackageUrl, initiateClickPayment, initiatePaymePayment, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
+import { getJob, Job, formatDuration, getVideoUrl, getAudioUrl, getCapcutPackageUrl, initiateClickPayment, initiatePaymePayment, startPayment, type PayProvider, type PayStart, clearJobId, cancelJob, retryJob, createAnalysis, saveAnalysisId } from '@/lib/api'
 import UploadRecoveryPrompt from '@/components/UploadRecoveryPrompt'
 import { useJobPolling } from '@/hooks/useJobPolling'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +18,7 @@ import FeedbackSection from '@/components/FeedbackSection'
 import ResolutionDownloadButtons from '@/components/ResolutionDownloadButtons'
 import DonateCTA from '@/components/DonateCTA'
 import ShareButton from '@/components/ShareButton'
+import { PAY_METHODS, PaymentCodeDialog } from '@/components/payments/PaymentChooser'
 import ConfirmModal from '@/components/ConfirmModal'
 import FirstVideoDiscountModal from '@/components/FirstVideoDiscountModal'
 import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
@@ -219,6 +220,7 @@ export default function VideoPage() {
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [paymentCode, setPaymentCode] = useState<Extract<PayStart, { kind: 'uzum' | 'paynet' }> | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [expandSourceText, setExpandSourceText] = useState(false)
   const [showSrt, setShowSrt] = useState(false)
@@ -454,10 +456,29 @@ export default function VideoPage() {
   const videoSrc = getVideoUrl(id)
   const audioUrl = job.status === 'completed' ? getAudioUrl(id) : undefined
 
-  const handlePayment = async (provider: 'click' | 'payme' = 'click') => {
+  const handlePayment = async (provider: PayProvider = 'click') => {
     if (!id) return
     setPaymentLoading(true)
     setPaymentError(null)
+
+    // Uzum / Paynet -- to'lov ilovaning o'zida hisob/buyurtma raqami bilan; sahifa
+    // ochiq qoladi va to'lov tasdiqlangach holat o'zi yangilanadi
+    if (provider === 'uzum' || provider === 'paynet') {
+      try {
+        const start = await startPayment({ kind: 'job', jobId: id }, provider)
+        if (start.kind === 'uzum' || start.kind === 'paynet') {
+          paidAmountRef.current = start.amount
+          setPaymentCode(start)
+        } else if (start.kind === 'none') {
+          window.location.reload()
+        }
+      } catch (err: any) {
+        setPaymentError(err?.response?.data?.detail || "To'lov jarayonida xatolik yuz berdi.")
+      } finally {
+        setPaymentLoading(false)
+      }
+      return
+    }
 
     // Popup blocker'ga tushmaslik uchun yangi oynani darhol ochamiz
     const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
@@ -634,28 +655,26 @@ export default function VideoPage() {
                     <p className="text-xs text-ui-muted">
                       Yoki ushbu video uchun bir martalik to&apos;lov qiling{job.video_duration ? ` (${calculateClientPrice(job.video_duration / 60.0).toLocaleString('uz-UZ')} so'm)` : ''}:
                     </p>
-                    <div className="flex items-center justify-center gap-3">
-                      <button
-                        onClick={() => handlePayment('click')}
-                        disabled={paymentLoading}
-                        title="Click orqali to'lash"
-                        className="flex items-center justify-center h-12 px-5 rounded-2xl bg-white border border-gray-200/80 hover:shadow-md transition disabled:opacity-50 active:scale-95 shadow-sm"
-                      >
-                        {paymentLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
-                        ) : (
-                          <img src="/logos/click.png" alt="Click" className="h-4 w-auto object-contain" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handlePayment('payme')}
-                        disabled={paymentLoading}
-                        title="Payme orqali to'lash"
-                        className="flex items-center justify-center h-12 px-5 rounded-2xl bg-white border border-gray-200/80 hover:shadow-md transition disabled:opacity-50 active:scale-95 shadow-sm"
-                      >
-                        <img src="/logos/payme.png" alt="Payme" className="h-4 w-auto object-contain" />
-                      </button>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {PAY_METHODS.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handlePayment(m.id)}
+                          disabled={paymentLoading}
+                          aria-label={`${m.name} orqali to'lash`}
+                          className="flex h-12 items-center justify-center rounded-control border border-ui-rule bg-white px-3 transition hover:border-ui-muted/60 hover:shadow-sm disabled:opacity-50"
+                        >
+                          <img src={m.logo} alt="" className="max-h-5 w-auto max-w-full object-contain" />
+                        </button>
+                      ))}
                     </div>
+                    {paymentLoading && (
+                      <p className="flex items-center justify-center gap-2 text-xs text-ui-muted">
+                        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> To&apos;lov tayyorlanmoqda...
+                      </p>
+                    )}
+                    <PaymentCodeDialog start={paymentCode} onClose={() => setPaymentCode(null)} />
                   </div>
 
                   <div className="pt-2">

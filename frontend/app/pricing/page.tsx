@@ -6,13 +6,6 @@ import Link from 'next/link'
 import { AlertCircle, Check, Loader2, Plus } from 'lucide-react'
 import {
   getPlans,
-  subscribeToPlan,
-  subscribeToPlanPayme,
-  subscribeToPlanUzum,
-  subscribeToPlanPaynet,
-  purchaseMinutes,
-  purchaseMinutesUzum,
-  purchaseMinutesPaynet,
   PlanDef,
   CurrentSubscription,
   MinutePack,
@@ -22,17 +15,7 @@ import { useAuth } from '@/hooks/useAuth'
 import DonateCTA from '@/components/DonateCTA'
 import SiteHeader from '@/components/home/SiteHeader'
 import Footer from '@/components/Footer'
-import UzumAccountCard from '@/components/UzumAccountCard'
-import PaynetOrderCard from '@/components/PaynetOrderCard'
-
-type PayProvider = 'click' | 'payme' | 'uzum' | 'paynet'
-
-const PROVIDERS: { id: PayProvider; name: string }[] = [
-  { id: 'click', name: 'Click' },
-  { id: 'payme', name: 'Payme' },
-  { id: 'uzum', name: 'Uzum' },
-  { id: 'paynet', name: 'Paynet' },
-]
+import { usePaymentChooser } from '@/components/payments/PaymentChooser'
 
 const som = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')
 
@@ -44,20 +27,16 @@ export default function PricingPage() {
   const [current, setCurrent] = useState<CurrentSubscription | null>(null)
   const [discountOffer, setDiscountOffer] = useState<JobDiscountOffer | null>(null)
   const [loading, setLoading] = useState(true)
-  const [subscribing, setSubscribing] = useState<string | null>(null)
-  const [buyingPack, setBuyingPack] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-  const [uzumAccount, setUzumAccount] = useState<{ account: number; amount: number; deeplink?: string } | null>(null)
-  const [paynetOrder, setPaynetOrder] = useState<{ orderId: string; amount: number } | null>(null)
 
   // Insufficient minutes modal
   const [showInsufficientMinutes, setShowInsufficientMinutes] = useState(false)
   const [shortfallMinutes, setShortfallMinutes] = useState<number | null>(null)
   const [videoDurationMinutes, setVideoDurationMinutes] = useState<number | null>(null)
 
-  // To'lov usuli bir marta tanlanadi -- har tarif/paket yonida 4 ta tugma o'rniga
-  const [provider, setProvider] = useState<PayProvider>('click')
+  // To'lov usuli "To'lash" bosilganda ochiladigan oynada tanlanadi (4 ta tizim, logotiplar bilan)
+  const pay = usePaymentChooser()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -92,74 +71,19 @@ export default function PricingPage() {
     }, 50)
   }
 
-  const handleBuyPack = async (pack: number, provider: PayProvider = 'click') => {
-    if (!isLoggedIn) {
-      router.push('/login')
-      return
-    }
-    setBuyingPack(pack)
-    setError(null)
-    try {
-      const res =
-        provider === 'uzum'
-          ? await purchaseMinutesUzum(pack)
-          : provider === 'paynet'
-          ? await purchaseMinutesPaynet(pack)
-          : await purchaseMinutes(pack, provider)
-      if (provider === 'uzum' && res.success && 'account' in res && res.account) {
-        setUzumAccount({
-          account: res.account as number,
-          amount: res.amount,
-          deeplink: 'payment_url' in res ? res.payment_url : undefined,
-        })
-      } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
-        setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
-      } else if (res.success && 'payment_url' in res && res.payment_url) {
-        window.location.assign(res.payment_url)
-      } else {
-        setError("To'lov havolasini yaratishda xatolik yuz berdi.")
-      }
-    } catch {
-      setError("To'lov havolasini yaratishda xatolik yuz berdi.")
-    } finally {
-      setBuyingPack(null)
-    }
+  const handleBuyPack = (p: MinutePack) => {
+    if (!isLoggedIn) return router.push('/login')
+    pay.open({ target: { kind: 'pack', minutes: p.minutes }, title: `+${p.minutes} daqiqa paketi`, amount: `${som(p.discounted_price ?? p.price)} so'm` })
   }
 
-  const handleSubscribe = async (planId: string, provider: PayProvider = 'click') => {
-    if (!isLoggedIn) {
-      router.push('/login')
-      return
-    }
-    setSubscribing(planId)
-    setError(null)
-    try {
-      const res =
-        provider === 'uzum'
-          ? await subscribeToPlanUzum(planId)
-          : provider === 'paynet'
-          ? await subscribeToPlanPaynet(planId)
-          : provider === 'payme'
-          ? await subscribeToPlanPayme(planId)
-          : await subscribeToPlan(planId)
-      if (provider === 'uzum' && res.success && 'account' in res && res.account) {
-        setUzumAccount({
-          account: res.account as number,
-          amount: res.amount,
-          deeplink: 'payment_url' in res ? res.payment_url : undefined,
-        })
-      } else if (provider === 'paynet' && res.success && 'order_id' in res && res.order_id) {
-        setPaynetOrder({ orderId: res.order_id as string, amount: res.amount })
-      } else if (res.success && 'payment_url' in res && res.payment_url) {
-        window.location.assign(res.payment_url)
-      } else {
-        setError("To'lov havolasini yaratishda xatolik yuz berdi.")
-      }
-    } catch {
-      setError("To'lov havolasini yaratishda xatolik yuz berdi.")
-    } finally {
-      setSubscribing(null)
-    }
+  const handleSubscribe = (plan: PlanDef) => {
+    if (!isLoggedIn) return router.push('/login')
+    const yearly = plan.period_days >= 365
+    pay.open({
+      target: { kind: 'plan', plan: plan.id },
+      title: `${plan.name} tarifi · ${yearly ? '1 yil' : '1 oy'}`,
+      amount: `${som(plan.discounted_price && !yearly ? plan.discounted_price : plan.price)} so'm`,
+    })
   }
 
   // Check user subscription and payment status
@@ -226,8 +150,8 @@ export default function PricingPage() {
       )
     }
     return (
-      <button type="button" onClick={() => handleSubscribe(plan.id, provider)} disabled={subscribing === plan.id} className="ui-btn w-full">
-        {subscribing === plan.id ? <><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Kutilmoqda...</> : `${PROVIDERS.find((x) => x.id === provider)?.name} orqali to'lash`}
+      <button type="button" onClick={() => handleSubscribe(plan)} className="ui-btn w-full">
+        Obuna bo&apos;lish
       </button>
     )
   }
@@ -314,23 +238,6 @@ export default function PricingPage() {
                 </button>
               ))}
             </div>
-            <fieldset className="flex flex-wrap items-center justify-center gap-1.5">
-              <legend className="sr-only">To&apos;lov usuli</legend>
-              <span aria-hidden="true" className="mr-1 text-sm text-ui-muted">Toʻlov:</span>
-              {PROVIDERS.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex min-h-10 cursor-pointer items-center rounded-lg border px-3 text-sm font-medium transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ui-accent ${
-                    provider === p.id
-                      ? 'border-ui-accent bg-ui-accent/[0.06] text-ui-ink shadow-[0_0_0_1px_rgb(var(--ui-accent))]'
-                      : 'border-ui-rule text-ui-muted hover:text-ui-ink'
-                  }`}
-                >
-                  <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} className="sr-only" />
-                  {p.name}
-                </label>
-              ))}
-            </fieldset>
           </div>
 
           {/* Tarif kartalari */}
@@ -402,14 +309,12 @@ export default function PricingPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleBuyPack(p.minutes, provider)}
-                        disabled={buyingPack === p.minutes || isAlreadyBought}
-                        aria-label={isAlreadyBought ? undefined : `${p.minutes} daqiqa sotib olish, ${PROVIDERS.find((x) => x.id === provider)?.name} orqali`}
+                        onClick={() => handleBuyPack(p)}
+                        disabled={isAlreadyBought}
+                        aria-label={isAlreadyBought ? undefined : `${p.minutes} daqiqa sotib olish`}
                         className="ui-btn ui-btn-secondary col-span-2 min-h-10 w-full px-4 text-sm sm:col-span-1 sm:w-auto"
                       >
-                        {buyingPack === p.minutes ? (
-                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                        ) : isAlreadyBought ? (
+                        {isAlreadyBought ? (
                           'Olingan'
                         ) : (
                           'Sotib olish'
@@ -479,25 +384,7 @@ export default function PricingPage() {
           </section>
         </div>
 
-        {/* Uzum hisob oynasi */}
-        {uzumAccount && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onClick={() => setUzumAccount(null)}>
-            <div role="dialog" aria-modal="true" aria-label="Uzum orqali to'lov" className="w-full max-w-sm rounded-card border border-ui-rule bg-ui-surface p-5 shadow-[0_24px_64px_rgb(0_0_0/0.25)]" onClick={(e) => e.stopPropagation()}>
-              <UzumAccountCard account={uzumAccount.account} amount={uzumAccount.amount} deeplink={uzumAccount.deeplink} />
-              <button onClick={() => setUzumAccount(null)} className="ui-btn ui-btn-secondary mt-3 w-full">Yopish</button>
-            </div>
-          </div>
-        )}
-
-        {/* Paynet buyurtma oynasi */}
-        {paynetOrder && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4" onClick={() => setPaynetOrder(null)}>
-            <div role="dialog" aria-modal="true" aria-label="Paynet orqali to'lov" className="w-full max-w-sm rounded-card border border-ui-rule bg-ui-surface p-5 shadow-[0_24px_64px_rgb(0_0_0/0.25)]" onClick={(e) => e.stopPropagation()}>
-              <PaynetOrderCard orderId={paynetOrder.orderId} amount={paynetOrder.amount} />
-              <button onClick={() => setPaynetOrder(null)} className="ui-btn ui-btn-secondary mt-3 w-full">Yopish</button>
-            </div>
-          </div>
-        )}
+        {pay.ui}
 
         {/* Daqiqa yetmadi oynasi */}
         {showInsufficientMinutes && (

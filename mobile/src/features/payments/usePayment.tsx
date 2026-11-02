@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { Check, ChevronRight, Copy } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -13,11 +14,12 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { formatNumber } from '../../utils/format';
 import { initiatePayment, type PaymentProvider, type PaymentStart, type PaymentTarget } from './api';
 
-const PROVIDERS: { id: PaymentProvider; label: string; hint: string }[] = [
-  { id: 'click', label: 'Click', hint: 'Click ilovasida yoki sahifasida' },
-  { id: 'payme', label: 'Payme', hint: 'Payme ilovasida yoki sahifasida' },
-  { id: 'uzum', label: 'Uzum', hint: 'Uzum Bank ilovasida' },
-  { id: 'paynet', label: 'Paynet', hint: 'Paynet ilovasida buyurtma raqami bilan' },
+// Logotiplar -- saytdagi frontend/public/logos bilan bir xil (tizim bir qarashda taniladi)
+const PROVIDERS: { id: PaymentProvider; label: string; hint: string; logo: number }[] = [
+  { id: 'click', label: 'Click', hint: 'Click ilovasi yoki bank kartasi', logo: require('../../../assets/payments/click.png') },
+  { id: 'payme', label: 'Payme', hint: 'Payme ilovasi yoki bank kartasi', logo: require('../../../assets/payments/payme.png') },
+  { id: 'uzum', label: 'Uzum', hint: 'Uzum Bank ilovasida', logo: require('../../../assets/payments/uzum.png') },
+  { id: 'paynet', label: 'Paynet', hint: 'Paynet ilovasida buyurtma raqami bilan', logo: require('../../../assets/payments/paynet.png') },
 ];
 
 type Code = Extract<PaymentStart, { kind: 'code' }>;
@@ -93,14 +95,18 @@ function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () 
 function PaymentSheet({ open, onClose, onChoose }: { open: boolean; onClose: () => void; onChoose: (p: PaymentProvider) => void }) {
   const { colors } = useTheme();
   return (
-    <Sheet open={open} onClose={onClose} title="Toʻlov usuli">
+    <Sheet open={open} onClose={onClose} title="Toʻlov usulini tanlang">
       {PROVIDERS.map((p) => (
         <Pressable
           key={p.id}
           onPress={() => onChoose(p.id)}
           accessibilityRole="button"
+          accessibilityLabel={`${p.label} orqali toʻlash`}
           style={({ pressed }) => [styles.option, pressed && { backgroundColor: colors.ground }]}
         >
+          <View style={[styles.logoTile, { borderColor: colors.rule }]}>
+            <Image source={p.logo} style={styles.logo} contentFit="contain" />
+          </View>
           <View style={styles.flex}>
             <ThemedText style={styles.optionLabel}>{p.label}</ThemedText>
             <ThemedText variant="secondary" style={styles.optionHint}>
@@ -192,6 +198,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.tab,
   },
   flex: { flex: 1 },
+  // Logotiplar oq fonga mo'ljallangan -- tungi rejimda ham oq plitka
+  logoTile: { width: 64, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  logo: { width: '100%', height: 22 },
   optionLabel: { fontSize: 15, fontWeight: '500' },
   optionHint: { fontSize: 13, marginTop: 2 },
   codeBody: { paddingHorizontal: 12, gap: 12 },
