@@ -573,6 +573,51 @@ export async function setAutoTopup(enabled: boolean, pack?: number | null): Prom
   return res.data
 }
 
+// ── Yagona to'lov boshlash (2026-11-02) ─────────────────────────────────────
+// Tarif, daqiqa paketi yoki bitta video -- 4 ta tizimning istalgani bilan.
+// mobile/src/features/payments/api.ts bilan bir xil endpointlar va javob shakli.
+export type PayProvider = 'click' | 'payme' | 'uzum' | 'paynet'
+export type PayTarget = { kind: 'plan'; plan: string } | { kind: 'pack'; minutes: number } | { kind: 'job'; jobId: string }
+export type PayStart =
+  | { kind: 'url'; url: string; amount: number; paymentId?: string }
+  | { kind: 'uzum'; account: number; amount: number; deeplink?: string }
+  | { kind: 'paynet'; orderId: string; amount: number }
+  | { kind: 'none' }
+
+const PAY_ENDPOINTS: Record<PayTarget['kind'], Record<PayProvider, string>> = {
+  plan: {
+    click: '/api/plans/subscribe',
+    payme: '/api/payments/payme/initiate-subscription',
+    uzum: '/api/payments/uzum/initiate-subscription',
+    paynet: '/api/payments/paynet/initiate-subscription',
+  },
+  pack: {
+    click: '/api/minutes/purchase',
+    payme: '/api/minutes/purchase',
+    uzum: '/api/payments/uzum/initiate-minutes',
+    paynet: '/api/payments/paynet/initiate-minutes',
+  },
+  job: {
+    click: '/api/payments/click/initiate',
+    payme: '/api/payments/payme/initiate',
+    uzum: '/api/payments/uzum/initiate',
+    paynet: '/api/payments/paynet/initiate',
+  },
+}
+
+export async function startPayment(target: PayTarget, provider: PayProvider): Promise<PayStart> {
+  const body =
+    target.kind === 'plan' ? { plan: target.plan }
+    : target.kind === 'pack' ? (provider === 'click' || provider === 'payme' ? { pack: target.minutes, provider } : { pack: target.minutes })
+    : { job_id: target.jobId }
+  const { data } = await apiClient.post(PAY_ENDPOINTS[target.kind][provider], body)
+  if (provider === 'uzum' && data.account) return { kind: 'uzum', account: data.account, amount: data.amount, deeplink: data.payment_url }
+  if (provider === 'paynet' && data.order_id) return { kind: 'paynet', orderId: data.order_id, amount: data.amount }
+  if (data.payment_url) return { kind: 'url', url: data.payment_url, amount: data.amount, paymentId: data.payment_id }
+  if (data.amount === 0) return { kind: 'none' }
+  throw new Error("To'lov havolasi kelmadi")
+}
+
 export async function subscribeToPlan(plan: string): Promise<{ success: boolean; payment_url: string; payment_id?: string; amount: number }> {
   const res = await apiClient.post('/api/plans/subscribe', { plan })
   return res.data

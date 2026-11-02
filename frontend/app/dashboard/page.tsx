@@ -6,7 +6,7 @@ import PageShell from '@/components/PageShell'
 import { useAuth } from '@/hooks/useAuth'
 import {
   listJobs, deleteJob, retryJob, Job, STATUS_LABELS, formatDuration, getVideoUrl,
-  getPlans, subscribeToPlan, CurrentSubscription, getJobsStats, JobsStats,
+  getPlans, CurrentSubscription, getJobsStats, JobsStats,
   listUserAnalyses, deleteAnalysis, retryAnalysis, VideoAnalysis,
 } from '@/lib/api'
 import { extractYouTubeId } from '@/lib/youtube'
@@ -14,6 +14,7 @@ import PushOptIn from '@/components/PushOptIn'
 import PremierePluginCard from '@/components/PremierePluginCard'
 import BillingCard from '@/components/billing/BillingCard'
 import DonateCTA from '@/components/DonateCTA'
+import { usePaymentChooser } from '@/components/payments/PaymentChooser'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
@@ -601,7 +602,7 @@ export default function DashboardPage() {
   const [deletingAnalysisId, setDeletingAnalysisId] = useState<string | null>(null)
   const [jobsStats, setJobsStats] = useState<JobsStats | null>(null)
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
-  const [renewing, setRenewing] = useState(false)
+  const payChooser = usePaymentChooser()
   const [conversionBannerDismissed, setConversionBannerDismissed] = useState(false)
 
   useEffect(() => {
@@ -671,23 +672,13 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleRenew() {
+  // Uzaytirish -- to'lov usuli oynada tanlanadi (Click, Payme, Uzum, Paynet)
+  function handleRenew() {
     if (!subscription || subscription.plan === 'free') return
-    setRenewing(true)
-    const paymentWindow = typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null
-    try {
-      const res = await subscribeToPlan(subscription.plan)
-      if (res.success && res.payment_url) {
-        if (paymentWindow) paymentWindow.location.href = res.payment_url
-        else window.location.href = res.payment_url
-      } else if (paymentWindow) {
-        paymentWindow.close()
-      }
-    } catch {
-      if (paymentWindow) paymentWindow.close()
-    } finally {
-      setRenewing(false)
-    }
+    payChooser.open({
+      target: { kind: 'plan', plan: subscription.plan },
+      title: `${PLAN_NAMES[subscription.plan] || subscription.plan} tarifini uzaytirish · 1 oy`,
+    })
   }
 
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -786,7 +777,8 @@ export default function DashboardPage() {
         </dl>
 
         <div className="mt-6" />
-        <PlanCard sub={subscription} onRenew={handleRenew} renewing={renewing} />
+        <PlanCard sub={subscription} onRenew={handleRenew} renewing={!!payChooser.busy} />
+        {payChooser.ui}
 
         {/* Conversion banner: only for free users who haven't dismissed it */}
         {subscription?.plan === 'free' && !conversionBannerDismissed && (
