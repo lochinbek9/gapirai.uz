@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import html
 import logging
+import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -41,7 +42,7 @@ from backend.models.database import (
     User,
     VideoAnalysis,
 )
-from backend.services.email_service import DeliveryResult, deliver_email, list_unsubscribe_headers
+from backend.services.email_service import BULK_SEND_INTERVAL_S, DeliveryResult, deliver_email, list_unsubscribe_headers
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -333,7 +334,9 @@ def run(db, now: datetime | None = None, daily_limit: int | None = None, dry_run
         stats["reason"] = "dry-run"
         return stats
 
-    for user, kind, (subject, page, text) in queue[:budget]:
+    for i, (user, kind, (subject, page, text)) in enumerate(queue[:budget]):
+        if i:
+            time.sleep(BULK_SEND_INTERVAL_S)  # Resend: sekundiga 2 ta so'rov
         result = _send(db, user, kind, subject, page, text, now)
         if result == DeliveryResult.OK:
             stats["sent"] += 1

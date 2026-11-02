@@ -2509,7 +2509,7 @@ def _process_broadcast_campaign(campaign_id: str):
     import html as html_lib
     import logging
     import time
-    from backend.services.email_service import send_broadcast_email
+    from backend.services.email_service import BULK_SEND_INTERVAL_S, send_broadcast_email
     from backend.services.telegram_notify import send_telegram_message
 
     task_logger = logging.getLogger("broadcast_task")
@@ -2621,7 +2621,7 @@ def _process_broadcast_campaign(campaign_id: str):
                 except Exception as e:
                     task_logger.warning(f"Broadcast Email error ({rec['email']}): {e}")
                     email_failed += 1
-                time.sleep(0.1)  # Resend limit ~10/sec
+                time.sleep(BULK_SEND_INTERVAL_S)  # Resend: sekundiga 2 ta so'rov (email_service.py)
 
             if idx % 20 == 0 or idx == len(recipient_data) - 1:
                 campaign.email_sent = email_sent

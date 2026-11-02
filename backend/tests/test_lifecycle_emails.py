@@ -36,6 +36,9 @@ class LifecycleTest(unittest.TestCase):
         p = patch.object(le, "deliver_email", side_effect=self._deliver)
         p.start()
         self.addCleanup(p.stop)
+        sleep = patch.object(le.time, "sleep")  # yuborishlar orasidagi 0.6 s kutish -- testda kerak emas
+        self.slept = sleep.start()
+        self.addCleanup(sleep.stop)
         self.result = DeliveryResult.OK
 
     def tearDown(self):
@@ -94,6 +97,7 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(le.run(self.db, now=night, daily_limit=100)["reason"], "tungi vaqt")
         res = le.run(self.db, now=NOON, daily_limit=2)
         self.assertEqual(res["sent"], 2)
+        self.assertEqual(self.slept.call_count, 1)  # 2 ta xat orasida bitta pauza
         self.assertIn("keyingi kunlarga", res["reason"])
         self.assertEqual(le.run(self.db, now=NOON + timedelta(hours=1), daily_limit=2)["reason"], "kunlik limit")
 
@@ -135,6 +139,43 @@ class LifecycleTest(unittest.TestCase):
         self.assertTrue(le.verify_unsubscribe(str(uid), le.unsubscribe_token(uid)))
         self.assertFalse(le.verify_unsubscribe(str(uid), le.unsubscribe_token(uuid.uuid4())))
         self.assertIn(str(uid), le.unsubscribe_url(uid))
+
+
+class DeliverEmailRetryTest(unittest.TestCase):
+    """Resend 429 (sekundiga 2 ta so'rov) -- kutib qayta urinadi; kvota tugasa RATE_LIMITED."""
+
+    def setUp(self):
+        from backend.services import email_service as es
+        self.es = es
+        for name, value in (("RESEND_API_KEY", "re_test"), ("SMTP_ENABLED", False), ("SMTP_USER", ""), ("SMTP_PASSWORD", "")):
+            p = patch.object(es.settings, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+        sleep = patch.object(es.time, "sleep")
+        self.sleep = sleep.start()
+        self.addCleanup(sleep.stop)
+
+    def resp(self, code, retry_after=None):
+        from unittest.mock import MagicMock
+        r = MagicMock(status_code=code, text="x")
+        r.headers = {"retry-after": retry_after} if retry_after else {}
+        return r
+
+    def test_retries_after_429_then_ok(self):
+        with patch.object(self.es.httpx, "post", side_effect=[self.resp(429, "2"), self.resp(200)]) as post:
+            self.assertEqual(self.es.deliver_email("a@t.uz", "s", "<p>h</p>", "t"), DeliveryResult.OK)
+        self.assertEqual(post.call_count, 2)
+        self.sleep.assert_called_once_with(2.0)
+
+    def test_persistent_429_is_rate_limited(self):
+        with patch.object(self.es.httpx, "post", return_value=self.resp(429)) as post:
+            self.assertEqual(self.es.deliver_email("a@t.uz", "s", "<p>h</p>", "t"), DeliveryResult.RATE_LIMITED)
+        self.assertEqual(post.call_count, 4)
+
+    def test_other_error_fails_without_retry(self):
+        with patch.object(self.es.httpx, "post", return_value=self.resp(422)) as post:
+            self.assertEqual(self.es.deliver_email("a@t.uz", "s", "<p>h</p>", "t"), DeliveryResult.FAILED)
+        self.assertEqual(post.call_count, 1)
 
 
 if __name__ == "__main__":
