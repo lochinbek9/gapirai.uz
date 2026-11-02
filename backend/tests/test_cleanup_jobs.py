@@ -66,8 +66,10 @@ class CleanupJobsTest(base.JobDeletionTest):
 
     def test_deleting_duplicate_keeps_other_users_cached_copy(self):
         a, b = self.user(), self.user()
-        root = self.make_root(minutes_ago=60 * 24 * 9)          # a ning eski nusxasi -- asl fayllar shu yerda
-        root.user_id, root.youtube_video_id = a.id, "dup"
+        root = self.make_root()                                  # a ning eski nusxasi -- asl fayllar shu yerda
+        # make_root() vaqtni haqiqiy soatdan oladi, qolgan job'lar esa qat'iy NOW'dan -- sanani
+        # NOW'ga bog'laymiz, aks holda test yozilganidan ~9 kun o'tib tartib aylanib qolardi
+        root.user_id, root.youtube_video_id, root.created_at = a.id, "dup", NOW - timedelta(days=9)
         keep = self.job(a, days_ago=2, vid="dup")                # a ning yangi nusxasi qoladi
         copy_b = self.make_copy(root, 60)                        # b ning kesh nusxasi asl fayllarga ishora qiladi
         copy_b.user_id, copy_b.youtube_video_id = b.id, "dup"
