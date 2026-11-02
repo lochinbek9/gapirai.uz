@@ -498,6 +498,42 @@ class UserDailyVisit(Base):
     user = relationship("User")
 
 
+class EmailLog(Base):
+    """Avtomatik (lifecycle) emaillar jurnali -- backend/services/lifecycle_emails.py.
+    kind: "activate_1" | "activate_2" | "activate_3" | "quota:<sana>" | "news:<yil>-W<hafta>".
+    (user_id, kind) noyob -- bir xil xat bir odamga ikki marta ketmaydi."""
+    __tablename__ = "email_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(40), nullable=False)
+    ok = Column(Boolean, nullable=False, default=True)
+    sent_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (UniqueConstraint("user_id", "kind"),)
+
+
+class EmailOptOut(Base):
+    """Avtomatik va ommaviy xatlardan chiqqanlar (xat ostidagi "Obunadan chiqish").
+    users jadvaliga ustun qo'shish o'rniga alohida jadval -- migratsiyasiz (create_all)."""
+    __tablename__ = "email_opt_outs"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SiteNews(Base):
+    """Admin yozadigan sayt yangiliklari -- haftalik "GapirAI.uz yangiliklari" xatiga kiradi."""
+    __tablename__ = "site_news"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(160), nullable=False)
+    body = Column(Text, nullable=False)
+    link_url = Column(String(500), nullable=True)
+    link_text = Column(String(60), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class BroadcastCampaign(Base):
     """Admin orqali ommaviy xabarnomalar yuborish tarixi (Email, Telegram bot yoki ikkalasi)."""
     __tablename__ = "broadcast_campaigns"

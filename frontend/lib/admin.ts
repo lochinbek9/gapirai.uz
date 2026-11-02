@@ -1168,3 +1168,43 @@ export async function apiAdminActiveUsers(
   })
   return res.data
 }
+
+// ─────────────────────────────────────────────────────────────
+// Avtomatik xatlar (backend/api/email_routes.py): yangiliklar va statistika
+// ─────────────────────────────────────────────────────────────
+export interface SiteNewsItem {
+  id: number
+  title: string
+  body: string
+  link_url: string | null
+  link_text: string | null
+  created_at: string
+}
+
+export interface EmailAutomationStats {
+  last_7_days: Record<string, { sent: number; failed: number }>
+  opt_outs: number
+  queued_now: number
+  note: string
+}
+
+const auth = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } })
+
+export async function apiEmailStats(token: string): Promise<EmailAutomationStats> {
+  return (await axios.get(`${API_URL}/api/email/admin/stats`, auth(token))).data
+}
+
+export async function apiListNews(token: string): Promise<SiteNewsItem[]> {
+  return (await axios.get(`${API_URL}/api/email/admin/news`, auth(token))).data
+}
+
+export async function apiCreateNews(
+  token: string,
+  payload: { title: string; body: string; link_url?: string; link_text?: string },
+): Promise<SiteNewsItem> {
+  return (await axios.post(`${API_URL}/api/email/admin/news`, payload, auth(token))).data
+}
+
+export async function apiDeleteNews(token: string, id: number): Promise<void> {
+  await axios.delete(`${API_URL}/api/email/admin/news/${id}`, auth(token))
+}
