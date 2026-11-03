@@ -83,7 +83,7 @@ def generate_downscaled(job, resolution: str) -> str:
         return f"/outputs/{job_id}/video/dubbed_{resolution}.mp4"
 
 
-def generate_1080p(job) -> str:
+def generate_1080p(job, watermark: bool = True) -> str:
     job_id = job.storage_id
     tmp_job_id = f"{job_id}_1080p"
     tmp_dir = Path(settings.UPLOAD_DIR) / tmp_job_id
@@ -147,6 +147,7 @@ def generate_1080p(job) -> str:
                 video_path=video_path,
                 dubbed_audio_path=local_audio,
                 output_path=local_out,
+                watermark=watermark,
             )
         else:
             # YouTube'dan yuklab bo'lmaganda yoki manbada 1080p bo'lmaganda,
@@ -192,11 +193,12 @@ def generate_1080p(job) -> str:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def generate_variant(job, resolution: str) -> str:
+def generate_variant(job, resolution: str, watermark: bool = True) -> str:
+    # 360p/480p -- master videodan kichraytiriladi, belgi holati masterdan o'tadi
     if resolution in ("360p", "480p"):
         return generate_downscaled(job, resolution)
     if resolution == "1080p":
-        return generate_1080p(job)
+        return generate_1080p(job, watermark=watermark)
     raise ValueError(f"Qo'llab-quvvatlanmaydigan rezolyutsiya: {resolution}")
 
 

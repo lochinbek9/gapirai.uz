@@ -91,6 +91,12 @@ class TestCreateDubbingJobCacheReuse(unittest.IsolatedAsyncioTestCase):
         self.user = User(id=uuid.uuid4(), name="Test User")
         self.youtube_url = "https://www.youtube.com/watch?v=abc12345678"
 
+        # Suv belgisi istisnosi (watermark.py) MagicMock db'da har kimni "hamkor" deb ko'radi --
+        # bu testlar kesh qarorining boshqa shartlarini tekshiradi
+        _w = patch("backend.services.watermark.is_cache_compatible", return_value=True)
+        _w.start()
+        self.addCleanup(_w.stop)
+
         # Kunlik job chegarasi -- bu testlar kesh-hit qarorini tekshiradi,
         # chegara emas (chegara test_daily_job_limit'da alohida sinaladi).
         _p = patch.object(job_creation, "_daily_job_limit_reached", return_value=False)

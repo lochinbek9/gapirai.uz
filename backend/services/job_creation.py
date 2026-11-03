@@ -287,7 +287,9 @@ async def create_dubbing_job(
 
         cached_job = cache_query.order_by(DubbingJob.completed_at.desc()).first()
 
-        if cached_job and _cached_job_files_exist(cached_job):
+        # Suv belgisi holati mos kelmasa (hamkor <-> oddiy foydalanuvchi) -- keshdan berilmaydi
+        from backend.services.watermark import is_cache_compatible
+        if cached_job and _cached_job_files_exist(cached_job) and is_cache_compatible(db, user.id, cached_job):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
 
     if video_id:

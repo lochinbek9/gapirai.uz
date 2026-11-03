@@ -37,7 +37,8 @@ def generate_resolution_variant_task(self: Task, job_id: str, resolution: str):
             return
 
         try:
-            s3_key = resolution_variants.generate_variant(job, resolution)
+            from backend.services.watermark import is_watermark_exempt
+            s3_key = resolution_variants.generate_variant(job, resolution, watermark=not is_watermark_exempt(db, job.user_id))
             variant.status = "ready"
             variant.s3_key = s3_key
             variant.error_message = None

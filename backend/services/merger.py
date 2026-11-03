@@ -207,6 +207,7 @@ def merge_video_audio(
     output_path: str,
     max_duration: float | None = None,
     audio_mix_mode: str | None = None,
+    watermark: bool = True,
 ) -> str:
     """
     Original video + O'zbekcha dublyaj → Tayyor video, kino-dublyaji uslubida
@@ -214,7 +215,8 @@ def merge_video_audio(
     gapirayotgan joyda moslashuvchan pasayadi — backend/config.py: DUCKING_*).
 
     Barcha tariflar uchun yuqori o'ng burchakda rasmiy GapirAI.uz suv belgisi
-    (logo + domen) joylashtiriladi.
+    (logo + domen) joylashtiriladi; watermark=False -- hamkorlar uchun istisno
+    (backend/services/watermark.py).
 
     Agar o'zbekcha dublyaj video dan uzunroq bo'lsa:
     → Video oxirgi kadri "freeze" qilinadi (qora ekran emas, tabiiy tugatish)
@@ -258,7 +260,7 @@ def merge_video_audio(
     vcodec = _probe_video_codec(video_path)
     needs_transcode = vcodec not in ("h264", "avc1")
 
-    use_watermark = WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
+    use_watermark = watermark and WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
 
     def _build_cmd(with_watermark: bool) -> list[str]:
         if with_watermark:
