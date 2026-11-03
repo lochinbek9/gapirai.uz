@@ -498,6 +498,17 @@ class UserDailyVisit(Base):
     user = relationship("User")
 
 
+class WatermarkExemption(Base):
+    """Suv belgisiz dublaj -- hamkorlar uchun istisno (egasi 2026-11-03).
+    Shu ro'yxatdagi foydalanuvchining dublajlari GapirAI.uz belgisisiz yig'iladi
+    (backend/services/merger.py). Boshqaruv: backend/scripts/watermark_exempt.py."""
+    __tablename__ = "watermark_exemptions"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    note = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class EmailLog(Base):
     """Avtomatik (lifecycle) emaillar jurnali -- backend/services/lifecycle_emails.py.
     kind: "activate_1" | "activate_2" | "activate_3" | "quota:<sana>" | "news:<yil>-W<hafta>".

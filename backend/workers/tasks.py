@@ -1215,6 +1215,8 @@ def process_video(self: Task, job_id: str) -> dict:
             final_output = str(final_output_dir / "dubbed_final.mp4")
 
             max_dur = 120.0 if getattr(job, "is_preview", False) else None
+            from backend.services.watermark import is_watermark_exempt
+            with_watermark = not is_watermark_exempt(db, job.user_id)
             _release_read_tx(db)
             merger.merge_video_audio(
                 video_path=video_path,
@@ -1222,6 +1224,7 @@ def process_video(self: Task, job_id: str) -> dict:
                 output_path=final_output,
                 max_duration=max_dur,
                 audio_mix_mode=getattr(job, "audio_mix_mode", None),
+                watermark=with_watermark,
             )
 
             # Birlashtirishdan so'ng darhol yakuniy video fayli tekshiriladi
