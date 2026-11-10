@@ -424,7 +424,7 @@ async def create_dubbing_job(
         # Sinov mutlaqo bepul — foydalanuvchi hisobida daqiqa bo'lmasa ham 2 daqiqalik sinov beriladi.
         pass
     else:
-        if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+        if duration_minutes > MAX_VIDEO_DURATION_MINUTES and not is_user_admin(db, user.id):
             return JobCreationResult(outcome="too_long", video_title=title, duration_minutes=duration_minutes)
 
         covered, minutes_short = _quota_or_autotopup(db, user.id, duration_minutes)
@@ -587,7 +587,7 @@ def create_job_from_local_video_file_sync(
         return JobCreationResult(outcome="bad_file")
 
     duration_minutes = duration / 60.0
-    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
+    if duration_minutes > MAX_VIDEO_DURATION_MINUTES and not is_user_admin(db, user.id):
         video_path.unlink(missing_ok=True)
         return JobCreationResult(outcome="too_long", duration_minutes=duration_minutes)
 
