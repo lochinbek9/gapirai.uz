@@ -822,10 +822,17 @@ def process_video(self: Task, job_id: str) -> dict:
             # Subtitr rejimi yoki uzbek_source uchun STT Gemini (Google AI Studio) bo'ladi.
             # OpenAI Whisper o'zbek tilini yaxshi tushunmaydi va tez-tez turkcha/xato chiqaradi.
             # O'zbekcha nutq: STT_UZ_PRIMARY (standart "gemini"; "neuronai" -- NeuronAI birinchi).
+            from backend.services import plans
+            # STT_PROVIDER=neuronai: dublaj/chet tilidagi subtitr ham NeuronAI'dan boshlanadi;
+            # NEURONAI_DUB_ADMIN_ONLY=True (standart) -- avval faqat admin joblarida (sinov).
             if uzbek_source:
                 stt_primary = settings.STT_UZ_PRIMARY or "gemini"
+            elif settings.STT_PROVIDER == "neuronai" and (
+                not settings.NEURONAI_DUB_ADMIN_ONLY or plans.is_user_admin(db, job.user_id)
+            ):
+                stt_primary = "neuronai"
             else:
-                stt_primary = "gemini" if (job.subtitle_only or settings.STT_PROVIDER == "gemini") else "openai"
+                stt_primary = "gemini" if (job.subtitle_only or settings.STT_PROVIDER in ("gemini", "neuronai")) else "openai"
             stt_is_paid = True
             try:
                 _release_read_tx(db)

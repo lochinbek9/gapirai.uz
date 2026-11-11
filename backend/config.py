@@ -262,6 +262,9 @@ class Settings(BaseSettings):
     NEURONAI_API_KEY: str = ""
     NEURONAI_BASE_URL: str = "https://my.neuronai.uz/api/v1"
     NEURONAI_STT_ENABLED: bool = False
+    # STT_PROVIDER=neuronai bo'lganda dublaj STT'si faqat admin joblarida NeuronAI'dan boshlanadi
+    # (sinov); False -- hamma foydalanuvchilar uchun.
+    NEURONAI_DUB_ADMIN_ONLY: bool = True
 
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""
