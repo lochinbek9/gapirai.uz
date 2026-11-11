@@ -462,61 +462,14 @@ def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> l
     return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
 
 
-# gemma 45 segmentlik bo'lakda gaplarni qo'shni segmentlarga ko'chirib, segmentlarni birlashtirib
-# yuborgan (94 -> 80, tarjima videodan 1-2 daqiqa siljigan, 2026-11-11) -- kichik bo'lak + qat'iy id tekshiruvi.
-_NEURONAI_CHUNK = 12
-
-
-def _neuronai_translate_strict(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """Bitta so'rov; javobda HAR BIR id aynan bir marta bo'lishi shart, aks holda ValueError.
-    Pozitsiya bo'yicha moslashtirish (_reconcile_segments) bu yerda ATAYLAB ishlatilmaydi --
-    u segmentlar soni farq qilganda butun qolgan tarjimani siljitib yuboradi."""
+def _translate_chunk_neuronai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """NeuronAI LLM (gemma) -- o'sha SYSTEM_PROMPT va ko'rsatma bilan."""
     from backend.services import neuronai_llm
     result = neuronai_llm.chat_json([
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": _build_instruction(clean_segments)},
     ])
-    items = _extract_segments_from_result(result, [])
-    by_id: dict = {}
-    for it in items:
-        if not isinstance(it, dict) or not (it.get("text") or "").strip():
-            continue
-        try:
-            key = int(it.get("id"))
-        except (TypeError, ValueError):
-            continue
-        if key in by_id:
-            raise ValueError(f"id {key} takrorlandi")
-        by_id[key] = it["text"].strip()
-    expected = [int(s["id"]) for s in segments]
-    missing = [k for k in expected if k not in by_id]
-    if missing or len(by_id) != len(expected):
-        raise ValueError(f"segmentlar mos emas: {len(expected)} ta kutilgan, {len(by_id)} ta keldi, yo'q id'lar {missing[:5]}")
-    return [{**s, "text": by_id[int(s["id"])]} for s in segments]
-
-
-def _translate_chunk_neuronai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """NeuronAI LLM (gemma) -- o'sha SYSTEM_PROMPT va ko'rsatma bilan, _NEURONAI_CHUNK'lik bo'laklarda.
-    Bo'lak mos kelmasa ikkiga bo'linib qayta so'raladi; bitta segment ham mos kelmasa ValueError
-    (chaqiruvchi butun bo'lakni avvalgi zanjirga beradi)."""
-    if any(s.get("id") is None for s in segments):
-        segments = [{**s, "id": i + 1} for i, s in enumerate(segments)]
-        clean_segments = [{**c, "id": i + 1} for i, c in enumerate(clean_segments)]
-
-    def run(seg: list[dict], cln: list[dict]) -> list[dict]:
-        try:
-            return _neuronai_translate_strict(seg, cln)
-        except ValueError as e:
-            if len(seg) <= 1:
-                raise
-            logger.warning(f"NeuronAI tarjima bo'lagi ({len(seg)} segment) mos kelmadi ({e}) -- ikkiga bo'linmoqda.")
-            mid = len(seg) // 2
-            return run(seg[:mid], cln[:mid]) + run(seg[mid:], cln[mid:])
-
-    out: list[dict] = []
-    for i in range(0, len(segments), _NEURONAI_CHUNK):
-        out.extend(run(segments[i:i + _NEURONAI_CHUNK], clean_segments[i:i + _NEURONAI_CHUNK]))
-    return out
+    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
 
 
 def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
