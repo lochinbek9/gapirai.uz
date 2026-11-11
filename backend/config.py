@@ -272,6 +272,9 @@ class Settings(BaseSettings):
     # True: dublyaj tarjimasi avval NeuronAI LLM'da, xato bo'lsa TRANSLATE_PROVIDER zanjiri (o'zgarmagan).
     NEURONAI_TRANSLATE_ENABLED: bool = False
     NEURONAI_LLM_MODEL: str = "gemma-4-26b-a4b"
+    # True: spiker jinsini aniqlash va kontent xavfsizligi tekshiruvi avval NeuronAI LLM'da
+    # (Gemini kalitlari limitda -- jins aniqlash 5-7 daqiqa kutgan, 2026-11-11); xatoda avvalgi zanjir.
+    NEURONAI_AUX_LLM_ENABLED: bool = False
 
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""

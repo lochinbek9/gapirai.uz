@@ -296,6 +296,19 @@ def _detect_gender(transcript_text: str, title: str = "") -> str:
         result = (resp.choices[0].message.content or "").strip().lower()
         return "female" if (result == "female" or (result.startswith("female") and "male" not in result)) else "male"
 
+    def _parse(result: str) -> str:  # gemma ba'zan "**Female**" / "Female." deb yozadi
+        return "female" if "female" in (result or "").lower() else "male"
+
+    if settings.NEURONAI_AUX_LLM_ENABLED and settings.NEURONAI_API_KEY:
+        try:
+            from backend.services import neuronai_llm
+            return _parse(neuronai_llm.chat_text([
+                {"role": "system", "content": _GENDER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt_text},
+            ], temperature=0, max_tokens=5))
+        except Exception as e:
+            logger.warning(f"_detect_gender: NeuronAI xato ({e}), avvalgi zanjirga o'tilmoqda.")
+
     if prefer_gemini and gemini_available:
         try:
             return _call_gemini()

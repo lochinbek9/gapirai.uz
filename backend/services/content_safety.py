@@ -201,6 +201,25 @@ def _gemini_safety_check(text: str) -> SafetyResult:
     return SafetyResult(allowed=True)
 
 
+def _result_from_data(data: dict) -> SafetyResult:
+    if data.get("is_prohibited") is True or str(data.get("is_prohibited")).lower() == "true":
+        category = data.get("category")
+        cat_key = category if category in PROHIBITED_CATEGORIES else "policy_violation"
+        fallback_reason = CATEGORY_DEFAULT_REASONS.get(cat_key, "Ushbu video kontent siyosatiga to'g'ri kelmaydi.")
+        return SafetyResult(allowed=False, category=cat_key, reason=data.get("reason_uz") or fallback_reason)
+    return SafetyResult(allowed=True)
+
+
+def _neuronai_safety_check(text: str) -> SafetyResult:
+    """NeuronAI LLM (NEURONAI_AUX_LLM_ENABLED) -- o'sha prompt, o'sha JSON format."""
+    from backend.services import neuronai_llm
+    data = neuronai_llm.chat_json([
+        {"role": "system", "content": _CONTENT_SAFETY_SYSTEM_PROMPT},
+        {"role": "user", "content": text[:8000]},
+    ], temperature=0.0)
+    return _result_from_data(data)
+
+
 def check_safety(text: str) -> SafetyResult:
     """Matnni (metadata yoki transkript) xavfsizlik tekshiruvidan o'tkazadi.
     Bo'sh matn yoki xizmat o'chirilgan bo'lsa — avtomatik ruxsat.
@@ -210,6 +229,12 @@ def check_safety(text: str) -> SafetyResult:
     """
     if not settings.CONTENT_SAFETY_ENABLED or not text.strip():
         return SafetyResult(allowed=True)
+
+    if settings.NEURONAI_AUX_LLM_ENABLED and settings.NEURONAI_API_KEY:
+        try:
+            return _neuronai_safety_check(text)
+        except Exception as e:
+            logger.warning(f"NeuronAI kontent xavfsizligi tekshiruvida xatolik ({e}) — avvalgi zanjirga o'tilmoqda.")
 
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
