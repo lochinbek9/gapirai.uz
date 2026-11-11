@@ -11,7 +11,7 @@ from pathlib import Path
 from pydub import AudioSegment
 from backend.config import get_settings
 from backend.services.tts.factory import get_provider, get_fallback_provider
-from backend.services.tts.base import PermanentTTSError
+from backend.services.tts.base import PermanentTTSError, TTSOutOfCreditsError
 from backend.services.tts_cost import log_tts_usage
 
 logger = logging.getLogger(__name__)
@@ -389,6 +389,8 @@ def synthesize_segments(
         else:
             try:
                 engine = _call_synth()
+            except TTSOutOfCreditsError:
+                raise  # butun dublyaj boshqa provayderda qaytadan -- tasks.py
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: dastlabki sintezda xatolik: {exc}")
                 engine = get_provider(provider_name).name
@@ -406,6 +408,8 @@ def synthesize_segments(
             )
             try:
                 engine = _call_synth()
+            except TTSOutOfCreditsError:
+                raise
             except Exception as exc:
                 logger.warning(f"Segment {seg['id']}: qayta sintezda xatolik: {exc}")
             valid, reason = _validate_wav_file(str(seg_file))

@@ -24,7 +24,7 @@ import time
 import httpx
 
 from backend.config import get_settings
-from backend.services.tts.base import PermanentTTSError, TTSProvider
+from backend.services.tts.base import PermanentTTSError, TTSOutOfCreditsError, TTSProvider
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -140,8 +140,10 @@ class VoiceLabProvider(TTSProvider):
             audio = self._wait_for_job(status_url)
         elif resp.status_code == 200:
             audio = resp.content
+        elif resp.status_code == 402:
+            raise TTSOutOfCreditsError(f"VoiceLab TTS: kredit tugadi ({_error_code(resp)})")
         else:
-            # 402 (kredit), 404 (ovoz), 409, 422, 429/5xx -- job to'xtamasin, synthesizer zaxiraga o'tadi.
+            # 404 (ovoz), 409, 422, 429/5xx -- job to'xtamasin, synthesizer zaxiraga o'tadi.
             logger.warning(f"VoiceLab TTS: {resp.status_code} {_error_code(resp)}")
             return False
 

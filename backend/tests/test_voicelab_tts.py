@@ -79,10 +79,16 @@ class VoiceLabTTSTest(unittest.TestCase):
         keys = {c.kwargs["headers"]["Idempotency-Key"] for c in post.call_args_list}
         self.assertEqual((post.call_count, len(keys)), (3, 1))
 
-    def test_credits_or_voice_errors_fall_back(self):
-        for code in (402, 404, 422):
-            with patch("httpx.post", return_value=_resp(code, json_body={"error": {"code": "insufficient_credits"}})):
+    def test_voice_or_validation_errors_fall_back(self):
+        for code in (404, 422):
+            with patch("httpx.post", return_value=_resp(code, json_body={"error": {"code": "voice_unavailable"}})):
                 self.assertFalse(VoiceLabProvider().synthesize("Salom", self.out))
+
+    def test_out_of_credits_raises(self):
+        from backend.services.tts.base import TTSOutOfCreditsError
+        with patch("httpx.post", return_value=_resp(402, json_body={"error": {"code": "insufficient_credits"}})):
+            with self.assertRaises(TTSOutOfCreditsError):
+                VoiceLabProvider().synthesize("Salom", self.out)
 
     def test_auth_error_is_permanent(self):
         with patch("httpx.post", return_value=_resp(401, json_body={"error": {"code": "invalid_api_key"}})):

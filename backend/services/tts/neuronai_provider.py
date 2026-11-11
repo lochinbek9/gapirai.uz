@@ -22,7 +22,7 @@ import time
 import httpx
 
 from backend.config import get_settings
-from backend.services.tts.base import PermanentTTSError, TTSProvider
+from backend.services.tts.base import PermanentTTSError, TTSOutOfCreditsError, TTSProvider
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -106,8 +106,10 @@ class NeuronAIProvider(TTSProvider):
 
         if resp.status_code in (401, 403):
             raise PermanentTTSError(f"NeuronAI TTS: ruxsat xatosi ({resp.status_code}): {_error_code(resp)}")
+        if resp.status_code == 402:
+            raise TTSOutOfCreditsError(f"NeuronAI TTS: balans tugadi ({_error_code(resp)})")
         if resp.status_code != 200:
-            # 402 (balans), 409, 422, 429, 5xx -- job to'xtamasin, synthesizer zaxiraga o'tadi.
+            # 409, 422, 429, 5xx -- job to'xtamasin, synthesizer zaxiraga o'tadi.
             logger.warning(f"NeuronAI TTS: {resp.status_code} {_error_code(resp)}")
             return False
         if len(resp.content) < 100:

@@ -12,6 +12,7 @@ from backend.workers.celery_app import celery_app
 from backend.models.database import SessionLocal, DubbingJob, JobStatus, ContentViolation, User
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
 from backend.services.errors import PermanentError, NoSpeechFoundError
+from backend.services.tts.base import TTSOutOfCreditsError
 from backend.services import error_classification
 from backend.services.content_safety import check_safety
 from backend.services.email_service import send_dubbing_complete_email
@@ -1193,21 +1194,52 @@ def process_video(self: Task, job_id: str) -> dict:
 
             speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
             _release_read_tx(db)
-            dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
-                speech_segments, tts_dir, voice_name=voice,
-                video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
-                existing_qa=job.segment_qa,
-                progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
-                provider_name=tts_provider,
-                is_paid=tts_is_paid,
-            )
+            try:
+                dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
+                    speech_segments, tts_dir, voice_name=voice,
+                    video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
+                    existing_qa=job.segment_qa,
+                    progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
+                    provider_name=tts_provider,
+                    is_paid=tts_is_paid,
+                )
+            except TTSOutOfCreditsError as exc:
+                # Pullik provayderda balans video o'rtasida tugadi -- qolgan segmentlarni Edge'da
+                # qilish bitta videoda ikki xil ovoz beradi. Shuning uchun butun ovoz Edge'da
+                # (bepul, Sardor/Madina) qaytadan; tayyor segment fayllari o'chiriladi.
+                logger.error(f"[JOB {job_id}] {exc} -- butun dublyaj Edge ovozida qaytadan sintez qilinmoqda.")
+                try:
+                    from backend.services.telegram_notify import send_alert_to_admins
+                    send_alert_to_admins(
+                        f"⚠️ {tts_provider} TTS balansi tugadi -- dublyajlar vaqtincha bepul Edge ovozida. "
+                        f"Balansni to'ldiring.\n{exc}",
+                        alert_key=f"tts_out_of_credits:{tts_provider}", throttle_seconds=3600,
+                    )
+                except Exception:
+                    pass
+                shutil.rmtree(tts_dir, ignore_errors=True)
+                tts_provider = "edge"
+                voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
+                job.tts_provider, job.voice_name, job.segment_qa = tts_provider, voice, None
+                db.commit()
+                _release_read_tx(db)
+                dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
+                    speech_segments, tts_dir, voice_name=voice,
+                    video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
+                    existing_qa=None,
+                    progress_cb=lambda done, total: set_subprogress(job_id, 60.0 + 22.0 * done / max(1, total)),
+                    provider_name=tts_provider,
+                    is_paid=False,
+                )
             job.dubbed_audio_path = dubbed_audio_path
             if tts_provider == "gemini":
                 job.tts_model = f"gemini-3.8-flash-tts ({voice})"
             elif tts_provider == "edge":
                 job.tts_model = f"edge-tts ({voice})"
-            else:
+            elif tts_provider == "azure":
                 job.tts_model = f"azure-neural ({voice})"
+            else:
+                job.tts_model = f"{tts_provider} ({voice})"
             # Segment darajasidagi QA checkpoint — Celery qayta urinishida
             # faqat muvaffaqiyatsiz/tekshirilmagan segmentlar qayta
             # ishlanadi (synthesizer.py'ning existing_qa parametri orqali).

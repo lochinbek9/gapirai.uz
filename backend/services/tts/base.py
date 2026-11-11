@@ -26,6 +26,12 @@ class PermanentTTSError(Exception):
     — bu holatda fallback urinilishi kerak."""
 
 
+class TTSOutOfCreditsError(Exception):
+    """Provayder hisobida balans/kredit tugadi (402). Segment-segment zaxiraga o'tish o'rniga
+    (bitta videoda ikki xil ovoz chiqardi) chaqiruvchi butun dublyajni boshqa provayderda
+    qaytadan sintez qiladi -- backend/workers/tasks.py TTS bosqichi."""
+
+
 class TTSProvider(ABC):
     """
     Barcha TTS provayderlari uchun umumiy interfeys.
