@@ -32,20 +32,26 @@ def _get_client() -> OpenAI:
     return _client
 
 
-def chat_json(messages: list[dict], temperature: float = 0.45) -> dict:
-    """JSON javob qaytaradigan so'rov. Model ba'zan JSON atrofiga matn qo'shadi --
-    birinchi '{' dan oxirgi '}' gacha bo'lgan qism o'qiladi."""
-    resp = _get_client().chat.completions.create(
-        model=settings.NEURONAI_LLM_MODEL,
-        messages=messages,
-        temperature=temperature,
-        response_format={"type": "json_object"},
-    )
-    content = resp.choices[0].message.content or ""
+def _complete(messages: list[dict], **kwargs) -> str:
+    resp = _get_client().chat.completions.create(model=settings.NEURONAI_LLM_MODEL, messages=messages, **kwargs)
     usage = resp.usage
     if usage:
         cost = (usage.prompt_tokens * 1.5 + usage.completion_tokens * 6) / 1000
         logger.info(f"NeuronAI LLM: {usage.prompt_tokens}+{usage.completion_tokens} token, ~{cost:.1f} so'm")
+    return resp.choices[0].message.content or ""
+
+
+def chat_text(messages: list[dict], temperature: float = 0.0, max_tokens: int | None = None) -> str:
+    kwargs = {"temperature": temperature}
+    if max_tokens:
+        kwargs["max_tokens"] = max_tokens
+    return _complete(messages, **kwargs).strip()
+
+
+def chat_json(messages: list[dict], temperature: float = 0.45) -> dict:
+    """JSON javob qaytaradigan so'rov. Model ba'zan JSON atrofiga matn qo'shadi --
+    birinchi '{' dan oxirgi '}' gacha bo'lgan qism o'qiladi."""
+    content = _complete(messages, temperature=temperature, response_format={"type": "json_object"})
     start, end = content.find("{"), content.rfind("}")
     if start < 0 or end <= start:
         raise ValueError(f"NeuronAI LLM JSON qaytarmadi: {content[:200]}")
