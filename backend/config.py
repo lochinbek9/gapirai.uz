@@ -265,6 +265,13 @@ class Settings(BaseSettings):
     # STT_PROVIDER=neuronai bo'lganda dublaj STT'si faqat admin joblarida NeuronAI'dan boshlanadi
     # (sinov); False -- hamma foydalanuvchilar uchun.
     NEURONAI_DUB_ADMIN_ONLY: bool = True
+    # NeuronAI STT tilni o'zi aniqlaganda adashishi mumkin (inglizcha videoni arabcha deb olgan, 2026-11-11) --
+    # til avval lokal Whisper bilan aniqlanadi; ishonch shundan past yoki til NeuronAI ro'yxatida yo'q bo'lsa
+    # NeuronAI chetlab o'tiladi.
+    NEURONAI_LANG_MIN_PROB: float = 0.5
+    # True: dublyaj tarjimasi avval NeuronAI LLM'da, xato bo'lsa TRANSLATE_PROVIDER zanjiri (o'zgarmagan).
+    NEURONAI_TRANSLATE_ENABLED: bool = False
+    NEURONAI_LLM_MODEL: str = "gemma-4-26b-a4b"
 
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""
