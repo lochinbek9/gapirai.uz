@@ -63,10 +63,16 @@ class NeuronAITTSTest(unittest.TestCase):
         first, second = post.call_args_list
         self.assertEqual(first.kwargs["headers"]["Idempotency-Key"], second.kwargs["headers"]["Idempotency-Key"])
 
-    def test_balance_or_server_error_returns_false_for_fallback(self):
-        for code in (402, 500, 422):
-            with patch("httpx.post", return_value=_resp(code, json_body={"error": {"code": "insufficient_balance"}})):
+    def test_server_or_validation_error_returns_false_for_fallback(self):
+        for code in (500, 422):
+            with patch("httpx.post", return_value=_resp(code, json_body={"error": {"code": "server_error"}})):
                 self.assertFalse(NeuronAIProvider().synthesize("Salom", self.out))
+
+    def test_balance_exhausted_raises_out_of_credits(self):
+        from backend.services.tts.base import TTSOutOfCreditsError
+        with patch("httpx.post", return_value=_resp(402, json_body={"error": {"code": "insufficient_balance"}})):
+            with self.assertRaises(TTSOutOfCreditsError):
+                NeuronAIProvider().synthesize("Salom", self.out)
 
     def test_auth_error_is_permanent(self):
         with patch("httpx.post", return_value=_resp(401, json_body={"error": {"code": "invalid_api_key"}})):
