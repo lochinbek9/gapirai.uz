@@ -162,8 +162,7 @@ def translate_segments(segments: list[dict], is_paid: bool = False) -> list[dict
     if not segments:
         return []
 
-    neuronai_on = settings.NEURONAI_TRANSLATE_ENABLED and bool(settings.NEURONAI_API_KEY)
-    if settings.FREE_MODE and not neuronai_on and not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
+    if settings.FREE_MODE and not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
         logger.info("FREE_MODE (Gemini kaliti yo'q): Translating segments using free Google Translate API...")
         with ThreadPoolExecutor(max_workers=5) as executor:
             return list(executor.map(_translate_segment_free, segments))
@@ -462,31 +461,14 @@ def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> l
     return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
 
 
-def _translate_chunk_neuronai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """NeuronAI LLM (gemma) -- o'sha SYSTEM_PROMPT va ko'rsatma bilan."""
-    from backend.services import neuronai_llm
-    result = neuronai_llm.chat_json([
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": _build_instruction(clean_segments)},
-    ])
-    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
-
-
 def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
     """Bir bo'lak segmentlarni tarjima qilish -- TRANSLATE_PROVIDER ga qarab,
     ko'p pog'onali zaxira bilan: Gemini -> Groq LPU (bepul) -> xom Google Translate
-    (oxirgi chora). Video hech qachon tarjima sababli to'xtab qolmaydi.
-    NEURONAI_TRANSLATE_ENABLED=True bo'lsa bularning hammasidan oldin NeuronAI LLM."""
+    (oxirgi chora). Video hech qachon tarjima sababli to'xtab qolmaydi."""
     clean_segments = [
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
-
-    if settings.NEURONAI_TRANSLATE_ENABLED and settings.NEURONAI_API_KEY:
-        try:
-            return _translate_chunk_neuronai(segments, clean_segments)
-        except Exception as e:
-            logger.warning(f"NeuronAI tarjima muvaffaqiyatsiz ({e}) -- {settings.TRANSLATE_PROVIDER} zanjiriga o'tilmoqda.")
 
     if settings.TRANSLATE_PROVIDER == "groq":
         try:

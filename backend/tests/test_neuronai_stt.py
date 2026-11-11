@@ -114,32 +114,13 @@ class FreeModeOrderTest(unittest.TestCase):
             p.start()
             self.addCleanup(p.stop)
 
-    def test_neuronai_primary_skips_local_whisper_and_gets_detected_language(self):
+    def test_neuronai_primary_skips_local_whisper(self):
         api = {"text": "hi", "segments": [{"start": 0, "end": 1, "text": "hi"}], "srt": "", "language": "en"}
-        with patch.object(transcriber, "detect_language_local", return_value=("en", 0.93)), \
-             patch.object(transcriber, "_transcribe_local_whisper") as whisper, \
+        with patch.object(transcriber, "_transcribe_local_whisper") as whisper, \
              patch.object(transcriber, "_transcribe_via_api", return_value=api) as via_api:
             self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="neuronai"), api)
         whisper.assert_not_called()
-        self.assertEqual(via_api.call_args.args[1:3], ("en", "neuronai"))
-
-    def test_unsupported_or_unsure_language_skips_neuronai(self):
-        local = {"text": "x", "segments": [], "srt": "", "language": "ar"}
-        for detected in (("ar", 0.95), ("en", 0.3), (None, 0.0)):
-            with patch.object(transcriber, "detect_language_local", return_value=detected), \
-                 patch.object(transcriber, "_transcribe_local_whisper", return_value=local) as whisper, \
-                 patch.object(transcriber, "_transcribe_via_api") as via_api:
-                self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="neuronai"), local, detected)
-            whisper.assert_called_once()
-            via_api.assert_not_called()
-
-    def test_known_language_is_not_redetected(self):
-        api = {"text": "hi", "segments": [], "srt": "", "language": "ru"}
-        with patch.object(transcriber, "detect_language_local") as detect, \
-             patch.object(transcriber, "_transcribe_via_api", return_value=api) as via_api:
-            transcriber.transcribe_audio("a.wav", "ru", primary="neuronai")
-        detect.assert_not_called()
-        self.assertEqual(via_api.call_args.args[1:3], ("ru", "neuronai"))
+        self.assertEqual(via_api.call_args.args[2], "neuronai")
 
     def test_other_primary_keeps_local_whisper_first(self):
         local = {"text": "x", "segments": [], "srt": "", "language": "en"}
@@ -151,31 +132,10 @@ class FreeModeOrderTest(unittest.TestCase):
 
     def test_neuronai_down_falls_back_to_local_whisper(self):
         local = {"text": "x", "segments": [], "srt": "", "language": "en"}
-        with patch.object(transcriber, "detect_language_local", return_value=("en", 0.9)), \
-             patch.object(transcriber, "_transcribe_local_whisper", return_value=local) as whisper, \
+        with patch.object(transcriber, "_transcribe_local_whisper", return_value=local) as whisper, \
              patch.object(transcriber, "_transcribe_via_api", side_effect=RuntimeError("402")):
             self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="neuronai"), local)
         whisper.assert_called_once()
-
-
-class DetectLanguageLocalTest(unittest.TestCase):
-    def test_short_audio_falls_back_to_start_and_returns_whisper_language(self):
-        import shutil
-        import subprocess
-        if not shutil.which("ffmpeg"):
-            self.skipTest("ffmpeg yo'q")
-        with tempfile.TemporaryDirectory() as tmp:
-            wav = Path(tmp) / "a.wav"  # 5 s -- 20-soniyadan boshlab kesish bo'sh chiqadi
-            subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=5", str(wav)], check=True)
-            model = MagicMock()
-            model.transcribe.return_value = (iter([]), MagicMock(language="en", language_probability=0.87))
-            with patch.object(transcriber, "_get_local_whisper_model", return_value=model):
-                self.assertEqual(transcriber.detect_language_local(str(wav)), ("en", 0.87))
-            self.assertEqual(model.transcribe.call_args.kwargs["language"], None)
-
-    def test_error_returns_none(self):
-        with patch.object(transcriber, "_get_local_whisper_model", side_effect=RuntimeError("no model")):
-            self.assertEqual(transcriber.detect_language_local("/yoq/fayl.wav"), (None, 0.0))
 
 
 class SplitLongSegmentTest(unittest.TestCase):
