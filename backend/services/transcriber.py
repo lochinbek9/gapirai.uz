@@ -826,15 +826,80 @@ def _transcribe_chunk_groq(chunk_path: Path, offset_seconds: float, language: st
     return adjusted_segs, text, lang, "free", f"groq:{masked_k}"
 
 
+# NeuronAI qabul qiladigan til kodlari (OpenAPI: /v1/stt/transcribe); boshqasi -> "auto".
+_NEURONAI_STT_LANGUAGES = {"uz", "kaa", "ru", "en", "kk", "tk", "tg", "tr", "az", "ja", "de", "ko"}
+
+
+def is_neuronai_stt_available() -> bool:
+    return bool(settings.NEURONAI_STT_ENABLED and settings.NEURONAI_API_KEY)
+
+
+def neuronai_transcribe_file(path: Path, language: str | None = None, timeout: float = 300.0) -> dict:
+    """NeuronAI STT: bitta fayl (<=25 MB) -> {"text", "language", "duration_seconds", "segments", "cost", "balance"}.
+    Idempotency-Key = fayl mazmuni + til xeshi: Celery qayta urinishida xuddi shu bo'lak ikki marta to'lanmaydi."""
+    import hashlib
+    import httpx
+
+    if not settings.NEURONAI_API_KEY:
+        raise RuntimeError("NEURONAI_API_KEY sozlanmagan")
+    lang = language if language in _NEURONAI_STT_LANGUAGES else "auto"
+    data = path.read_bytes()
+    idem = "stt-" + hashlib.sha256(data + lang.encode()).hexdigest()
+    for attempt in range(4):
+        resp = httpx.post(
+            f"{settings.NEURONAI_BASE_URL.rstrip('/')}/stt/transcribe",
+            headers={"Authorization": f"Bearer {settings.NEURONAI_API_KEY}", "Idempotency-Key": idem},
+            files={"file": (path.name, data, "audio/mpeg")},
+            data={"language": lang},
+            timeout=timeout,
+        )
+        if resp.status_code != 429 or attempt == 3:
+            break
+        try:  # minutlik limit yoki bir vaqtdagi so'rovlar chegarasi -- kutib qayta (kalit tufayli qayta to'lanmaydi)
+            wait = min(max(float(resp.headers.get("retry-after", "2")), 1.0), 10.0)
+        except ValueError:
+            wait = 2.0
+        time.sleep(wait)
+    if resp.status_code != 200:
+        try:
+            err = resp.json().get("error", {})
+        except Exception:
+            err = {}
+        raise RuntimeError(f"NeuronAI STT {resp.status_code} {err.get('code', '')}: {(err.get('message') or resp.text)[:200]}")
+    return resp.json()["data"]
+
+
+def _transcribe_chunk_neuronai(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
+    """NeuronAI orqali bitta audio bo'lak (8 daqiqalik 64k mp3 ~4 MB -- 25 MB chegarasidan ancha past)."""
+    data = neuronai_transcribe_file(chunk_path, language)
+    segments = []
+    for s in data.get("segments") or []:
+        text = (s.get("text") or "").strip()
+        if not text:
+            continue
+        segments.append({
+            "start": round(float(s["start"]) + offset_seconds, 3),
+            "end": round(float(s["end"]) + offset_seconds, 3),
+            "text": text,
+        })
+    logger.info(
+        f"NeuronAI STT: {len(segments)} segment, {data.get('duration_seconds')} s, "
+        f"narx {data.get('cost')} so'm, balans {data.get('balance')} so'm"
+    )
+    return segments, (data.get("text") or "").strip(), data.get("language") or language or ""
+
+
 def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     """API provayderlar tartibi:
     1-o'rin: Groq Whisper (ultra-tez LPU, 0 CPU/RAM, bepul kvota)
-    2-o'rin: Gemini STT (Google AI Studio / Vertex AI)
-    3-o'rin: Azure STT (Cognitive Services)
-    4-o'rin: OpenAI Whisper
+    2-o'rin: NeuronAI STT (faqat NEURONAI_STT_ENABLED=True bo'lsa)
+    3-o'rin: Gemini STT (Google AI Studio / Vertex AI)
+    4-o'rin: Azure STT (Cognitive Services)
+    5-o'rin: OpenAI Whisper
     """
     from backend.services.groq_service import is_groq_available
     groq_ok = is_groq_available()
+    neuronai_ok = is_neuronai_stt_available()
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     azure_ok = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
@@ -842,6 +907,8 @@ def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     active = []
     if groq_ok:
         active.append("groq")
+    if neuronai_ok:
+        active.append("neuronai")
     if gemini_ok:
         active.append("gemini")
     if azure_ok:
@@ -861,7 +928,7 @@ def _transcribe_provider_order(primary: str = "groq") -> list[str]:
 
 
 def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini", is_paid: bool = False) -> dict:
-    """STT API (Groq / Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
+    """STT API (Groq / NeuronAI / Gemini / Azure / OpenAI Whisper) orqali audio'ni bo'lak-bo'lak
     transkripsiya qiladi. Groq 1-o'rinda (0 xarajat, ultra-tez), Gemini 2-o'rindagi ishonchli zaxira."""
     segments_list = []
     full_text_parts = []
@@ -878,6 +945,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
                 fn = _transcribe_chunk_gemini
             elif name == "azure":
                 fn = _transcribe_chunk_azure
+            elif name == "neuronai":
+                fn = _transcribe_chunk_neuronai
             else:
                 fn = _transcribe_chunk
             try:
