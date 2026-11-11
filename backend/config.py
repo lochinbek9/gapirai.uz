@@ -275,6 +275,10 @@ class Settings(BaseSettings):
     # True: spiker jinsini aniqlash va kontent xavfsizligi tekshiruvi avval NeuronAI LLM'da
     # (Gemini kalitlari limitda -- jins aniqlash 5-7 daqiqa kutgan, 2026-11-11); xatoda avvalgi zanjir.
     NEURONAI_AUX_LLM_ENABLED: bool = False
+    # NeuronAI TTS (0,3 so'm/belgi): yoqish -- TTS_PROVIDER_OVERRIDE=neuronai.
+    NEURONAI_TTS_MALE_VOICE: str = "kamron"
+    NEURONAI_TTS_FEMALE_VOICE: str = "madina"
+    NEURONAI_TTS_QUALITY: str = "standard"   # fast | standard | high
 
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""

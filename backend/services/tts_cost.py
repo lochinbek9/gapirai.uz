@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # uzbekvoice — UZS'da narxlanadi (500 so'm/1000 belgi); qolgan barcha
 # provayderlar (elevenlabs/azure/edge/openai/gemini) USD'da.
-_UZS_PROVIDERS = {"uzbekvoice"}
+_UZS_PROVIDERS = {"uzbekvoice", "neuronai"}
 
 
 def _get_audio_duration_seconds(path: str) -> float | None:
