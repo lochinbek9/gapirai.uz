@@ -869,24 +869,98 @@ def neuronai_transcribe_file(path: Path, language: str | None = None, timeout: f
     return resp.json()["data"]
 
 
+# NeuronAI o'zbekchani turk lotin harflarida yozadi (yönalişlardan, töğrisida) -- izchil,
+# shuning uchun rasmiy o'zbek lotin yozuviga bir xil almashtirish yetadi (2026-11-11 sinovi).
+_UZ_LATIN_FIX = {
+    "ş": "sh", "Ş": "Sh", "ç": "ch", "Ç": "Ch", "ö": "oʻ", "Ö": "Oʻ",
+    "ğ": "gʻ", "Ğ": "Gʻ", "ı": "i", "İ": "I", "ü": "u", "Ü": "U",
+}
+_UZ_LATIN_FIX_RE = re.compile("[" + "".join(_UZ_LATIN_FIX) + "]")
+
+
+def normalize_uz_latin(text: str) -> str:
+    """Turk lotin harflarini rasmiy o'zbek lotin yozuviga: ş->sh, ç->ch, ö->oʻ, ğ->gʻ."""
+    return _UZ_LATIN_FIX_RE.sub(lambda m: _UZ_LATIN_FIX[m.group()], text)
+
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
+_CLAUSE_SPLIT_RE = re.compile(r"(?<=[,;:])\s+")
+MAX_SEGMENT_SECONDS = 7.0
+
+
+def split_long_segment(seg: dict, max_seconds: float = MAX_SEGMENT_SECONDS) -> list[dict]:
+    """NeuronAI 20-30 soniyalik segment qaytaradi -- dublaj/subtitr uchun ~2-7 soniya kerak.
+    Matn gaplarga (kerak bo'lsa vergul/so'zlarga) bo'linadi, qisqa gaplar birlashtiriladi;
+    vaqt har bo'lakka matn uzunligiga mutanosib taqsimlanadi (taxminiy, so'z vaqtlari yo'q)."""
+    start, end, text = float(seg["start"]), float(seg["end"]), seg["text"].strip()
+    duration = end - start
+    if duration <= max_seconds or not text:
+        return [seg]
+    max_chars = max(20, int(len(text) / duration * max_seconds))
+
+    units: list[str] = []
+    for sentence in filter(None, (x.strip() for x in _SENTENCE_SPLIT_RE.split(text))):
+        if len(sentence) <= max_chars:
+            units.append(sentence)
+            continue
+        for clause in filter(None, (x.strip() for x in _CLAUSE_SPLIT_RE.split(sentence))):
+            if len(clause) <= max_chars:
+                units.append(clause)
+                continue
+            words, cur = clause.split(), ""
+            for w in words:
+                if cur and len(cur) + 1 + len(w) > max_chars:
+                    units.append(cur)
+                    cur = w
+                else:
+                    cur = f"{cur} {w}".strip()
+            if cur:
+                units.append(cur)
+
+    groups: list[str] = []
+    cur = ""
+    for u in units:
+        if cur and len(cur) + 1 + len(u) > max_chars:
+            groups.append(cur)
+            cur = u
+        else:
+            cur = f"{cur} {u}".strip()
+    if cur:
+        groups.append(cur)
+    if len(groups) < 2:
+        return [seg]
+
+    total = sum(len(g) for g in groups)
+    out, t = [], start
+    for i, g in enumerate(groups):
+        e = end if i == len(groups) - 1 else t + duration * len(g) / total
+        out.append({"start": round(t, 3), "end": round(e, 3), "text": g})
+        t = e
+    return out
+
+
 def _transcribe_chunk_neuronai(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
-    """NeuronAI orqali bitta audio bo'lak (8 daqiqalik 64k mp3 ~4 MB -- 25 MB chegarasidan ancha past)."""
+    """NeuronAI orqali bitta audio bo'lak (8 daqiqalik 64k mp3 ~4 MB -- 25 MB chegarasidan ancha past).
+    O'zbekcha matn rasmiy lotin yozuviga keltiriladi (aks holda looks_turkish() uni rad etardi),
+    uzun segmentlar gaplarga bo'linadi."""
     data = neuronai_transcribe_file(chunk_path, language)
+    lang = data.get("language") or language or ""
+    fix = normalize_uz_latin if "uz" in (lang, language) else (lambda x: x)
     segments = []
     for s in data.get("segments") or []:
-        text = (s.get("text") or "").strip()
+        text = fix((s.get("text") or "").strip())
         if not text:
             continue
-        segments.append({
+        segments.extend(split_long_segment({
             "start": round(float(s["start"]) + offset_seconds, 3),
             "end": round(float(s["end"]) + offset_seconds, 3),
             "text": text,
-        })
+        }))
     logger.info(
         f"NeuronAI STT: {len(segments)} segment, {data.get('duration_seconds')} s, "
         f"narx {data.get('cost')} so'm, balans {data.get('balance')} so'm"
     )
-    return segments, (data.get("text") or "").strip(), data.get("language") or language or ""
+    return segments, fix((data.get("text") or "").strip()), lang
 
 
 def _transcribe_provider_order(primary: str = "groq") -> list[str]:
