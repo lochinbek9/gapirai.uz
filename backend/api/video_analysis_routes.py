@@ -13,7 +13,6 @@ import uuid
 from backend.services.auth import get_current_user, get_optional_user_id
 from backend.services.video_analysis import VideoAnalysisService, find_cached_analysis, clone_analysis_for_user
 from backend.services.job_creation import extract_youtube_video_id
-from backend.services.plans import is_user_admin
 from backend.services.rate_limiter import rate_limit
 from backend.workers.analysis_tasks import analyze_video_task
 from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
@@ -215,8 +214,11 @@ async def create_analysis(
         root_job = db.query(DubbingJob).filter(DubbingJob.id == target_job.storage_id).first() if target_job.storage_id else target_job
         segments = (root_job.transcript_segments if root_job else None) or target_job.transcript_segments
 
-        # User'da is_admin/current_plan maydonlari yo'q -- tarif plans.py orqali aniqlanadi
-        is_user_paid = _is_paid_user(db, current_user.id) or bool(getattr(target_job, "quota_consumed", False))
+        is_user_paid = (
+            getattr(current_user, "is_admin", False)
+            or getattr(current_user, "current_plan", "free") != "free"
+            or bool(getattr(target_job, "quota_consumed", False))
+        )
 
         analysis = VideoAnalysis(
             user_id=current_user.id,
@@ -257,7 +259,7 @@ async def create_analysis(
         raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
 
     duration_minutes = info.get("duration", 0) / 60.0
-    if duration_minutes > MAX_VIDEO_DURATION_MINUTES and not is_user_admin(db, current_user.id):
+    if duration_minutes > MAX_VIDEO_DURATION_MINUTES:
         raise HTTPException(
             status_code=400,
             detail=f"Video juda uzun ({duration_minutes:.0f} daqiqa). Maksimal ruxsat etilgan davomiylik — {MAX_VIDEO_DURATION_MINUTES} daqiqa.",
@@ -270,7 +272,10 @@ async def create_analysis(
         analysis = clone_analysis_for_user(db, cached, current_user.id)
         return {"analysis_id": str(analysis.id), "status": "completed"}
 
-    is_user_paid = _is_paid_user(db, current_user.id)
+    is_user_paid = (
+        getattr(current_user, "is_admin", False)
+        or getattr(current_user, "current_plan", "free") != "free"
+    )
 
     analysis = VideoAnalysis(
         user_id=current_user.id,
@@ -335,7 +340,7 @@ async def create_document_analysis(
     if not extracted["ocr_pages"] and not any(p.strip() for p in pages):
         raise HTTPException(status_code=400, detail="Hujjatdan matn topilmadi.")
 
-    is_paid = limit >= document_extract.PAID_PAGE_LIMIT
+    is_paid = limit == document_extract.PAID_PAGE_LIMIT
     analysis = VideoAnalysis(
         user_id=current_user.id,
         youtube_url=f"document://{filename}"[:500],
