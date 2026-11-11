@@ -44,7 +44,7 @@ def _resolve_source(source: str, work: Path) -> tuple[Path, str | None, list[dic
         job = db.get(DubbingJob, uuid.UUID(source))
         if not job:
             sys.exit(f"Job topilmadi: {source}")
-        root = db.get(DubbingJob, job.storage_id) if job.storage_id else job
+        root = db.get(DubbingJob, job.source_job_id) if job.source_job_id else job  # kesh nusxasi -> asl job
         segments = (root.transcript_segments if root else None) or job.transcript_segments
         lang = job.source_language
         if job.original_video_path and Path(job.original_video_path).exists():
