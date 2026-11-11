@@ -38,7 +38,6 @@ OCR_PAGES_PER_REQUEST = 5
 
 FREE_PAGE_LIMIT = 30
 PAID_PAGE_LIMIT = 300
-ADMIN_PAGE_LIMIT = 5000  # amalda cheksiz
 
 
 class DocumentError(PermanentError):
@@ -50,10 +49,10 @@ class DocumentError(PermanentError):
 
 
 def page_limit(db, user) -> int:
-    """Bepul: 30 bet, pullik tarif / daqiqa paketi: 300 bet, admin: amalda cheksiz."""
-    from backend.services.plans import is_user_admin, is_user_paid_tier
-    if is_user_admin(db, user.id):
-        return ADMIN_PAGE_LIMIT
+    """Bepul: 30 bet, pullik tarif / daqiqa paketi / admin: 300 bet."""
+    if getattr(user, "is_admin", False):
+        return PAID_PAGE_LIMIT
+    from backend.services.plans import is_user_paid_tier
     return PAID_PAGE_LIMIT if is_user_paid_tier(db, user.id) else FREE_PAGE_LIMIT
 
 
