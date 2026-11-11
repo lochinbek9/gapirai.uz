@@ -4,28 +4,55 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "frontend",
       "port": 3000
     },
     {
+      "name": "frontend-3001",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3001"
+      ],
+      "cwd": "frontend",
+      "port": 3001
+    },
+    {
       "name": "Backend + Worker + DB (Docker Compose)",
       "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "up"],
+      "runtimeArgs": [
+        "compose",
+        "up"
+      ],
       "cwd": ".",
       "port": 8000
     },
     {
       "name": "Flower Monitor (Celery UI)",
       "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "up", "flower"],
+      "runtimeArgs": [
+        "compose",
+        "up",
+        "flower"
+      ],
       "cwd": ".",
       "port": 5555
     },
     {
       "name": "mobile-web",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web"],
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web"
+      ],
       "cwd": "mobile",
       "port": 8081
     }
