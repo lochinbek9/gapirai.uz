@@ -489,6 +489,8 @@ def get_minute_balance(db, user_id) -> dict:
         "monthly_remaining": round(monthly_remaining, 1),
         "purchased": round(purchased, 1),
         "total_available": round(monthly_remaining + purchased, 1),
+        # Admin: daqiqa, video uzunligi va kunlik limitlar qo'llanmaydi -- frontend oldindan ogohlantirmasin
+        "is_unlimited": is_user_admin(db, user_id),
     }
 
 
