@@ -223,7 +223,7 @@ class Settings(BaseSettings):
     # small = 500MB RAM, 100% accuracy, ~4s per 8s audio on CPU
     # medium = 1.5GB RAM, same accuracy, ~13s — too slow for production
     WHISPER_MODEL: str = "small"
-    # STT (Speech-to-Text) provayderi: "gemini" | "azure" | "openai".
+    # STT (Speech-to-Text) provayderi: "gemini" | "neuronai" | "azure" | "openai".
     # Gemini (Google AI Studio) o'zbek tili va ko'p tilli audio transkripsiyasi uchun
     # asosiy provayder. Azure esa 2-o'rindagi zaxira (fallback) hisoblanadi.
     STT_PROVIDER: str = "gemini"
@@ -255,6 +255,13 @@ class Settings(BaseSettings):
     GOOGLE_GENERATIVE_AI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
     GEMINI_STT_MODEL: str = "gemini-3.8-flash"
+
+    # NeuronAI (my.neuronai.uz) -- o'zbekcha STT/TTS/LLM, to'lov so'mda (1 kredit = 1 so'm).
+    # STT 1 so'm/soniya. NEURONAI_STT_ENABLED=False bo'lsa provayderlar ro'yxatiga kirmaydi
+    # (sinov: backend/scripts/compare_stt.py); STT_PROVIDER/STT_UZ_PRIMARY="neuronai" -- 1-o'rinda.
+    NEURONAI_API_KEY: str = ""
+    NEURONAI_BASE_URL: str = "https://my.neuronai.uz/api/v1"
+    NEURONAI_STT_ENABLED: bool = False
 
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""
