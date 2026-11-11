@@ -88,6 +88,15 @@ class NeuronAISTTTest(unittest.TestCase):
         self.assertEqual(segs[0]["text"], text)
 
 
+    def test_worker_uses_stt_uz_primary_for_uzbek_source(self):
+        """2026-11-11: tasks.py o'zbekcha nutq uchun primary="gemini" ni qattiq yozgani sababli
+        STT_UZ_PRIMARY=neuronai e'tiborsiz qolgan, job Gemini cooldown'larida osilib turgan."""
+        import inspect
+        from backend.workers import tasks
+        src = inspect.getsource(tasks.process_video.run)
+        self.assertIn("stt_primary = settings.STT_UZ_PRIMARY", src)
+
+
 class SplitLongSegmentTest(unittest.TestCase):
     def test_short_segment_unchanged(self):
         seg = {"start": 1.0, "end": 5.0, "text": "Salom. Qalaysiz?"}
