@@ -280,6 +280,14 @@ class Settings(BaseSettings):
     NEURONAI_TTS_FEMALE_VOICE: str = "madina"
     NEURONAI_TTS_QUALITY: str = "standard"   # fast | standard | high
 
+    # VoiceLab (voicelab.uz, Aisha kompaniyasi) TTS -- yoqish: TTS_PROVIDER_OVERRIDE=voicelab.
+    # Ovoz ID'lari: GET /v1/voices?language=uz&model_id=lison. Standart: Amir (erkak), Gulnoza (ayol).
+    VOICELAB_API_KEY: str = ""
+    VOICELAB_BASE_URL: str = "https://api.voicelab.uz/v1"
+    VOICELAB_TTS_MODEL: str = "lison"   # lison (1 kredit/belgi) | lison-v2 (1,5, hissiyot teglari)
+    VOICELAB_TTS_MALE_VOICE: str = "voice_8bae02c6-d078-4757-9d62-0fce6da23cf7"
+    VOICELAB_TTS_FEMALE_VOICE: str = "voice_01J9NEUTRAL0000000000000001"
+
     # Groq Cloud API (Ultra-Fast LPU Inference — Whisper STT & Fast LLM)
     GROQ_API_KEY: str = ""
     GROQ_API_KEYS: str = ""
