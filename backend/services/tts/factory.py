@@ -36,6 +36,7 @@ def _load_registry() -> dict[str, type]:
     from backend.services.tts.gemini_provider import GeminiProvider
     from backend.services.tts.uzbekvoice_provider import UzbekVoiceProvider
     from backend.services.tts.neuronai_provider import NeuronAIProvider
+    from backend.services.tts.voicelab_provider import VoiceLabProvider
 
     _REGISTRY = {
         "elevenlabs": ElevenLabsProvider,
@@ -45,6 +46,7 @@ def _load_registry() -> dict[str, type]:
         "gemini":     GeminiProvider,
         "uzbekvoice": UzbekVoiceProvider,
         "neuronai":   NeuronAIProvider,
+        "voicelab":   VoiceLabProvider,
     }
     return _REGISTRY
 
