@@ -610,7 +610,10 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
     if primary is None:
         primary = settings.STT_UZ_PRIMARY if language == "uz" else settings.STT_PROVIDER
 
-    if settings.FREE_MODE and language != "uz":
+    # FREE_MODE: lokal Whisper birinchi -- NeuronAI tanlangan bo'lsa (STT_PROVIDER=neuronai) API birinchi,
+    # lokal Whisper faqat u ham ishlamasa (pastdagi oxirgi chora).
+    neuronai_first = primary == "neuronai" and is_neuronai_stt_available()
+    if settings.FREE_MODE and language != "uz" and not neuronai_first:
         result = _transcribe_local_whisper(audio_path, language)
         if result is not None:
             return result

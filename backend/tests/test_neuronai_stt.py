@@ -97,6 +97,47 @@ class NeuronAISTTTest(unittest.TestCase):
         self.assertIn("stt_primary = settings.STT_UZ_PRIMARY", src)
 
 
+    def test_worker_dub_stt_neuronai_admin_gate(self):
+        import inspect
+        from backend.workers import tasks
+        src = inspect.getsource(tasks.process_video.run)
+        self.assertIn('elif settings.STT_PROVIDER == "neuronai" and (', src)
+        self.assertIn("not settings.NEURONAI_DUB_ADMIN_ONLY or plans.is_user_admin(db, job.user_id)", src)
+
+
+class FreeModeOrderTest(unittest.TestCase):
+    """FREE_MODE'da lokal Whisper birinchi; primary=neuronai bo'lsa NeuronAI birinchi."""
+
+    def setUp(self):
+        for name, value in (("FREE_MODE", True), ("NEURONAI_API_KEY", "nai_test"), ("NEURONAI_STT_ENABLED", True)):
+            p = patch.object(settings, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_neuronai_primary_skips_local_whisper(self):
+        api = {"text": "hi", "segments": [{"start": 0, "end": 1, "text": "hi"}], "srt": "", "language": "en"}
+        with patch.object(transcriber, "_transcribe_local_whisper") as whisper, \
+             patch.object(transcriber, "_transcribe_via_api", return_value=api) as via_api:
+            self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="neuronai"), api)
+        whisper.assert_not_called()
+        self.assertEqual(via_api.call_args.args[2], "neuronai")
+
+    def test_other_primary_keeps_local_whisper_first(self):
+        local = {"text": "x", "segments": [], "srt": "", "language": "en"}
+        with patch.object(transcriber, "_transcribe_local_whisper", return_value=local) as whisper, \
+             patch.object(transcriber, "_transcribe_via_api") as via_api:
+            self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="gemini"), local)
+        whisper.assert_called_once()
+        via_api.assert_not_called()
+
+    def test_neuronai_down_falls_back_to_local_whisper(self):
+        local = {"text": "x", "segments": [], "srt": "", "language": "en"}
+        with patch.object(transcriber, "_transcribe_local_whisper", return_value=local) as whisper, \
+             patch.object(transcriber, "_transcribe_via_api", side_effect=RuntimeError("402")):
+            self.assertEqual(transcriber.transcribe_audio("a.wav", None, primary="neuronai"), local)
+        whisper.assert_called_once()
+
+
 class SplitLongSegmentTest(unittest.TestCase):
     def test_short_segment_unchanged(self):
         seg = {"start": 1.0, "end": 5.0, "text": "Salom. Qalaysiz?"}
