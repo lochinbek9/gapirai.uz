@@ -144,6 +144,7 @@ export default function DubFileForm({
       getMinuteBalance().then((r) => r.balance).catch(() => null),
     ]);
     if (id !== checkId.current || minutes == null) return;
+    if (balance?.is_unlimited) return; // admin: uzunlik va daqiqa limiti yo'q
     if (minutes > MAX_VIDEO_MINUTES) {
       setFile(null);
       setError(`Video juda uzun (${Math.round(minutes)} daqiqa). Maksimal ruxsat etilgan davomiylik — ${MAX_VIDEO_MINUTES} daqiqa.`);
