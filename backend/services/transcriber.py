@@ -613,6 +613,17 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
     # FREE_MODE: lokal Whisper birinchi -- NeuronAI tanlangan bo'lsa (STT_PROVIDER=neuronai) API birinchi,
     # lokal Whisper faqat u ham ishlamasa (pastdagi oxirgi chora).
     neuronai_first = primary == "neuronai" and is_neuronai_stt_available()
+    if neuronai_first and not language:
+        # NeuronAI "auto" rejimida adashadi (inglizcha video -> arabcha matn, 2026-11-11) --
+        # til lokal Whisper bilan aniqlanib aniq beriladi; ishonchsiz yoki qo'llanmaydigan til -> NeuronAI'siz.
+        detected, prob = detect_language_local(audio_path)
+        if detected in _NEURONAI_STT_LANGUAGES and prob >= settings.NEURONAI_LANG_MIN_PROB:
+            logger.info(f"STT tili lokal aniqlandi: {detected} ({prob:.2f}) -- NeuronAI'ga beriladi.")
+            language = detected
+        else:
+            logger.warning(f"STT tili: {detected} ({prob:.2f}) -- NeuronAI uchun yaroqsiz, avvalgi zanjir ishlatiladi.")
+            neuronai_first = False
+            primary = "gemini"
     if settings.FREE_MODE and language != "uz" and not neuronai_first:
         result = _transcribe_local_whisper(audio_path, language)
         if result is not None:
@@ -646,6 +657,29 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
 
 _local_whisper_model = None
 _whisper_lock = threading.Lock()
+
+
+def detect_language_local(audio_path: str, offset_seconds: int = 20, clip_seconds: int = 30) -> tuple[str | None, float]:
+    """Lokal faster-whisper bilan nutq tilini aniqlaydi (boshidagi musiqa/kirishni chetlab, 20-50 s
+    oralig'idan; audio qisqa bo'lsa boshidan). Xato bo'lsa (None, 0.0) -- chaqiruvchi NeuronAI'ni chetlab o'tadi."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="lang-") as tmp:
+            clip = Path(tmp) / "clip.wav"
+            for ss in (offset_seconds, 0):
+                subprocess.run(
+                    ["ffmpeg", "-loglevel", "error", "-y", "-ss", str(ss), "-i", audio_path, "-t", str(clip_seconds),
+                     "-vn", "-ac", "1", "-ar", "16000", str(clip)],
+                    capture_output=True, check=False,
+                )
+                if clip.exists() and clip.stat().st_size > 32_000:  # ~1 s dan ko'p audio
+                    break
+            else:
+                return None, 0.0
+            _, info = _get_local_whisper_model().transcribe(str(clip), beam_size=1, language=None)
+            return info.language, float(info.language_probability)
+    except Exception as e:
+        logger.warning(f"Lokal til aniqlash ishlamadi: {e}")
+        return None, 0.0
 
 
 def _get_local_whisper_model():
