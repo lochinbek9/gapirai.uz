@@ -76,6 +76,44 @@ class NeuronAISTTTest(unittest.TestCase):
             with patch.object(settings, "NEURONAI_STT_ENABLED", False):
                 self.assertNotIn("neuronai", transcriber._transcribe_provider_order("neuronai"))
 
+    def test_uzbek_turkish_letters_are_normalized(self):
+        raw = "Keling suhbatimizni avval ular bilan bir tanişişdan boşlaylik. Özi umuman eksportçilar uyuşmasi qanday faoliyat olib boryapti, şular töğrisida"
+        body = {"data": {"text": raw, "language": "uz", "segments": [{"start": 0.0, "end": 6.0, "text": raw}]}}
+        with patch("httpx.post", return_value=_resp(200, body)):
+            segs, text, lang = transcriber._transcribe_chunk_neuronai(self.chunk, offset_seconds=0, language="uz")
+        self.assertIn("tanishishdan boshlaylik. Oʻzi", text)
+        self.assertIn("eksportchilar uyushmasi", text)
+        self.assertIn("shular toʻgʻrisida", text)
+        self.assertFalse(transcriber.looks_turkish(text))
+        self.assertEqual(segs[0]["text"], text)
+
+
+class SplitLongSegmentTest(unittest.TestCase):
+    def test_short_segment_unchanged(self):
+        seg = {"start": 1.0, "end": 5.0, "text": "Salom. Qalaysiz?"}
+        self.assertEqual(transcriber.split_long_segment(seg), [seg])
+
+    def test_long_segment_split_into_contiguous_sentence_pieces(self):
+        text = ("Assalomu alaykum, bugun eksport haqida gaplashamiz. Rahmat. "
+                "Oʻzbekiston eksportchilar uyushmasi oʻz faoliyatini ikki ming oʻn toʻqqizinchi yildan boshlagan. "
+                "Keyin turli savollar va muammolar chiqib kela boshladi, biz ularni oʻrganib chiqdik. "
+                "Hukumatga takliflar berdik va boshqa davlatlar amaliyotini oʻrgandik.")
+        parts = transcriber.split_long_segment({"start": 100.0, "end": 130.0, "text": text})
+        self.assertGreater(len(parts), 3)
+        self.assertEqual(parts[0]["start"], 100.0)
+        self.assertEqual(parts[-1]["end"], 130.0)
+        for a, b in zip(parts, parts[1:]):
+            self.assertEqual(a["end"], b["start"])
+        self.assertTrue(all(p["end"] - p["start"] <= 9.0 for p in parts))
+        self.assertEqual(" ".join(p["text"] for p in parts), text)
+        self.assertIn("Rahmat.", parts[0]["text"] + parts[1]["text"])  # qisqa gap qo'shni bilan birlashadi
+
+    def test_run_on_sentence_split_on_commas_and_words(self):
+        text = ", ".join(["juda uzun gap davom etmoqda va tugamaydi"] * 12)
+        parts = transcriber.split_long_segment({"start": 0.0, "end": 30.0, "text": text})
+        self.assertGreater(len(parts), 3)
+        self.assertEqual(" ".join(p["text"] for p in parts), text)
+
 
 if __name__ == "__main__":
     unittest.main()
