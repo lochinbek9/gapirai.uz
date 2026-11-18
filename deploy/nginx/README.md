@@ -15,6 +15,13 @@ emas, ularni certbot boshqaradi.
 | `sites-available/gapirai.uz` | `/etc/nginx/sites-available/gapirai.uz` (`sites-enabled/` da symlink) | `gapirai.uz` -> Next.js `:3000`; `api.gapirai.uz` -> backend `:8000` (+ job keshi); HTTP -> HTTPS yo'naltirish |
 | `sites-available/admin.gapirai.uz` | xuddi shunday | `admin.gapirai.uz` -> Next.js `:3000` (`/` uchun keshsiz) |
 | `conf.d/gapirai-cache.conf` | `/etc/nginx/conf.d/gapirai-cache.conf` | Job keshi zonasi (`proxy_cache_path`) |
+| `conf.d/00-default-catchall.conf` | `/etc/nginx/conf.d/00-default-catchall.conf` | Hech bir `server_name` mos kelmasa (IP orqali kirish, begona host): HTTP -> 444, HTTPS -> TLS rad (`ssl_reject_handshake`). Busiz nginx birinchi blokni (`admin.gapirai.uz`) berardi |
+
+**Eslatma (2026-11-18):** hozirgi server `173.212.220.188` (yuqoridagi `host-1` emas) va u **boshqa loyihalar** bilan
+(`lodex-crm.uz`, `nodiygram.com`) bitta nginx'ni baham ko'radi. `apply.sh` ularga tegmaydi, lekin `00-default-catchall.conf`
+ni u o'rnatmaydi -- uni `apply-catchall-and-loopback.sh` qo'yadi (`sudo`, bir martalik; `nginx -t` va 6 domen
+tekshiruvi bilan, xato bo'lsa o'zi qaytaradi; shuningdek frontend'ni `127.0.0.1:3000` ga bog'laydi). `apply.sh` ni
+ishlatsangiz, avval `check-drift.sh`.
 
 Eslatma: `gapirai.uz/api/*` so'rovlari ham backend'ga boradi (Next.js `rewrites`, `frontend/next.config.ts`), lekin
 brauzer `https://api.gapirai.uz` dan foydalanadi (`frontend/lib/runtime-config.ts`), shuning uchun kesh faqat shu

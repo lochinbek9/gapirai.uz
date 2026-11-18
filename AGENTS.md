@@ -5,7 +5,10 @@
 - **Monorepo**: `frontend/` (Next.js 15 App Router, React 19, Tailwind CSS) + `backend/` (FastAPI + Celery worker)
 - **AI Pipeline** (Celery → `backend/workers/tasks.py`): yt-dlp download → OpenAI Whisper STT → GPT-4o translate → Azure TTS → FFmpeg merge
 - **Infra**: PostgreSQL 16, Redis 7 (Celery broker), Flower (monitoring on :5555)
-- **Production server**: `51.21.35.247`, deployed to `/opt/xadichai`, Nginx reverse proxy → FastAPI :8000
+- **Production server** (verified 2026-11-18): this VPS `173.212.220.188` (`vmi3605436`), repo at `/home/gapirai/gapirai.uz`, Docker compose project `gapiraiuz` + systemd `gapirai-frontend.service` (Next.js :3000). Nginx reverse proxy → frontend :3000 / FastAPI :8000. The old `51.21.35.247` / `/opt/xadichai` no longer exist.
+- **Shared server — do not disturb other projects**: the same host and the same nginx also run `lodex-crm` (`~/lodex-crm`, 127.0.0.1:3100, lodex-crm.uz) and `nodiygram` (`~/nodiygram`, 127.0.0.1:3200, nodiygram.com, plus coturn on host network UDP/TCP 3478 and 49160–49359). Rules: use `docker compose` only inside this repo; never `docker system/volume/network prune`, `docker rm/stop` on other names; touch only gapirai files in nginx (`nginx -t`, then `reload`, never `restart`); new services get a free port bound to `127.0.0.1` (taken: 22, 53, 80, 443, 631, 3000, 3100, 3200, 3478, 5439, 5555, 6379, 8000, 8081, 8888); ask before freeing disk (`outputs/` is ~60 GB).
+- **Nginx source of truth**: `deploy/nginx/` (see its README). `conf.d/00-default-catchall.conf` rejects unknown hosts/IP. Do not run `deploy/nginx/apply.sh` blindly — check with `check-drift.sh` first.
+- **Deploy caveat**: CI runs `git reset --hard` on the server, so uncommitted edits to tracked files (compose, package.json) are wiped on the next deploy. Commit server-side fixes.
 
 ## Critical: PYTHONPATH
 

@@ -23,6 +23,7 @@ check "$HERE/nginx.conf"                        "$ROOT/nginx.conf"
 check "$HERE/sites-available/gapirai.uz"        "$ROOT/sites-available/gapirai.uz"
 check "$HERE/sites-available/admin.gapirai.uz"  "$ROOT/sites-available/admin.gapirai.uz"
 check "$HERE/conf.d/gapirai-cache.conf"         "$ROOT/conf.d/gapirai-cache.conf"
+check "$HERE/conf.d/00-default-catchall.conf"   "$ROOT/conf.d/00-default-catchall.conf"
 
 if [ "$rc" -eq 0 ]; then echo "Hammasi mos."; else echo "Farq bor: reponi yoki serverni yangilang (README.md)."; fi
 exit "$rc"
