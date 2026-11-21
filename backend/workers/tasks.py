@@ -171,6 +171,8 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
     if status == JobStatus.COMPLETED:
         from backend.services.api_v1 import notify_api_job_finished
         notify_api_job_finished(job.id)  # API v1 webhook (faqat API orqali yaratilgan job uchun)
+        from backend.services.provider_balance import maybe_check_balances
+        maybe_check_balances()  # NeuronAI balansi kam bo'lsa adminlarga xabar (15 daqiqada 1 tekshiruv)
 
 
 _STAGE_ICONS = {"ok": "✅", "skipped": "⏭️", "error": "❌"}
@@ -311,7 +313,19 @@ def _detect_gender(transcript_text: str, title: str = "") -> str:
                 {"role": "user", "content": prompt_text},
             ], temperature=0, max_tokens=5))
         except Exception as e:
-            logger.warning(f"_detect_gender: NeuronAI xato ({e}), avvalgi zanjirga o'tilmoqda.")
+            logger.warning(f"_detect_gender: NeuronAI xato ({e}), Groq'ga o'tilmoqda.")
+        try:  # Groq: bepul va tez -- sekin bepul Gemini kalitlaridan oldin
+            from backend.services.groq_service import groq_chat_completion, is_groq_available
+            if is_groq_available():
+                content, _ = groq_chat_completion(
+                    messages=[{"role": "system", "content": _GENDER_SYSTEM_PROMPT + ' Reply only JSON {"gender": "male"|"female"}.'},
+                              {"role": "user", "content": prompt_text}],
+                    json_mode=True, temperature=0.0, max_tokens=60,
+                )
+                import json as _json
+                return _parse(str(_json.loads(content).get("gender", "")))
+        except Exception as e:
+            logger.warning(f"_detect_gender: Groq xato ({e}), avvalgi zanjirga o'tilmoqda.")
 
     if prefer_gemini and gemini_available:
         try:
@@ -453,6 +467,8 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
             session.commit()
             from backend.services.api_v1 import notify_api_job_finished
             notify_api_job_finished(job_id)  # API v1 webhook
+            from backend.services.provider_balance import maybe_check_balances
+            maybe_check_balances()
             return
         except Exception as mark_exc:
             logger.error(f"[JOB {job_id}] FAILED holatiga o'tkazishda xatolik (urinish {attempt + 1}/2): {mark_exc}")
@@ -846,6 +862,9 @@ def process_video(self: Task, job_id: str) -> dict:
             # NEURONAI_DUB_ADMIN_ONLY=True (standart) -- avval faqat admin joblarida (sinov).
             if uzbek_source:
                 stt_primary = settings.STT_UZ_PRIMARY or "gemini"
+            elif settings.STT_FOREIGN_PRIMARY:
+                # Chet tili: Groq Whisper (bepul, tez); o'zbekcha nutq chiqsa transcriber o'zi NeuronAI'ga qaytaradi.
+                stt_primary = settings.STT_FOREIGN_PRIMARY
             elif settings.STT_PROVIDER == "neuronai" and (
                 not settings.NEURONAI_DUB_ADMIN_ONLY or plans.is_user_admin(db, job.user_id)
             ):

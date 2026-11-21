@@ -33,7 +33,13 @@ def _get_client() -> OpenAI:
 
 
 def _complete(messages: list[dict], **kwargs) -> str:
-    resp = _get_client().chat.completions.create(model=settings.NEURONAI_LLM_MODEL, messages=messages, **kwargs)
+    try:
+        resp = _get_client().chat.completions.create(model=settings.NEURONAI_LLM_MODEL, messages=messages, **kwargs)
+    except Exception as exc:
+        if getattr(exc, "status_code", None) == 402:
+            from backend.services.provider_balance import report_out_of_credits
+            report_out_of_credits("neuronai")
+        raise
     usage = resp.usage
     if usage:
         cost = (usage.prompt_tokens * 1.5 + usage.completion_tokens * 6) / 1000

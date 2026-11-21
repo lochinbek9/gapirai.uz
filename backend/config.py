@@ -275,6 +275,12 @@ class Settings(BaseSettings):
     # True: spiker jinsini aniqlash va kontent xavfsizligi tekshiruvi avval NeuronAI LLM'da
     # (Gemini kalitlari limitda -- jins aniqlash 5-7 daqiqa kutgan, 2026-11-11); xatoda avvalgi zanjir.
     NEURONAI_AUX_LLM_ENABLED: bool = False
+    # Chet tilidagi (o'zbekcha bo'lmagan) video STT'si: "groq" -- Whisper (bepul, tez, ingliz tilida aniq);
+    # NeuronAI faqat o'zbekcha nutq uchun (u yerda ustun). "" -- eski xatti-harakat (STT_PROVIDER).
+    STT_FOREIGN_PRIMARY: str = "groq"
+    # backend/services/provider_balance.py: NeuronAI balansi shundan kam bo'lsa adminlarga xabar (0 -- o'chiq)
+    NEURONAI_BALANCE_ALERT_UZS: float = 5000.0
+    PROVIDER_BALANCE_CHECK_SECONDS: int = 900
     # NeuronAI TTS (0,3 so'm/belgi): yoqish -- TTS_PROVIDER_OVERRIDE=neuronai.
     NEURONAI_TTS_MALE_VOICE: str = "kamron"
     NEURONAI_TTS_FEMALE_VOICE: str = "madina"

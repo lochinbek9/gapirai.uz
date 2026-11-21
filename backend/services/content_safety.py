@@ -220,6 +220,18 @@ def _neuronai_safety_check(text: str) -> SafetyResult:
     return _result_from_data(data)
 
 
+def _groq_safety_check(text: str) -> SafetyResult:
+    """Groq (bepul, tez) -- NeuronAI ishlamasa sekin bepul Gemini kalitlaridan oldin (2026-11-21:
+    NeuronAI 402 bo'lganda Gemini zanjiri 19 s'lik videoda ham ~2 daqiqa olgan)."""
+    from backend.services.groq_service import groq_chat_completion
+    content, _ = groq_chat_completion(
+        messages=[{"role": "system", "content": _CONTENT_SAFETY_SYSTEM_PROMPT},
+                  {"role": "user", "content": text[:8000]}],
+        json_mode=True, temperature=0.0, max_tokens=400,
+    )
+    return _result_from_data(json.loads(content))
+
+
 def check_safety(text: str) -> SafetyResult:
     """Matnni (metadata yoki transkript) xavfsizlik tekshiruvidan o'tkazadi.
     Bo'sh matn yoki xizmat o'chirilgan bo'lsa — avtomatik ruxsat.
@@ -234,7 +246,13 @@ def check_safety(text: str) -> SafetyResult:
         try:
             return _neuronai_safety_check(text)
         except Exception as e:
-            logger.warning(f"NeuronAI kontent xavfsizligi tekshiruvida xatolik ({e}) — avvalgi zanjirga o'tilmoqda.")
+            logger.warning(f"NeuronAI kontent xavfsizligi tekshiruvida xatolik ({e}) — Groq'ga o'tilmoqda.")
+        try:
+            from backend.services.groq_service import is_groq_available
+            if is_groq_available():
+                return _groq_safety_check(text)
+        except Exception as e:
+            logger.warning(f"Groq kontent xavfsizligi tekshiruvida xatolik ({e}) — avvalgi zanjirga o'tilmoqda.")
 
     openai_ok = bool(settings.OPENAI_API_KEY and getattr(settings, "OPENAI_ENABLED", True))
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
