@@ -447,23 +447,22 @@ def _translate_chunk_free_mt(segments: list[dict]) -> list[dict]:
         return list(executor.map(_translate_segment_free, segments))
 
 
-def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """Groq Cloud LPU orqali ultra-tez va 100% bepul tarjima (qwen/qwen3.8-27b)."""
+def _groq_translate_strict(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
     from backend.services.groq_service import groq_chat_completion
-    instruction = _build_instruction(clean_segments)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": instruction},
-    ]
-    content, masked_k = groq_chat_completion(
-        messages=messages,
-        model="qwen/qwen3.8-27b",
-        json_mode=True,
-        temperature=0.35,
+    content, _masked = groq_chat_completion(
+        messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                  {"role": "user", "content": _build_instruction(clean_segments)}],
+        model="qwen/qwen3.8-27b", json_mode=True, temperature=0.35,
     )
-    result = json.loads(content)
-    logger.info(f"Groq LLM tarjima muvaffaqiyatli yakunlandi ({masked_k}).")
-    return _reconcile_segments(segments, _extract_segments_from_result(result, segments))
+    return _strict_by_id(json.loads(content), segments)
+
+
+def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """Groq Cloud LPU orqali ultra-tez va bepul tarjima (qwen/qwen3.8-27b). 2026-11-21 dan NeuronAI kabi
+    qat'iy id tekshiruvi bilan: LLM segmentlarni birlashtirsa pozitsion moslashtirish tarjimani siljitardi."""
+    out = _translate_strict_chunked(segments, clean_segments, _groq_translate_strict, _NEURONAI_CHUNK * 2, "Groq")
+    logger.info(f"Groq LLM tarjima muvaffaqiyatli yakunlandi ({len(out)} segment).")
+    return out
 
 
 # gemma 45 segmentlik bo'lakda gaplarni qo'shni segmentlarga ko'chirib, segmentlarni birlashtirib
@@ -471,15 +470,10 @@ def _translate_chunk_groq(segments: list[dict], clean_segments: list[dict]) -> l
 _NEURONAI_CHUNK = 12
 
 
-def _neuronai_translate_strict(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """Bitta so'rov; javobda HAR BIR id aynan bir marta bo'lishi shart, aks holda ValueError.
+def _strict_by_id(result, segments: list[dict]) -> list[dict]:
+    """Javobda HAR BIR id aynan bir marta bo'lishi shart, aks holda ValueError.
     Pozitsiya bo'yicha moslashtirish (_reconcile_segments) bu yerda ATAYLAB ishlatilmaydi --
     u segmentlar soni farq qilganda butun qolgan tarjimani siljitib yuboradi."""
-    from backend.services import neuronai_llm
-    result = neuronai_llm.chat_json([
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": _build_instruction(clean_segments)},
-    ])
     items = _extract_segments_from_result(result, [])
     by_id: dict = {}
     for it in items:
@@ -499,28 +493,42 @@ def _neuronai_translate_strict(segments: list[dict], clean_segments: list[dict])
     return [{**s, "text": by_id[int(s["id"])]} for s in segments]
 
 
-def _translate_chunk_neuronai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
-    """NeuronAI LLM (gemma) -- o'sha SYSTEM_PROMPT va ko'rsatma bilan, _NEURONAI_CHUNK'lik bo'laklarda.
-    Bo'lak mos kelmasa ikkiga bo'linib qayta so'raladi; bitta segment ham mos kelmasa ValueError
-    (chaqiruvchi butun bo'lakni avvalgi zanjirga beradi)."""
+def _neuronai_translate_strict(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """Bitta NeuronAI so'rovi + qat'iy id tekshiruvi (_strict_by_id)."""
+    from backend.services import neuronai_llm
+    result = neuronai_llm.chat_json([
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": _build_instruction(clean_segments)},
+    ])
+    return _strict_by_id(result, segments)
+
+
+def _translate_strict_chunked(segments: list[dict], clean_segments: list[dict], request, chunk: int, label: str) -> list[dict]:
+    """`chunk`lik bo'laklarda `request(seg, cln)`; bo'lak mos kelmasa ikkiga bo'linib qayta so'raladi;
+    bitta segment ham mos kelmasa ValueError (chaqiruvchi butun bo'lakni keyingi provayderga beradi)."""
     if any(s.get("id") is None for s in segments):
         segments = [{**s, "id": i + 1} for i, s in enumerate(segments)]
         clean_segments = [{**c, "id": i + 1} for i, c in enumerate(clean_segments)]
 
     def run(seg: list[dict], cln: list[dict]) -> list[dict]:
         try:
-            return _neuronai_translate_strict(seg, cln)
+            return request(seg, cln)
         except ValueError as e:
             if len(seg) <= 1:
                 raise
-            logger.warning(f"NeuronAI tarjima bo'lagi ({len(seg)} segment) mos kelmadi ({e}) -- ikkiga bo'linmoqda.")
+            logger.warning(f"{label} tarjima bo'lagi ({len(seg)} segment) mos kelmadi ({e}) -- ikkiga bo'linmoqda.")
             mid = len(seg) // 2
             return run(seg[:mid], cln[:mid]) + run(seg[mid:], cln[mid:])
 
     out: list[dict] = []
-    for i in range(0, len(segments), _NEURONAI_CHUNK):
-        out.extend(run(segments[i:i + _NEURONAI_CHUNK], clean_segments[i:i + _NEURONAI_CHUNK]))
+    for i in range(0, len(segments), chunk):
+        out.extend(run(segments[i:i + chunk], clean_segments[i:i + chunk]))
     return out
+
+
+def _translate_chunk_neuronai(segments: list[dict], clean_segments: list[dict]) -> list[dict]:
+    """NeuronAI LLM (gemma) -- o'sha SYSTEM_PROMPT va ko'rsatma bilan, _NEURONAI_CHUNK'lik bo'laklarda."""
+    return _translate_strict_chunked(segments, clean_segments, _neuronai_translate_strict, _NEURONAI_CHUNK, "NeuronAI")
 
 
 def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:

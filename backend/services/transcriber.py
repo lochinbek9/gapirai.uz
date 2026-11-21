@@ -627,14 +627,24 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
             logger.warning(f"STT tili: {detected} ({prob:.2f}) -- NeuronAI uchun yaroqsiz, avvalgi zanjir ishlatiladi.")
             neuronai_first = False
             primary = "gemini"
-    if settings.FREE_MODE and language != "uz" and not neuronai_first:
+    # Groq (STT_FOREIGN_PRIMARY, video tahlili) -- API birinchi; lokal Whisper faqat oxirgi chora (pastda).
+    groq_first = primary == "groq" and _groq_stt_available()
+    if settings.FREE_MODE and language != "uz" and not neuronai_first and not groq_first:
         result = _transcribe_local_whisper(audio_path, language)
         if result is not None:
             return result
         logger.error("Falling back to OpenAI...")
 
     try:
-        return _transcribe_via_api(audio_path, language, primary, is_paid=is_paid)
+        result = _transcribe_via_api(audio_path, language, primary, is_paid=is_paid)
+        if groq_first and not language and _is_uzbek(result.get("language")) and is_neuronai_stt_available():
+            # Video "uz" deb belgilanmagan, lekin nutq o'zbekcha -- Whisper o'zbekchada kuchsiz, NeuronAI'da qayta.
+            logger.info("STT: Groq o'zbekcha nutq aniqladi -- NeuronAI (uz) bilan qayta transkripsiya.")
+            try:
+                return _transcribe_via_api(audio_path, "uz", "neuronai", is_paid=is_paid)
+            except Exception as e:
+                logger.warning(f"NeuronAI o'zbekcha qayta transkripsiya ishlamadi ({e}) -- Groq natijasi qoldirildi.")
+        return result
     except WrongLanguageError:
         raise   # boshqa tildagi matnni "oxirgi chora" bilan yashirmaymiz
     except Exception as e:
@@ -870,6 +880,18 @@ def _transcribe_chunk_groq(chunk_path: Path, offset_seconds: float, language: st
 _NEURONAI_STT_LANGUAGES = {"uz", "kaa", "ru", "en", "kk", "tk", "tg", "tr", "az", "ja", "de", "ko"}
 
 
+def _groq_stt_available() -> bool:
+    try:
+        from backend.services.groq_service import is_groq_available
+        return is_groq_available()
+    except Exception:
+        return False
+
+
+def _is_uzbek(lang) -> bool:
+    return str(lang or "").strip().lower() in ("uz", "uzb", "uzbek")
+
+
 def is_neuronai_stt_available() -> bool:
     return bool(settings.NEURONAI_STT_ENABLED and settings.NEURONAI_API_KEY)
 
@@ -900,6 +922,9 @@ def neuronai_transcribe_file(path: Path, language: str | None = None, timeout: f
         except ValueError:
             wait = 2.0
         time.sleep(wait)
+    if resp.status_code == 402:
+        from backend.services.provider_balance import report_out_of_credits
+        report_out_of_credits("neuronai")
     if resp.status_code != 200:
         try:
             err = resp.json().get("error", {})
