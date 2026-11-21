@@ -509,6 +509,34 @@ class WatermarkExemption(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class CaptionDub(Base):
+    """Kurs platformalari (Coursera, ...) darslarining o'zbekcha dublaji -- Chrome kengaytmasi
+    sahifadagi inglizcha subtitrni (video.textTracks) yuboradi; video serverga YUKLANMAYDI.
+    backend/api/caption_dub_routes.py + backend/workers/caption_dub_tasks.py. Natija faqat
+    egasiga tegishli (ommaviy kesh yo'q -- pullik kurs kontenti)."""
+    __tablename__ = "caption_dubs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform = Column(String(30), nullable=False)
+    page_key = Column(String(300), nullable=False, index=True)   # masalan /learn/<kurs>/lecture/<id>
+    page_url = Column(String(1000), nullable=True)
+    title = Column(String(500), nullable=True)
+    source_key = Column(String(64), nullable=False, index=True)  # sha256(cues + ovoz)
+    voice_gender = Column(String(10), nullable=False, default="auto")
+    cues = Column(JSONB, nullable=False)                         # [{start, end, text}] -- inglizcha
+    translated = Column(JSONB, nullable=True)                    # [{start, end, text}] -- o'zbekcha
+    status = Column(String(20), nullable=False, default="pending")  # pending|translating|synthesizing|completed|failed
+    progress = Column(Float, default=0.0)
+    duration_seconds = Column(Float, nullable=False, default=0.0)
+    minutes_charged = Column(Float, nullable=False, default=0.0)
+    audio_path = Column(String(1000), nullable=True)
+    tts_provider = Column(String(30), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class EmailLog(Base):
     """Avtomatik (lifecycle) emaillar jurnali -- backend/services/lifecycle_emails.py.
     kind: "activate_1" | "activate_2" | "activate_3" | "quota:<sana>" | "news:<yil>-W<hafta>".

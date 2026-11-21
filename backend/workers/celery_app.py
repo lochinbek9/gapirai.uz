@@ -7,7 +7,7 @@ celery_app = Celery(
     "ai_dubber",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["backend.workers.tasks", "backend.workers.analysis_tasks", "backend.workers.resolution_tasks"],
+    include=["backend.workers.tasks", "backend.workers.analysis_tasks", "backend.workers.resolution_tasks", "backend.workers.caption_dub_tasks"],
 )
 
 celery_app.conf.update(
@@ -71,6 +71,9 @@ celery_app.conf.update(
             # Ustuvorlik tizimiga kirmaydi — doim default short navbat
             "queue": "video_short_free",
             "rate_limit": "1/m",
+        },
+        "backend.workers.caption_dub_tasks.process_caption_dub": {
+            # YouTube yuklash yo'q -- 1/m cheklovi kerak emas; navbat chaqiruvda get_job_queue_v2() bilan
         },
         "backend.workers.resolution_tasks.generate_resolution_variant_task": {
             # Resolution variant — qisqa, tez, default short navbatga
