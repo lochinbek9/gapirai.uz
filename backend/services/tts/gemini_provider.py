@@ -20,6 +20,9 @@ settings = get_settings()
 _gemini_local = threading.local()
 
 
+# Timeout'siz chaqiruv javob bermagan kalitda cheksiz osilib qoladi (2026-11-21). bitta TTS segmenti uchun chegara (ms).
+_GEMINI_TIMEOUT_MS = 120000
+
 def _get_client(api_key: str | None = None):
     from google import genai
 
@@ -45,7 +48,7 @@ def _get_client(api_key: str | None = None):
         _gemini_local.clients = clients
 
     if api_key not in clients:
-        clients[api_key] = genai.Client(api_key=api_key)
+        clients[api_key] = genai.Client(api_key=api_key, http_options={"timeout": _GEMINI_TIMEOUT_MS})
     return clients[api_key]
 
 

@@ -25,6 +25,10 @@ _NO_RETRY_ERROR_MARKERS = ("insufficient_quota", "credit_balance_exhausted")
 _gemini_local = threading.local()
 
 
+# Timeout'siz chaqiruv javob bermagan bepul kalitda cheksiz osilib qoladi (2026-11-21: Coursera
+# dublaji tarjimada 5+ daqiqa turib qoldi). Tarjima bo'lagi (45 segment) uchun yetarli chegara (ms).
+_GEMINI_TIMEOUT_MS = 90_000
+
 def _get_gemini_client(api_key: str | None = None):
     from google import genai
 
@@ -50,7 +54,7 @@ def _get_gemini_client(api_key: str | None = None):
         _gemini_local.clients = clients
 
     if api_key not in clients:
-        clients[api_key] = genai.Client(api_key=api_key)
+        clients[api_key] = genai.Client(api_key=api_key, http_options={"timeout": _GEMINI_TIMEOUT_MS})
     return clients[api_key]
 
 
