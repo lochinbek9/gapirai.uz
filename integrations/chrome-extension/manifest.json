@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "GapirAI — YouTube oʻzbekcha",
+  "name": "GapirAI — oʻzbekcha dublaj",
   "short_name": "GapirAI",
-  "version": "0.1.2",
-  "description": "YouTube videolarini oʻzbekcha ovoz va subtitr bilan tomosha qiling.",
+  "version": "0.2.0",
+  "description": "YouTube videolari va Coursera darslarini oʻzbekcha ovoz va subtitr bilan tomosha qiling.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -27,6 +27,7 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
+    "https://www.coursera.org/*",
     "https://gapirai.uz/*",
     "https://api.gapirai.uz/*",
     "http://localhost:3000/*",
@@ -39,6 +40,15 @@
       ],
       "js": [
         "src/content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.coursera.org/learn/*"
+      ],
+      "js": [
+        "src/coursera.js"
       ],
       "run_at": "document_idle"
     }
