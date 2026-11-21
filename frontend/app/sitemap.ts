@@ -12,6 +12,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/videos`, lastModified: new Date('2026-10-23'), changeFrequency: 'daily', priority: 0.9 },
     { url: `${baseUrl}/about`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/faq`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${baseUrl}/developers`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${baseUrl}/developers/docs`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${baseUrl}/terms`, lastModified, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${baseUrl}/privacy`, lastModified, changeFrequency: 'yearly', priority: 0.3 },
   ]
