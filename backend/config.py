@@ -496,6 +496,7 @@ class Settings(BaseSettings):
     PAYNET_SERVICE_ID: int = 1
 
     FRONTEND_URL: str = "https://gapirai.uz"
+    PUBLIC_API_URL: str = "https://api.gapirai.uz"  # API v1 javoblaridagi to'liq fayl havolalari uchun
 
     # yt-dlp orqali YouTube'dan yuklab olishda ishlatiladigan HTTP(S) proxy —
     # http://user:pass@host:port. Butunlay IXTIYORIY — AWS/GCP kabi datacenter

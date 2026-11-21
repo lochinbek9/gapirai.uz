@@ -168,6 +168,9 @@ def _update_job(db, job: DubbingJob, status: JobStatus, progress: float, message
         job.error_code = None
     job.updated_at = datetime.utcnow()
     db.commit()
+    if status == JobStatus.COMPLETED:
+        from backend.services.api_v1 import notify_api_job_finished
+        notify_api_job_finished(job.id)  # API v1 webhook (faqat API orqali yaratilgan job uchun)
 
 
 _STAGE_ICONS = {"ok": "✅", "skipped": "⏭️", "error": "❌"}
@@ -448,6 +451,8 @@ def _mark_job_failed(job_id: str, exc: Exception, current_stage: str) -> None:
         try:
             session.query(DubbingJob).filter(DubbingJob.id == job_id).update(fields)
             session.commit()
+            from backend.services.api_v1 import notify_api_job_finished
+            notify_api_job_finished(job_id)  # API v1 webhook
             return
         except Exception as mark_exc:
             logger.error(f"[JOB {job_id}] FAILED holatiga o'tkazishda xatolik (urinish {attempt + 1}/2): {mark_exc}")
@@ -1356,6 +1361,9 @@ def process_video(self: Task, job_id: str) -> dict:
 
         # Duplicate joblar (source_job_id == job_id bo'lgan boshqa joblar)ni ham COMPLETED qilish
         try:
+            dup_ids = [r[0] for r in db.query(DubbingJob.id).filter(
+                DubbingJob.source_job_id == job_id, DubbingJob.id != job_id,
+                DubbingJob.status != JobStatus.COMPLETED).all()]
             db.query(DubbingJob).filter(
                 DubbingJob.source_job_id == job_id,
                 DubbingJob.id != job_id,
@@ -1368,6 +1376,9 @@ def process_video(self: Task, job_id: str) -> dict:
                 "dubbed_audio_path": dubbed_audio_path,
             }, synchronize_session=False)
             db.commit()
+            if dup_ids:
+                from backend.services.api_v1 import notify_api_job_finished
+                notify_api_job_finished(dup_ids)  # shu videoni kutayotgan API so'rovlari
         except Exception as dup_err:
             logger.warning(f"Duplicate joblarni yangilashda xatolik: {dup_err}")
 

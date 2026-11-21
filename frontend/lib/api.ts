@@ -1052,3 +1052,14 @@ export async function createApiKey(name = 'Premiere Pro'): Promise<ApiKeyInfo & 
 export async function revokeApiKey(keyId: string): Promise<void> {
   await apiClient.delete(`/api/api-keys/${keyId}`)
 }
+
+// Ommaviy API v1 (backend/api/v1_routes.py): webhook imzosini tekshirish uchun sir.
+export async function getApiBalance(): Promise<{ minutes_available: number; unlimited: boolean }> {
+  const res = await apiClient.get('/v1/balance')
+  return res.data
+}
+
+export async function getWebhookSecret(): Promise<string> {
+  const res = await apiClient.get('/v1/webhook-secret')
+  return res.data.secret
+}

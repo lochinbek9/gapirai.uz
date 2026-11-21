@@ -46,6 +46,7 @@ from backend.api.feedback_routes import router as feedback_router
 from backend.api.api_key_routes import router as api_key_router
 from backend.api.email_routes import router as email_router
 from backend.api.caption_dub_routes import router as caption_dub_router
+from backend.api.v1_routes import V1Error, router as v1_router, v1_error_handler
 
 settings = get_settings()
 
@@ -429,6 +430,8 @@ app.include_router(feedback_router)
 app.include_router(api_key_router)
 app.include_router(email_router)
 app.include_router(caption_dub_router)
+app.include_router(v1_router)
+app.add_exception_handler(V1Error, v1_error_handler)
 
 # Tayyor videolarni statik fayl sifatida serve qilish
 os.makedirs(settings.OUTPUT_DIR, exist_ok=True)

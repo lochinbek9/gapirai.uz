@@ -30,6 +30,7 @@ export default function Footer() {
               <li><Link href="/videos" className={LINK}>Ommaviy videolar</Link></li>
               <li><Link href="/pricing" className={LINK}>Tariflar</Link></li>
               <li><Link href="/donate" className={LINK}>Loyihani qo&apos;llab-quvvatlash</Link></li>
+              <li><Link href="/developers" className={LINK}>API (dasturchilar uchun)</Link></li>
             </ul>
           </div>
 

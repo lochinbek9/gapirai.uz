@@ -162,6 +162,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Foydalanuvchi topilmadi.")
     # API kalit bilan kelgan so'rovlar admin va kalit boshqaruviga kira olmaydi
     user._via_api_key = payload.get("typ") == "api"
+    user._api_key_id = payload.get("jti") if user._via_api_key else None
     if getattr(user, "is_verified", True) is False:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hisob tasdiqlanmagan. Iltimos, emailingizni tasdiqlang.")
     record_user_activity(db, user)

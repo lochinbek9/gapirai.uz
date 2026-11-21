@@ -625,6 +625,27 @@ class ApiKey(Base):
     revoked_at = Column(DateTime, nullable=True)
 
 
+class ApiJobRequest(Base):
+    """Ommaviy API v1 orqali yaratilgan dublaj/subtitr (backend/api/v1_routes.py, 2026-11-21).
+    Job'ning o'zi dubbing_jobs'da; bu yerda faqat API'ga xos narsalar: qaysi kalit,
+    Idempotency-Key (bir xil so'rov ikki marta pul yechmasin) va webhook yetkazish holati."""
+    __tablename__ = "api_job_requests"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_api_job_requests_user_idem"),)
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    api_key_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("dubbing_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    mode = Column(String(20), nullable=False, default="dub")  # dub | subtitles
+    idempotency_key = Column(String(128), nullable=True)
+    webhook_url = Column(String(1000), nullable=True)
+    webhook_status = Column(String(20), nullable=True)  # pending | delivered | failed
+    webhook_attempts = Column(Integer, nullable=False, default=0)
+    webhook_last_error = Column(String(300), nullable=True)
+    webhook_delivered_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 
 def get_db():
     db = SessionLocal()
