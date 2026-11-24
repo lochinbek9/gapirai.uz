@@ -5,6 +5,7 @@ python-multipart==0.0.20
 
 # Task Queue
 celery==5.4.0
+kombu==5.5.4
 redis==5.2.1
 flower==2.0.1
 
