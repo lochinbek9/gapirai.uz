@@ -378,6 +378,8 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = "-1004431243067"
 
     # Resend (email tasdiqlash kodlari uchun — gapirai.uz domenida SPF/DKIM tasdiqlangan)
+    # Lokal/dev: True bo'lsa email_service HECH QACHON tarmoqqa chiqmaydi (kodlar faqat logga yoziladi).
+    EMAIL_DISABLED: bool = False
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"

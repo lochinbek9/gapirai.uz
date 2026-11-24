@@ -508,3 +508,31 @@ def send_broadcast_email(
 def list_unsubscribe_headers(unsubscribe_url: str) -> dict:
     """RFC 8058 bir bosishda obunadan chiqish -- Gmail/Yahoo ommaviy jo'natuvchilardan talab qiladi."""
     return {"List-Unsubscribe": f"<{unsubscribe_url}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+
+
+# ── Lokal/dev: EMAIL_DISABLED=true bo'lsa hech qanday email yuborilmaydi ─────────
+# Barcha chiquvchi yo'llar (kod, billing, broadcast, lifecycle) shu o'ram orqali o'tadi.
+import functools as _functools
+
+
+def _email_guard(fn):
+    @_functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if settings.EMAIL_DISABLED:
+            to = args[0] if args else kwargs.get("to_email", "?")
+            if fn.__name__ in ("send_verification_email", "send_password_reset_email"):
+                code = args[1] if len(args) > 1 else kwargs.get("code", "?")
+                logger.warning(f"[EMAIL_DISABLED] {fn.__name__} -> {to}: KOD = {code}")
+            else:
+                logger.info(f"[EMAIL_DISABLED] {fn.__name__} -> {to}: yuborilmadi")
+            return "email-disabled" if fn.__name__ == "deliver_email" else True
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+for _name in (
+    "deliver_email", "send_verification_email", "send_password_reset_email",
+    "send_dubbing_complete_email", "send_subtitles_complete_email", "send_analysis_complete_email",
+    "send_subscription_reminder_email", "send_billing_email", "send_broadcast_email",
+):
+    globals()[_name] = _email_guard(globals()[_name])
