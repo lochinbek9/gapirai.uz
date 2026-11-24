@@ -6,6 +6,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 
 from backend.workers.celery_app import celery_app
+from backend.workers.override_task import GeminiOverrideTask
 from backend.workers.tasks import _record_stage, _log_pipeline_summary, _error_code_for, _safe_persisted_error, _cleanup_upload_dir
 from backend.models.database import SessionLocal, VideoAnalysis, AnalysisStatus
 from backend.services import downloader, transcriber
@@ -134,6 +135,7 @@ def _cleanup_analysis_dirs(analysis_id: str) -> None:
 
 @celery_app.task(
     bind=True,
+    base=GeminiOverrideTask,
     name="backend.workers.analysis_tasks.analyze_video_task",
     max_retries=3,
     default_retry_delay=60,

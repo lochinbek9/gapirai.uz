@@ -3941,8 +3941,8 @@ def get_unactivated_users(
         db.close()
 
 
-
-
-
-
-
+@router.get("/gemini-options")
+def get_gemini_options_endpoint(current_admin: User = Depends(get_current_admin_user)):
+    """Admin: dublyaj/subtitr/tahlil formalaridagi kalit turi va model tanlovi uchun jonli holat."""
+    from backend.services.gemini_quota_manager import get_gemini_options
+    return get_gemini_options()
