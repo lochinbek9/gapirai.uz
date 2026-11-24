@@ -7,11 +7,14 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { createAnalysis, saveAnalysisId, ANALYSIS_LANGUAGE_OPTIONS } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useVideoInfo } from "@/hooks/useVideoInfo";
+import VideoPreview from "@/components/VideoPreview";
 
 export default function AnalysisUrlForm() {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
+  const videoInfo = useVideoInfo(url);
   const [language, setLanguage] = useState("uz");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,7 @@ export default function AnalysisUrlForm() {
             <span className="sm:hidden">Qo&apos;yish</span>
           </button>
         </div>
+        {videoInfo && <VideoPreview info={videoInfo} />}
       </div>
 
       <div className="space-y-2">
@@ -111,24 +115,24 @@ export default function AnalysisUrlForm() {
         </motion.div>
       )}
 
-      {/* Feature teaser banner */}
-      <div className="border-t border-ui-rule pt-4">
-        <p className="text-base text-ui-muted">
-          <strong>Tezkor rejim:</strong> 15-20 soniyada butun videoning qisqa konspekti, asosiy xulosalari va testini oling.
-        </p>
-      </div>
-
       <motion.button
         type="submit"
         disabled={loading || !url.trim()}
+        aria-describedby="analysis-submit-hint"
                 className="ui-btn ui-btn-primary min-h-12 w-full"
       >
         {loading ? (
           <><Loader2 aria-hidden="true" size={18} className="animate-spin" /> Tahlil boshlanmoqda...</>
         ) : (
-          <><Sparkles aria-hidden="true" size={18} /> Tezkor tahlil qilish</>
+          <><Sparkles aria-hidden="true" size={18} /> Tahlil qilish</>
         )}
       </motion.button>
+
+      <p id="analysis-submit-hint" className="text-sm text-ui-muted">
+        {url.trim()
+          ? "Tayyor bo'lgach natija \"Mening videolarim\" bo'limida ko'rinadi."
+          : "Havolani qo'ying — tahlil shundan keyin boshlanadi."}
+      </p>
 
       <ul className="flex flex-wrap justify-center gap-3 sm:gap-6 pt-1">
         {["AI Xulosa", "Asosiy fikrlar", "Transkript", "Konspekt", "Test"].map((label) => (
