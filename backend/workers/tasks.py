@@ -1219,8 +1219,8 @@ def process_video(self: Task, job_id: str) -> dict:
             tts_is_paid = True if tts_provider == "gemini" else is_paid_job
 
             speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
-            _release_read_tx(db)
             try:
+                _release_read_tx(db)
                 dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                     speech_segments, tts_dir, voice_name=voice,
                     video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),
