@@ -15,6 +15,7 @@ from backend.services.video_analysis import VideoAnalysisService, find_cached_an
 from backend.services.job_creation import extract_youtube_video_id
 from backend.services.plans import is_user_admin
 from backend.services.rate_limiter import rate_limit
+from backend.api.gemini_override_dep import capture_gemini_override
 from backend.workers.analysis_tasks import analyze_video_task
 from backend.api.routes import _is_valid_youtube_url, MAX_VIDEO_DURATION_MINUTES
 from backend.services.timezone_utils import to_tashkent_iso
@@ -186,6 +187,7 @@ async def create_analysis(
     request: CreateAnalysisRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ) -> dict:
     if request.language not in ALLOWED_ANALYSIS_LANGUAGES:
         raise HTTPException(status_code=400, detail="Noto'g'ri tahlil tili.")

@@ -9,6 +9,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
+from backend.workers.override_task import GeminiOverrideTask
 from backend.models.database import SessionLocal, DubbingJob, JobStatus, ContentViolation, User
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
 from backend.services.errors import PermanentError, NoSpeechFoundError
@@ -564,6 +565,7 @@ def _verify_output_files_exist(final_output: str | None, dubbed_audio_path: str 
 
 @celery_app.task(
     bind=True,
+    base=GeminiOverrideTask,
     name="backend.workers.tasks.process_video",
     max_retries=3,
     default_retry_delay=60,
@@ -1217,8 +1219,8 @@ def process_video(self: Task, job_id: str) -> dict:
             tts_is_paid = True if tts_provider == "gemini" else is_paid_job
 
             speech_segments = _clamp_segments_to_video(speech_segments, job.video_duration)
-            _release_read_tx(db)
             try:
+                _release_read_tx(db)
                 dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
                     speech_segments, tts_dir, voice_name=voice,
                     video_id=job_id, user_id=(str(job.user_id) if job.user_id else None),

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, defer
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+from backend.api.gemini_override_dep import capture_gemini_override
 from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant, VideoAnalysis
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
 from backend.services.downloader import get_video_info
@@ -423,6 +424,7 @@ async def create_job(
     request: CreateJobRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ) -> dict:
     # Yaratish mantig'i backend/services/job_creation.py'da -- Telegram bot
     # ham xuddi shu funksiyani chaqiradi, ikki joyda saqlanmaydi.

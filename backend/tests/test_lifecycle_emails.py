@@ -147,7 +147,7 @@ class DeliverEmailRetryTest(unittest.TestCase):
     def setUp(self):
         from backend.services import email_service as es
         self.es = es
-        for name, value in (("RESEND_API_KEY", "re_test"), ("SMTP_ENABLED", False), ("SMTP_USER", ""), ("SMTP_PASSWORD", "")):
+        for name, value in (("RESEND_API_KEY", "re_test"), ("EMAIL_DISABLED", False), ("SMTP_ENABLED", False), ("SMTP_USER", ""), ("SMTP_PASSWORD", "")):
             p = patch.object(es.settings, name, value)
             p.start()
             self.addCleanup(p.stop)

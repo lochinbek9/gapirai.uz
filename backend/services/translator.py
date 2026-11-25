@@ -350,6 +350,8 @@ def _translate_chunk_gemini(segments: list[dict], clean_segments: list[dict], is
     ]
     seen = set()
     candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+    from backend.services.gemini_quota_manager import apply_model_override
+    candidate_models = apply_model_override(candidate_models)
 
     api_keys = get_gemini_keys_for_request(is_paid=is_paid)
     if not api_keys:

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PageShell from '@/components/PageShell'
@@ -591,10 +591,35 @@ function FreeTierConversionBanner({ onDismiss }: { onDismiss: () => void }) {
   )
 }
 
+/** Ro'yxat bo'limi: sarlavha + soni. "Jarayonda" bo'limi doim birinchi turadi. */
+function ListSection({ title, count, tone = 'default', children }: {
+  title: string
+  count: number
+  tone?: 'default' | 'active' | 'error'
+  children: React.ReactNode
+}) {
+  if (count === 0) return null
+  const dot = tone === 'active' ? 'bg-blue-500 animate-pulse' : tone === 'error' ? 'bg-red-500' : 'bg-emerald-500'
+  return (
+    <section className="mb-10 last:mb-0" aria-label={title}>
+      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-ui-ink">
+        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot}`} />
+        {title}
+        <span className="text-sm font-normal text-ui-muted tabular-nums">{count}</span>
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">{children}</div>
+    </section>
+  )
+}
+
+const isDone = (status: string) => status === 'completed' || status === 'COMPLETED'
+const isFailed = (status: string) => status === 'failed' || status === 'FAILED'
+
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'dubbing' | 'analysis'>('dubbing')
+  const tabTouched = useRef(false)
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
   const [analyses, setAnalyses] = useState<VideoAnalysis[]>([])
@@ -724,6 +749,25 @@ export default function DashboardPage() {
     router.push('/')
   }
 
+  const activeJobs = jobs.filter((j) => !isDone(j.status) && !isFailed(j.status))
+  const doneJobs = jobs.filter((j) => isDone(j.status))
+  const failedJobs = jobs.filter((j) => isFailed(j.status))
+  const activeAnalyses = analyses.filter((a) => !isDone(a.status) && !isFailed(a.status))
+  const doneAnalyses = analyses.filter((a) => isDone(a.status))
+  const failedAnalyses = analyses.filter((a) => isFailed(a.status))
+
+  // Sahifa ochilganda jarayoni bor tabni ko'rsatamiz (foydalanuvchi o'zi tanlamagan bo'lsa)
+  useEffect(() => {
+    if (tabTouched.current || jobsLoading || analysesLoading) return
+    if (activeJobs.length === 0 && activeAnalyses.length > 0) setActiveTab('analysis')
+    tabTouched.current = true
+  }, [jobsLoading, analysesLoading, activeJobs.length, activeAnalyses.length])
+
+  const selectTab = (tab: 'dubbing' | 'analysis') => {
+    tabTouched.current = true
+    setActiveTab(tab)
+  }
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ui-surface" role="status">
@@ -792,15 +836,17 @@ export default function DashboardPage() {
 
         {/* Tabs */}
         <div role="tablist" aria-label="Videolar turi" className="mb-6 mt-4 inline-flex gap-1 rounded-control bg-ui-ground p-1">
-          <button type="button" role="tab" aria-selected={activeTab === 'dubbing'} onClick={() => setActiveTab('dubbing')} className={TAB(activeTab === 'dubbing')}>
+          <button type="button" role="tab" aria-selected={activeTab === 'dubbing'} onClick={() => selectTab('dubbing')} className={TAB(activeTab === 'dubbing')}>
             <Youtube aria-hidden="true" className="h-4 w-4" />
             <span>Dublyaj</span>
             <span className="text-xs text-ui-muted tabular-nums">{jobs.length}</span>
+            {activeJobs.length > 0 && <span className="rounded-full bg-blue-500/15 px-1.5 text-xs font-medium text-blue-600 tabular-nums">{activeJobs.length} jarayonda</span>}
           </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'analysis'} onClick={() => setActiveTab('analysis')} className={TAB(activeTab === 'analysis')}>
+          <button type="button" role="tab" aria-selected={activeTab === 'analysis'} onClick={() => selectTab('analysis')} className={TAB(activeTab === 'analysis')}>
             <Sparkles aria-hidden="true" className="h-4 w-4" />
             <span>Tahlillar</span>
             <span className="text-xs text-ui-muted tabular-nums">{analyses.length}</span>
+            {activeAnalyses.length > 0 && <span className="rounded-full bg-blue-500/15 px-1.5 text-xs font-medium text-blue-600 tabular-nums">{activeAnalyses.length} jarayonda</span>}
           </button>
         </div>
 
@@ -818,8 +864,9 @@ export default function DashboardPage() {
               <Link href="/" className="ui-btn ui-btn-primary mt-6">Birinchi videoni dublyaj qilish</Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {jobs.map((job) => (
+            <>
+              <ListSection title="Jarayonda" count={activeJobs.length} tone="active">
+                {activeJobs.map((job) => (
                 <VideoCard
                   key={job.job_id}
                   job={job}
@@ -828,8 +875,33 @@ export default function DashboardPage() {
                   isRetrying={retryingId === job.job_id}
                   isDeleting={deletingId === job.job_id}
                 />
-              ))}
-            </div>
+                ))}
+              </ListSection>
+              <ListSection title="Tayyor" count={doneJobs.length}>
+                {doneJobs.map((job) => (
+                <VideoCard
+                  key={job.job_id}
+                  job={job}
+                  onDelete={handleDelete}
+                  onRetry={handleRetry}
+                  isRetrying={retryingId === job.job_id}
+                  isDeleting={deletingId === job.job_id}
+                />
+                ))}
+              </ListSection>
+              <ListSection title="Xatolik bilan tugagan" count={failedJobs.length} tone="error">
+                {failedJobs.map((job) => (
+                <VideoCard
+                  key={job.job_id}
+                  job={job}
+                  onDelete={handleDelete}
+                  onRetry={handleRetry}
+                  isRetrying={retryingId === job.job_id}
+                  isDeleting={deletingId === job.job_id}
+                />
+                ))}
+              </ListSection>
+            </>
           )
         )}
 
@@ -846,8 +918,9 @@ export default function DashboardPage() {
               <Link href="/?mode=analyze" className="ui-btn ui-btn-primary mt-6">Video tahlil qilish</Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {analyses.map((analysis) => (
+            <>
+              <ListSection title="Jarayonda" count={activeAnalyses.length} tone="active">
+                {activeAnalyses.map((analysis) => (
                 <AnalysisCard
                   key={analysis.id}
                   analysis={analysis}
@@ -856,8 +929,33 @@ export default function DashboardPage() {
                   isDeleting={deletingAnalysisId === analysis.id}
                   isRetrying={retryingAnalysisId === analysis.id}
                 />
-              ))}
-            </div>
+                ))}
+              </ListSection>
+              <ListSection title="Tayyor" count={doneAnalyses.length}>
+                {doneAnalyses.map((analysis) => (
+                <AnalysisCard
+                  key={analysis.id}
+                  analysis={analysis}
+                  onDelete={handleDeleteAnalysis}
+                  onRetry={handleRetryAnalysis}
+                  isDeleting={deletingAnalysisId === analysis.id}
+                  isRetrying={retryingAnalysisId === analysis.id}
+                />
+                ))}
+              </ListSection>
+              <ListSection title="Xatolik bilan tugagan" count={failedAnalyses.length} tone="error">
+                {failedAnalyses.map((analysis) => (
+                <AnalysisCard
+                  key={analysis.id}
+                  analysis={analysis}
+                  onDelete={handleDeleteAnalysis}
+                  onRetry={handleRetryAnalysis}
+                  isDeleting={deletingAnalysisId === analysis.id}
+                  isRetrying={retryingAnalysisId === analysis.id}
+                />
+                ))}
+              </ListSection>
+            </>
           )
         )}
       </div>

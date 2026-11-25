@@ -63,6 +63,16 @@ function formatHumanDuration(seconds: number): string {
   return `${s} soniya`;
 }
 
+/** Tahlil davomiyligining halol bahosi: yuklab olish + STT + AI zanjiri.
+ * Haqiqiy o'lchov: 18:44 video ≈ 3,5 daqiqa (AI provayderlari band bo'lganda ko'proq). */
+function estimateAnalysisTime(videoDurationSec?: number | null): string {
+  const min = (videoDurationSec || 0) / 60;
+  if (!min) return "1–5 daqiqa";
+  const lo = 1 + Math.floor(min / 15);
+  const hi = 3 + Math.ceil(min / 6);
+  return `${lo}–${hi} daqiqa`;
+}
+
 export default function VideoAnalysisPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -472,7 +482,7 @@ export default function VideoAnalysisPage() {
               </div>
               <div className="flex justify-between items-center text-xs text-ui-muted">
                 <span>{analysis.status_message || ANALYSIS_STATUS_LABELS[analysis.status]}</span>
-                <span>Taxminan: 30-60 soniya</span>
+                <span>Taxminan: {estimateAnalysisTime(analysis.video_duration)}</span>
               </div>
             </div>
 

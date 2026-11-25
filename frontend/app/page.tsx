@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
@@ -17,7 +16,7 @@ import DonateCTA from "@/components/DonateCTA";
 import TelegramFeedbackSection from "@/components/TelegramFeedbackSection";
 import PreviewOfferModal from "@/components/PreviewOfferModal";
 import UploadRecoveryPrompt from "@/components/UploadRecoveryPrompt";
-import { X, UserPlus, LogIn, Sparkles, AlertTriangle } from "lucide-react";
+import { Sparkles, AlertTriangle } from "lucide-react";
 import TabList, { tabPanelProps } from "@/components/ui/TabList";
 import SiteHeader from "@/components/home/SiteHeader";
 import StatsStrip from "@/components/home/StatsStrip";
@@ -58,37 +57,6 @@ function clearJobId() {
   localStorage.removeItem(JOB_KEY);
 }
 
-/* ── Birinchi tashrif: ro'yxatdan o'tish taklifi ─────
-   Ilgari sahifani to'sadigan modal edi; endi birinchi ekranni bloklamaydigan,
-   yopiladigan qator (yopilganda dubber_welcome_seen saqlanadi). */
-function WelcomeModal({ onClose }: { onClose: () => void }) {
-  return (
-    <aside aria-label="Ro'yxatdan o'tish taklifi" className="border-b border-ui-rule bg-ui-surface">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-6">
-        <p className="flex-1 text-[15px] text-ui-muted">
-          <strong className="font-medium text-ui-ink">Bepul hisob oching</strong> — videolaringiz saqlanadi va har 30 kunda 5 daqiqa bepul.
-        </p>
-        <div className="flex items-center gap-2">
-          <Link href="/register" onClick={onClose} className="ui-btn min-h-10 flex-1 whitespace-nowrap px-3.5 text-sm sm:flex-none">
-            <UserPlus aria-hidden="true" className="h-4 w-4" /> Ro&apos;yxatdan o&apos;tish
-          </Link>
-          <Link href="/login" onClick={onClose} className="ui-btn ui-btn-secondary hidden min-h-10 px-3.5 text-sm sm:inline-flex">
-            <LogIn aria-hidden="true" className="h-4 w-4" /> Kirish
-          </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Taklifni yopish"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-ui-muted hover:bg-ui-ground hover:text-ui-ink"
-          >
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 /* ── Main Page ────────────────────────────────────── */
 export default function Home() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
@@ -104,7 +72,6 @@ export default function Home() {
   const [voiceName, setVoiceName] = useState<string>("");
   const [ttsProvider, setTtsProvider] = useState<string>("gemini");
   const [isProUser, setIsProUser] = useState<boolean>(false);
-  const [showWelcome, setShowWelcome] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [mode, setMode] = useState<"dub" | "subtitle" | "analyze">("dub");
   const [previewOffer, setPreviewOffer] = useState<{
@@ -202,21 +169,6 @@ export default function Home() {
         });
     }
   }, []);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (isLoggedIn) return;
-    const seen = localStorage.getItem("dubber_welcome_seen");
-    if (!seen) {
-      const t = setTimeout(() => setShowWelcome(true), 800);
-      return () => clearTimeout(t);
-    }
-  }, [authLoading, isLoggedIn]);
-
-  const handleCloseWelcome = () => {
-    setShowWelcome(false);
-    localStorage.setItem("dubber_welcome_seen", "1");
-  };
 
   useEffect(() => {
     if (jobId) saveJobId(jobId);
@@ -404,7 +356,6 @@ export default function Home() {
     <>
       <SiteHeader />
       <main id="main" tabIndex={-1} className="relative overflow-x-hidden bg-ui-surface text-ui-ink focus:outline-none">
-        {showWelcome && <WelcomeModal onClose={handleCloseWelcome} />}
         <PreviewOfferModal
           isOpen={previewOffer.isOpen}
           videoInfo={videoInfo}

@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { createJob, SubtitleSourceLanguage } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useVideoInfo } from "@/hooks/useVideoInfo";
+import VideoPreview from "@/components/VideoPreview";
 
 /** "Subtitr" rejimi (2026-09-16) -- AnalysisUrlForm bilan bir xil, o'zicha
  * mustaqil (parent'ning "dub" holat mashinasiga bog'liq emas): so'rov
@@ -17,6 +19,7 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
+  const videoInfo = useVideoInfo(url);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +81,7 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
             <span className="sm:hidden">Qo&apos;yish</span>
           </button>
         </div>
+        {videoInfo && <VideoPreview info={videoInfo} />}
         <p className="text-sm text-ui-muted">
           O'zbekcha subtitr (.srt/.vtt) yaratiladi — dublyaj audiosi yo'q, tezroq va TTS xarajatisiz.
         </p>

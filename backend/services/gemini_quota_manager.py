@@ -77,16 +77,13 @@ def get_all_gemini_api_keys() -> List[str]:
     raw_keys: List[str] = []
 
     # 1. Settings va os.environ
+    # 2026-11-24: faqat ikki manba -- GEMINI_API_KEYS (bepul hovuz) va GEMINI_PAID_API_KEY (pullik).
+    # Eski bitta-kalitli GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / GEMINI_PAID_API_KEYS hovuzga kirmaydi.
     for env_val in [
-        getattr(settings, "GEMINI_API_KEY", ""),
-        getattr(settings, "GOOGLE_GENERATIVE_AI_API_KEY", ""),
+        getattr(settings, "GEMINI_API_KEYS", ""),
         getattr(settings, "GEMINI_PAID_API_KEY", ""),
-        getattr(settings, "GEMINI_PAID_API_KEYS", ""),
         os.environ.get("GEMINI_API_KEYS", ""),
-        os.environ.get("GEMINI_API_KEY", ""),
         os.environ.get("GEMINI_PAID_API_KEY", ""),
-        os.environ.get("GEMINI_PAID_API_KEYS", ""),
-        os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY", ""),
     ]:
         if env_val:
             for part in str(env_val).split(","):
@@ -115,7 +112,7 @@ def get_all_gemini_api_keys() -> List[str]:
                         k, v = line.split("=", 1)
                         k = k.strip()
                         v = v.strip().strip('"').strip("'")
-                        if k in ("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GEMINI_API_KEYS", "GEMINI_PAID_API_KEY", "GEMINI_PAID_API_KEYS"):
+                        if k in ("GEMINI_API_KEYS", "GEMINI_PAID_API_KEY"):
                             for part in v.split(","):
                                 cleaned = part.strip()
                                 if cleaned and len(cleaned) >= 15:
@@ -140,9 +137,7 @@ def get_paid_gemini_api_keys() -> List[str]:
 
     for env_val in [
         getattr(settings, "GEMINI_PAID_API_KEY", ""),
-        getattr(settings, "GEMINI_PAID_API_KEYS", ""),
         os.environ.get("GEMINI_PAID_API_KEY", ""),
-        os.environ.get("GEMINI_PAID_API_KEYS", ""),
     ]:
         if env_val:
             for part in str(env_val).split(","):
@@ -170,7 +165,7 @@ def get_paid_gemini_api_keys() -> List[str]:
                         k, v = line.split("=", 1)
                         k = k.strip()
                         v = v.strip().strip('"').strip("'")
-                        if k in ("GEMINI_PAID_API_KEY", "GEMINI_PAID_API_KEYS"):
+                        if k == "GEMINI_PAID_API_KEY":
                             for part in v.split(","):
                                 cleaned = part.strip()
                                 if cleaned and len(cleaned) >= 15:
@@ -214,6 +209,10 @@ def get_gemini_keys_for_request(is_paid: bool = False, allow_paid_fallback: bool
       yoki cooldown sababli tugasa, foydalanuvchi ishi to'xtab qolmasligi uchun
       avtomatik ravishda pullik kalit(lar)ga favqulodda zaxira sifatida o'tiladi.
     """
+    strict = _strict_keys_for_override()
+    if strict is not None:
+        return strict
+
     paid_keys = get_paid_gemini_api_keys()
     free_keys = get_free_gemini_api_keys()
 
@@ -258,6 +257,15 @@ def _key_hash(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
 
 
+BILLING_COOLDOWN_SEC = 86400.0  # 1 sutka
+
+
+def is_billing_exhausted(error_str: str) -> bool:
+    """Pullik kalit balansi tugaganmi (402 / 'prepayment credits are depleted')."""
+    e = str(error_str)
+    return bool(re.search(r"['\"]code['\"]:\s*402\b", e)) or "prepayment credits" in e.lower() or "credits are depleted" in e.lower()
+
+
 def parse_retry_delay(error_str: str) -> float:
     """
     API 429 xatosidan tiklanish muddatini soniyalarda hisoblaydi.
@@ -267,6 +275,11 @@ def parse_retry_delay(error_str: str) -> float:
       - retry in 30.5s
     """
     err_str = str(error_str)
+
+    # 0. Balans tugagan (402 / prepayment credits depleted): pul qachon to'ldirilishi noma'lum --
+    # qayta-qayta urinmaslik uchun 1 sutka kutamiz.
+    if is_billing_exhausted(err_str):
+        return BILLING_COOLDOWN_SEC
 
     # 1. retryDelay: '123s' yoki "123"
     m_delay = re.search(r"retryDelay['\"]?:\s*['\"]?(\d+)s?", err_str, re.IGNORECASE)
@@ -336,6 +349,13 @@ def mark_model_cooldown(api_key: str, model: str, duration_sec: float, reason: s
         f"[Gemini Quota] Kalit {masked} | Model: {model} — {duration_sec:.1f}s "
         f"({duration_sec / 60:.1f} daqiqa) kutishga qo'yildi. Sabab: {reason[:100]}"
     )
+
+    # Balans tugagan: kalit BUTUN (barcha modellar) bo'yicha to'xtatiladi -- har modelni alohida sinab
+    # vaqt va so'rov sarflamaymiz. Holat Redis'da saqlanadi (TTL = 1 sutka).
+    if is_billing_exhausted(reason) and not reason.startswith("[billing-all]"):
+        for m in GEMINI_ALL_MONITORED_MODELS:
+            if m != model:
+                mark_model_cooldown(api_key, m, duration_sec, reason="[billing-all] " + reason)
 
     redis_client = _get_redis()
     if redis_client:
@@ -496,7 +516,7 @@ def call_gemini_json_with_fallback(
     # Sifat bo'yicha: Har bir model uchun kalitlarni sinaymiz.
     # Agar model Google tomonida 503 (high demand) yoki timeout bersa,
     # 2 ta kalitdan so'ng darhol KEYINGI MODELGA o'tiladi (foydalanuvchi yarim soat kutmasligi uchun).
-    for model_name in GEMINI_TEXT_MODELS:
+    for model_name in apply_model_override(GEMINI_TEXT_MODELS):
         model_fail_count = 0
         for api_key in keys:
             avail, remaining_sec = is_model_available(api_key, model_name)
@@ -965,4 +985,124 @@ def get_gemini_keys_detailed_stats(db=None) -> Dict[str, Any]:
             "total_cost_all_usd": round(grand_total_cost_usd, 4),
         }
     }
+
+# ── Admin: har bir ish uchun kalit turi (bepul/pullik) va model tanlovi ──────────────
+# Tanlov Redis'da ISH ID'si bo'yicha saqlanadi (sxema o'zgarmaydi), worker vazifa boshida faollashtiradi.
+# Celery prefork: har bir jarayon bir vaqtda bitta vazifa bajaradi, shuning uchun jarayon-global holat xavfsiz.
+import contextvars as _contextvars
+import json as _json
+
+REQUEST_OVERRIDE: "_contextvars.ContextVar[Optional[Dict[str, str]]]" = _contextvars.ContextVar("gemini_request_override", default=None)
+_ACTIVE_OVERRIDE: Optional[Dict[str, str]] = None
+_OVERRIDE_TTL_SEC = 7 * 86400
+
+
+def sanitize_override(tier: Optional[str], model: Optional[str]) -> Optional[Dict[str, str]]:
+    """Faqat ma'lum qiymatlar o'tadi: tier in {free, paid}, model -- GEMINI_TEXT_MODELS ro'yxatidan."""
+    out: Dict[str, str] = {}
+    if tier in ("free", "paid"):
+        out["tier"] = tier
+    if model and model in GEMINI_TEXT_MODELS:
+        out["model"] = model
+    return out or None
+
+
+def save_job_gemini_override(job_id: str, override: Dict[str, str]) -> None:
+    r = _get_redis()
+    if not r or not job_id or not override:
+        return
+    try:
+        r.set(f"gemini:override:{job_id}", _json.dumps(override), ex=_OVERRIDE_TTL_SEC)
+    except Exception as e:
+        logger.warning(f"Admin tanlovini saqlashda xato: {e}")
+
+
+def load_job_gemini_override(job_id: str) -> Optional[Dict[str, str]]:
+    r = _get_redis()
+    if not r or not job_id:
+        return None
+    try:
+        raw = r.get(f"gemini:override:{job_id}")
+        return sanitize_override(**{k: v for k, v in _json.loads(raw).items() if k in ("tier", "model")}) if raw else None
+    except Exception:
+        return None
+
+
+def activate_gemini_override(override: Optional[Dict[str, str]]) -> None:
+    global _ACTIVE_OVERRIDE
+    _ACTIVE_OVERRIDE = override or None
+    if _ACTIVE_OVERRIDE:
+        logger.info(f"[Gemini Override] faol: {_ACTIVE_OVERRIDE}")
+
+
+def deactivate_gemini_override() -> None:
+    global _ACTIVE_OVERRIDE
+    _ACTIVE_OVERRIDE = None
+
+
+def apply_model_override(models: List[str]) -> List[str]:
+    """Admin aniq model tanlagan bo'lsa -- faqat shu model (qat'iy), aks holda ro'yxat o'zgarishsiz."""
+    ov = _ACTIVE_OVERRIDE
+    if ov and ov.get("model"):
+        return [ov["model"]]
+    return models
+
+
+def _strict_keys_for_override() -> Optional[List[str]]:
+    ov = _ACTIVE_OVERRIDE
+    if not ov or ov.get("tier") not in ("free", "paid"):
+        return None
+    paid = get_paid_gemini_api_keys()
+    if ov["tier"] == "paid":
+        return paid
+    paid_set = set(paid)
+    return [k for k in get_all_gemini_api_keys() if k not in paid_set]
+
+
+def _cooldown_reason(api_key: str, model: str) -> str:
+    r = _get_redis()
+    if not r:
+        return ""
+    try:
+        return r.get(f"gemini_cd:{_key_hash(api_key)}:{model}") or ""
+    except Exception:
+        return ""
+
+
+def _reason_label(reason: str) -> str:
+    if is_billing_exhausted(reason):
+        return "Balans tugagan"
+    if "429" in reason or "exceeded your current quota" in reason:
+        return "Kunlik kvota tugagan"
+    if reason:
+        return "Vaqtincha band"
+    return ""
+
+
+def get_gemini_options() -> Dict[str, Any]:
+    """Admin tanlovi uchun: har bir tur (bepul/pullik) va model bo'yicha jonli holat."""
+    paid = get_paid_gemini_api_keys()
+    paid_set = set(paid)
+    free = [k for k in get_all_gemini_api_keys() if k not in paid_set]
+    tiers: Dict[str, Any] = {}
+    models_out: List[Dict[str, Any]] = [{"model": m, "free_available": 0, "paid_available": 0} for m in GEMINI_TEXT_MODELS]
+    for tier_name, keys in (("free", free), ("paid", paid)):
+        usable_keys = 0
+        notes: Dict[str, int] = {}
+        for k in keys:
+            any_ok = False
+            for i, m in enumerate(GEMINI_TEXT_MODELS):
+                ok, _rem = is_model_available(k, m)
+                if ok:
+                    any_ok = True
+                    models_out[i][f"{tier_name}_available"] += 1
+                else:
+                    lab = _reason_label(_cooldown_reason(k, m))
+                    if lab:
+                        notes[lab] = notes.get(lab, 0) + 1
+            usable_keys += 1 if any_ok else 0
+        status = "blocked" if keys and usable_keys == 0 else ("empty" if not keys else ("limited" if usable_keys < len(keys) else "ok"))
+        top_note = max(notes, key=notes.get) if notes and status in ("blocked", "limited") else ""
+        tiers[tier_name] = {"keys_total": len(keys), "keys_usable": usable_keys, "status": status, "note": top_note}
+    return {"tiers": tiers, "models": models_out}
 

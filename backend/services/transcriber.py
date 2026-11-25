@@ -306,7 +306,8 @@ def _get_gemini_candidate_models(primary: str) -> list[str]:
         "gemini-3.1-flash-lite-preview",
     ]
     seen = set()
-    return [m for m in order if m and not (m in seen or seen.add(m))]
+    from backend.services.gemini_quota_manager import apply_model_override
+    return apply_model_override([m for m in order if m and not (m in seen or seen.add(m))])
 
 
 def _get_gemini_stt_model_name() -> str:
@@ -637,9 +638,14 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
 
     try:
         result = _transcribe_via_api(audio_path, language, primary, is_paid=is_paid)
-        if groq_first and not language and _is_uzbek(result.get("language")) and is_neuronai_stt_available():
-            # Video "uz" deb belgilanmagan, lekin nutq o'zbekcha -- Whisper o'zbekchada kuchsiz, NeuronAI'da qayta.
-            logger.info("STT: Groq o'zbekcha nutq aniqladi -- NeuronAI (uz) bilan qayta transkripsiya.")
+        detected = result.get("language")
+        if (
+            groq_first and not language and is_neuronai_stt_available()
+            and (_is_uzbek(detected) or (_is_turkic_confusable(detected) and _probe_is_uzbek(audio_path)))
+        ):
+            # Video "uz" deb belgilanmagan, lekin nutq o'zbekcha -- Whisper o'zbekchada kuchsiz (ko'pincha
+            # turkcha/ozarbayjoncha deb adashadi), NeuronAI'da qayta.
+            logger.info(f"STT: nutq o'zbekcha (Groq: {detected}) -- NeuronAI (uz) bilan qayta transkripsiya.")
             try:
                 return _transcribe_via_api(audio_path, "uz", "neuronai", is_paid=is_paid)
             except Exception as e:
@@ -890,6 +896,59 @@ def _groq_stt_available() -> bool:
 
 def _is_uzbek(lang) -> bool:
     return str(lang or "").strip().lower() in ("uz", "uzb", "uzbek")
+
+
+# Whisper o'zbekchani ko'pincha shu turkiy tillardan biri deb aniqlaydi (2026-11-24: o'zbekcha video "tr").
+_TURKIC_CONFUSABLE = frozenset({
+    "tr", "turkish", "az", "azerbaijani", "kk", "kazakh", "ky", "kyrgyz",
+    "tk", "turkmen", "tt", "tatar", "ba", "bashkir", "ug", "uyghur",
+})
+# O'zbekchaga xos xizmat so'zlari (turkcha/qozoqchada uchramaydi yoki juda kam): "bir", "bu" kabi umumiylar kiritilmagan.
+_UZ_MARKERS = frozenset({
+    "va", "uchun", "bilan", "emas", "ham", "deb", "lekin", "yoki", "kerak", "mumkin", "qanday", "nima",
+    "juda", "hamma", "boʻlsa", "boʻladi", "boʻlib", "degan", "ekan", "edi", "men", "siz", "biz", "shu",
+    "endi", "uni", "buni", "unda", "bunda", "yaxshi", "hayot", "odam", "lekin", "agar", "chunki",
+})
+
+
+def _is_turkic_confusable(lang) -> bool:
+    return str(lang or "").strip().lower() in _TURKIC_CONFUSABLE
+
+
+def uzbek_marker_stats(text: str | None) -> tuple[float, int]:
+    """(O'zbekcha xizmat so'zlari ulushi, turli marker soni). NeuronAI turk harflarida yozadi -- avval lotinga keltiriladi."""
+    norm = normalize_uz_latin(text or "").lower().replace("ʼ", "ʻ").replace("'", "ʻ").replace("’", "ʻ")
+    tokens = re.findall(r"[a-zʻ]+", norm)
+    if not tokens:
+        return 0.0, 0
+    hits = [t for t in tokens if t in _UZ_MARKERS]
+    return len(hits) / len(tokens), len(set(hits))
+
+
+def _probe_is_uzbek(audio_path: str, offset_seconds: int = 20, clip_seconds: int = 40) -> bool:
+    """Whisper turkiy til aniqlaganda haqiqatan o'zbekchami: qisqa namunani NeuronAI'da 'uz' sifatida yozdirib,
+    o'zbekcha xizmat so'zlari ulushini tekshiradi (haqiqiy turkcha videoda bunday so'zlar deyarli yo'q).
+    Xatoda False -- avvalgi natija o'zgarmaydi."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="uzprobe-") as tmp:
+            clip = Path(tmp) / "clip.mp3"
+            for ss in (offset_seconds, 0):
+                subprocess.run(
+                    ["ffmpeg", "-loglevel", "error", "-y", "-ss", str(ss), "-i", audio_path, "-t", str(clip_seconds),
+                     "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", str(clip)],
+                    capture_output=True, check=False,
+                )
+                if clip.exists() and clip.stat().st_size > 8_000:
+                    break
+            else:
+                return False
+            data = neuronai_transcribe_file(clip, "uz", timeout=120.0)
+            ratio, distinct = uzbek_marker_stats(data.get("text"))
+            logger.info(f"STT o'zbek namunasi: marker ulushi={ratio:.3f}, turli markerlar={distinct}")
+            return ratio >= 0.06 and distinct >= 4
+    except Exception as e:
+        logger.warning(f"O'zbek namunasi tekshiruvi ishlamadi: {e}")
+        return False
 
 
 def is_neuronai_stt_available() -> bool:
