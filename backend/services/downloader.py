@@ -221,6 +221,9 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
                 # shu uchtasi 1080p gacha formatlarni qaytaradi.
                 "player_client": ["default", "web_safari", "web_embedded"],
                 "fetch_pot": ["always"],
+                # 2026-11-25: YouTube'ning yangi "main" pleyerida imza yechuvchi yiqiladi (addOnDisposeCallback),
+                # formatlar qaytmaydi. yt-dlp 2026.11.23 ham aynan "tv" variantiga o'tgan (yt-dlp#18123).
+                "player_js_variant": ["tv"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
             # bu YouTube'ning "Sign in to confirm you're not a bot" bloklashini
