@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Job } from "@/lib/api";
-import { formatTashkentTime, parseApiDate } from "@/lib/timestamp";
+import { parseApiDate } from "@/lib/timestamp";
 
 const STEPS = [
   { key: "downloading",  icon: "⬇", label: "Yuklab olish" },
@@ -164,10 +164,6 @@ export default function StepProgress({ job, elapsed, onCancel, cancelLoading }: 
 
       {job.expected_end_time && !isFailed && job.status !== 'pending' && (job.progress || 0) > 0 && (
         <div className="bg-ui-ground border border-ui-rule rounded-2xl p-4 text-center text-xs text-ui-muted space-y-1 transition-colors">
-          <p className="font-semibold text-gray-700 dark:text-gray-300">Taxminiy yakunlanish vaqti:</p>
-          <p className="text-ui-ink font-mono text-base font-semibold">
-            {formatTashkentTime(job.expected_end_time)}
-          </p>
           <p className="text-xs text-ui-muted font-medium">
             {Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000) <= 0
               ? "(tez orada yakunlanadi...)"

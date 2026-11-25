@@ -14,7 +14,6 @@ import {
   TrendingUp,
   Sliders,
   Info,
-  Edit2,
   Check,
   X,
   ExternalLink,
@@ -27,7 +26,6 @@ import {
 import {
   apiAdminGeminiKeysOverview,
   apiAdminSetGeminiAdminMode,
-  apiAdminSetGeminiInitialBalance,
   apiAdminResetGeminiCooldown,
   apiAdminResetGroqCooldown,
   GeminiKeysOverviewResponse,
@@ -55,11 +53,6 @@ export default function AdminGeminiKeysManager({ token }: Props) {
 
   // Search & filter for Groq keys
   const [groqSearchTerm, setGroqSearchTerm] = useState('')
-
-  // Edit balance modal/state
-  const [editingBalance, setEditingBalance] = useState(false)
-  const [newBalance, setNewBalance] = useState('')
-  const [savingBalance, setSavingBalance] = useState(false)
 
   // Mode change state
   const [switchingMode, setSwitchingMode] = useState(false)
@@ -104,26 +97,6 @@ export default function AdminGeminiKeysManager({ token }: Props) {
       showFeedback(err?.response?.data?.detail || 'Rejimni o‘zgartirishda xatolik', 'error')
     } finally {
       setSwitchingMode(false)
-    }
-  }
-
-  const handleSaveBalance = async () => {
-    if (!token || savingBalance) return
-    const num = parseFloat(newBalance)
-    if (isNaN(num) || num < 0) {
-      alert("Iltimos, to'g'ri musbat dollar miqdorini kiriting (masalan: 30.0)")
-      return
-    }
-    try {
-      setSavingBalance(true)
-      await apiAdminSetGeminiInitialBalance(token, num)
-      showFeedback(`Boshlang'ich balans $${num.toFixed(2)} qilib belgilandi!`)
-      setEditingBalance(false)
-      await loadData(true)
-    } catch (err: any) {
-      showFeedback(err?.response?.data?.detail || 'Balansni saqlashda xatolik', 'error')
-    } finally {
-      setSavingBalance(false)
     }
   }
 
@@ -269,7 +242,7 @@ export default function AdminGeminiKeysManager({ token }: Props) {
                 <span>Google Gemini Kalitlari</span>
               </div>
               <p className="text-xs text-ui-muted mt-0.5">
-                1 pullik ($30.00) + {data?.summary.total_free_keys || 35} ta bepul kalit • Ovoz & Matn
+                1 pullik + {data?.summary.total_free_keys || 35} ta bepul kalit • Ovoz & Matn
               </p>
             </div>
           </div>
@@ -560,12 +533,8 @@ export default function AdminGeminiKeysManager({ token }: Props) {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight">
-                        Pullik (Balansli) Gemini API Kaliti
+                        Pullik Gemini API Kaliti
                       </h3>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 font-mono">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        BALANSLI ENGINE
-                      </span>
                     </div>
                     <p className="text-xs text-amber-200/70 font-mono mt-0.5">
                       Kalit: <span className="text-white font-semibold">{paidKey?.key_masked || 'AQ.Ab8...WaETg'}</span> • Faqat Standard/Pro obunachilar va sotib olingan daqiqalar uchun
@@ -601,50 +570,8 @@ export default function AdminGeminiKeysManager({ token }: Props) {
                 </div>
               </div>
 
-              {/* Balance & Cost Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-black/30 border border-white/10 rounded-xl p-3.5 relative group">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-ui-muted ">Boshlang'ich Kiritilgan</p>
-                    <button
-                      onClick={() => {
-                        setNewBalance(String(paidKey?.initial_balance_usd || 30.0))
-                        setEditingBalance(true)
-                      }}
-                      className="opacity-60 hover:opacity-100 p-1 hover:bg-white/10 rounded text-gray-300 transition"
-                      title="Balansni tahrirlash"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <p className="text-xl sm:text-2xl font-semibold text-white mt-1 font-mono">
-                    ${paidKey?.initial_balance_usd ? paidKey.initial_balance_usd.toFixed(2) : '30.00'}
-                  </p>
-                  <p className="text-xs text-ui-muted mt-0.5 font-mono">
-                    {paidKey?.initial_balance_usd ? (paidKey.initial_balance_usd * 12850).toLocaleString() : '385,500'} UZS
-                  </p>
-                </div>
-
-                <div className="bg-black/30 border border-emerald-500/20 rounded-xl p-3.5">
-                  <p className="text-xs font-semibold text-emerald-400 ">Haqiqiy Qoldiq Balans</p>
-                  <p className="text-xl sm:text-2xl font-semibold text-emerald-400 mt-1 font-mono">
-                    ${paidKey?.remaining_balance_usd !== undefined ? paidKey.remaining_balance_usd.toFixed(2) : '30.00'}
-                  </p>
-                  <p className="text-xs text-emerald-200/80 mt-0.5 font-mono">
-                    {paidKey?.remaining_balance_uzs ? paidKey.remaining_balance_uzs.toLocaleString() : '385,500'} UZS
-                  </p>
-                </div>
-
-                <div className="bg-black/30 border border-white/10 rounded-xl p-3.5">
-                  <p className="text-xs font-semibold text-ui-muted ">Sarflangan Xarajat</p>
-                  <p className="text-xl sm:text-2xl font-semibold text-amber-300 mt-1 font-mono">
-                    ${paidKey?.total_cost_usd !== undefined ? paidKey.total_cost_usd.toFixed(4) : '0.0000'}
-                  </p>
-                  <p className="text-xs text-ui-muted mt-0.5 font-mono">
-                    {paidKey?.total_cost_uzs ? paidKey.total_cost_uzs.toLocaleString() : '0'} UZS sarflandi
-                  </p>
-                </div>
-
+              {/* Balans hisoblanmaydi: Google qoldiqni bermaydi, taxminiy hisob esa noto'g'ri chiqqan */}
+              <div className="max-w-xs">
                 <div className="bg-black/30 border border-white/10 rounded-xl p-3.5">
                   <p className="text-xs font-semibold text-ui-muted ">Bajarilgan Videolar</p>
                   <p className="text-xl sm:text-2xl font-semibold text-white mt-1 font-mono">
@@ -653,44 +580,6 @@ export default function AdminGeminiKeysManager({ token }: Props) {
                   <p className="text-xs text-ui-muted mt-0.5 font-mono">
                     Davomiyligi: {paidKey?.total_duration_formatted || '0 son'}
                   </p>
-                </div>
-              </div>
-
-              {/* Balance edit form */}
-              {editingBalance && (
-                <div className="p-4 bg-black/60 border border-amber-500/40 rounded-xl flex flex-col sm:flex-row items-center gap-3">
-                  <span className="text-xs text-amber-300 font-semibold">Yangi boshlang'ich balans ($):</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newBalance}
-                    onChange={(e) => setNewBalance(e.target.value)}
-                    className="px-3 py-1.5 bg-black/50 border border-white/20 rounded-lg text-sm text-white font-mono w-32 focus:outline-none focus:border-amber-400"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSaveBalance}
-                      disabled={savingBalance}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs rounded-lg transition disabled:opacity-50"
-                    >
-                      {savingBalance ? 'Saqlanmoqda...' : 'Saqlash'}
-                    </button>
-                    <button
-                      onClick={() => setEditingBalance(false)}
-                      className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs rounded-lg transition"
-                    >
-                      Bekor qilish
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Informative explanation note */}
-              <div className="bg-amber-950/20 border border-amber-500/20 rounded-xl p-3.5 text-xs text-amber-200/90 leading-relaxed flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-white">Google API arxitekturasi va balans hisobi: </span>
-                  Google AI Studio faqat AI inferensiya so'rovlari uchun mo'ljallangan va xavfsizlik nuqtai nazaridan bank kartasi/balans ma'lumotlarini ochiq API orqali bermaydi. Shuning uchun GapirAI tizimi Google'ning rasmiy narxlari ($0.002/min audio/matn) asosida har bir so'rovni 1 cent aniqlikda hisoblab boradi.
                 </div>
               </div>
             </div>

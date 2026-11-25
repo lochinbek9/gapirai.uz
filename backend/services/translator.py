@@ -166,7 +166,9 @@ def translate_segments(segments: list[dict], is_paid: bool = False) -> list[dict
     if not segments:
         return []
 
-    neuronai_on = settings.NEURONAI_TRANSLATE_ENABLED and bool(settings.NEURONAI_API_KEY)
+    from backend.services.gemini_quota_manager import chosen_provider
+
+    neuronai_on = settings.NEURONAI_TRANSLATE_ENABLED and bool(settings.NEURONAI_API_KEY) or bool(chosen_provider("llm"))
     if settings.FREE_MODE and not neuronai_on and not (settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX):
         logger.info("FREE_MODE (Gemini kaliti yo'q): Translating segments using free Google Translate API...")
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -542,6 +544,16 @@ def _translate_chunk(segments: list[dict], is_paid: bool = False) -> list[dict]:
         {**s, 'text': _clean_text(s.get('text', ''))} for s in segments
     ]
     gemini_available = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
+
+    from backend.services.gemini_quota_manager import chosen_provider
+
+    choice = chosen_provider("llm")
+    if choice == "neuronai":
+        return _translate_chunk_neuronai(segments, clean_segments)
+    if choice == "groq":
+        return _translate_chunk_groq(segments, clean_segments)
+    if choice == "gemini":
+        return _translate_chunk_gemini(segments, clean_segments, is_paid=is_paid)
 
     if settings.NEURONAI_TRANSLATE_ENABLED and settings.NEURONAI_API_KEY:
         try:

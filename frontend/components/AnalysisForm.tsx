@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText, Youtube } from "lucide-react";
 import TabList, { tabPanelProps } from "@/components/ui/TabList";
+import ModelPicker from "@/components/ModelPicker";
 import AnalysisUrlForm from "@/components/AnalysisUrlForm";
 import AnalysisDocumentForm from "@/components/AnalysisDocumentForm";
 
@@ -28,6 +29,7 @@ export default function AnalysisForm() {
             active ? "border-ui-ink text-ui-ink" : "border-transparent text-ui-muted hover:text-ui-ink"
           }`}
       />
+      <ModelPicker stages={source === 'url' ? ['stt', 'llm'] : ['llm']} />
       <div {...tabPanelProps("analysis-source", source)}>
         {source === "url" ? <AnalysisUrlForm /> : <AnalysisDocumentForm />}
       </div>

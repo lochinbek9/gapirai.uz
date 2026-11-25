@@ -18,6 +18,8 @@ from backend.api.gemini_override_dep import capture_gemini_override
 from backend.models.database import get_db, SessionLocal, DubbingJob, JobStatus, User, ResolutionVariant, VideoAnalysis
 from backend.services.auth import get_current_user, get_optional_user, get_optional_user_id
 from backend.services.downloader import get_video_info
+from backend.services.error_classification import VIDEO_UNAVAILABLE
+from backend.services.errors import VIDEO_UNAVAILABLE_MESSAGE, PermanentError
 from backend.config import get_settings
 from backend.services.rate_limiter import rate_limit
 # Job yaratish mantig'i (video ma'lumot olish, Safety Gate, davomiylik
@@ -338,6 +340,11 @@ async def video_info(url: str) -> VideoInfoResponse:
         # productionda haqiqiy uzilish orqali tasdiqlangan).
         info = await asyncio.to_thread(get_video_info, url)
         return VideoInfoResponse(**info)
+    except PermanentError as e:
+        if e.code != VIDEO_UNAVAILABLE:
+            raise HTTPException(status_code=400, detail=str(e))
+        logger.info(f"Video ochiq emas: {url}")
+        raise HTTPException(status_code=400, detail=VIDEO_UNAVAILABLE_MESSAGE)
     except Exception as e:
         # Xom kutubxona xatosini (yt-dlp/YouTube API) foydalanuvchiga
         # ko'rsatmaymiz -- faqat serverda log qilamiz.
@@ -501,6 +508,7 @@ async def upload_job_file(
     voice_name: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ) -> dict:
     """Video FAYLDAN (YouTube havolasisiz) job yaratadi -- asosan "Subtitr"
     rejimi uchun (2026-09-20), lekin subtitle_only=false bo'lsa dublyaj ham.
@@ -1058,6 +1066,7 @@ def retry_job(
     payload: Optional[RegenerateJobRequest] = Body(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ):
     """Xatolik yuz bergan (failed) yoki muvaffaqiyatli yakunlangan (completed) job'ni
     qayta ishga tushirish (regenerate).
@@ -1168,11 +1177,14 @@ def retry_job(
 
     # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
     video_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
-    if not is_regenerate and video_id and not getattr(job, "subtitle_only", False):
+    from backend.services import dub_options
+    custom = dub_options.requested_tag() or job.dub_options
+    if not is_regenerate and video_id and not getattr(job, "subtitle_only", False) and not custom:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
             DubbingJob.subtitle_only.is_(False),
+            DubbingJob.dub_options.is_(None),
             DubbingJob.id != job.id,
         )
         if job.speaker_gender in ("male", "female"):
@@ -1733,7 +1745,9 @@ def list_resolutions(job_id: uuid.UUID, db: Session = Depends(get_db)):
     master_missing = False
     if settings.AWS_BUCKET_NAME:
         from backend.services.storage import s3_object_exists
-        master_missing = not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
+        # S3'ga yuklanmagan bo'lsa-da lokal diskdagi master hali xizmat qiladi
+        master_missing = (not s3_object_exists(f"dubber/{job.storage_id}/dubbed_final.mp4")
+                          and not (Path(settings.OUTPUT_DIR) / job.storage_id / "video" / "dubbed_final.mp4").is_file())
 
     resolutions = []
     for i, res in enumerate(RESOLUTION_ORDER):

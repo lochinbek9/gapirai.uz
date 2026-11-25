@@ -14,7 +14,7 @@ export default function AnalysisUrlForm() {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
-  const videoInfo = useVideoInfo(url);
+  const { info: videoInfo, error: previewError } = useVideoInfo(url);
   const [language, setLanguage] = useState("uz");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +74,7 @@ export default function AnalysisUrlForm() {
           </button>
         </div>
         {videoInfo && <VideoPreview info={videoInfo} />}
+        {previewError && <p role="alert" className="text-sm font-medium text-ui-red-ink">{previewError}</p>}
       </div>
 
       <div className="space-y-2">

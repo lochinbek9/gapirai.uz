@@ -73,6 +73,11 @@ def get_all_gemini_api_keys() -> List[str]:
     2. os.environ: GEMINI_API_KEYS, GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY
     3. .env va backend/.env fayllaridagi kalitlar
     """
+    from backend.services import byok  # aylanma import bo'lmasin
+
+    own = byok.active_keys("gemini")
+    if own:
+        return own
     settings = get_settings()
     raw_keys: List[str] = []
 
@@ -132,6 +137,11 @@ def get_all_gemini_api_keys() -> List[str]:
 
 def get_paid_gemini_api_keys() -> List[str]:
     """Pullik (balansli) Gemini API kalitlarini qaytaradi."""
+    from backend.services import byok  # aylanma import bo'lmasin
+
+    own = byok.active_keys("gemini")
+    if own:
+        return []
     settings = get_settings()
     raw_keys: List[str] = []
 
@@ -395,6 +405,9 @@ def record_model_request(api_key: str, model: str):
 
 def record_model_success(api_key: str, model: str):
     """Muvaffaqiyatli so'rovni qayd qiladi."""
+    from backend.services import byok
+
+    byok.count_request("gemini", api_key)
     kh = _key_hash(api_key)
     redis_client = _get_redis()
     if redis_client:
@@ -997,13 +1010,23 @@ _ACTIVE_OVERRIDE: Optional[Dict[str, str]] = None
 _OVERRIDE_TTL_SEC = 7 * 86400
 
 
-def sanitize_override(tier: Optional[str], model: Optional[str]) -> Optional[Dict[str, str]]:
+def sanitize_override(tier: Optional[str] = None, model: Optional[str] = None, tts: Optional[str] = None,
+                      stt: Optional[str] = None, llm: Optional[str] = None,
+                      female: Optional[str] = None, male: Optional[str] = None,
+                      quality: Optional[str] = None,
+                      mix: Optional[str] = None, voices: Optional[str] = None) -> Optional[Dict[str, str]]:
     """Faqat ma'lum qiymatlar o'tadi: tier in {free, paid}, model -- GEMINI_TEXT_MODELS ro'yxatidan."""
     out: Dict[str, str] = {}
     if tier in ("free", "paid"):
         out["tier"] = tier
     if model and model in GEMINI_TEXT_MODELS:
         out["model"] = model
+    from backend.services.model_choice import STAGES
+
+    for stage, value in (("tts", tts), ("stt", stt), ("llm", llm), ("female", female), ("male", male), ("quality", quality),
+                         ("mix", mix), ("voices", voices)):
+        if value in STAGES[stage]:
+            out[stage] = value
     return out or None
 
 
@@ -1023,7 +1046,7 @@ def load_job_gemini_override(job_id: str) -> Optional[Dict[str, str]]:
         return None
     try:
         raw = r.get(f"gemini:override:{job_id}")
-        return sanitize_override(**{k: v for k, v in _json.loads(raw).items() if k in ("tier", "model")}) if raw else None
+        return sanitize_override(**{k: v for k, v in _json.loads(raw).items() if k in ("tier", "model", "tts", "stt", "llm", "female", "male", "quality", "mix", "voices")}) if raw else None
     except Exception:
         return None
 
@@ -1040,6 +1063,11 @@ def deactivate_gemini_override() -> None:
     _ACTIVE_OVERRIDE = None
 
 
+def chosen_provider(stage: str) -> Optional[str]:
+    """Faol vazifa uchun egasi tanlagan provayder ("stt" | "llm" | "tts") yoki None (avtomatik)."""
+    return (_ACTIVE_OVERRIDE or {}).get(stage)
+
+
 def apply_model_override(models: List[str]) -> List[str]:
     """Admin aniq model tanlagan bo'lsa -- faqat shu model (qat'iy), aks holda ro'yxat o'zgarishsiz."""
     ov = _ACTIVE_OVERRIDE
@@ -1049,6 +1077,11 @@ def apply_model_override(models: List[str]) -> List[str]:
 
 
 def _strict_keys_for_override() -> Optional[List[str]]:
+    from backend.services import byok
+
+    own = byok.active_keys("gemini")
+    if own:  # o'z kaliti admin tanlagan tur (bepul/pullik)dan ustun
+        return own
     ov = _ACTIVE_OVERRIDE
     if not ov or ov.get("tier") not in ("free", "paid"):
         return None

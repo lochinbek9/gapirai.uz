@@ -35,6 +35,9 @@ from backend.api.paynet_routes import router as paynet_router
 from backend.api.uzum_routes import router as uzum_router
 from backend.api.admin_routes import router as admin_router
 from backend.api.video_analysis_routes import router as video_analysis_router
+from backend.api.brain_routes import router as brain_router
+from backend.api.brain_task_routes import router as brain_task_router
+from backend.api.byok_routes import router as byok_router
 from backend.api.plans_routes import router as plans_router
 from backend.api.learn_routes import router as learn_router
 from backend.api.minutes_routes import router as minutes_router
@@ -419,6 +422,9 @@ app.include_router(paynet_router)
 app.include_router(uzum_router)
 app.include_router(admin_router)
 app.include_router(video_analysis_router)
+app.include_router(brain_router)
+app.include_router(brain_task_router)
+app.include_router(byok_router)
 app.include_router(plans_router)
 app.include_router(learn_router)
 app.include_router(minutes_router)

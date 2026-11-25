@@ -113,6 +113,8 @@ class DubbingJob(Base):
     subtitle_only = Column(Boolean, nullable=False, default=False)
     # 2026-10-17: 2 daqiqalik bepul sinov dublyaji rejimi
     is_preview = Column(Boolean, nullable=False, default=False)
+    # 2026-11-25: egasining rejimlari ("vocal", "two", "vocal,two"); NULL -- oddiy dublyaj
+    dub_options = Column(String(32), nullable=True)
     # 2026-09-20: "Subtitr" rejimida video tili. "uz" -- nutq o'zbekcha STT bilan matnga aylantiriladi
     # va TARJIMA QILINMAYDI; NULL -- eski xatti-harakat (chet tildagi video -> o'zbekchaga tarjima).
     # DIQQAT: ustun qo'lda `ALTER TABLE` bilan qo'shiladi (create_tables'ga tegilmaydi, pastga qarang) va
@@ -661,8 +663,23 @@ def create_tables():
         import backend.models.payment  # noqa: F401
     except Exception:
         pass
+    import backend.models.brain  # noqa: F401
+    import backend.models.byok  # noqa: F401
     # Base.metadata.create_all handles new tables safely without locking existing ones
     Base.metadata.create_all(bind=engine)
+
+    if engine.dialect.name == "postgresql":
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("SET LOCAL lock_timeout = '3s'"))
+                # ADD COLUMN qulf oladi -- avval ustun borligi tekshiriladi
+                if not conn.execute(text("SELECT 1 FROM information_schema.columns WHERE table_name = 'dubbing_jobs' "
+                                         "AND column_name = 'dub_options'")).first():
+                    conn.execute(text("ALTER TABLE dubbing_jobs ADD COLUMN dub_options VARCHAR(32)"))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"dub_options ustuni qo'shilmadi: {e}")
 
     # 2026-10-22: dubbing_jobs.linked_analysis_id FK -> ON DELETE SET NULL.
     # 2026-10-23: ilgari har ishga tushishda cheklovni DROP + ADD qilardi (ACCESS

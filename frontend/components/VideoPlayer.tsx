@@ -306,6 +306,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       .then(res => {
         if (res?.resolutions) {
           setResolutions(res.resolutions);
+          // 1080p nusxa allaqachon tayyor bo'lsa, darhol o'sha o'ynaydi
+          if (res.resolutions.some(r => r.resolution === "1080p" && r.available && r.status === "ready")) {
+            setCurrentQuality("1080p");
+          }
           const curOpt = res.resolutions.find(r => r.resolution === (initialQuality || "720p"));
           if (curOpt && !curOpt.available) {
             const fallback = [...res.resolutions].reverse().find(r => r.available && r.status === "ready");
@@ -344,6 +348,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       savedTimeRef.current = v.currentTime;
       wasPlayingRef.current = !v.paused;
     }
+    // Server "tayyor" degan zahoti ro'yxatda ham belgilanadi -- aks holda pleyer asosiy (past sifatli)
+    // faylni o'ynatib, tugmada yangi sifatni ko'rsatib turardi
+    setResolutions((list) => list.map((r) => (r.resolution === targetRes ? { ...r, status: "ready" } : r)));
     setCurrentQuality(targetRes);
     setShowQualityMenu(false);
     showToast(`${targetRes} (${QUALITY_LABEL[targetRes] ?? ""}) ga o'tkazildi`);

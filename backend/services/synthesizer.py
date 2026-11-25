@@ -105,6 +105,7 @@ def group_segments_into_sentences(segments: list[dict]) -> list[dict]:
 
         can_merge = (
             not prev_ends_sentence
+            and current.get("gender") == seg.get("gender")
             and gap <= _GROUP_MAX_GAP_S
             and len(combined_text.split()) <= _GROUP_MAX_WORDS
             and (seg["end"] - current["start"]) <= _GROUP_MAX_SPAN_S
@@ -123,9 +124,14 @@ def group_segments_into_sentences(segments: list[dict]) -> list[dict]:
     return groups
 
 
-def _free_tts() -> bool:
+def _free_tts(provider_name: str | None = None) -> bool:
     """FREE_MODE'da ovoz bepul Edge'da -- lekin TTS_PROVIDER_OVERRIDE berilgan
     bo'lsa (masalan Gemini krediti tugaganda "azure"), o'sha provayder ishlaydi."""
+    from backend.services.gemini_quota_manager import chosen_provider
+
+    # egasining o'z kaliti (BYOK) yoki u aniq tanlagan ovoz
+    if provider_name == "gapi" or (provider_name and provider_name == chosen_provider("tts")):
+        return False
     return settings.FREE_MODE and not (settings.TTS_PROVIDER_OVERRIDE or "").strip()
 
 
@@ -158,7 +164,7 @@ def _synthesize_text(
     # O'SHA yaroqsiz audio qaytib kelardi — qayta urinish ma'nosiz bo'lardi.
     from backend.services.tts_cache import get_cached
 
-    if _free_tts():
+    if _free_tts(provider_name):
         logger.info("FREE_MODE: Edge TTS (bepul) ishlatilmoqda...")
         fallback = get_fallback_provider()
         if fallback.synthesize(text, output_path, voice_name=voice_name):
@@ -331,7 +337,7 @@ def synthesize_segments(
     # kamaytiradi. Oldindan tayyorlab qo'yamiz; muvaffaqiyatsiz bo'lgan
     # segmentlar pastdagi oddiy bir-bir yo'lga avtomatik qaytadi.
     pre_synthesized: dict[int, str] = {}
-    if not _free_tts():
+    if not _free_tts(provider_name) and not any(s.get("voice") for s in segments):
         primary_provider = get_provider(provider_name)
         try:
             pre_synthesized = primary_provider.synthesize_batch(segments, str(output_path), voice_name=voice_name)
@@ -371,12 +377,13 @@ def synthesize_segments(
             return None
         seg_file = output_path / f"seg_{seg['id']:04d}.wav"
         engine = "unknown"
+        seg_voice = seg.get("voice") or voice_name
         def _call_synth() -> str:
             try:
-                return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
+                return _synthesize_text(text, str(seg_file), voice_name=seg_voice, video_id=video_id, user_id=user_id, provider_name=provider_name, is_paid=is_paid)
             except TypeError as te:
                 if "is_paid" in str(te):
-                    return _synthesize_text(text, str(seg_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                    return _synthesize_text(text, str(seg_file), voice_name=seg_voice, video_id=video_id, user_id=user_id, provider_name=provider_name)
                 raise
 
         # Checkpoint reuse: agar ushbu segment audio fayli diskda allaqachon mavjud va yaroqli bo'lsa,
@@ -438,12 +445,13 @@ def synthesize_segments(
             "engine": engine,
             "text": text,
             "seg_id": seg["id"],
+            "voice": seg_voice,
         })
 
     # ElevenLabs bir vaqtda ko'p so'rovni qabul qilmaydi (concurrency limit: 5).
     # Edge TTS va Azure esa yuqori parallellikni muammosiz ko'tara oladi,
     # shu sababli 8 ta oqim orqali sintez qilish vaqti 40-50% ga qisqaradi.
-    synth_workers = 8 if (provider_name in ("edge", "azure") or _free_tts()) else 5
+    synth_workers = 8 if (provider_name in ("edge", "azure") or _free_tts(provider_name)) else 5
     with ThreadPoolExecutor(max_workers=synth_workers) as executor:
         raw_results = list(executor.map(_process_single_segment, enumerate(segments)))
 
@@ -481,7 +489,7 @@ def synthesize_segments(
     # boshqa TTS provayderiga tushib qolgan bo'lsa, ular ko'pchilik
     # ishlatgan provayder bilan ketma-ket (shoshilmasdan) qayta sintez
     # qilinadi — aks holda dublyajda bir necha xil ovoz aralashib qolardi.
-    if not _free_tts():
+    if not _free_tts(provider_name):
         engine_counts: dict[str, int] = {}
         for item in seg_data:
             engine_counts[item["engine"]] = engine_counts.get(item["engine"], 0) + 1
@@ -494,7 +502,7 @@ def synthesize_segments(
                 retry_file = output_path / f"seg_retry_{item['seg_id']:04d}.wav"
                 try:
                     time.sleep(1.5)
-                    if primary.synthesize(item["text"], str(retry_file), voice_name=voice_name):
+                    if primary.synthesize(item["text"], str(retry_file), voice_name=item.get("voice") or voice_name):
                         item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
                         item["engine"] = majority_engine
                         logger.info(f"Segment {item['seg_id']} ovoz izchilligi uchun {majority_engine} bilan qayta sintez qilindi.")
@@ -536,7 +544,7 @@ def synthesize_segments(
                     logger.warning(f"Segment {seg_id} QA'dan o'tmadi (score={qa['score']}, flags={qa['flags']}) — qayta sintez qilinmoqda.")
                     retry_file = output_path / f"seg_qaretry_{seg_id:04d}.wav"
                     try:
-                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
+                        engine = _synthesize_text(item["text"], str(retry_file), voice_name=item.get("voice") or voice_name, video_id=video_id, user_id=user_id, provider_name=provider_name)
                         if retry_file.exists():
                             item["audio"] = _clean_audio(AudioSegment.from_wav(str(retry_file)))
                             item["engine"] = engine
@@ -553,7 +561,7 @@ def synthesize_segments(
                 qa["attempts"] = attempts
                 if qa["score"] >= settings.SEGMENT_QA_THRESHOLD:
                     try:
-                        store_cached(item["text"], voice_name, item["engine"], str(qa_file))
+                        store_cached(item["text"], item.get("voice") or voice_name, item["engine"], str(qa_file))
                     except Exception:
                         pass
             finally:

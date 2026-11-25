@@ -19,6 +19,7 @@ from pathlib import Path
 
 from backend.config import get_settings
 from backend.services import downloader, merger
+from backend.services.video_quality import good_enough
 from backend.services.storage import (
     upload_file_to_s3,
     download_file_from_s3,
@@ -35,9 +36,10 @@ def generate_downscaled(job, resolution: str) -> str:
     height = int(resolution.rstrip("p"))
     job_id = job.storage_id
     master_key = f"dubber/{job_id}/dubbed_final.mp4"
-    if settings.AWS_BUCKET_NAME:
-        if not s3_object_exists(master_key):
-            raise RuntimeError("Master video S3'da topilmadi (saqlash muddati tugagan bo'lishi mumkin).")
+    in_s3 = bool(settings.AWS_BUCKET_NAME) and s3_object_exists(master_key)
+    if settings.AWS_BUCKET_NAME and not in_s3 and not (Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4").is_file():
+        raise RuntimeError("Master video S3'da topilmadi (saqlash muddati tugagan bo'lishi mumkin).")
+    if in_s3:
         master_url = generate_presigned_download_url(master_key)
         if not master_url:
             raise RuntimeError("Master video S3'da topilmadi.")
@@ -71,7 +73,7 @@ def generate_downscaled(job, resolution: str) -> str:
         raise RuntimeError(f"{resolution} video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
 
     s3_key = f"dubber/{job_id}/dubbed_{resolution}.mp4"
-    if settings.AWS_BUCKET_NAME:
+    if in_s3:
         if not upload_file_to_s3(local_out, s3_key):
             raise RuntimeError(f"{resolution} versiyani S3'ga yuklab bo'lmadi.")
         try:
@@ -148,6 +150,8 @@ def generate_1080p(job, watermark: bool = True) -> str:
                 dubbed_audio_path=local_audio,
                 output_path=local_out,
                 watermark=watermark,
+                # 2 daqiqalik sinovda butun video montaj qilinmasin
+                max_duration=120.0 if getattr(job, "is_preview", False) else None,
             )
         else:
             # YouTube'dan yuklab bo'lmaganda yoki manbada 1080p bo'lmaganda,
@@ -179,7 +183,8 @@ def generate_1080p(job, watermark: bool = True) -> str:
             raise RuntimeError(f"1080p video fayli yaratilmadi yoki bo'sh (0 bayt): {local_out}")
 
         s3_key = f"dubber/{job_id}/dubbed_1080p.mp4"
-        if settings.AWS_BUCKET_NAME:
+        master_in_s3 = bool(settings.AWS_BUCKET_NAME) and s3_object_exists(f"dubber/{job_id}/dubbed_final.mp4")
+        if master_in_s3:
             if not upload_file_to_s3(local_out, s3_key):
                 raise RuntimeError("1080p versiyani S3'ga yuklab bo'lmadi.")
             try:
@@ -187,7 +192,7 @@ def generate_1080p(job, watermark: bool = True) -> str:
             except Exception:
                 pass
             return s3_key
-        else:
+        else:  # S3 yo'q yoki ishlamayapti -- lokal fayl beriladi
             return f"/outputs/{job_id}/video/dubbed_1080p.mp4"
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -238,11 +243,18 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
     # bu tekshirilmasdan "ready" qaytarilardi, keyin yuklab olishda jim 404
     # bo'lardi yoki 360p generatsiyasi tushunarsiz ffmpeg xatosi bilan
     # yiqilardi).
-    if settings.AWS_BUCKET_NAME and not s3_object_exists(master_key):
+    # S3 sozlangan, lekin yuklash ishlamagan bo'lsa master lokal diskda turadi -- "muddati o'tgan" emas
+    local_master = Path(settings.OUTPUT_DIR) / job_id / "video" / "dubbed_final.mp4"
+    in_s3 = bool(settings.AWS_BUCKET_NAME) and s3_object_exists(master_key)
+    if settings.AWS_BUCKET_NAME and not in_s3 and not local_master.is_file():
         return ResolutionRequestResult(outcome="expired")
 
+    # Master allaqachon 1080p (admin dublyaji) -- qayta yaratish shart emas
+    if resolution == "1080p" and local_master.is_file() and good_enough(local_master, 1080):
+        return ResolutionRequestResult(outcome="ready", download_url=f"/api/outputs/{job_id}/video?resolution=720p&download=1")
+
     if resolution == "720p":
-        if settings.AWS_BUCKET_NAME:
+        if in_s3:
             presigned_url = generate_presigned_download_url(master_key)
             if presigned_url:
                 return ResolutionRequestResult(outcome="ready", download_url=presigned_url)
@@ -260,7 +272,7 @@ def request_resolution(db, job, resolution: str, max_resolution_override: str | 
         db.refresh(variant)
 
     if variant.status == "ready" and variant.s3_key:
-        if settings.AWS_BUCKET_NAME:
+        if in_s3:
             if s3_object_exists(variant.s3_key):
                 presigned_url = generate_presigned_download_url(variant.s3_key)
                 if presigned_url:

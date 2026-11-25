@@ -60,6 +60,11 @@ def get_all_groq_api_keys() -> List[str]:
     2. os.environ: GROQ_API_KEYS, GROQ_API_KEY
     3. .env va backend/.env fayllaridagi kalitlar
     """
+    from backend.services import byok  # aylanma import bo'lmasin
+
+    own = byok.active_keys("groq")
+    if own:
+        return own
     settings = get_settings()
     raw_keys: List[str] = []
 
@@ -183,6 +188,9 @@ def record_groq_request(key: str):
 
 
 def record_groq_success(key: str):
+    from backend.services import byok
+
+    byok.count_request("groq", key)
     kh = _key_hash(key)
     redis_client = _get_redis()
     if redis_client:

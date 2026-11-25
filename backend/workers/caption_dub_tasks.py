@@ -15,6 +15,8 @@ from backend.config import get_settings
 from backend.models.database import CaptionDub, SessionLocal
 from backend.services.tts.base import TTSOutOfCreditsError
 from backend.workers.celery_app import celery_app
+from backend.services import byok
+from backend.workers.override_task import GeminiOverrideTask
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,7 +41,8 @@ def _resolve_gender(dub: CaptionDub) -> str:
     return _detect_gender(text, dub.title or "")
 
 
-@celery_app.task(name="backend.workers.caption_dub_tasks.process_caption_dub", bind=True, acks_late=True)
+@celery_app.task(name="backend.workers.caption_dub_tasks.process_caption_dub", bind=True,
+                 base=GeminiOverrideTask, acks_late=True)
 def process_caption_dub(self, dub_id: str):
     from backend.services import synthesizer, translator
     from backend.services.plans import get_tts_provider_for_job, refund_quota
@@ -59,6 +62,8 @@ def process_caption_dub(self, dub_id: str):
 
             gender = _resolve_gender(dub)
             provider = get_tts_provider_for_job(db, SimpleNamespace(user_id=dub.user_id, tts_provider=None))
+            if byok.active_keys("gapi"):  # egasining o'z kaliti (BYOK)
+                provider = "gapi"
             voice = _EDGE_VOICES[gender]
             out_dir = caption_dub_dir(dub.id) / "tts"
 

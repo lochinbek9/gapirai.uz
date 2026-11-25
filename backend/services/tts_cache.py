@@ -31,6 +31,10 @@ _LOCAL_CACHE_DIR = Path("outputs/cache/tts")
 
 def _cache_key(text: str, voice_name: str | None, provider: str) -> str:
     raw = f"{text}|{voice_name or ''}|{provider}"
+    if provider == "gapi":  # uslub almashsa eski uslubdagi audio qaytmasin
+        from backend.services.tts.gapi_provider import GapiProvider, chosen_style
+
+        raw += f"|{chosen_style(GapiProvider()._is_female(voice_name))}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 

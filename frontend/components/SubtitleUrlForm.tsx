@@ -19,7 +19,7 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [url, setUrl] = useState("");
-  const videoInfo = useVideoInfo(url);
+  const { info: videoInfo, error: previewError } = useVideoInfo(url);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +82,7 @@ export default function SubtitleUrlForm({ sourceLanguage = "auto" }: { sourceLan
           </button>
         </div>
         {videoInfo && <VideoPreview info={videoInfo} />}
+        {previewError && <p role="alert" className="text-sm font-medium text-ui-red-ink">{previewError}</p>}
         <p className="text-sm text-ui-muted">
           O'zbekcha subtitr (.srt/.vtt) yaratiladi — dublyaj audiosi yo'q, tezroq va TTS xarajatisiz.
         </p>

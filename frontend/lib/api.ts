@@ -7,9 +7,20 @@ const API_URL = getApiUrl()
 export const apiClient = axios.create({ baseURL: API_URL })
 
 // Har bir so'rovga token qo'shish
+export const MODEL_CHOICE_KEYS = { model: 'byok:model', stt: 'byok:stt', llm: 'byok:llm', tts: 'byok:tts', preview: 'byok:preview', female: 'byok:female', male: 'byok:male', quality: 'byok:quality', mix: 'byok:mix', voices: 'byok:voices' }
+
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // BYOK egasining model tanlovi (components/ModelPicker.tsx); server faqat adminnikini qabul qiladi
+  try {
+    const model = localStorage.getItem(MODEL_CHOICE_KEYS.model)
+    if (model) config.headers['X-Gemini-Model'] = model
+    for (const stage of ['stt', 'llm', 'tts', 'female', 'male', 'quality', 'mix', 'voices'] as const) {
+      const value = localStorage.getItem(MODEL_CHOICE_KEYS[stage])
+      if (value) config.headers[`X-${stage}-Choice`] = value
+    }
+  } catch {}
   return config
 })
 

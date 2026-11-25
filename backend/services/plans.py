@@ -381,6 +381,10 @@ def _is_pro_or_admin(db, user_id) -> bool:
     return get_or_create_subscription(db, user_id).plan == PlanTier.PRO
 
 
+def gapi_is_default(cfg) -> bool:
+    return getattr(cfg, "GAPI_TTS_DEFAULT", False) is True and bool(getattr(cfg, "GAPI_API_KEY", ""))
+
+
 def get_tts_provider_for_job(db, job) -> str:
     """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi:
     -1. settings.TTS_PRO_PROVIDER berilgan va egasi amaldagi Pro (yoki admin) bo'lsa -- o'sha
@@ -392,6 +396,8 @@ def get_tts_provider_for_job(db, job) -> str:
     """
     from backend.config import get_settings
     cfg = get_settings()
+    if gapi_is_default(cfg):
+        return "gapi"
     pro_provider = (getattr(cfg, "TTS_PRO_PROVIDER", "") or "").lower().strip()
     user_id = getattr(job, "user_id", None)
     if pro_provider and user_id and _is_pro_or_admin(db, user_id):

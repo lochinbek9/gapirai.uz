@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileVideo, Youtube } from "lucide-react";
 import TabList, { tabPanelProps } from "@/components/ui/TabList";
+import ModelPicker from "@/components/ModelPicker";
 import SubtitleUrlForm from "@/components/SubtitleUrlForm";
 import SubtitleFileForm from "@/components/SubtitleFileForm";
 import type { SubtitleSourceLanguage } from "@/lib/api";
@@ -60,6 +61,7 @@ export default function SubtitleForm() {
             : "Chet tildagi (ingliz, rus, turk va b.) nutq avtomatik aniqlanib, o'zbekchaga tarjima qilinadi."}
         </p>
       </div>
+      <ModelPicker stages={['stt', 'llm']} />
       <div {...tabPanelProps("sub-source", source)}>
         {source === "url" ? <SubtitleUrlForm sourceLanguage={lang} /> : <SubtitleFileForm sourceLanguage={lang} />}
       </div>
