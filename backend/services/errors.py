@@ -1,3 +1,9 @@
+# Video egasi tomonidagi sabab -- tizim aybdordek ko'rsatilmaydi
+VIDEO_UNAVAILABLE_MESSAGE = (
+    "Bu video YouTube'da ochiq emas: u o'chirilgan, shaxsiy yoki cheklangan. Boshqa video havolasini kiriting."
+)
+
+
 class PermanentError(Exception):
     """Qayta urinish ma'nosiz bo'lgan xatolik — har safar bir xil natija
     chiqadi (masalan, video shaxsiy/o'chirilgan).

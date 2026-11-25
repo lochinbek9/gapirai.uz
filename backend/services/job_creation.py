@@ -228,6 +228,9 @@ async def create_dubbing_job(
     clean_provider = (tts_provider or "gemini").strip().lower()
     if clean_provider not in valid_providers:
         clean_provider = "gemini"
+    from backend.services.plans import gapi_is_default
+    if gapi_is_default(get_settings()):  # tizim ovozi -- kesh ham shu provayder bo'yicha
+        clean_provider = "gapi"
 
     # Aniq ovoz nomini provayder va jinsga qarab to'liq normallashtirish / biriktirish:
     if voice_gender in ("male", "female"):
@@ -256,12 +259,15 @@ async def create_dubbing_job(
     # 1 ta parametr o'zgarsa ham yangi job sifatida qayta dublyaj qilinadi!
     video_id = extract_youtube_video_id(youtube_url)
     donor_job = None
-    if video_id and not subtitle_only and not force_new and not is_preview:
+    from backend.services import dub_options
+    custom = None if subtitle_only else dub_options.requested_tag()
+    if video_id and not subtitle_only and not force_new and not is_preview and not custom:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
             DubbingJob.status == JobStatus.COMPLETED,
             DubbingJob.subtitle_only.is_(False),
             DubbingJob.is_preview.is_(False),
+            DubbingJob.dub_options.is_(None),
         )
         # 1. Jins parametri
         if voice_gender in ("male", "female"):
@@ -289,10 +295,15 @@ async def create_dubbing_job(
 
         # Suv belgisi holati mos kelmasa (hamkor <-> oddiy foydalanuvchi) -- keshdan berilmaydi
         from backend.services.watermark import is_cache_compatible
-        if cached_job and _cached_job_files_exist(cached_job) and is_cache_compatible(db, user.id, cached_job):
+        from backend.services.video_quality import good_enough, required_height
+        if (cached_job and _cached_job_files_exist(cached_job) and is_cache_compatible(db, user.id, cached_job)
+                and good_enough(cached_job.output_video_path, required_height(db, user.id))):
             return await _create_job_from_cache(db, user, youtube_url, cached_job, voice_gender)
 
-    if video_id:
+    # ikki ovoz: tayyor (jinsi belgilanmagan, birlashtirilgan) matn qayta ishlatilmaydi
+    if video_id and "two" not in (custom or ""):
+        # 2 daqiqalik sinov to'liq ishga donor bo'lmasin -- matn va video kesilgan bo'ladi
+        full_only = [] if is_preview else [DubbingJob.is_preview.is_(False)]
         # Cross-gender yoki umumiy donor job qidirish:
         # Ushbu video uchun allaqachon transkripsiya va tarjima qilingan segmentlar bormi?
         # Agar bor bo'lsa, barcha oldingi matnlar qayta ishlatiladi (resurs tejaladi).
@@ -301,6 +312,7 @@ async def create_dubbing_job(
             .filter(
                 DubbingJob.youtube_video_id == video_id,
                 DubbingJob.translated_segments.isnot(None),
+                *full_only,
             )
             .order_by(
                 (DubbingJob.status == JobStatus.COMPLETED).desc(),
@@ -314,6 +326,7 @@ async def create_dubbing_job(
                 .filter(
                     DubbingJob.youtube_video_id == video_id,
                     DubbingJob.transcript_segments.isnot(None),
+                    *full_only,
                 )
                 .order_by(
                     (DubbingJob.status == JobStatus.COMPLETED).desc(),
@@ -485,6 +498,7 @@ async def create_dubbing_job(
         voice_name=voice_name,
         voice_style=voice_style or "neutral",
         is_preview=is_preview,
+        dub_options=custom,
         status=JobStatus.PENDING,
         progress=0.0,
         status_message="Navbatga qo'shildi (tayyor matnlar asosida)" if donor_job else "Navbatga qo'shildi",

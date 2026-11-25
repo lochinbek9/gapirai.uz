@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from backend.models.database import get_db, VideoAnalysis, AnalysisStatus, User, DubbingJob
 from backend.services.downloader import get_video_info
+from backend.services.error_classification import VIDEO_UNAVAILABLE
+from backend.services.errors import VIDEO_UNAVAILABLE_MESSAGE, PermanentError
 import uuid
 from backend.services.auth import get_current_user, get_optional_user_id
 from backend.services.video_analysis import VideoAnalysisService, find_cached_analysis, clone_analysis_for_user
@@ -254,6 +256,11 @@ async def create_analysis(
         # to'g'ridan-to'g'ri await qilinsa butun asyncio event loop'ni to'sib
         # qo'yadi (backend/api/routes.py'da xuddi shu sababdan tuzatilgan).
         info = await asyncio.to_thread(get_video_info, request.youtube_url)
+    except PermanentError as e:
+        if e.code != VIDEO_UNAVAILABLE:
+            raise HTTPException(status_code=400, detail=str(e))
+        logger.info(f"Video ochiq emas: {request.youtube_url}")
+        raise HTTPException(status_code=400, detail=VIDEO_UNAVAILABLE_MESSAGE)
     except Exception as e:
         logger.exception(f"video_info xato (tahlil): {request.youtube_url}")
         raise HTTPException(status_code=400, detail="Video ma'lumotlarini olib bo'lmadi. Havola to'g'riligini tekshiring yoki birozdan so'ng qaytadan urinib ko'ring.")
@@ -302,6 +309,7 @@ async def create_document_analysis(
     language: str = Form("uz"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ) -> dict:
     """Hujjat tahlili (PDF/DOCX/TXT/PPTX/EPUB). Matn shu yerda (OCR'siz, tez)
     ajratiladi -- bet limiti darhol tekshiriladi; skanerlangan PDF betlari va
@@ -381,6 +389,7 @@ def retry_analysis(
     analysis_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _gemini_override: None = Depends(capture_gemini_override),
 ) -> dict:
     """Xatolik yuz bergan (failed) tahlilni qayta ishga tushirish (retry)."""
     analysis = _get_owned_analysis(analysis_id, db, current_user)

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileVideo, Youtube } from "lucide-react";
 import TabList, { tabPanelProps } from "@/components/ui/TabList";
+import ModelPicker from "@/components/ModelPicker";
 import UrlInput from "@/components/UrlInput";
 import DubFileForm from "@/components/DubFileForm";
 import type { VideoInfo } from "@/lib/api";
@@ -59,6 +60,7 @@ export default function DubbingForm({
           }`}
       />
 
+      <ModelPicker stages={['stt', 'llm', 'tts']} preview={source === "url"} />
       <div {...tabPanelProps("dub-source", source)}>
       {source === "url" ? (
         <UrlInput

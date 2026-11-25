@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback, useTransition } from 'react'
 import Link from 'next/link'
+import ByokPanel from '@/components/ByokPanel'
 import {
   Loader2,
   Users,
@@ -936,7 +937,9 @@ export default function AdminPage() {
         {/* TAB 2.5: GEMINI API KEYS & QUOTA MANAGEMENT */}
         {/* ========================================================= */}
         {activeTab === 'gemini' && (
-          <section>
+          <section className="space-y-5">
+            {/* Faqat egasiga ko'rinadi: boshqa adminlarga API 404 qaytaradi */}
+            <div className="dark"><ByokPanel /></div>
             <AdminGeminiKeysManager token={token} />
           </section>
         )}

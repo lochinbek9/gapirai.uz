@@ -49,7 +49,7 @@ def log_tts_usage(
     baribir yoziladi (butunlay o'tkazib yuborilmaydi)."""
     try:
         chars = len(text or "")
-        currency = "UZS" if provider.name in _UZS_PROVIDERS else "USD"
+        currency = "G" if provider.name == "gapi" else "UZS" if provider.name in _UZS_PROVIDERS else "USD"
         cost = 0.0 if cache_hit else provider.estimate_cost(chars)
         duration = _get_audio_duration_seconds(audio_path)
 

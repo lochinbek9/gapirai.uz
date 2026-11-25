@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob } from "@/lib/api";
+import { createJob, getJob, getVideoInfo, VideoInfo, cancelJob, MODEL_CHOICE_KEYS } from "@/lib/api";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useAuth } from "@/hooks/useAuth";
+import { videoInfoError } from "@/hooks/useVideoInfo";
 import DubbingForm from "@/components/DubbingForm";
 import AnalysisForm from "@/components/AnalysisForm";
 import SubtitleForm from "@/components/SubtitleForm";
@@ -184,15 +185,22 @@ export default function Home() {
     return () => clearInterval(id);
   }, [jobId, job?.status]);
 
+  const latestUrl = useRef("");
+
   const handleUrlChange = async (value: string) => {
     setUrl(value);
     setVideoInfo(null);
     setError(null);
     const isYoutube = value.includes("youtube.com/watch") || value.includes("youtu.be/");
+    latestUrl.current = value;
     if (!isYoutube) return;
     try {
-      setVideoInfo(await getVideoInfo(value));
-    } catch { /* Fail silently */ }
+      const info = await getVideoInfo(value);
+      if (latestUrl.current === value) setVideoInfo(info);
+    } catch (err) {
+      // Eski havolaning kechikkan javobi yangisiga xato yozmasin
+      if (latestUrl.current === value) setError(videoInfoError(err));
+    }
   };
 
   // PWA share-target (app/share/page.tsx -> /?shared=<url>): YouTube ilovasidan
@@ -233,6 +241,10 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isLoggedIn]);
 
+  const previewChosen = () => {
+    try { return !!localStorage.getItem(MODEL_CHOICE_KEYS.preview) } catch { return false }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
@@ -267,7 +279,10 @@ export default function Home() {
         false,
         "auto",
         ttsProvider || "gemini",
-        voiceName || undefined
+        voiceName || undefined,
+        undefined,
+        false,
+        previewChosen() // BYOK egasining "faqat ilk 2 daqiqa" belgisi
       );
       router.push(`/video/${job_id}`);
     } catch (err: any) {
@@ -329,6 +344,7 @@ export default function Home() {
   };
 
   const handleReset = () => {
+    latestUrl.current = "";
     setUrl("");
     setVideoInfo(null);
     setJobId(null);

@@ -18,7 +18,7 @@ from redis import Redis
 
 
 from backend.config import get_settings
-from backend.services.errors import PermanentError
+from backend.services.errors import PermanentError, VIDEO_UNAVAILABLE_MESSAGE
 from backend.services import error_classification as errcls
 from backend.services import proxy_manager
 
@@ -217,7 +217,9 @@ def _build_yt_opts(extra: dict | None = None, use_cookies: bool = True, proxy_ur
         "extractor_args": {
             "youtube": {
                 # Zamonaviy yt-dlp va bgutil pot-provider bilan ishlaydigan mijozlar
-                "player_client": ["mweb", "web", "tv", "tv_downgraded", "android", "ios"],
+                # 2026-11-25 sinovi: eski ro'yxat (mweb, web, tv, android, ios) faqat 360p berardi;
+                # shu uchtasi 1080p gacha formatlarni qaytaradi.
+                "player_client": ["default", "web_safari", "web_embedded"],
                 "fetch_pot": ["always"],
             },
             # PO token provider (bgutil, docker-compose "pot-provider" sidecar) —
@@ -450,7 +452,7 @@ def get_video_info(youtube_url: str) -> dict:
         code = errcls.classify_text(str(e2))
         if code == errcls.VIDEO_UNAVAILABLE:
             raise PermanentError(
-                "Bu videoni ochib bo'lmadi — u shaxsiy, o'chirilgan, mavjud emas yoki cheklangan bo'lishi mumkin.",
+                VIDEO_UNAVAILABLE_MESSAGE,
                 code=errcls.VIDEO_UNAVAILABLE,
             ) from e2
 
@@ -521,9 +523,12 @@ def _do_download(youtube_url: str, job_id: str, max_height: int = 720, max_durat
         except Exception:
             pass
 
+    # 1080p dan yuqori sifat YouTube'da faqat VP9/AV1 -- avval o'shalar, bo'lmasa odatdagi zanjir
+    above_hd = (f"bestvideo[height>1080][height<={max_height}]+bestaudio[ext=m4a]/" if max_height > 1080 else "")
+
     extra_opts = {
         "outtmpl": video_tpl,
-        "format": (
+        "format": above_hd + (
             f"bestvideo[vcodec^=avc1][height<={max_height}]+bestaudio[ext=m4a]/"
             f"bestvideo[ext=mp4][height<={max_height}]+bestaudio[ext=m4a]/"
             f"best[vcodec^=avc1][ext=mp4]/"

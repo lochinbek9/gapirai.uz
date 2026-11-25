@@ -3327,7 +3327,7 @@ def admin_jobs_cost(
                 else:
                     if r.currency == "UZS":
                         entry["cost_uzs"] += float(r.estimated_cost or 0.0)
-                    else:
+                    elif r.currency != "G":  # gapi birligi pul emas -- so'm/USD'ga qo'shilmaydi
                         entry["cost_usd"] += float(r.estimated_cost or 0.0)
 
         # Batch load payments for current page

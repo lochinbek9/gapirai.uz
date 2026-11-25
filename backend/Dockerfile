@@ -20,6 +20,11 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ARG INSTALL_VOCALS=0
+COPY backend/requirements-vocals.txt .
+RUN if [ "$INSTALL_VOCALS" = "1" ]; then pip install --no-cache-dir -r requirements-vocals.txt \
+    && python -c "from demucs.pretrained import get_model; get_model('htdemucs')"; fi
+
 # yt-dlp config: enable Deno for PO tokens + EJS for JS challenge solving +
 # bgutil PO token provider (sidecar container "pot-provider") — without a
 # valid PO token, YouTube serves "UNPLAYABLE" for most videos from datacenter

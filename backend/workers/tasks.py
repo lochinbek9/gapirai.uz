@@ -10,6 +10,9 @@ from celery.utils.log import get_task_logger
 from openai import OpenAI
 from backend.workers.celery_app import celery_app
 from backend.workers.override_task import GeminiOverrideTask
+from backend.services import byok
+from backend.services.gemini_quota_manager import chosen_provider
+from backend.services import dub_options, speaker_voices, vocals
 from backend.models.database import SessionLocal, DubbingJob, JobStatus, ContentViolation, User
 from backend.services import downloader, transcriber, translator, speech_optimizer, synthesizer, merger, subtitle_cues
 from backend.services.errors import PermanentError, NoSpeechFoundError
@@ -635,6 +638,10 @@ def process_video(self: Task, job_id: str) -> dict:
         job_dir = Path(settings.UPLOAD_DIR) / job_id
         output_dir = Path(settings.OUTPUT_DIR) / job_id
 
+        if job.dub_options != dub_options.active_tag():
+            job.dub_options = dub_options.active_tag()
+            db.commit()
+
         # BOSQICH 1: Yuklash
         # Checkpoint: agar video+audio disk'da hali ham mavjud bo'lsa (masalan
         # oldingi urinish shu yerdan keyin qulagan bo'lsa), qayta yuklab
@@ -667,16 +674,26 @@ def process_video(self: Task, job_id: str) -> dict:
                         pass
                 job.original_video_path = None
 
+        from backend.services.video_quality import DEFAULT_HEIGHT, good_enough, required_height
+        from backend.services.job_creation import is_valid_youtube_url
+        min_height = required_height(db, job.user_id)
+        if has_video and is_valid_youtube_url(job.youtube_url or "") and not good_enough(job.original_video_path, min_height):
+            has_video = False  # yuqori sifatda qayta yuklanadi
+            job.original_video_path = None
+
         # Worker kesh himoyasi: agar video diskda yo'q bo'lsa, lekin u allaqachon boshqa job orqali
         # muvaffaqiyatli dublyaj qilingan bo'lsa, YouTube'dan qayta yuklab o'tirmasdan keshdan olamiz.
         if not has_video and not job.subtitle_only:
             from backend.services.job_creation import extract_youtube_video_id, _cached_job_files_exist
             v_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
-            if v_id:
+            job.dub_options = dub_options.active_tag()
+            if v_id and not job.dub_options:
                 cache_q = db.query(DubbingJob).filter(
                     DubbingJob.youtube_video_id == v_id,
                     DubbingJob.status == JobStatus.COMPLETED,
                     DubbingJob.subtitle_only.is_(False),
+                    DubbingJob.is_preview.is_(False),  # sinov natijasi to'liq video emas
+                    DubbingJob.dub_options.is_(None),
                     DubbingJob.id != job.id,
                 )
                 if job.speaker_gender in ("male", "female"):
@@ -685,7 +702,9 @@ def process_video(self: Task, job_id: str) -> dict:
                     cache_q = cache_q.filter(DubbingJob.speaker_gender == job.voice_gender_setting)
 
                 cached_j = cache_q.order_by(DubbingJob.completed_at.desc()).first()
-                if cached_j and _cached_job_files_exist(cached_j):
+                if cached_j and _cached_job_files_exist(cached_j) and good_enough(
+                    cached_j.output_video_path or f"outputs/{cached_j.storage_id}/video/dubbed_final.mp4", min_height
+                ):
                     logger.info(f"[JOB {job_id}] Video {v_id} keshdan topildi (job {cached_j.id}) -- worker to'liq natijalarni ko'chirdi.")
                     job.source_job_id = cached_j.storage_id
                     job.video_title = job.video_title or cached_j.video_title
@@ -719,10 +738,13 @@ def process_video(self: Task, job_id: str) -> dict:
         from backend.services.job_creation import extract_youtube_video_id
         v_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
         donor_j = None
+        # 2 daqiqalik sinov to'liq ishga donor bo'lmasin -- matn va video kesilgan bo'ladi
+        full_only = [] if getattr(job, "is_preview", False) else [DubbingJob.is_preview.is_(False)]
         if v_id and not job.translated_segments:
             donor_q = db.query(DubbingJob).filter(
                 DubbingJob.youtube_video_id == v_id,
                 DubbingJob.translated_segments.isnot(None),
+                *full_only,
                 DubbingJob.id != job.id,
             )
             donor_j = donor_q.order_by(
@@ -733,13 +755,14 @@ def process_video(self: Task, job_id: str) -> dict:
                 donor_q = db.query(DubbingJob).filter(
                     DubbingJob.youtube_video_id == v_id,
                     DubbingJob.transcript_segments.isnot(None),
+                    *full_only,
                     DubbingJob.id != job.id,
                 )
                 donor_j = donor_q.order_by(
                     (DubbingJob.status == JobStatus.COMPLETED).desc(),
                     DubbingJob.created_at.desc(),
                 ).first()
-            if donor_j:
+            if donor_j and not dub_options.two_voices():  # ikki ovoz: matn qaytadan
                 logger.info(
                     f"[JOB {job_id}] Video {v_id} uchun tayyor matnlar donor job {donor_j.id} dan olindi "
                     f"(jinslararo matn keshidan qayta ishlatildi)."
@@ -759,12 +782,14 @@ def process_video(self: Task, job_id: str) -> dict:
                 if not has_video:
                     if donor_j.original_video_path:
                         p_donor_vid = Path(donor_j.original_video_path)
-                        if p_donor_vid.exists() and p_donor_vid.is_file() and p_donor_vid.stat().st_size > 0:
+                        if (p_donor_vid.exists() and p_donor_vid.is_file() and p_donor_vid.stat().st_size > 0
+                                and good_enough(p_donor_vid, min_height)):
                             job.original_video_path = donor_j.original_video_path
                             has_video = True
                     if not has_video:
                         target_vid = job_dir / "video" / "video.mp4"
-                        if restore_checkpoint(donor_j.storage_id, "video.mp4", str(target_vid)) and target_vid.exists() and target_vid.stat().st_size > 0:
+                        if (restore_checkpoint(donor_j.storage_id, "video.mp4", str(target_vid)) and target_vid.exists()
+                                and target_vid.stat().st_size > 0 and good_enough(target_vid, min_height)):
                             job.original_video_path = str(target_vid)
                             has_video = True
                 db.commit()
@@ -829,7 +854,10 @@ def process_video(self: Task, job_id: str) -> dict:
             _update_job(db, job, JobStatus.DOWNLOADING, 5.0, "YouTube'dan yuklanmoqda...")
             max_sec = 120.0 if getattr(job, "is_preview", False) else None
             _release_read_tx(db)
-            download_result = downloader.download_video(job.youtube_url, job_id, max_duration_seconds=max_sec)
+            download_result = downloader.download_video(
+                job.youtube_url, job_id, max_duration_seconds=max_sec,
+                max_height=min_height or DEFAULT_HEIGHT,
+            )
             job.video_title = download_result["title"]
             job.video_duration = download_result["duration"]
             job.original_video_path = download_result["video_path"]
@@ -1010,6 +1038,10 @@ def process_video(self: Task, job_id: str) -> dict:
         # emas — tarjima/nutq optimallashdan OLDIN tabiiy gaplarga
         # birlashtiramiz, aks holda LLM har bir bo'lakka soxta nuqta qo'yib,
         # keyingi bosqichlarni "bu tugal gap" deb aldab qo'yadi.
+        if dub_options.two_voices() and not job.subtitle_only and not job.translated_segments:
+            _update_job(db, job, JobStatus.TRANSLATING, 33.0, "Erkak va ayol ovozlari aniqlanmoqda...")
+            _release_read_tx(db)
+            segments = speaker_voices.label_segments(video_path, segments)
         segments = synthesizer.group_segments_into_sentences(segments)
 
         # BOSQICH 3: Jins aniqlash (foydalanuvchi yangi videoda qo'lda tanlagan bo'lsa o'sha olinadi, qolganlarida AI aniqlaydi)
@@ -1182,6 +1214,10 @@ def process_video(self: Task, job_id: str) -> dict:
             from backend.services.plans import get_tts_provider_for_job
 
             tts_provider = get_tts_provider_for_job(db, job)
+            if chosen_provider("tts"):  # egasining tanlovi
+                tts_provider = chosen_provider("tts")
+            elif byok.active_keys("gapi"):  # egasining o'z kaliti (BYOK)
+                tts_provider = "gapi"
             job.tts_provider = tts_provider
 
             # Provayder va jinsga qarab aniq ovoz nomini tanlash
@@ -1205,6 +1241,23 @@ def process_video(self: Task, job_id: str) -> dict:
                 voice = default_voice
 
             job.voice_name = voice
+
+            if dub_options.two_voices():
+                if not any(s.get("gender") for s in speech_segments):  # tayyor matn qayta ishlatilgan
+                    _release_read_tx(db)
+                    speech_segments = speaker_voices.label_segments(video_path, speech_segments)
+
+                def _default_voice(g, provider):
+                    if provider == "gemini":
+                        return settings.GEMINI_FEMALE_VOICE if g == "female" else settings.GEMINI_MALE_VOICE
+                    return "uz-UZ-MadinaNeural" if g == "female" else "uz-UZ-SardorNeural"
+
+                speech_segments = speaker_voices.assign_voices(
+                    speech_segments, gender, voice, lambda g: _default_voice(g, tts_provider))
+                job.speech_segments = speech_segments
+            elif any("voice" in s for s in speech_segments):  # oldingi ikki ovozli urinishdan qolgan
+                speech_segments = [{k: v for k, v in s.items() if k != "voice"} for s in speech_segments]
+                job.speech_segments = speech_segments
 
             if not getattr(job, "voice_style", None):
                 job.voice_style = "neutral"
@@ -1247,6 +1300,9 @@ def process_video(self: Task, job_id: str) -> dict:
                 tts_provider = "edge"
                 voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
                 job.tts_provider, job.voice_name, job.segment_qa = tts_provider, voice, None
+                if dub_options.two_voices():
+                    speech_segments = speaker_voices.assign_voices(
+                        speech_segments, gender, voice, lambda g: _default_voice(g, "edge"))
                 db.commit()
                 _release_read_tx(db)
                 dubbed_audio_path, actual_timings, qa_results = synthesizer.synthesize_segments(
@@ -1299,8 +1355,16 @@ def process_video(self: Task, job_id: str) -> dict:
             max_dur = 120.0 if getattr(job, "is_preview", False) else None
             from backend.services.watermark import is_watermark_exempt
             with_watermark = not is_watermark_exempt(db, job.user_id)
+            background = None
+            if dub_options.vocal_replace():
+                _update_job(db, job, JobStatus.MERGING, 85.0, "Vokal musiqadan ajratilmoqda...")
+                speech = job.transcript_segments
+                _release_read_tx(db)
+                background = vocals.build_background(video_path, speech, str(output_dir / "audio" / "background.wav"))
+                _update_job(db, job, JobStatus.MERGING, 92.0, "Video birlashtirilmoqda...")
             _release_read_tx(db)
             merger.merge_video_audio(
+                background_path=background,
                 video_path=video_path,
                 dubbed_audio_path=dubbed_audio_path,
                 output_path=final_output,

@@ -129,6 +129,22 @@ def _build_audio_filtergraph(
         return _build_dubbed_only_filtergraph(target_dur)
 
     s = settings
+    if mode == "vocal_replace":
+        # [BG:a] -- vokalsiz original (services/vocals.py). Qo'shiq musiqasi baland masterlangan (-11 LUFS atrofida),
+        # shuning uchun dublyaj balandroq me'yorlanadi va musiqa FAQAT ovoz yangrayotganda pasayadi.
+        pad = (f"atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,apad=whole_dur={target_dur:.3f},"
+               if isinstance(target_dur, (int, float)) and target_dur > 0 else "")
+        return (
+            f"[BG:a]aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo[orig];"
+            f"[1:a]{pad}highpass=f={s.VOICE_HIGHPASS_HZ},"
+            f"equalizer=f={s.VOICE_EQ_FREQ_HZ}:width_type=q:width=1:g={s.VOICE_EQ_GAIN_DB},"
+            f"loudnorm=I={s.VOCAL_REPLACE_VOICE_LUFS}:TP={s.FINAL_LOUDNORM_TP}:LRA=7,"
+            f"aformat=sample_rates={_MIX_SAMPLE_RATE}:channel_layouts=stereo,asplit=2[sc][dubproc];"
+            f"[orig][sc]sidechaincompress=threshold={s.VOCAL_REPLACE_DUCK_THRESHOLD}:"
+            f"ratio={s.VOCAL_REPLACE_DUCK_RATIO}:attack=20:release=400:makeup=1[music];"
+            f"[music][dubproc]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,"
+            f"alimiter=limit=0.95:level=false[final]"
+        )
     ducking_ratio = max(1.0, min(20.0, s.DUCKING_RATIO))
     duck_stage = (
         f"sidechaincompress=threshold={s.DUCKING_THRESHOLD}:ratio={ducking_ratio}:"
@@ -208,6 +224,7 @@ def merge_video_audio(
     max_duration: float | None = None,
     audio_mix_mode: str | None = None,
     watermark: bool = True,
+    background_path: str | None = None,
 ) -> str:
     """
     Original video + O'zbekcha dublyaj → Tayyor video, kino-dublyaji uslubida
@@ -253,12 +270,15 @@ def merge_video_audio(
 
     audio_filter = _build_audio_filtergraph(
         target_dur=target_dur,
-        audio_mix_mode=audio_mix_mode,
+        audio_mix_mode="vocal_replace" if background_path else audio_mix_mode,
         has_orig_audio=has_orig_audio,
     )
 
     vcodec = _probe_video_codec(video_path)
     needs_transcode = vcodec not in ("h264", "avc1")
+
+    # 4K 2 oqimda juda sekin -- barcha yadrolar (4K faqat admin tanlovida keladi)
+    encode_threads = "0" if min(_get_video_dimensions(video_path)) > 1080 else "2"
 
     use_watermark = watermark and WATERMARK_PATH.exists() and getattr(settings, "ENABLE_VIDEO_WATERMARK", True)
 
@@ -293,7 +313,7 @@ def merge_video_audio(
                 "-filter_complex", fc,
                 "-map", "[v_out]",
                 "-map", "[final]",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", "2",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", encode_threads,
                 "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
                 "-movflags", "+faststart",
                 output_path,
@@ -305,7 +325,7 @@ def merge_video_audio(
                 if needs_transcode:
                     video_codec_args = [
                         "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                        "-crf", "22", "-preset", "veryfast", "-threads", "2",
+                        "-crf", "22", "-preset", "veryfast", "-threads", encode_threads,
                     ]
                 else:
                     video_codec_args = ["-c:v", "copy"]
@@ -334,7 +354,7 @@ def merge_video_audio(
                     "-filter_complex", fc,
                     "-map", "[v]",
                     "-map", "[final]",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", "2",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-preset", "veryfast", "-threads", encode_threads,
                     "-c:a", "aac", "-b:a", "192k", "-ar", str(_MIX_SAMPLE_RATE),
                     "-movflags", "+faststart",
                     output_path,
@@ -349,6 +369,11 @@ def merge_video_audio(
         if actual_limit_dur > 0:
             c.insert(-1, "-t")
             c.insert(-1, f"{actual_limit_dur:.3f}")
+        if background_path:  # vokalsiz fon -- oxirgi kirish
+            at = c.index("-filter_complex")
+            n = c[:at].count("-i")
+            c[at + 1] = c[at + 1].replace("[BG:a]", f"[{n}:a]")
+            c[at:at] = ["-i", str(background_path)]
         return c
 
     cmd = _build_cmd(with_watermark=use_watermark)

@@ -38,7 +38,10 @@ def _load_registry() -> dict[str, type]:
     from backend.services.tts.neuronai_provider import NeuronAIProvider
     from backend.services.tts.voicelab_provider import VoiceLabProvider
 
+    from backend.services.tts.gapi_provider import GapiProvider
+
     _REGISTRY = {
+        "gapi":       GapiProvider,
         "elevenlabs": ElevenLabsProvider,
         "azure":      AzureProvider,
         "edge":       EdgeProvider,

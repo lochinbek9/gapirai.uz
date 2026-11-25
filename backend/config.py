@@ -138,6 +138,14 @@ class Settings(BaseSettings):
     VOICE_LIMITER_LIMIT: float = 0.95
     # Yakuniy aralashma EBU R128 standartiga normallashtiriladi (I = integrated
     # loudness, TP = true peak, LRA = loudness range).
+    # gapi.uz tizim kaliti; GAPI_TTS_DEFAULT=True -- barcha dublyajlar gapi ovozida (balans tugasa Edge)
+    GAPI_API_KEY: str = ""
+    GAPI_TTS_DEFAULT: bool = False
+
+    # "Faqat vokalni almashtirish" rejimi: dublyaj balandligi va u yangraganda musiqaning pasayishi
+    VOCAL_REPLACE_VOICE_LUFS: float = -11.0
+    VOCAL_REPLACE_DUCK_THRESHOLD: float = 0.03
+    VOCAL_REPLACE_DUCK_RATIO: float = 3.0
     FINAL_LOUDNORM_I: float = -16.0
     FINAL_LOUDNORM_TP: float = -1.5
     FINAL_LOUDNORM_LRA: float = 11.0
@@ -380,6 +388,8 @@ class Settings(BaseSettings):
     # Resend (email tasdiqlash kodlari uchun — gapirai.uz domenida SPF/DKIM tasdiqlangan)
     # Lokal/dev: True bo'lsa email_service HECH QACHON tarmoqqa chiqmaydi (kodlar faqat logga yoziladi).
     EMAIL_DISABLED: bool = False
+    # «Miyya» (second brain) bo'limi ochiq bo'lgan admin email'lari (vergul bilan). Bo'sh -- hech kimga.
+    BRAIN_OWNER_EMAILS: str = ""
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "noreply@gapirai.uz"
     RESEND_FROM_NAME: str = "GapirAI.uz"

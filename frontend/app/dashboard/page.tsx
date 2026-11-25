@@ -10,6 +10,8 @@ import {
   listUserAnalyses, deleteAnalysis, retryAnalysis, VideoAnalysis,
 } from '@/lib/api'
 import { extractYouTubeId } from '@/lib/youtube'
+import { isAppWindow } from '@/lib/pwaInstall'
+import { getBrainAccess } from '@/lib/brain'
 import PushOptIn from '@/components/PushOptIn'
 import PremierePluginCard from '@/components/PremierePluginCard'
 import BillingCard from '@/components/billing/BillingCard'
@@ -18,7 +20,7 @@ import { usePaymentChooser } from '@/components/payments/PaymentChooser'
 import {
   Youtube, Plus, LogOut, Clock, CheckCircle2, XCircle, CircleSlash,
   Loader2, Trash2, Play, User2, Mic2, MicOff, Crown, RotateCw, ShieldAlert,
-  Sparkles, FileText, Zap, Package, X,
+  Sparkles, FileText, Zap, Package, X, Captions, Brain, ShieldCheck,
 } from 'lucide-react'
 import { formatTashkentDate } from '@/lib/timestamp'
 
@@ -182,6 +184,8 @@ function VideoCard({
   const isNoSpeech = job.error_code === 'NO_SPEECH_FOUND' || job.error_message?.toLowerCase().includes('nutq topilmadi')
   const isContentBlocked = job.error_code === 'CONTENT_BLOCKED' || job.error_message?.toLowerCase().includes('kontent siyosati') || job.error_message?.toLowerCase().includes('taqiqlangan')
   const isNonRetryable = isNoSpeech || isContentBlocked
+  const isSubtitle = !!job.subtitle_only
+  const href = jobHref(job.job_id, isSubtitle)
 
   // TTS Metadata formatting
   const prov = (job.tts_provider || 'azure').toLowerCase()
@@ -219,7 +223,7 @@ function VideoCard({
         </div>
         {/* Play overlay for ready jobs */}
         {isReady && (
-          <Link href={`/video/${job.job_id}`} aria-label={`${job.video_title || 'Video'} — ochish`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 ">
+          <Link href={href} aria-label={`${job.video_title || 'Video'} — ochish`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 ">
             <div className="w-12 h-12 bg-white/95 rounded-2xl flex items-center justify-center shadow-lg transition transform translate-y-2 group-hover:translate-y-0 duration-300">
               <Play className="w-5 h-5 text-blue-600 fill-blue-600 ml-0.5" />
             </div>
@@ -228,7 +232,7 @@ function VideoCard({
         {/* In-progress overlay linking to video page */}
         {!isReady && !isFailed && (
           <Link
-            href={`/video/${job.job_id}`}
+            href={href}
             title="Jarayonni ko'rish"
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 "
           >
@@ -247,6 +251,12 @@ function VideoCard({
             />
           </div>
         )}
+        {isSubtitle ? (
+          <div className="absolute top-2.5 left-2.5 bg-black/75 text-white text-xs font-semibold px-2 py-1 rounded-lg flex items-center gap-1.5">
+            <Captions className="w-3 h-3 text-blue-400" />
+            <span>Subtitr</span>
+          </div>
+        ) : (<>
         {/* Top-left: Voice & Gender badge */}
         <div className="absolute top-2.5 left-2.5 bg-black/75 text-white text-xs font-semibold tracking-wider px-2 py-1 rounded-lg flex items-center gap-1.5 ">
           {isFemale ? <Mic2 className="w-3 h-3 text-blue-400" /> : <Mic2 className="w-3 h-3 text-blue-400" />}
@@ -264,18 +274,19 @@ function VideoCard({
             {prov === 'gemini' ? 'HD' : prov === 'edge' ? 'Standart' : 'Neural'}
           </span>
         </div>
+        </>)}
       </div>
 
       {/* Info */}
       <div className="p-4">
         <h3 className="text-ui-ink font-semibold text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
-          <Link href={`/video/${job.job_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition">
+          <Link href={href} className="hover:text-blue-600 dark:hover:text-blue-400 transition">
             {job.video_title || 'Yuklanmoqda...'}
           </Link>
         </h3>
 
-        {/* Metadata chips */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
+        {/* Metadata chips (faqat dublyaj) */}
+        {!isSubtitle && <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
           <span className={`px-2 py-0.5 rounded-md font-semibold border ${
             prov === 'gemini'
             ? 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20'
@@ -291,21 +302,21 @@ function VideoCard({
           <span className="px-1.5 py-0.5 rounded-md font-medium text-ui-muted bg-ui-ground">
             Ohang: {styleDisplayName}
           </span>
-        </div>
+        </div>}
 
         <div className="flex items-center justify-between">
           <StatusBadge status={job.status} errorCode={job.error_code} errorMessage={job.error_message} />
           <div className="flex items-center gap-1.5 sm:gap-2">
             {isReady ? (
               <Link
-                href={`/video/${job.job_id}`}
+                href={href}
                 className="text-xs text-ui-accent-ink hover:text-blue-500 font-semibold"
               >
                 Ko'rish →
               </Link>
             ) : !isFailed ? (
               <Link
-                href={`/video/${job.job_id}`}
+                href={href}
                 className="text-xs text-ui-accent-ink hover:text-blue-500 font-medium flex items-center gap-1"
                 title="Jarayonni ko'rish"
               >
@@ -612,13 +623,17 @@ function ListSection({ title, count, tone = 'default', children }: {
   )
 }
 
+const jobHref = (id: string, subtitleOnly?: boolean) => `/${subtitleOnly ? 'subtitles' : 'video'}/${id}`
+
+type Tab = 'dubbing' | 'subtitle' | 'analysis'
+
 const isDone = (status: string) => status === 'completed' || status === 'COMPLETED'
 const isFailed = (status: string) => status === 'failed' || status === 'FAILED'
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'dubbing' | 'analysis'>('dubbing')
+  const [activeTab, setActiveTab] = useState<Tab>('dubbing')
   const tabTouched = useRef(false)
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
@@ -629,6 +644,13 @@ export default function DashboardPage() {
   const [subscription, setSubscription] = useState<CurrentSubscription | null>(null)
   const payChooser = usePaymentChooser()
   const [conversionBannerDismissed, setConversionBannerDismissed] = useState(false)
+  const [brainAllowed, setBrainAllowed] = useState(false)
+  const [inApp, setInApp] = useState(false)
+  useEffect(() => setInApp(isAppWindow()), [])
+
+  useEffect(() => {
+    if (user?.role === 'admin') getBrainAccess().then(setBrainAllowed).catch(() => setBrainAllowed(false))
+  }, [user])
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -642,13 +664,7 @@ export default function DashboardPage() {
         .finally(() => setJobsLoading(false))
 
       listUserAnalyses()
-        .then((data) => {
-          setAnalyses(data)
-          // Agar foydalanuvchida dublyaj yo'q lekin tahlil bo'lsa, avtomatik tahlil tabini ko'rsatish
-          if (jobs.length === 0 && data.length > 0) {
-            setActiveTab('analysis')
-          }
-        })
+        .then(setAnalyses)
         .catch(console.error)
         .finally(() => setAnalysesLoading(false))
 
@@ -737,7 +753,7 @@ export default function DashboardPage() {
     setRetryingId(id)
     try {
       await retryJob(id, isRegenerate ? { force_regenerate: true } : undefined)
-      router.push(`/video/${id}`)
+      router.push(jobHref(id, jobs.find((j) => j.job_id === id)?.subtitle_only))
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Videoni qayta ishga tushirishda xatolik yuz berdi.")
       setRetryingId(null)
@@ -749,21 +765,33 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  const activeJobs = jobs.filter((j) => !isDone(j.status) && !isFailed(j.status))
-  const doneJobs = jobs.filter((j) => isDone(j.status))
-  const failedJobs = jobs.filter((j) => isFailed(j.status))
-  const activeAnalyses = analyses.filter((a) => !isDone(a.status) && !isFailed(a.status))
+  const dubJobs = jobs.filter((j) => !j.subtitle_only)
+  const subtitleJobs = jobs.filter((j) => j.subtitle_only)
+  const isActive = (item: { status: string }) => !isDone(item.status) && !isFailed(item.status)
+  const tabJobs = activeTab === 'subtitle' ? subtitleJobs : dubJobs
+  const activeJobs = tabJobs.filter(isActive)
+  const doneJobs = tabJobs.filter((j) => isDone(j.status))
+  const failedJobs = tabJobs.filter((j) => isFailed(j.status))
+  const activeAnalyses = analyses.filter(isActive)
   const doneAnalyses = analyses.filter((a) => isDone(a.status))
   const failedAnalyses = analyses.filter((a) => isFailed(a.status))
 
-  // Sahifa ochilganda jarayoni bor tabni ko'rsatamiz (foydalanuvchi o'zi tanlamagan bo'lsa)
+  const tabs = [
+    { id: 'dubbing' as const, label: 'Dublyaj', icon: Youtube, items: dubJobs as { status: string }[] },
+    { id: 'subtitle' as const, label: 'Subtitr', icon: Captions, items: subtitleJobs as { status: string }[] },
+    { id: 'analysis' as const, label: 'Tahlil', icon: Sparkles, items: analyses as { status: string }[] },
+  ]
+  // Avval jarayoni bor bo'lim, bo'lmasa birinchi bo'sh bo'lmagani
+  const preferredTab: Tab = (tabs.find((t) => t.items.some(isActive)) ?? tabs.find((t) => t.items.length > 0) ?? tabs[0]).id
+
+  // Sahifa ochilganda mos tabni ko'rsatamiz (foydalanuvchi o'zi tanlamagan bo'lsa)
   useEffect(() => {
     if (tabTouched.current || jobsLoading || analysesLoading) return
-    if (activeJobs.length === 0 && activeAnalyses.length > 0) setActiveTab('analysis')
+    setActiveTab(preferredTab)
     tabTouched.current = true
-  }, [jobsLoading, analysesLoading, activeJobs.length, activeAnalyses.length])
+  }, [jobsLoading, analysesLoading, preferredTab])
 
-  const selectTab = (tab: 'dubbing' | 'analysis') => {
+  const selectTab = (tab: Tab) => {
     tabTouched.current = true
     setActiveTab(tab)
   }
@@ -777,9 +805,15 @@ export default function DashboardPage() {
     )
   }
 
-  const completedCount = jobsStats ? jobsStats.completed : jobs.filter(j => j.status === 'completed').length
-  const processingCount = jobsStats ? jobsStats.processing : jobs.filter(j => !['completed', 'failed'].includes(j.status)).length
-  const totalCount = jobsStats ? jobsStats.total : jobs.length
+  // Umumiy raqamlar uchala xizmatni qamraydi: /api/jobs/stats = dublyaj + subtitr
+  const jobTotals = jobsStats ?? {
+    total: jobs.length,
+    completed: jobs.filter((j) => isDone(j.status)).length,
+    processing: jobs.filter(isActive).length,
+  }
+  const totalCount = jobTotals.total + analyses.length
+  const completedCount = jobTotals.completed + doneAnalyses.length
+  const processingCount = jobTotals.processing + activeAnalyses.length
 
   const TAB = (active: boolean) =>
     `flex min-h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition ${
@@ -798,6 +832,16 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {inApp && user.role === 'admin' && (
+              <Link href="/admin" className="ui-btn ui-btn-secondary">
+                <ShieldCheck aria-hidden="true" className="h-4 w-4" /> Admin panel
+              </Link>
+            )}
+            {brainAllowed && (
+              <Link href="/brain" className="ui-btn ui-btn-secondary">
+                <Brain aria-hidden="true" className="h-4 w-4" /> Miyya
+              </Link>
+            )}
             <Link href="/" className="ui-btn ui-btn-primary">
               <Plus aria-hidden="true" className="h-4 w-4" /> Yangi video
             </Link>
@@ -825,7 +869,7 @@ export default function DashboardPage() {
         {payChooser.ui}
 
         {/* Conversion banner: only for free users who haven't dismissed it */}
-        {subscription?.plan === 'free' && !conversionBannerDismissed && (
+        {subscription?.plan === 'free' && !subscription.is_admin && user.role !== 'admin' && !conversionBannerDismissed && (
           <FreeTierConversionBanner onDismiss={() => setConversionBannerDismissed(true)} />
         )}
 
@@ -835,33 +879,34 @@ export default function DashboardPage() {
         <DonateCTA className="mb-6" />
 
         {/* Tabs */}
-        <div role="tablist" aria-label="Videolar turi" className="mb-6 mt-4 inline-flex gap-1 rounded-control bg-ui-ground p-1">
-          <button type="button" role="tab" aria-selected={activeTab === 'dubbing'} onClick={() => selectTab('dubbing')} className={TAB(activeTab === 'dubbing')}>
-            <Youtube aria-hidden="true" className="h-4 w-4" />
-            <span>Dublyaj</span>
-            <span className="text-xs text-ui-muted tabular-nums">{jobs.length}</span>
-            {activeJobs.length > 0 && <span className="rounded-full bg-blue-500/15 px-1.5 text-xs font-medium text-blue-600 tabular-nums">{activeJobs.length} jarayonda</span>}
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'analysis'} onClick={() => selectTab('analysis')} className={TAB(activeTab === 'analysis')}>
-            <Sparkles aria-hidden="true" className="h-4 w-4" />
-            <span>Tahlillar</span>
-            <span className="text-xs text-ui-muted tabular-nums">{analyses.length}</span>
-            {activeAnalyses.length > 0 && <span className="rounded-full bg-blue-500/15 px-1.5 text-xs font-medium text-blue-600 tabular-nums">{activeAnalyses.length} jarayonda</span>}
-          </button>
+        <div role="tablist" aria-label="Videolar turi" className="mb-6 mt-4 inline-flex max-w-full flex-wrap gap-1 rounded-control bg-ui-ground p-1">
+          {tabs.map(({ id, label, icon: Icon, items }) => {
+            const running = items.filter(isActive).length
+            return (
+              <button key={id} type="button" role="tab" aria-selected={activeTab === id} onClick={() => selectTab(id)} className={TAB(activeTab === id)}>
+                <Icon aria-hidden="true" className="h-4 w-4" />
+                <span>{label}</span>
+                <span className="text-xs text-ui-muted tabular-nums">{items.length}</span>
+                {running > 0 && <span className="rounded-full bg-blue-500/15 px-1.5 text-xs font-medium text-blue-600 tabular-nums">{running} jarayonda</span>}
+              </button>
+            )
+          })}
         </div>
 
         {/* Content by active tab */}
-        {activeTab === 'dubbing' && (
+        {activeTab !== 'analysis' && (
           jobsLoading ? (
             <div className="flex items-center justify-center py-20" role="status">
               <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-ui-muted" />
               <span className="sr-only">Yuklanmoqda</span>
             </div>
-          ) : jobs.length === 0 ? (
+          ) : tabJobs.length === 0 ? (
             <div className="rounded-card border border-dashed border-ui-rule px-6 py-16 text-center">
-              <p className="text-lg font-semibold text-ui-ink">Hali video yoʻq</p>
-              <p className="mt-1 text-[15px] text-ui-muted">YouTube havolasini yuboring — tayyor videolar shu yerda saqlanadi.</p>
-              <Link href="/" className="ui-btn ui-btn-primary mt-6">Birinchi videoni dublyaj qilish</Link>
+              <p className="text-lg font-semibold text-ui-ink">{activeTab === 'subtitle' ? 'Hali subtitr yoʻq' : 'Hali dublyaj yoʻq'}</p>
+              <p className="mt-1 text-[15px] text-ui-muted">YouTube havolasini yuboring — tayyor natijalar shu yerda saqlanadi.</p>
+              <Link href={activeTab === 'subtitle' ? '/?mode=subtitle' : '/'} className="ui-btn ui-btn-primary mt-6">
+                {activeTab === 'subtitle' ? 'Subtitr yaratish' : 'Videoni dublyaj qilish'}
+              </Link>
             </div>
           ) : (
             <>

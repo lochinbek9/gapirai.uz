@@ -21,7 +21,7 @@ import ShareButton from '@/components/ShareButton'
 import { PAY_METHODS, PaymentCodeDialog } from '@/components/payments/PaymentChooser'
 import ConfirmModal from '@/components/ConfirmModal'
 import FirstVideoDiscountModal from '@/components/FirstVideoDiscountModal'
-import { formatTashkentDateTime, formatTashkentTime, parseApiDate } from '@/lib/timestamp'
+import { formatTashkentDateTime, parseApiDate } from '@/lib/timestamp'
 
 const TEST_PRICE_MULTIPLIER = 1.0
 
@@ -1008,13 +1008,7 @@ export default function VideoPage() {
 
                     {job.expected_end_time && !isQueued && (
                       <div className="glass-input rounded-2xl p-4 text-xs space-y-1 border border-ui-rule">
-                        <div className="flex items-center justify-between text-ui-muted font-semibold">
-                          <span>Taxminiy yakunlanish:</span>
-                          <span className="text-ui-ink font-mono font-semibold">
-                            {formatTashkentTime(job.expected_end_time)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-ui-muted font-medium">
+                        <p className="text-center text-xs text-ui-muted font-medium">
                           {Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000) <= 0
                             ? "(tez orada yakunlanadi...)"
                             : `(taxminan ${formatRemainingTime(Math.ceil(((parseApiDate(job.expected_end_time)?.getTime() ?? currentTime) - currentTime) / 1000))} qoldi)`}

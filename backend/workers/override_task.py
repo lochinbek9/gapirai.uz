@@ -6,6 +6,7 @@ Tanlov yo'q bo'lsa hech narsa o'zgarmaydi -- oddiy foydalanuvchilar uchun xatti-
 """
 from celery import Task
 
+from backend.services import byok
 from backend.services import gemini_quota_manager as gqm
 
 
@@ -13,7 +14,8 @@ class GeminiOverrideTask(Task):
     def apply_async(self, args=None, kwargs=None, task_id=None, **options):
         ov = gqm.REQUEST_OVERRIDE.get()
         if ov:
-            key = task_id or (str(args[0]) if args else None)
+            # job ID (args[0]) ustun: "qayta boshlash" yangi task_id bilan navbatga qo'yadi
+            key = (str(args[0]) if args else None) or task_id
             if key:
                 gqm.save_job_gemini_override(str(key), ov)
         return super().apply_async(args=args, kwargs=kwargs, task_id=task_id, **options)
@@ -21,11 +23,13 @@ class GeminiOverrideTask(Task):
     def __call__(self, *args, **kwargs):
         job_key = None
         try:
-            job_key = str(self.request.id or (args[0] if args else ""))
+            job_key = str((args[0] if args else None) or self.request.id or "")
         except Exception:
-            job_key = str(args[0]) if args else None
+            job_key = None
         gqm.activate_gemini_override(gqm.load_job_gemini_override(job_key) if job_key else None)
+        byok.activate_for_job(job_key)
         try:
             return super().__call__(*args, **kwargs)
         finally:
             gqm.deactivate_gemini_override()
+            byok.deactivate()

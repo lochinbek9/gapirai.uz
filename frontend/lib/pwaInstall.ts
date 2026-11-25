@@ -27,6 +27,12 @@ export function isStandalone(): boolean {
   )
 }
 
+/** Dastur oynasi: oʻrnatilgan PWA yoki Chrome --app yorligʻi (menyu paneli yoʻq) */
+export function isAppWindow(): boolean {
+  if (typeof window === 'undefined') return false
+  return isStandalone() || window.menubar?.visible === false
+}
+
 export function onInstallChange(fn: () => void): () => void {
   listeners.add(fn)
   return () => listeners.delete(fn)

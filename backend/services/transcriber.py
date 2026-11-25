@@ -611,6 +611,24 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
             "language": str,       # Aniqlangan til
         }
     """
+    from backend.services.gemini_quota_manager import chosen_provider
+
+    from backend.services import byok
+
+    choice = chosen_provider("stt")
+    has_gapi = bool(byok.active_keys("gapi"))
+    if choice == "gapi":
+        # gapi faqat o'zbekcha: boshqa tildagi videoda avtomatik zanjir ishlaydi
+        if language == "uz" or (not language and detect_language_local(audio_path)[0] == "uz"):
+            return _transcribe_via_api(audio_path, "uz", "gapi", is_paid=is_paid)
+        logger.warning("STT: gapi faqat o'zbekcha uchun -- bu audio avtomatik provayderda taniladi.")
+        choice = None
+    elif not choice and language == "uz" and has_gapi:  # egasining kaliti: arzonroq va o'zbekchaga mos
+        return _transcribe_via_api(audio_path, "uz", "gapi", is_paid=is_paid)
+    if choice:  # qat'iy: lokal Whisper ham, boshqa provayder ham ishlatilmaydi
+        if choice == "neuronai" and not language:
+            language = detect_language_local(audio_path)[0]  # NeuronAI "auto" rejimida adashadi
+        return _transcribe_via_api(audio_path, language, choice, is_paid=is_paid)
     if primary is None:
         primary = settings.STT_UZ_PRIMARY if language == "uz" else settings.STT_PROVIDER
 
@@ -640,14 +658,14 @@ def transcribe_audio(audio_path: str, language: str | None = None, primary: str 
         result = _transcribe_via_api(audio_path, language, primary, is_paid=is_paid)
         detected = result.get("language")
         if (
-            groq_first and not language and is_neuronai_stt_available()
+            groq_first and not language and (has_gapi or is_neuronai_stt_available())
             and (_is_uzbek(detected) or (_is_turkic_confusable(detected) and _probe_is_uzbek(audio_path)))
         ):
             # Video "uz" deb belgilanmagan, lekin nutq o'zbekcha -- Whisper o'zbekchada kuchsiz (ko'pincha
             # turkcha/ozarbayjoncha deb adashadi), NeuronAI'da qayta.
             logger.info(f"STT: nutq o'zbekcha (Groq: {detected}) -- NeuronAI (uz) bilan qayta transkripsiya.")
             try:
-                return _transcribe_via_api(audio_path, "uz", "neuronai", is_paid=is_paid)
+                return _transcribe_via_api(audio_path, "uz", "gapi" if has_gapi else "neuronai", is_paid=is_paid)
             except Exception as e:
                 logger.warning(f"NeuronAI o'zbekcha qayta transkripsiya ishlamadi ({e}) -- Groq natijasi qoldirildi.")
         return result
@@ -1087,6 +1105,23 @@ def _transcribe_chunk_neuronai(chunk_path: Path, offset_seconds: float, language
     return segments, fix((data.get("text") or "").strip()), lang
 
 
+def _transcribe_chunk_gapi(chunk_path: Path, offset_seconds: float, language: str | None = None) -> tuple[list[dict], str, str]:
+    """gapi.uz -- faqat o'zbekcha audio (backend/services/gapi_stt.py)."""
+    from backend.services import gapi_stt
+
+    data = gapi_stt.transcribe_file(chunk_path)
+    segments = []
+    for s in data.get("segments") or []:
+        text = normalize_uz_latin((s.get("text") or "").strip())
+        if text:
+            segments.extend(split_long_segment({
+                "start": round(float(s["start"]) + offset_seconds, 3),
+                "end": round(float(s["end"]) + offset_seconds, 3),
+                "text": text,
+            }))
+    return segments, normalize_uz_latin((data.get("text") or "").strip()), "uz"
+
+
 def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     """API provayderlar tartibi:
     1-o'rin: Groq Whisper (ultra-tez LPU, 0 CPU/RAM, bepul kvota)
@@ -1095,7 +1130,16 @@ def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     4-o'rin: Azure STT (Cognitive Services)
     5-o'rin: OpenAI Whisper
     """
+    from backend.services.gemini_quota_manager import chosen_provider
     from backend.services.groq_service import is_groq_available
+    from backend.services import byok
+
+    choice = chosen_provider("stt")
+    use_gapi = primary == "gapi" and bool(byok.active_keys("gapi"))  # faqat o'zbekcha uchun so'raladi
+    if use_gapi and choice == "gapi":
+        return ["gapi"]
+    if choice and choice != "gapi":
+        return [choice]
     groq_ok = is_groq_available()
     neuronai_ok = is_neuronai_stt_available()
     gemini_ok = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
@@ -1122,7 +1166,8 @@ def _transcribe_provider_order(primary: str = "groq") -> list[str]:
         else:
             order = active
 
-    return order or ["gemini"]
+    order = order or ["gemini"]
+    return ["gapi", *order] if use_gapi else order
 
 
 def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "gemini", is_paid: bool = False) -> dict:
@@ -1145,6 +1190,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
                 fn = _transcribe_chunk_azure
             elif name == "neuronai":
                 fn = _transcribe_chunk_neuronai
+            elif name == "gapi":
+                fn = _transcribe_chunk_gapi
             else:
                 fn = _transcribe_chunk
             try:
@@ -1173,6 +1220,8 @@ def _transcribe_via_api(audio_path: str, language: str | None, primary: str = "g
 
     # Gemini uchun 3 daqiqa (180s) optimal -- token chegarasidan oshmaydi va aniq vaqt beradi
     chunk_seconds = 180 if primary == "gemini" else _CHUNK_DURATION_SECONDS
+    if primary == "gapi":
+        chunk_seconds = 280  # gapi sinxron so'rovi 5 daqiqagacha
     with tempfile.TemporaryDirectory(prefix="stt-") as temp_dir:
         chunk_paths = _chunk_audio(audio_path, Path(temp_dir), chunk_seconds=chunk_seconds)
 

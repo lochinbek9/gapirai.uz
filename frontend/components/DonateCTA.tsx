@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Heart } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   variant?: 'card' | 'line'
@@ -14,6 +15,10 @@ interface Props {
  *  (dashboard, landing), `line` — ixcham matn+havola (video natijasi, tarif).
  *  TMA ichida ham ko'rsatiladi — /donate login talab qilmaydi. */
 export default function DonateCTA({ variant = 'card', className = '', headingId }: Props) {
+  const { user, loading } = useAuth()
+  // Adminga reklama/chaqiriqlar ko'rsatilmaydi (loading: miltillab chiqmasligi uchun)
+  if (loading || user?.role === 'admin') return null
+
   if (variant === 'line') {
     return (
       <div className={`flex flex-wrap items-center justify-center gap-2 text-[15px] text-ui-muted ${className}`}>

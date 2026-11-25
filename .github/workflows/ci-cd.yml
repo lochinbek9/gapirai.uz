@@ -245,7 +245,7 @@ jobs:
             for svc in gapirai-frontend xadichai-frontend frontend; do
               if systemctl is-enabled --quiet "$svc" 2>/dev/null || systemctl is-active --quiet "$svc" 2>/dev/null; then
                 echo "Restarting systemd service: $svc"
-                timeout 20s run_sudo systemctl restart "$svc" 2>&1 || timeout 15s systemctl --user restart "$svc" 2>&1 || true
+                timeout 20s sudo -n /usr/bin/systemctl restart "$svc" 2>&1 || timeout 15s systemctl --user restart "$svc" 2>&1 || true
               fi
             done
 

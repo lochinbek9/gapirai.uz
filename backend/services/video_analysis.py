@@ -247,7 +247,13 @@ def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3, is_
     import re
     from backend.services.groq_service import is_groq_available, groq_chat_completion
 
-    if is_groq_available():
+    from backend.services.gemini_quota_manager import chosen_provider
+
+    choice = chosen_provider("llm")
+    if choice == "neuronai":
+        from backend.services import neuronai_llm
+        return neuronai_llm.chat_json([{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}])
+    if choice != "gemini" and (choice == "groq" or is_groq_available()):
         try:
             messages = [
                 {"role": "system", "content": system_prompt + "\nMUHIM: Faqat to'g'ri JSON formatida javob bering, markdown kod bloklari yoki ortiqcha matn yozmang."},
@@ -261,6 +267,8 @@ def _call_json(system_prompt: str, user_message: str, max_attempts: int = 3, is_
             clean = clean.strip()
             return json.loads(clean)
         except Exception as e:
+            if choice == "groq":
+                raise
             logger.warning(f"Groq JSON generation xatolik ({e}) — Gemini zaxirasiga o'tilmoqda")
 
     from backend.services.gemini_quota_manager import call_gemini_json_with_fallback
