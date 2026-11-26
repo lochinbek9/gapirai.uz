@@ -146,6 +146,7 @@ def check_youtube_cookies(notify_if_expiring: bool = True) -> dict[str, Any]:
 
 def check_ai_providers() -> dict[str, Any]:
     """Tizimda sozlangan AI provayderlar (Gemini, Azure, OpenAI, Edge) holatini tekshiradi."""
+    from backend.services.plans import gapi_is_default
     settings = get_settings()
     gemini_key = bool(settings.GEMINI_API_KEY or settings.GEMINI_USE_VERTEX)
     azure_key = bool(settings.AZURE_SPEECH_KEY and settings.AZURE_SPEECH_KEY not in ("", "your-azure-key"))
@@ -179,6 +180,14 @@ def check_ai_providers() -> dict[str, Any]:
             "enabled": openai_enabled,
             "configured": openai_key,
             "note": "Vaqtinchalik nofaol (Balans 0). Zaxira Gemini/Azure ishlamoqda." if not openai_enabled else "Faol",
+        },
+        "gapi": {
+            "status": "healthy" if (settings.GAPI_API_KEY or "").strip() else "warning",
+            "name": "Gapi.uz",
+            "enabled": True,
+            "configured": bool((settings.GAPI_API_KEY or "").strip()),
+            "default": gapi_is_default(settings),
+            "note": "O'zbekcha ovoz (Zebo / Doston) va nutqni tanish",
         },
         "edge_tts": {
             "status": "healthy",

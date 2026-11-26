@@ -27,6 +27,7 @@ def available(has_gapi_key: bool) -> dict[str, list[str]]:
     from backend.services.groq_service import get_all_groq_api_keys
 
     s = get_settings()
+    has_gapi_key = has_gapi_key or bool((getattr(s, "GAPI_API_KEY", "") or "").strip())
     gemini, groq, neuronai = bool(get_all_gemini_api_keys()), bool(get_all_groq_api_keys()), bool(s.NEURONAI_API_KEY)
     azure = s.AZURE_SPEECH_KEY not in ("", "your-azure-key")
     on = {

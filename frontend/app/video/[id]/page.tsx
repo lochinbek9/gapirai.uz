@@ -1,4 +1,5 @@
 'use client'
+import { engineLabel, voiceName, useSystemVoice } from '@/lib/voice'
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -232,7 +233,7 @@ export default function VideoPage() {
   const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
   const [retryLoading, setRetryLoading] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
-  const [regenProvider, setRegenProvider] = useState<'gemini' | 'edge' | 'azure'>('gemini')
+  const systemVoice = useSystemVoice()
   const [regenGender, setRegenGender] = useState<'male' | 'female'>('male')
   const [regenLoading, setRegenLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -276,19 +277,13 @@ export default function VideoPage() {
   const canManage = Boolean(job?.viewer_is_owner) || isAdmin
 
   useEffect(() => {
-    if (job?.tts_provider) {
-      const p = job.tts_provider.toLowerCase()
-      if (p === 'gemini' || p === 'edge' || p === 'azure') {
-        setRegenProvider(p as any)
-      }
-    }
     if (job?.speaker_gender) {
       const g = job.speaker_gender.toLowerCase()
       if (g === 'male' || g === 'female') {
         setRegenGender(g as any)
       }
     }
-  }, [job?.tts_provider, job?.speaker_gender])
+  }, [job?.speaker_gender])
 
   useEffect(() => {
     if (job?.status === 'completed' && job?.discount_offer?.active) {
@@ -333,7 +328,6 @@ export default function VideoPage() {
     setRegenLoading(true)
     try {
       await retryJob(id, {
-        tts_provider: regenProvider,
         speaker_gender: regenGender,
         force_regenerate: true,
       })
@@ -1051,10 +1045,7 @@ export default function VideoPage() {
                     <span className="flex items-center gap-1.5 font-medium">
                       <Mic2 className="w-4 h-4 text-ui-accent-ink" />
                       {(() => {
-                        const prov = (job.tts_provider || 'azure').toLowerCase();
-                        const provLabel = prov === 'gemini' ? 'GapirAI HD' : prov === 'edge' ? 'Standart' : 'Neural HD';
-                        const voiceName = (job.voice_name || (prov === 'gemini' ? (job.speaker_gender === 'female' ? 'Autonoe' : 'Charon') : (job.speaker_gender === 'female' ? 'Madina' : 'Sardor'))).replace('uz-UZ-', '').replace('Neural', '');
-                        return `${job.speaker_gender === 'female' ? 'Ayol ovozi' : 'Erkak ovozi'} (${voiceName} • ${provLabel})`;
+                        return `${job.speaker_gender === 'female' ? 'Ayol ovozi' : 'Erkak ovozi'} (${voiceName(job)} • ${engineLabel(job.tts_provider)})`;
                       })()}
                     </span>
                   )}
@@ -1268,10 +1259,10 @@ export default function VideoPage() {
                       <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? 'Ayol' : 'Erkak'} />
                     )}
                     {job.tts_provider && (
-                      <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? 'GapirAI HD' : job.tts_provider.toLowerCase() === 'edge' ? 'Standart' : 'Neural HD'} />
+                      <InfoRow label="Ovoz dvigateli" value={engineLabel(job.tts_provider)} />
                     )}
                     {job.voice_name && (
-                      <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
+                      <InfoRow label="Ovoz egasi" value={voiceName(job)} />
                     )}
                     {job.created_at && (
                       <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
@@ -1333,10 +1324,10 @@ export default function VideoPage() {
                   <InfoRow label="Spikerning jinsi" value={job.speaker_gender === 'female' ? 'Ayol' : 'Erkak'} />
                 )}
                 {job.tts_provider && (
-                  <InfoRow label="Ovoz dvigateli" value={job.tts_provider.toLowerCase() === 'gemini' ? 'GapirAI HD' : job.tts_provider.toLowerCase() === 'edge' ? 'Standart' : 'Neural HD'} />
+                  <InfoRow label="Ovoz dvigateli" value={engineLabel(job.tts_provider)} />
                 )}
                 {job.voice_name && (
-                  <InfoRow label="Ovoz egasi" value={job.voice_name.replace('uz-UZ-', '').replace('Neural', '')} />
+                  <InfoRow label="Ovoz egasi" value={voiceName(job)} />
                 )}
                 {job.created_at && (
                   <InfoRow label="Yuborilgan" value={formatTashkentDateTime(job.created_at)} />
@@ -1564,8 +1555,8 @@ export default function VideoPage() {
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { id: 'male', label: 'Erkak ovozi', name: 'Charon' },
-                    { id: 'female', label: 'Ayol ovozi', name: 'Autonoe' },
+                    { id: 'male', label: 'Erkak ovozi', name: voiceName({ tts_provider: systemVoice || job.tts_provider, speaker_gender: 'male' }) },
+                    { id: 'female', label: 'Ayol ovozi', name: voiceName({ tts_provider: systemVoice || job.tts_provider, speaker_gender: 'female' }) },
                   ].map((g) => {
                     const active = regenGender === g.id
                     return (

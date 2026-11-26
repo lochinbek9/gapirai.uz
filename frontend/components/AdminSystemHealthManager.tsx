@@ -395,6 +395,22 @@ export default function AdminSystemHealthManager({ token }: AdminSystemHealthMan
             </div>
           </div>
 
+          {/* Gapi */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Gapi.uz</h4>
+                <p className="text-xs text-ui-muted mt-1">Oʻzbekcha ovoz (Zebo / Doston) va nutqni tanish</p>
+              </div>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${comp?.ai_providers?.gapi?.configured ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'}`}>
+                {comp?.ai_providers?.gapi?.configured ? 'FAOL ✅' : 'KALIT YOʻQ'}
+              </span>
+            </div>
+            <div className="text-xs font-mono text-gray-300 bg-white/5 p-2 rounded-lg">
+              {comp?.ai_providers?.gapi?.default ? 'Barcha dublyajlar uchun standart ovoz' : 'Standart ovoz emas'}
+            </div>
+          </div>
+
           {/* Edge TTS */}
           <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col justify-between space-y-3">
             <div className="flex items-start justify-between">

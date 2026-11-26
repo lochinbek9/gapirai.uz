@@ -1134,8 +1134,9 @@ def _transcribe_provider_order(primary: str = "groq") -> list[str]:
     from backend.services.groq_service import is_groq_available
     from backend.services import byok
 
+    from backend.services import gapi_stt
     choice = chosen_provider("stt")
-    use_gapi = primary == "gapi" and bool(byok.active_keys("gapi"))  # faqat o'zbekcha uchun so'raladi
+    use_gapi = primary == "gapi" and bool(gapi_stt.keys())  # faqat o'zbekcha uchun so'raladi
     if use_gapi and choice == "gapi":
         return ["gapi"]
     if choice and choice != "gapi":

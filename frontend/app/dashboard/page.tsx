@@ -1,4 +1,5 @@
 'use client'
+import { engineLabel, voiceName } from '@/lib/voice'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -192,17 +193,7 @@ function VideoCard({
   const isFemale = job.speaker_gender === 'female' || (job.voice_name && /madina|female|autonoe|aoede/i.test(job.voice_name))
   const genderDisplayName = isFemale ? 'Ayol' : 'Erkak'
 
-  let voiceDisplayName = job.voice_name || ''
-  if (!voiceDisplayName) {
-    if (prov === 'gemini') {
-      voiceDisplayName = isFemale ? 'Autonoe' : 'Charon'
-    } else {
-      voiceDisplayName = isFemale ? 'Madina' : 'Sardor'
-    }
-  } else {
-    // Toza nomini ajratib ko'rsatish: masalan uz-UZ-MadinaNeural -> Madina
-    voiceDisplayName = voiceDisplayName.replace('uz-UZ-', '').replace('Neural', '')
-  }
+  const voiceDisplayName = voiceName(job)
 
   const styleDisplayName = job.voice_style && job.voice_style !== 'neutral' ? job.voice_style : 'Neytral'
 
@@ -294,7 +285,7 @@ function VideoCard({
             ? 'bg-emerald-500/10 text-ui-green-ink border-emerald-500/20'
             : 'bg-blue-500/10 text-ui-accent-ink border-blue-500/20'
           }`}>
-            {prov === 'gemini' ? 'GapirAI HD' : prov === 'edge' ? 'Standart' : 'Neural HD'}
+            {engineLabel(job.tts_provider)}
           </span>
           <span className="px-2 py-0.5 rounded-md font-medium bg-ui-ground text-gray-700 dark:text-gray-300 border border-ui-rule">
             {voiceDisplayName} ({genderDisplayName})

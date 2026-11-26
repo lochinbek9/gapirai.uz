@@ -40,6 +40,8 @@ from backend.services.timezone_utils import to_tashkent_iso, format_tashkent, no
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+from backend.services.tts_cost import GAPI_UZS_PER_1K
+
 router = APIRouter(prefix="/api", tags=["dubbing"])
 
 
@@ -70,6 +72,34 @@ class RegenerateJobRequest(BaseModel):
     translation_model: Optional[str] = None
     reuse_transcript: Optional[bool] = None
     reuse_translation: Optional[bool] = None
+
+
+def _apply_admin_retry_choice(job_id: str, payload: RegenerateJobRequest) -> None:
+    """Admin qayta urinishda tanlagan provayderlar tizim standartidan (gapi, TTS override) ustun bo'ladi."""
+    from backend.services import gemini_quota_manager as gqm
+
+    choice = {}
+    if payload.tts_provider:
+        choice["tts"] = payload.tts_provider
+    for stage, model, reuse in (("stt", payload.stt_provider, payload.reuse_transcript),
+                                ("llm", payload.translation_model, payload.reuse_translation)):
+        if model and reuse is False:
+            name = model.lower()
+            choice[stage] = ("gapi" if name == "gapi" else "gemini" if name.startswith("gemini")
+                             else "groq" if name.startswith(("groq", "qwen")) else name)
+    if not choice:
+        return
+    if "gemini" in choice.values() and payload.gemini_key_tier:
+        choice["tier"] = payload.gemini_key_tier
+    stored = {**(gqm.load_job_gemini_override(job_id) or {}), **(gqm.REQUEST_OVERRIDE.get() or {})}
+    if payload.reuse_transcript is False:
+        stored.pop("stt", None)  # "Avtomatik" -- oldingi qat'iy tanlov qolmasin
+    if payload.reuse_translation is False:
+        stored.pop("llm", None)
+    merged = gqm.sanitize_override(**{**stored, **choice})
+    if merged:
+        gqm.REQUEST_OVERRIDE.set(merged)
+        gqm.save_job_gemini_override(job_id, merged)
 
 
 class VideoInfoResponse(BaseModel):
@@ -229,6 +259,8 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
     est_chars = chars if chars > 0 else int(dur_min * 1200)
     if tts_prov == "edge":
         tts_cost_usd = 0.0
+    elif tts_prov == "gapi":
+        tts_cost_usd = round((est_chars / 1000.0) * GAPI_UZS_PER_1K / 12850, 4)
     elif tts_prov == "azure":
         tts_cost_usd = round((est_chars / 1000.0) * 0.016, 4) if (dur_sec > 0 or est_chars > 0) else 0.0
     else:
@@ -328,6 +360,13 @@ def _job_to_response(job: DubbingJob, redact: bool = False) -> JobResponse:
         current_stage=curr_stage,
     )
 
+
+
+@router.get("/tts-default")
+def tts_default() -> dict:
+    """Tizim ovozi yoqilgan bo'lsa frontend boshqa dvigatel ovozlarini ko'rsatmaydi."""
+    from backend.services.plans import gapi_is_default
+    return {"provider": "gapi" if gapi_is_default(settings) else None}
 
 
 @router.get("/video-info", dependencies=[Depends(rate_limit("video_info", 20, 600))])
@@ -1107,16 +1146,19 @@ def retry_job(
         if payload.speaker_gender:
             if payload.speaker_gender != job.speaker_gender:
                 job.speech_segments = None  # yangi jins uchun qayta optimizatsiya bo'ladi
+                if not payload.voice_name:
+                    job.voice_name = None  # eski jinsning ovozi qolib ketmasin
             job.speaker_gender = payload.speaker_gender
         if payload.tts_provider:
             job.tts_provider = payload.tts_provider
             gender = job.speaker_gender or "male"
-            if payload.tts_provider in ("azure", "edge"):
+            if payload.tts_provider in ("azure", "edge", "gapi"):
                 if payload.voice_name and "neural" in payload.voice_name.lower():
                     job.voice_name = payload.voice_name
                 else:
                     job.voice_name = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
-                job.tts_model = f"{payload.tts_provider}-tts ({job.voice_name})"
+                job.tts_model = (f"gapi ({'Zebo' if 'Madina' in job.voice_name else 'Doston'})"
+                                 if payload.tts_provider == "gapi" else f"{payload.tts_provider}-tts ({job.voice_name})")
             elif payload.tts_provider == "gemini":
                 if payload.voice_name and "neural" not in payload.voice_name.lower():
                     job.voice_name = payload.voice_name
@@ -1178,7 +1220,8 @@ def retry_job(
     # 3. Kesh tekshiruvi: Faqat FAILED videolarda (Regenerate bo'lmaganda) boshqa donor kesh qidiriladi
     video_id = job.youtube_video_id or (extract_youtube_video_id(job.youtube_url) if job.youtube_url else None)
     from backend.services import dub_options
-    custom = dub_options.requested_tag() or job.dub_options
+    admin_picked = bool(payload and payload.tts_provider and is_user_admin(db, current_user.id))
+    custom = dub_options.requested_tag() or job.dub_options or admin_picked
     if not is_regenerate and video_id and not getattr(job, "subtitle_only", False) and not custom:
         cache_query = db.query(DubbingJob).filter(
             DubbingJob.youtube_video_id == video_id,
@@ -1342,6 +1385,8 @@ def retry_job(
         queue = get_job_queue_v2(db, job.user_id or current_user.id, _dur)
     # Do not pass task_id=str(job.id) so Celery creates a fresh task ID,
     # preventing Celery worker from discarding previously revoked tasks.
+    if payload and is_user_admin(db, current_user.id):
+        _apply_admin_retry_choice(job_id, payload)
     process_video.apply_async(args=[str(job.id)], queue=queue)
 
     return {

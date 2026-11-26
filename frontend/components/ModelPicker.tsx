@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 const SELECT = 'min-h-10 w-full rounded-lg border border-ui-rule bg-ui-surface px-2 text-sm text-ui-ink'
 type Stage = 'stt' | 'llm' | 'tts'
-interface Options { models: string[]; choices: Record<Stage, string[]> }
+interface Options { models: string[]; choices: Record<Stage, string[]>; default_tts?: string | null }
 const STYLE_KEYS = ['female', 'male'] as const
 const STAGES: Record<Stage, string> = { stt: 'Nutqni tanish (STT)', llm: 'Tarjima va matn', tts: 'Dublyaj ovozi' }
 const NAMES: Record<string, string> = {
@@ -42,12 +42,12 @@ export default function ModelPicker({ stages, preview = false }: { stages: Stage
   }, [user?.role])
 
   if (user?.role !== 'admin' || !options) return null
-  const gapiVoice = stages.includes('tts') && options.choices.tts.includes('gapi') && ['', 'gapi', undefined].includes(picked.tts)
+  const gapiVoice = stages.includes('tts') && options.choices.tts.includes('gapi') && (picked.tts === 'gapi' || (!picked.tts && options.default_tts === 'gapi'))
   const select = (key: keyof typeof MODEL_CHOICE_KEYS, label: string, values: string[], auto?: string) => (
     <label key={key} className="space-y-1 text-sm font-medium text-ui-ink">{label}
       <select value={picked[key] ?? ''} className={SELECT}
         onChange={(e) => { write(MODEL_CHOICE_KEYS[key], e.target.value); setPicked({ ...picked, [key]: e.target.value }) }}>
-        <option value="">{auto ?? (key === 'tts' && values.includes('gapi') ? 'Avtomatik (Gapi)' : 'Avtomatik')}</option>
+        <option value="">{auto ?? (key === 'tts' && options.default_tts === 'gapi' ? 'Avtomatik (Gapi)' : 'Avtomatik')}</option>
         {values.map((v) => <option key={v} value={v}>{v === 'gapi' ? (key === 'stt' ? 'Gapi (faqat oʻzbekcha)' : 'Gapi (Zebo / Doston)') : NAMES[v] ?? v[0].toUpperCase() + v.slice(1)}</option>)}
       </select>
     </label>

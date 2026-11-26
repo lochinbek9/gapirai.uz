@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { voiceName } from '@/lib/voice'
 import { useEffect, useState, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import ByokPanel from '@/components/ByokPanel'
@@ -852,9 +853,9 @@ export default function AdminPage() {
                           </td>
                           <td className="py-2.5 px-3 text-xs font-mono text-gray-300">
                             <span className="text-amber-300 font-semibold">
-                              {j.tts_provider === 'gemini' ? 'Gemini' : j.tts_provider === 'edge' ? 'Edge' : 'Azure'}
+                              {({ gemini: 'Gemini', edge: 'Edge', azure: 'Azure', gapi: 'Gapi', neuronai: 'NeuronAI' } as Record<string, string>)[j.tts_provider || ''] ?? j.tts_provider ?? '—'}
                             </span>
-                            <span className="text-gray-500 text-xs ml-1">({j.voice_name || 'Charon'})</span>
+                            <span className="text-gray-500 text-xs ml-1">({j.voice_name ? voiceName(j) : '—'})</span>
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
                             {isNoSpeech ? (

@@ -385,6 +385,24 @@ def gapi_is_default(cfg) -> bool:
     return getattr(cfg, "GAPI_TTS_DEFAULT", False) is True and bool(getattr(cfg, "GAPI_API_KEY", ""))
 
 
+NEURAL_VOICE_PROVIDERS = ("azure", "edge", "gapi")  # ovoz nomi Madina/Sardor ko'rinishida
+
+
+def gapi_system_key() -> str:
+    from backend.config import get_settings
+    return (getattr(get_settings(), "GAPI_API_KEY", "") or "").strip()
+
+
+def requested_tts_provider(requested: str | None) -> str:
+    """Yangi ish uchun provayder: tizim ovozi yoqilgan bo'lsa gapi, aks holda so'ralgani (noma'lumi -- gemini)."""
+    from backend.config import get_settings
+    if gapi_is_default(get_settings()):
+        return "gapi"
+    clean = (requested or "gemini").strip().lower()
+    valid = ("azure", "edge", "gemini", "gapi") if gapi_system_key() else ("azure", "edge", "gemini")
+    return clean if clean in valid else "gemini"
+
+
 def get_tts_provider_for_job(db, job) -> str:
     """Job egasining tanlovi va tarifiga qarab qaysi TTS provayderi ishlatilishini aniqlaydi:
     -1. settings.TTS_PRO_PROVIDER berilgan va egasi amaldagi Pro (yoki admin) bo'lsa -- o'sha

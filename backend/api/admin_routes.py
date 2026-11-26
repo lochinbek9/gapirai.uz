@@ -11,6 +11,8 @@ from backend.services.auth import get_current_admin_user, hash_password, create_
 from backend.services.plans import get_or_create_subscription, get_minute_balance, PLANS
 from backend.services.timezone_utils import to_tashkent_iso
 
+from backend.services.tts_cost import GAPI_UZS_PER_1K
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -157,7 +159,7 @@ def admin_stats(
                 "tts_provider": job.tts_provider,
                 "stt_model": job.stt_model,
                 "translation_model": job.translation_model,
-                "tts_model": job.tts_model or (f"gemini-3.8-flash-tts ({job.voice_name})" if job.tts_provider == 'gemini' else (f"edge-tts ({job.voice_name})" if job.tts_provider == 'edge' else (f"azure ({job.voice_name})" if job.tts_provider == 'azure' or (job.voice_name and 'Neural' in str(job.voice_name)) else None))),
+                "tts_model": job.tts_model or (f"gemini-3.8-flash-tts ({job.voice_name})" if job.tts_provider == 'gemini' else (f"edge-tts ({job.voice_name})" if job.tts_provider == 'edge' else (f"azure ({job.voice_name})" if job.tts_provider == 'azure' or (not job.tts_provider and job.voice_name and 'Neural' in str(job.voice_name)) else None))),
             }
             for job, email in recent_jobs_rows
         ]
@@ -3430,13 +3432,17 @@ def admin_jobs_cost(
                 tts_usd = 0.0
                 tts_uzs = 0
             elif (dur_sec > 0 or est_chars > 0) and job.status not in (JobStatus.PENDING, JobStatus.AWAITING_PAYMENT, JobStatus.DOWNLOADING):
-                if tts_provider_clean == "azure":
+                if tts_provider_clean == "gapi":
+                    tts_uzs = int(round(est_chars / 1000.0 * GAPI_UZS_PER_1K))
+                    tts_usd = round(tts_uzs / USD_TO_UZS, 4)
+                elif tts_provider_clean == "azure":
                     calculated_azure_tts = round((est_chars / 1000.0) * 0.016, 4)
                     tts_usd = max(tts_usd, calculated_azure_tts)
                 else:  # gemini
                     calculated_gemini_tts = round((est_chars / 1000.0) * 0.017, 4)
                     tts_usd = max(tts_usd, calculated_gemini_tts)
-                tts_uzs = int(round(tts_usd * USD_TO_UZS))
+                if tts_provider_clean != "gapi":
+                    tts_uzs = int(round(tts_usd * USD_TO_UZS))
 
             total_usd = round(tts_usd + stt_cost_usd + llm_cost_usd, 4)
             total_uzs = int(round(total_usd * USD_TO_UZS))

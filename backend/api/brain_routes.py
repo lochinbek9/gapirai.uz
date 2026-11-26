@@ -183,6 +183,40 @@ def _clean_tags(tags: list[str]) -> list[str]:
     return cleaned
 
 
+@router.post("/analyses/{analysis_id}/select-all")
+def select_all_ideas(
+    analysis_id: uuid.UUID,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_brain_owner),
+) -> dict:
+    """Tahlilning yashirilmagan barcha fikrlarini tanlaydi va vazifa takliflarini fonda boshlaydi."""
+    analysis = db.query(VideoAnalysis).filter(
+        VideoAnalysis.id == analysis_id, VideoAnalysis.user_id == user.id,
+        VideoAnalysis.status == AnalysisStatus.COMPLETED,
+    ).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Tahlil topilmadi.")
+    states = {s.idea_key: s for s in db.query(BrainIdeaState).filter(
+        BrainIdeaState.user_id == user.id, BrainIdeaState.analysis_id == analysis_id).all()}
+    keys = []
+    for key in dict.fromkeys(idea_key(p) for p in _points(analysis)):
+        state = states.get(key)
+        if state is None:
+            state = BrainIdeaState(user_id=user.id, analysis_id=analysis_id, idea_key=key,
+                                   selected=False, hidden=False, note="", tags=[])
+            db.add(state)
+        if not state.hidden:
+            state.selected = True
+            keys.append(key)
+    db.commit()
+    # Avval xato bo'lganlari qayta uriniladi; tayyorlari takrorlanmaydi
+    started = [(analysis_id, k) for k in keys if claim_generation(db, user.id, analysis_id, k, retry=True)]
+    if started:
+        background.add_task(run_generations, user.id, started)
+    return {"selected": keys, "started": len(started)}
+
+
 @router.put("/ideas/{analysis_id}/{key}")
 def update_idea(
     analysis_id: uuid.UUID,

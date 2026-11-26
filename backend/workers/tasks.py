@@ -1221,7 +1221,7 @@ def process_video(self: Task, job_id: str) -> dict:
             job.tts_provider = tts_provider
 
             # Provayder va jinsga qarab aniq ovoz nomini tanlash
-            if tts_provider in ("azure", "edge"):
+            if tts_provider in ("azure", "edge", "gapi"):
                 default_voice = "uz-UZ-MadinaNeural" if gender == "female" else "uz-UZ-SardorNeural"
             elif tts_provider == "gemini":
                 default_voice = getattr(settings, "GEMINI_FEMALE_VOICE", "Autonoe") if gender == "female" else getattr(settings, "GEMINI_MALE_VOICE", "Charon")
@@ -1231,7 +1231,7 @@ def process_video(self: Task, job_id: str) -> dict:
             user_chose_gender = getattr(job, "voice_gender_setting", None) in ("male", "female")
             if user_chose_gender and getattr(job, "voice_name", None):
                 candidate_voice = job.voice_name
-                if tts_provider in ("azure", "edge"):
+                if tts_provider in ("azure", "edge", "gapi"):
                     voice = candidate_voice if "neural" in candidate_voice.lower() else default_voice
                 elif tts_provider == "gemini":
                     voice = candidate_voice if "neural" not in candidate_voice.lower() else default_voice
@@ -1320,6 +1320,8 @@ def process_video(self: Task, job_id: str) -> dict:
                 job.tts_model = f"edge-tts ({voice})"
             elif tts_provider == "azure":
                 job.tts_model = f"azure-neural ({voice})"
+            elif tts_provider == "gapi":
+                job.tts_model = f"gapi ({'Zebo' if 'Madina' in voice else 'Doston'})"
             else:
                 job.tts_model = f"{tts_provider} ({voice})"
             # Segment darajasidagi QA checkpoint — Celery qayta urinishida
