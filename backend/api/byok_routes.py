@@ -14,6 +14,8 @@ from backend.models.byok import ByokSetting
 from backend.models.database import TTSUsageLog, User
 from backend.services import byok, model_choice
 from backend.services.gemini_quota_manager import GEMINI_TEXT_MODELS, get_paid_gemini_api_keys
+from backend.config import get_settings
+from backend.services.plans import gapi_is_default
 
 router = APIRouter(prefix="/api/byok", tags=["byok"])
 
@@ -40,6 +42,7 @@ def _view(row: Optional[ByokSetting]) -> dict:
                  "paid": sum(p == "gemini" and k in paid for k in v)} for p, v in keys.items()}
     return {"enabled": bool(row and row.enabled), "tiers": tiers, "models": GEMINI_TEXT_MODELS,
             "choices": model_choice.available(bool(keys["gapi"])),
+            "default_tts": "gapi" if keys["gapi"] or gapi_is_default(get_settings()) else None,
             "providers": {p: [f"••••{k[-4:]}" for k in v] for p, v in keys.items()}}
 
 

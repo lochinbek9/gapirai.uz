@@ -2,15 +2,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Eye, EyeOff, FileText, Loader2, Play, Search, Star, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Eye, EyeOff, FileText, ListPlus, Loader2, Play, Search, Star, X } from 'lucide-react'
 import PageShell from '@/components/PageShell'
 import BrainGraph, { GraphLink, GraphNode } from '@/components/brain/BrainGraph'
 import IdeaTasks from '@/components/brain/IdeaTasks'
+import SelectAllDialog, { SelectAllResult } from '@/components/brain/SelectAllDialog'
 import TaskBoard from '@/components/brain/TaskBoard'
 import { useAuth } from '@/hooks/useAuth'
 import { useBrainBoard } from '@/hooks/useBrainBoard'
 import { formatDuration } from '@/lib/api'
-import { BrainAnalysis, BrainIdea, IdeaPatch, getBrain, updateBrainIdea } from '@/lib/brain'
+import { BrainAnalysis, BrainIdea, IdeaPatch, getBrain, selectAllIdeas, updateBrainIdea } from '@/lib/brain'
 import { formatTashkentDate } from '@/lib/timestamp'
 
 type Mode = 'all' | 'selected'
@@ -168,6 +169,24 @@ export default function BrainPage() {
     }
   }, [reloadTasks])
 
+  const [selectingId, setSelectingId] = useState<string | null>(null)
+  const [selectResult, setSelectResult] = useState<SelectAllResult | null>(null)
+  const selectAll = useCallback(async (analysisId: string, name: string) => {
+    setSelectingId(analysisId)
+    try {
+      const { selected } = await selectAllIdeas(analysisId)
+      setData((prev) => prev && prev.map((a) => a.analysis_id !== analysisId ? a
+        : { ...a, ideas: a.ideas.map((i) => (selected.includes(i.key) ? { ...i, selected: true } : i)) }))
+      setError('')
+      setSelectResult({ analysisId, title: name, keys: selected })
+      reloadTasks()
+    } catch {
+      setError('Vazifalar yaratilmadi. Qayta urinib koʻring.')
+    } finally {
+      setSelectingId(null)
+    }
+  }, [reloadTasks])
+
   const all = useMemo<Idea[]>(() => (data ?? []).flatMap((a) => a.ideas.map((i) => ({ ...i, id: ideaId(a, i.key), analysis: a }))), [data])
   const channels = useMemo(() => Array.from(new Set((data ?? []).map((a) => a.channel?.name).filter(Boolean) as string[])).sort(), [data])
   const tags = useMemo(() => Array.from(new Set(all.flatMap((i) => i.tags))).sort(), [all])
@@ -221,6 +240,19 @@ export default function BrainPage() {
 
   const selectedCount = all.filter((i) => i.selected).length
 
+  const hasUnselected = (a: BrainAnalysis) => a.ideas.some((i) => !i.selected && !i.hidden)
+  const selectAllButton = (a: BrainAnalysis) => hasUnselected(a) && (
+    <button type="button" disabled={selectingId !== null} onClick={() => selectAll(a.analysis_id, title(a))}
+      className={`${BTN} py-1.5 text-left text-ui-accent-ink disabled:opacity-50`}>
+      {selectingId === a.analysis_id
+        ? <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
+        : <ListPlus aria-hidden="true" className="h-4 w-4 shrink-0" />}
+      Hammasini tanlab, vazifa yaratish
+    </button>
+  )
+  // Hali birorta fikri tanlanmagan tahlillar: ulardan vazifa chiqmagan
+  const untouched = analyses.filter((a) => hasUnselected(a) && !a.ideas.some((i) => i.selected))
+
   return (
     <PageShell>
       <div className="mx-auto w-full max-w-7xl px-4 pb-24 pt-8 sm:px-6">
@@ -243,6 +275,11 @@ export default function BrainPage() {
           </button>
         </div>
         {tasks.error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-ui-red-ink">{tasks.error}</p>}
+
+        {selectResult && (
+          <SelectAllDialog result={selectResult} state={tasks} onClose={() => setSelectResult(null)}
+            onShowTasks={() => { setSelectResult(null); showSection('tasks') }} />
+        )}
 
         {section === 'tasks' && (
           <TaskBoard state={tasks} onOpenSource={(t) => {
@@ -333,6 +370,7 @@ export default function BrainPage() {
                     {activeAnalysis.thumbnail && <img src={activeAnalysis.thumbnail} alt="" className="aspect-video w-full rounded-lg object-cover" />}
                     <h2 className="text-lg font-semibold text-ui-ink">{title(activeAnalysis)}</h2>
                     <AnalysisInfo a={activeAnalysis} />
+                    {selectAllButton(activeAnalysis)}
                     {activeAnalysis.summary && <p className="text-sm leading-relaxed text-ui-muted">{activeAnalysis.summary}</p>}
                     <ul className="space-y-1">
                       {all.filter((i) => i.analysis.analysis_id === activeAnalysis.analysis_id).map((i) => (
@@ -364,6 +402,19 @@ export default function BrainPage() {
               <button type="button" aria-pressed={cardKind === 'analyses'} onClick={() => setCardKind('analyses')} className={SEG(cardKind === 'analyses')}>Tahlillar · {analyses.length}</button>
             </div>
 
+            {cardKind === 'ideas' && untouched.length > 0 && (
+              <ul className="mb-4 space-y-2">
+                {untouched.map((a) => (
+                  <li key={a.analysis_id} className="ui-card flex flex-wrap items-center justify-between gap-3 p-4">
+                    <p className="min-w-0 flex-1 basis-60 text-sm text-ui-muted">
+                      <span className="font-semibold text-ui-ink">{title(a)}</span> — fikr tanlanmagan, shuning uchun vazifa yoʻq.
+                    </p>
+                    {selectAllButton(a)}
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <ul className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {cardKind === 'ideas' ? ideas.map((i) => (
                 <li key={i.id} className={`ui-card flex flex-col gap-3 p-4 ${i.hidden ? 'opacity-60' : ''}`}>
@@ -392,6 +443,7 @@ export default function BrainPage() {
                   <div className="space-y-2 p-4">
                     <button type="button" onClick={() => openFromCard(analysisNodeId(a))} className="line-clamp-2 text-left text-sm font-semibold text-ui-ink hover:underline">{title(a)}</button>
                     <AnalysisInfo a={a} />
+                    {selectAllButton(a)}
                     {a.summary && <p className="line-clamp-4 text-sm text-ui-muted">{a.summary}</p>}
                   </div>
                 </li>

@@ -47,6 +47,12 @@ export async function updateBrainIdea(analysisId: string, key: string, patch: Id
   return res.data
 }
 
+/** Tahlilning barcha fikrlarini tanlaydi; vazifalar fonda yaratiladi */
+export async function selectAllIdeas(analysisId: string): Promise<{ selected: string[]; started: number }> {
+  const res = await apiClient.post(`/api/brain/analyses/${analysisId}/select-all`)
+  return res.data
+}
+
 /* ── Vazifalar va kanban ───────────────────────────────── */
 
 export interface ChecklistItem { text: string; done: boolean }

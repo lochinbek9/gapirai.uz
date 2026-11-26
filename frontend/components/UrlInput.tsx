@@ -1,5 +1,6 @@
 "use client";
 
+import { useSystemVoice } from "@/lib/voice";
 import { useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { AudioLines, ClipboardPaste, Info, Loader2, Sparkles, Youtube } from "lucide-react";
@@ -31,6 +32,7 @@ export default function UrlInput({
 }: Props) {
   const currentProvider = ttsProvider || "gemini";
   const isGemini = currentProvider === "gemini";
+  const systemVoice = useSystemVoice();
 
   // Real Gemini AI voices
   const maleVoices = [
@@ -207,7 +209,7 @@ export default function UrlInput({
         <p className="text-sm text-ui-muted">{genderOptions.find((o) => o.value === voiceGender)?.desc ?? genderOptions[0].desc}</p>
       </fieldset>
 
-      {isProUser && isGemini && voiceGender !== "auto" && (
+      {isProUser && isGemini && !systemVoice && voiceGender !== "auto" && (
         <div className="space-y-2">
           <span id="voice-variant-label" className="ui-label block">Ovoz varianti (Pro)</span>
           <div role="group" aria-labelledby="voice-variant-label" className="grid grid-cols-3 gap-1 rounded-control bg-ui-ground p-1">

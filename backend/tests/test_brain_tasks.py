@@ -35,6 +35,40 @@ class SuggestTest(unittest.TestCase):
         for text, suggested, expected in cases:
             self.assertEqual(service._duration(text, suggested), expected, text)
 
+    def test_only_tasks_quoted_from_source_survive(self):
+        source = "Don't buy more tools, just use Claude and ChatGPT."
+        real = {"title": "A", "quote": "just use  claude and chatgpt"}
+        fake = {"title": "B", "quote": "buy a Mac Mini today"}
+        tasks = service.grounded_tasks(json.dumps({"tasks": [real, fake, {"title": "C"}]}), source)
+        self.assertEqual([t["title"] for t in tasks], ["A."])
+        self.assertIn("Manbada: “just use claude and chatgpt”", tasks[0]["description"])
+        self.assertEqual(service.grounded_tasks('{"tasks":[]}', source), [])
+        with self.assertRaises(ValueError):
+            service.grounded_tasks(json.dumps({"tasks": [fake]}), source)
+
+    def test_excerpt_stops_at_next_idea_and_empty_source_asks_nobody(self):
+        segments = [{"start": 0, "end": 5, "text": "one"}, {"start": 5, "end": 9, "text": "two"},
+                    {"start": 9, "end": 12, "text": "three"}]
+        points = [{"timestamp": 5}, {"timestamp": 9}]
+        self.assertEqual(service.excerpt(segments, points, points[0]), "two")
+        self.assertEqual(service.suggest_tasks("t", "d", ""), ([], ""))
+
+    def test_busy_keys_and_missing_models_fall_through_to_next_strong_model(self):
+        calls = []
+
+        def ask(model, key, text):
+            calls.append(model)
+            if model == service.MODELS[0]:
+                response = SimpleNamespace(status_code=429)
+                raise type("E", (Exception,), {"response": response})()
+            return '{"tasks":[]}'
+
+        with patch.object(service, "_ask_gemini", ask), patch.object(service, "RETRY_PAUSE", 0), \
+             patch.object(service, "_free_gemini_keys", return_value=["a", "b"]):
+            self.assertEqual(service.suggest_tasks("t", "d", "some source"), ([], service.MODELS[1]))
+        self.assertEqual(calls, [service.MODELS[0]] * 2 + [service.MODELS[1]])
+        self.assertFalse(any("lite" in m for m in service.MODELS))
+
     def test_paid_key_never_used(self):
         with patch.object(service, "get_all_gemini_api_keys", return_value=["paid"]), \
              patch.object(service, "get_paid_gemini_api_keys", return_value=["paid"]):
@@ -66,6 +100,26 @@ class BoardTest(unittest.TestCase):
         listed = routes.list_tasks(BackgroundTasks(), self._with_states(), self.user)
         self.assertEqual([t["title"] for t in listed["tasks"]], ["a"])
         self.assertEqual(len(listed["columns"]), 2)
+
+    def test_select_all_skips_hidden_and_does_not_repeat(self):
+        from backend.api import brain_routes
+        from backend.models.brain import BrainIdeaState
+        db = self._with_states()
+        points = [{"title": "a"}, {"title": "b"}, {"title": "c"}]
+        analysis_id = uuid.uuid4()
+        hidden = brain_routes.idea_key(points[2])
+        db.add(BrainIdeaState(user_id=self.user.id, analysis_id=analysis_id, idea_key=hidden,
+                              selected=False, hidden=True, note="", tags=[]))
+        db.commit()
+        analysis = SimpleNamespace(id=analysis_id)
+        original = db.query
+        with patch.object(db, "query") as query, patch.object(brain_routes, "_points", return_value=points):
+            found = SimpleNamespace(filter=lambda *a: SimpleNamespace(first=lambda: analysis))
+            query.side_effect = lambda model: found if model is brain_routes.VideoAnalysis else original(model)
+            first = brain_routes.select_all_ideas(analysis_id, BackgroundTasks(), db, self.user)
+            second = brain_routes.select_all_ideas(analysis_id, BackgroundTasks(), db, self.user)
+        self.assertEqual(first["selected"], [brain_routes.idea_key(p) for p in points[:2]])
+        self.assertEqual((first["started"], second["started"]), (2, 0))
 
     def _with_states(self):
         from backend.models.brain import BrainIdeaState

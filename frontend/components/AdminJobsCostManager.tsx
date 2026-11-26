@@ -1,5 +1,6 @@
 'use client'
 
+import { useSystemVoice } from '@/lib/voice'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Search,
@@ -106,9 +107,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   // Retry Confirmation Modal State (Granular AI models per stage)
   const [retryModalJob, setRetryModalJob] = useState<AdminJobCostItem | null>(null)
-  const [retryTtsOption, setRetryTtsOption] = useState<'gemini_paid' | 'edge' | 'gemini_free' | 'azure'>('gemini_paid')
-  const [retrySttOption, setRetrySttOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
-  const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'groq' | 'gemini_free' | 'gemini_paid' | 'openai'>('existing')
+  const [retryTtsOption, setRetryTtsOption] = useState<'gapi' | 'gemini_paid' | 'edge' | 'gemini_free' | 'azure'>('gemini_paid')
+  const [retrySttOption, setRetrySttOption] = useState<'existing' | 'auto' | 'gapi' | 'groq' | 'gemini_free' | 'gemini_paid'>('existing')
+  const [retryLlmOption, setRetryLlmOption] = useState<'existing' | 'auto' | 'groq' | 'gemini_free' | 'gemini_paid'>('existing')
+
+  const systemVoice = useSystemVoice()
 
   // Bepul kalitlarning cooldown holati va aniq tiklanish vaqti
   const freeKeys = geminiOverview?.free_keys || []
@@ -133,16 +136,10 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
 
   const openRetryModal = (job: AdminJobCostItem) => {
     setRetryModalJob(job)
-    // Standart holatda bepul variantlar (Edge TTS va Groq/Kesh) tanlanadi, kerak bo'lsa pullik Gemini/Azure tanlanishi mumkin:
-    if (isFreeKeysInCooldown) {
-      setRetryTtsOption('edge')
-      setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
-      setRetryLlmOption(job.models.has_translation ? 'existing' : 'groq')
-    } else {
-      setRetryTtsOption('edge')
-      setRetrySttOption(job.models.has_transcript ? 'existing' : 'groq')
-      setRetryLlmOption(job.models.has_translation ? 'existing' : 'gemini_free')
-    }
+    // Standart: tizim ovozi (gapi yoqilgan bo'lsa), aks holda bepul Edge; matnlar bor bo'lsa qayta ishlatiladi
+    setRetryTtsOption(systemVoice === 'gapi' ? 'gapi' : 'edge')
+    setRetrySttOption(job.models.has_transcript ? 'existing' : 'auto')
+    setRetryLlmOption(job.models.has_translation ? 'existing' : 'auto')
   }
 
   const handleRetryJob = async (
@@ -708,6 +705,8 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                 { value: 'ALL', label: 'Barcha TTS' },
                 { value: 'azure', label: 'Azure' },
                 { value: 'edge', label: 'Edge (Bepul)' },
+                { value: 'gapi', label: 'Gapi' },
+                { value: 'neuronai', label: 'NeuronAI' },
                 { value: 'gemini', label: 'Gemini' },
                 { value: 'uzbekvoice', label: 'UzbekVoice' },
                 { value: 'openai', label: 'OpenAI' },
@@ -1686,28 +1685,28 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           estTTSUsd = (estChars / 1000) * 0.017
         } else if (retryTtsOption === 'azure') {
           estTTSUsd = (estChars / 1000) * 0.016
+        } else if (retryTtsOption === 'gapi') {
+          estTTSUsd = (estChars / 1000) * 112 / 12800 // gapi: 1000 belgi = 112 so'm
         } else {
           estTTSUsd = 0 // edge
         }
 
         // STT Cost:
         let estSTTUsd = 0
-        if (retrySttOption === 'existing' || retrySttOption === 'groq' || retrySttOption === 'gemini_free') {
+        if (retrySttOption === 'existing' || retrySttOption === 'auto' || retrySttOption === 'groq' || retrySttOption === 'gemini_free') {
           estSTTUsd = 0
         } else if (retrySttOption === 'gemini_paid') {
           estSTTUsd = durMin * 0.002
-        } else if (retrySttOption === 'openai') {
-          estSTTUsd = durMin * 0.006
+        } else if (retrySttOption === 'gapi') {
+          estSTTUsd = (durMin * 35) / 12800 // gapi: 35 so'm/daqiqa
         }
 
         // LLM Cost:
         let estLLMUsd = 0
-        if (retryLlmOption === 'existing' || retryLlmOption === 'gemini_free' || retryLlmOption === 'groq') {
+        if (retryLlmOption === 'existing' || retryLlmOption === 'auto' || retryLlmOption === 'gemini_free' || retryLlmOption === 'groq') {
           estLLMUsd = 0
         } else if (retryLlmOption === 'gemini_paid') {
           estLLMUsd = (estChars / 1000) * 0.0005
-        } else if (retryLlmOption === 'openai') {
-          estLLMUsd = (estChars / 1000) * 0.001
         }
 
         const estTotalUsd = estTTSUsd + estSTTUsd + estLLMUsd
@@ -1721,17 +1720,14 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
           let ttsProv = 'gemini'
           if (retryTtsOption === 'edge') ttsProv = 'edge'
           else if (retryTtsOption === 'azure') ttsProv = 'azure'
+          else if (retryTtsOption === 'gapi') ttsProv = 'gapi'
           else ttsProv = 'gemini'
 
-          let sttProv = 'groq'
-          if (retrySttOption === 'gemini_paid' || retrySttOption === 'gemini_free') sttProv = 'gemini-3.8-flash'
-          else if (retrySttOption === 'openai') sttProv = 'whisper-1'
-          else sttProv = 'groq'
-
-          let transModel = 'gemini-3.8-flash'
-          if (retryLlmOption === 'openai') transModel = 'gpt-4o-mini'
-          else if (retryLlmOption === 'groq') transModel = 'qwen/qwen3.8-27b'
-          else transModel = 'gemini-3.8-flash'
+          // 'existing' / 'auto' -- provayder yuborilmaydi
+          const sttProv = retrySttOption === 'gapi' || retrySttOption === 'groq' ? retrySttOption
+            : retrySttOption.startsWith('gemini') ? 'gemini-3.8-flash' : undefined
+          const transModel = retryLlmOption === 'groq' ? 'qwen/qwen3.8-27b'
+            : retryLlmOption.startsWith('gemini') ? 'gemini-3.8-flash' : undefined
 
           const geminiTier =
             retryTtsOption === 'gemini_paid' || retrySttOption === 'gemini_paid' || retryLlmOption === 'gemini_paid'
@@ -1805,6 +1801,20 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                   </div>
 
                   <div className="grid grid-cols-1 gap-2">
+                    {/* Gapi */}
+                    <label className={`cursor-pointer rounded-xl p-3 border transition-all ${retryTtsOption === 'gapi' ? 'bg-violet-500/10 border-violet-500/50' : 'bg-white/[0.02] border-white/10 hover:border-white/20'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input type="radio" name="retry_tts" checked={retryTtsOption === 'gapi'} onChange={() => setRetryTtsOption('gapi')} className="accent-violet-500" />
+                          <span className="text-xs font-semibold text-white">🗣️ Gapi (Zebo / Doston){systemVoice === 'gapi' ? ' — tizim standarti' : ''}</span>
+                        </div>
+                        <span className="text-xs font-mono font-semibold text-violet-300 bg-violet-500/15 px-2 py-0.5 rounded border border-violet-500/30">
+                          ~{Math.round((estChars / 1000) * 112).toLocaleString()} UZS
+                        </span>
+                      </div>
+                      <p className="text-xs text-ui-muted mt-1 pl-5">Oʻzbekcha gapi.uz ovozlari. Balans tugasa dublyaj Edge ovozida yakunlanadi.</p>
+                    </label>
+
                     {/* Gemini Paid */}
                     <div
                       onClick={() => setRetryTtsOption('gemini_paid')}
@@ -1993,6 +2003,17 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       </div>
                     )}
 
+                    {/* Avtomatik va Gapi */}
+                    <label className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-semibold text-white ${retrySttOption === 'auto' ? 'border-violet-500/50 bg-violet-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                      <input type="radio" checked={retrySttOption === 'auto'} onChange={() => setRetrySttOption('auto')} className="accent-violet-500" />
+                      Avtomatik (tizim tanlaydi)
+                    </label>
+
+                    <label className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-semibold text-white ${retrySttOption === 'gapi' ? 'border-violet-500/50 bg-violet-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                      <input type="radio" checked={retrySttOption === 'gapi'} onChange={() => setRetrySttOption('gapi')} className="accent-violet-500" />
+                      🗣️ Gapi (faqat oʻzbekcha nutq, 35 soʻm/daqiqa)
+                    </label>
+
                     {/* Groq Whisper */}
                     <div
                       onClick={() => setRetrySttOption('groq')}
@@ -2080,31 +2101,6 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       </div>
                     </div>
 
-                    {/* OpenAI Whisper */}
-                    <div
-                      onClick={() => setRetrySttOption('openai')}
-                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
-                        retrySttOption === 'openai'
-                          ? 'bg-white/15 border-white/40 text-white'
-                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer font-medium">
-                          <input
-                            type="radio"
-                            name="retry_stt"
-                            checked={retrySttOption === 'openai'}
-                            onChange={() => setRetrySttOption('openai')}
-                            className="accent-gray-400"
-                          />
-                          <span>🤖 OpenAI Whisper</span>
-                        </label>
-                        <span className="text-xs font-mono text-gray-300">
-                          ~{Math.round(durMin * 0.006 * 12800).toLocaleString()} UZS
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -2146,6 +2142,11 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                         </div>
                       </div>
                     )}
+
+                    <label className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-semibold text-white ${retryLlmOption === 'auto' ? 'border-violet-500/50 bg-violet-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                      <input type="radio" checked={retryLlmOption === 'auto'} onChange={() => setRetryLlmOption('auto')} className="accent-violet-500" />
+                      Avtomatik (tizim tanlaydi)
+                    </label>
 
                     {/* Gemini Free Translation */}
                     <div
@@ -2234,31 +2235,6 @@ export default function AdminJobsCostManager({ token }: AdminJobsCostManagerProp
                       </div>
                     </div>
 
-                    {/* GPT-4o Mini */}
-                    <div
-                      onClick={() => setRetryLlmOption('openai')}
-                      className={`cursor-pointer rounded-xl p-2.5 border transition-all ${
-                        retryLlmOption === 'openai'
-                          ? 'bg-white/15 border-white/40 text-white'
-                          : 'bg-white/[0.02] border-white/10 text-gray-300 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer font-medium">
-                          <input
-                            type="radio"
-                            name="retry_llm"
-                            checked={retryLlmOption === 'openai'}
-                            onChange={() => setRetryLlmOption('openai')}
-                            className="accent-gray-400"
-                          />
-                          <span>🤖 GPT-4o Mini</span>
-                        </label>
-                        <span className="text-xs font-mono text-gray-300">
-                          ~{Math.round((estChars / 1000) * 0.001 * 12800).toLocaleString()} UZS
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 

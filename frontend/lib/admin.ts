@@ -920,6 +920,11 @@ export interface SystemHealthResponse {
         configured: boolean
         note?: string
       }
+      gapi?: {
+        status: string
+        configured: boolean
+        default?: boolean
+      }
       edge_tts: {
         status: string
         name: string

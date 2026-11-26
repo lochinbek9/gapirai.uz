@@ -38,7 +38,7 @@ export function SuggestionRow({ task, state }: { task: BrainTask; state: BrainBo
     <li className="space-y-2 rounded-lg border border-ui-rule p-2.5">
       <div>
         <p className="break-words text-sm font-medium text-ui-ink">{task.title}</p>
-        {task.description && <p className="mt-0.5 break-words text-xs leading-relaxed text-ui-muted">{task.description}</p>}
+        {task.description && <p className="mt-0.5 whitespace-pre-line break-words text-xs leading-relaxed text-ui-muted">{task.description}</p>}
         {task.duration_minutes && <p className="mt-1 flex text-xs text-ui-muted"><DurationBadge minutes={task.duration_minutes} /></p>}
       </div>
       {task.version && <VersionButton version={task.version} onSwitch={(v) => state.run(() => switchTaskVersion(task.id, v))} />}
@@ -89,7 +89,9 @@ export default function IdeaTasks({ analysisId, ideaKey, state }: { analysisId: 
           {status === 'pending' && (
             <p role="status" className="flex items-center gap-2 text-sm text-ui-muted"><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />Tayyorlanmoqda…</p>
           )}
-          {status === 'done' && suggestions.length === 0 && <p className="text-sm text-ui-muted">Yangi taklif qolmagan.</p>}
+          {status === 'done' && suggestions.length === 0 && (
+            <p className="text-sm text-ui-muted">{mine.length === 0 ? 'Manbada bu fikr boʻyicha aniq harakat aytilmagan.' : 'Yangi taklif qolmagan.'}</p>
+          )}
           {status === 'failed' && (
             <button type="button" onClick={() => state.run(() => retryGeneration(analysisId, ideaKey))} className="flex items-center gap-1.5 text-sm font-medium text-ui-accent-ink">
               <RotateCw aria-hidden="true" className="h-4 w-4" />Tayyorlab boʻlmadi — qayta urinish

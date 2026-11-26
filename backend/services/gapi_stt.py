@@ -23,13 +23,20 @@ _SETTINGS = {"formatting": True, "itn": True, "pii": False, "summary": False, "v
              "call_outcome": False}
 
 
+def keys() -> list[str]:
+    """Egasining BYOK kaliti, bo'lmasa tizim kaliti (GAPI_API_KEY)."""
+    from backend.services.plans import gapi_system_key
+    system = gapi_system_key()
+    return byok.active_keys("gapi") or ([system] if system else [])
+
+
 def transcribe_file(path: Path) -> dict:
     """{"text", "segments": [{"start","end","text"}], "audio_seconds"}"""
-    keys = byok.active_keys("gapi")
-    if not keys:
+    owner_keys = keys()
+    if not owner_keys:
         raise RuntimeError("gapi kaliti yo'q")
     last = "javob yo'q"
-    for key in keys:  # bir kalit balansi tugasa keyingisi
+    for key in owner_keys:  # bir kalit balansi tugasa keyingisi
         headers = {"Authorization": f"Bearer {key}"}
         with open(path, "rb") as f:
             resp = httpx.post(f"{BASE_URL}/v1/transcribe", headers=headers, files={"file": (Path(path).name, f)},

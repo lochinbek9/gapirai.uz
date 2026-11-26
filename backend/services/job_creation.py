@@ -224,13 +224,8 @@ async def create_dubbing_job(
         sub = get_or_create_subscription(db, user.id)
         user_is_pro = (sub.plan == PlanTier.PRO)
 
-    valid_providers = {"azure", "edge", "gemini"}
-    clean_provider = (tts_provider or "gemini").strip().lower()
-    if clean_provider not in valid_providers:
-        clean_provider = "gemini"
-    from backend.services.plans import gapi_is_default
-    if gapi_is_default(get_settings()):  # tizim ovozi -- kesh ham shu provayder bo'yicha
-        clean_provider = "gapi"
+    from backend.services.plans import requested_tts_provider, NEURAL_VOICE_PROVIDERS
+    clean_provider = requested_tts_provider(tts_provider)  # kesh ham shu provayder bo'yicha
 
     # Aniq ovoz nomini provayder va jinsga qarab to'liq normallashtirish / biriktirish:
     if voice_gender in ("male", "female"):
@@ -241,7 +236,7 @@ async def create_dubbing_job(
                 voice_name = "uz-UZ-MadinaNeural" if voice_gender == "female" else "uz-UZ-SardorNeural"
         else:
             v_low = voice_name.strip().lower()
-            if clean_provider in ("azure", "edge"):
+            if clean_provider in NEURAL_VOICE_PROVIDERS:
                 voice_name = "uz-UZ-MadinaNeural" if "madina" in v_low else "uz-UZ-SardorNeural"
             elif clean_provider == "gemini":
                 gemini_map = {
@@ -632,9 +627,8 @@ def create_job_from_local_video_file_sync(
         sub = get_or_create_subscription(db, user.id)
         user_is_pro = (sub.plan == PlanTier.PRO)
 
-    clean_provider = (tts_provider or "gemini").strip().lower()
-    if clean_provider not in ("azure", "edge", "gemini"):
-        clean_provider = "gemini"
+    from backend.services.plans import requested_tts_provider, NEURAL_VOICE_PROVIDERS
+    clean_provider = requested_tts_provider(tts_provider)
 
     if voice_gender in ("male", "female"):
         if not voice_name:
@@ -644,7 +638,7 @@ def create_job_from_local_video_file_sync(
                 voice_name = "uz-UZ-MadinaNeural" if voice_gender == "female" else "uz-UZ-SardorNeural"
         else:
             v_low = voice_name.strip().lower()
-            if clean_provider in ("azure", "edge"):
+            if clean_provider in NEURAL_VOICE_PROVIDERS:
                 voice_name = "uz-UZ-MadinaNeural" if "madina" in v_low else "uz-UZ-SardorNeural"
             elif clean_provider == "gemini":
                 gemini_map = {

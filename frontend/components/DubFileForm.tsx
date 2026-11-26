@@ -1,5 +1,6 @@
 "use client";
 
+import { useSystemVoice } from "@/lib/voice";
 import { useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { AudioLines, FileVideo, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
@@ -87,6 +88,7 @@ export default function DubFileForm({
 
   const currentProvider = ttsProvider || "gemini";
   const isGemini = currentProvider === "gemini";
+  const systemVoice = useSystemVoice();
 
   // Real Gemini AI voices
   const maleVoices = [
@@ -317,7 +319,7 @@ export default function DubFileForm({
       </fieldset>
 
       {/* Gemini ovoz tanlash (faqat Pro foydalanuvchi Gemini tanlaganda) */}
-      {isProUser && isGemini && gender !== "auto" && (
+      {isProUser && isGemini && !systemVoice && gender !== "auto" && (
         <div className="space-y-1.5 pt-1">
           <span id="dub-file-variant-label" className="text-sm text-ui-muted font-medium">
             Ovoz variantini tanlang:
